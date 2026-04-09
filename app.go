@@ -193,6 +193,21 @@ func (a *App) Connect(domain, serverKey, username string) error {
 	return nil
 }
 
+// serverMsg is every packet the server sends over WebSocket.
+type serverMsg struct {
+	Type     string        `json:"type"`
+	BoardID  string        `json:"board_id"`           // present in "history"
+	Data     *ChatMessage  `json:"data"`               // present in "message"
+	Messages []ChatMessage `json:"messages"`            // present in "history"
+}
+
+// historyEvent is what we emit to the frontend for "chat:history".
+// Carrying board_id lets the JS verify the history is still relevant.
+type historyEvent struct {
+	BoardID  string        `json:"board_id"`
+	Messages []ChatMessage `json:"messages"`
+}
+
 // wsReader runs in its own goroutine and forwards server messages to the frontend.
 func (a *App) wsReader(conn *websocket.Conn) {
 	defer func() {
@@ -210,27 +225,21 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			return
 		}
 
-		var envelope map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &envelope); err != nil {
+		var msg serverMsg
+		if err := json.Unmarshal(raw, &msg); err != nil {
 			continue
 		}
 
-		var msgType string
-		json.Unmarshal(envelope["type"], &msgType)
-
-		switch msgType {
+		switch msg.Type {
 		case "message":
-			// Single new message — forward the "data" field
-			var msg ChatMessage
-			if err := json.Unmarshal(envelope["data"], &msg); err == nil {
-				runtime.EventsEmit(a.ctx, "chat:message", msg)
+			if msg.Data != nil {
+				runtime.EventsEmit(a.ctx, "chat:message", *msg.Data)
 			}
 		case "history":
-			// Full message history — forward the "messages" array
-			var msgs []ChatMessage
-			if err := json.Unmarshal(envelope["messages"], &msgs); err == nil {
-				runtime.EventsEmit(a.ctx, "chat:history", msgs)
-			}
+			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{
+				BoardID:  msg.BoardID,
+				Messages: msg.Messages,
+			})
 		}
 	}
 }
