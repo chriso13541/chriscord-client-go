@@ -37,6 +37,7 @@ type ChatMessage struct {
 	AttachmentURL  *string `json:"attachment_url,omitempty"`
 	AttachmentName *string `json:"attachment_name,omitempty"`
 	AttachmentMime *string `json:"attachment_mime,omitempty"`
+	Edited         bool    `json:"edited"`
 	CreatedAt      string  `json:"created_at"`
 }
 

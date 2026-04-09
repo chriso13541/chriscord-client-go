@@ -6,8 +6,16 @@ export function Connect(arg1, arg2, arg3) {
   return window['go']['main']['App']['Connect'](arg1, arg2, arg3);
 }
 
+export function DeleteMessage(arg1) {
+  return window['go']['main']['App']['DeleteMessage'](arg1);
+}
+
 export function Disconnect() {
   return window['go']['main']['App']['Disconnect']();
+}
+
+export function EditMessage(arg1, arg2) {
+  return window['go']['main']['App']['EditMessage'](arg1, arg2);
 }
 
 export function GetBoards(arg1) {
@@ -34,8 +42,8 @@ export function GetUsername() {
   return window['go']['main']['App']['GetUsername']();
 }
 
-export function PickFile() {
-  return window['go']['main']['App']['PickFile']();
+export function PickFiles() {
+  return window['go']['main']['App']['PickFiles']();
 }
 
 export function RemoveServer(arg1) {

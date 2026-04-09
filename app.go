@@ -169,8 +169,11 @@ type serverMsg struct {
 	Data     *ChatMessage  `json:"data"`
 	Messages []ChatMessage `json:"messages"`
 	// users packet
-	Online  []string `json:"online"`
-	All     []string `json:"all"`
+	Online []string `json:"online"`
+	All    []string `json:"all"`
+	// edit/delete packets
+	ID      string `json:"id"`
+	Content string `json:"content"`
 }
 
 type historyEvent struct {
@@ -181,6 +184,17 @@ type historyEvent struct {
 type usersEvent struct {
 	Online []string `json:"online"`
 	All    []string `json:"all"`
+}
+
+type editEvent struct {
+	ID      string `json:"id"`
+	BoardID string `json:"board_id"`
+	Content string `json:"content"`
+}
+
+type deleteEvent struct {
+	ID      string `json:"id"`
+	BoardID string `json:"board_id"`
 }
 
 func (a *App) wsReader(conn *websocket.Conn) {
@@ -216,6 +230,14 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{
 				Online: msg.Online,
 				All:    msg.All,
+			})
+		case "message_edit":
+			runtime.EventsEmit(a.ctx, "chat:edit", editEvent{
+				ID: msg.ID, BoardID: msg.BoardID, Content: msg.Content,
+			})
+		case "message_delete":
+			runtime.EventsEmit(a.ctx, "chat:delete", deleteEvent{
+				ID: msg.ID, BoardID: msg.BoardID,
 			})
 		}
 	}
@@ -273,22 +295,22 @@ func (a *App) SendMessage(boardID, content string, attachURL, attachName, attach
 	return conn.WriteMessage(websocket.TextMessage, msg)
 }
 
-// PickFile opens a native file dialog and returns the chosen path.
-func (a *App) PickFile() (string, error) {
-	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Attach a file",
+// PickFiles opens a native file dialog allowing multiple file selection.
+func (a *App) PickFiles() ([]string, error) {
+	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Attach files",
 		Filters: []runtime.FileFilter{
-			{DisplayName: "All Files", Pattern: "*"},
-			{DisplayName: "Images",    Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"},
-			{DisplayName: "Video",     Pattern: "*.mp4;*.webm;*.mov;*.mkv;*.avi"},
-			{DisplayName: "Audio",     Pattern: "*.mp3;*.ogg;*.wav;*.flac;*.m4a"},
-			{DisplayName: "Documents", Pattern: "*.pdf;*.doc;*.docx;*.txt;*.zip"},
+			{DisplayName: "All Files",   Pattern: "*"},
+			{DisplayName: "Images",      Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"},
+			{DisplayName: "Video",       Pattern: "*.mp4;*.webm;*.mov;*.mkv;*.avi"},
+			{DisplayName: "Audio",       Pattern: "*.mp3;*.ogg;*.wav;*.flac;*.m4a"},
+			{DisplayName: "Documents",   Pattern: "*.pdf;*.doc;*.docx;*.txt;*.zip"},
 		},
 	})
-	if err != nil || path == "" {
-		return "", err
+	if err != nil {
+		return nil, err
 	}
-	return path, nil
+	return paths, nil
 }
 
 // UploadFile streams a file from disk to the server without loading it all into memory.
@@ -367,6 +389,65 @@ func (a *App) GetFileURL(path string) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return normaliseHTTP(a.domain) + path
+}
+
+// DeleteMessage sends a DELETE request for a message the user owns.
+func (a *App) DeleteMessage(msgID string) error {
+	a.mu.Lock()
+	domain := a.domain
+	token  := a.token
+	a.mu.Unlock()
+
+	req, err := http.NewRequest("DELETE", normaliseHTTP(domain)+"/api/messages/"+msgID, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var e map[string]string
+		json.NewDecoder(resp.Body).Decode(&e)
+		if msg, ok := e["error"]; ok {
+			return fmt.Errorf("%s", msg)
+		}
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// EditMessage sends a PATCH request to update a message's content.
+func (a *App) EditMessage(msgID, content string) error {
+	a.mu.Lock()
+	domain := a.domain
+	token  := a.token
+	a.mu.Unlock()
+
+	data, _ := json.Marshal(map[string]string{"content": content})
+	req, err := http.NewRequest("PATCH", normaliseHTTP(domain)+"/api/messages/"+msgID,
+		bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var e map[string]string
+		json.NewDecoder(resp.Body).Decode(&e)
+		if msg, ok := e["error"]; ok {
+			return fmt.Errorf("%s", msg)
+		}
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func (a *App) GetUsername() string { return a.username }

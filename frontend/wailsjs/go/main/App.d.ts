@@ -4,7 +4,11 @@ import {main} from '../models';
 
 export function Connect(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function DeleteMessage(arg1:string):Promise<void>;
+
 export function Disconnect():Promise<void>;
+
+export function EditMessage(arg1:string,arg2:string):Promise<void>;
 
 export function GetBoards(arg1:string):Promise<Array<main.Board>>;
 
@@ -18,7 +22,7 @@ export function GetServers():Promise<Array<main.SavedServer>>;
 
 export function GetUsername():Promise<string>;
 
-export function PickFile():Promise<string>;
+export function PickFiles():Promise<Array<string>>;
 
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
