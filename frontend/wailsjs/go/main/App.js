@@ -14,8 +14,16 @@ export function Disconnect() {
   return window['go']['main']['App']['Disconnect']();
 }
 
+export function DropFiles(arg1) {
+  return window['go']['main']['App']['DropFiles'](arg1);
+}
+
 export function EditMessage(arg1, arg2) {
   return window['go']['main']['App']['EditMessage'](arg1, arg2);
+}
+
+export function FetchLinkPreview(arg1) {
+  return window['go']['main']['App']['FetchLinkPreview'](arg1);
 }
 
 export function GetBoards(arg1) {
@@ -50,8 +58,8 @@ export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
 }
 
-export function SendMessage(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3, arg4, arg5);
+export function SendMessage(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3);
 }
 
 export function SubscribeBoard(arg1) {

@@ -29,20 +29,33 @@ type Board struct {
 	Name   string `json:"name"`
 }
 
+// Attachment is a single file attached to a message.
+type Attachment struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
+	Mime string `json:"mime"`
+}
+
 type ChatMessage struct {
-	ID             string  `json:"id"`
-	BoardID        string  `json:"board_id"`
-	Username       string  `json:"username"`
-	Content        string  `json:"content"`
-	AttachmentURL  *string `json:"attachment_url,omitempty"`
-	AttachmentName *string `json:"attachment_name,omitempty"`
-	AttachmentMime *string `json:"attachment_mime,omitempty"`
-	Edited         bool    `json:"edited"`
-	CreatedAt      string  `json:"created_at"`
+	ID          string       `json:"id"`
+	BoardID     string       `json:"board_id"`
+	Username    string       `json:"username"`
+	Content     string       `json:"content"`
+	Attachments []Attachment `json:"attachments"`
+	Edited      bool         `json:"edited"`
+	CreatedAt   string       `json:"created_at"`
 }
 
 type UploadResult struct {
 	URL      string `json:"url"`
 	Filename string `json:"filename"`
 	Mime     string `json:"mime"`
+}
+
+type LinkPreview struct {
+	URL         string  `json:"url"`
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Image       *string `json:"image"`
+	SiteName    *string `json:"site_name"`
 }

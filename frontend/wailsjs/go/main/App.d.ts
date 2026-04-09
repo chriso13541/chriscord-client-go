@@ -8,7 +8,11 @@ export function DeleteMessage(arg1:string):Promise<void>;
 
 export function Disconnect():Promise<void>;
 
+export function DropFiles(arg1:Array<string>):Promise<void>;
+
 export function EditMessage(arg1:string,arg2:string):Promise<void>;
+
+export function FetchLinkPreview(arg1:string):Promise<main.LinkPreview>;
 
 export function GetBoards(arg1:string):Promise<Array<main.Board>>;
 
@@ -26,7 +30,7 @@ export function PickFiles():Promise<Array<string>>;
 
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
-export function SendMessage(arg1:string,arg2:string,arg3:any,arg4:any,arg5:any):Promise<void>;
+export function SendMessage(arg1:string,arg2:string,arg3:Array<main.Attachment>):Promise<void>;
 
 export function SubscribeBoard(arg1:string):Promise<void>;
 

@@ -1,5 +1,21 @@
 export namespace main {
 	
+	export class Attachment {
+	    url: string;
+	    name: string;
+	    mime: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Attachment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.name = source["name"];
+	        this.mime = source["mime"];
+	    }
+	}
 	export class Board {
 	    id: string;
 	    room_id: string;
@@ -14,6 +30,26 @@ export namespace main {
 	        this.id = source["id"];
 	        this.room_id = source["room_id"];
 	        this.name = source["name"];
+	    }
+	}
+	export class LinkPreview {
+	    url: string;
+	    title?: string;
+	    description?: string;
+	    image?: string;
+	    site_name?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.title = source["title"];
+	        this.description = source["description"];
+	        this.image = source["image"];
+	        this.site_name = source["site_name"];
 	    }
 	}
 	export class Room {
