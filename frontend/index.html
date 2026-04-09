@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chriscord</title>
 <style>
-/* ── Reset & variables ──────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -23,6 +22,7 @@
   --text-muted:  #72767d;
   --text-strong: #ffffff;
   --sidebar-w:   220px;
+  --members-w:   200px;
 }
 
 body {
@@ -34,22 +34,14 @@ body {
   user-select: none;
 }
 
-/* ── Utility ─────────────────────────────────────────────────────────── */
-.hidden   { display: none !important; }
-.flex     { display: flex; }
-.col      { flex-direction: column; }
-.gap-8    { gap: 8px; }
-.grow     { flex: 1; min-width: 0; min-height: 0; }
+.hidden { display: none !important; }
 input, button, textarea { font-family: inherit; }
 
-/* ── Scrollbar ───────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-light); border-radius: 3px; }
 
-/* ══════════════════════════════════════════════════════════════════════
-   SCREEN: SERVER LIST
-══════════════════════════════════════════════════════════════════════ */
+/* ══ SERVER LIST ══════════════════════════════════════════════════════ */
 #screen-servers {
   display: flex;
   flex-direction: column;
@@ -59,499 +51,226 @@ input, button, textarea { font-family: inherit; }
   padding: 40px 20px;
   overflow-y: auto;
 }
+.servers-header { text-align: center; margin-bottom: 32px; }
+.servers-header h1 { font-size: 2rem; color: var(--accent); letter-spacing: 4px; font-weight: 800; }
+.servers-header p  { color: var(--text-muted); margin-top: 6px; font-size: .9rem; }
 
-.servers-header {
-  text-align: center;
-  margin-bottom: 32px;
-}
-.servers-header h1 {
-  font-size: 2rem;
-  color: var(--accent);
-  letter-spacing: 4px;
-  font-weight: 800;
-}
-.servers-header p {
-  color: var(--text-muted);
-  margin-top: 6px;
-  font-size: 0.9rem;
-}
-
-.server-list {
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+.server-list { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
 .server-card {
   background: var(--bg-dark);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  transition: border-color 0.15s;
+  display: flex; align-items: center; gap: 14px;
+  transition: border-color .15s;
 }
 .server-card:hover { border-color: var(--accent-dim); }
-
 .server-icon {
   width: 44px; height: 44px;
-  background: var(--accent-dim);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.3rem;
-  flex-shrink: 0;
+  font-size: 1.3rem; font-weight: 700; color: #fff; flex-shrink: 0;
 }
-
 .server-info { flex: 1; min-width: 0; }
-.server-info .name {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.server-info .domain {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.server-info .lastuser {
-  font-size: 0.75rem;
-  color: var(--accent);
-  margin-top: 1px;
-}
-
+.server-info .name { font-weight: 700; font-size: 1rem; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.server-info .domain  { font-size: .78rem; color: var(--text-muted); margin-top: 2px; }
+.server-info .lastuser { font-size: .75rem; color: var(--accent); margin-top: 1px; }
 .server-actions { display: flex; gap: 6px; }
 
-.btn {
-  padding: 7px 16px;
-  border-radius: 6px;
-  border: none;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.15s;
-}
+.btn { padding: 7px 16px; border-radius: 6px; border: none; font-size: .85rem; font-weight: 600; cursor: pointer; transition: filter .15s; }
 .btn:hover { filter: brightness(1.15); }
-.btn-primary  { background: var(--accent);  color: #fff; }
-.btn-ghost    { background: var(--bg-light); color: var(--text); }
-.btn-danger   { background: var(--red);    color: #fff; }
-.btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-ghost   { background: var(--bg-light); color: var(--text); }
+.btn-danger  { background: var(--red); color: #fff; }
+.btn-sm { padding: 5px 10px; font-size: .78rem; }
 
 .btn-add-server {
-  width: 100%;
-  max-width: 480px;
-  margin-top: 10px;
-  padding: 13px;
-  border-radius: 10px;
+  width: 100%; max-width: 480px; margin-top: 10px;
+  padding: 13px; border-radius: 10px;
   border: 2px dashed var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  background: transparent; color: var(--text-muted);
+  font-size: .9rem; font-weight: 600; cursor: pointer;
+  transition: border-color .15s, color .15s;
 }
 .btn-add-server:hover { border-color: var(--accent); color: var(--accent); }
+.empty-hint { color: var(--text-muted); font-style: italic; font-size: .9rem; margin-top: 16px; text-align: center; }
 
-.empty-hint {
-  color: var(--text-muted);
-  font-style: italic;
-  font-size: 0.9rem;
-  margin-top: 16px;
-  text-align: center;
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   MODAL: ADD SERVER
-══════════════════════════════════════════════════════════════════════ */
+/* ══ MODAL ════════════════════════════════════════════════════════════ */
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,.6);
   display: flex; align-items: center; justify-content: center;
   z-index: 100;
 }
-
-.modal {
-  background: var(--bg-dark);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 28px 30px;
-  width: 420px;
-  max-width: 95vw;
-}
-.modal h2 {
-  font-size: 1.2rem;
-  color: var(--text-strong);
-  margin-bottom: 20px;
-}
-
+.modal { background: var(--bg-dark); border: 1px solid var(--border); border-radius: 12px; padding: 28px 30px; width: 420px; max-width: 95vw; }
+.modal h2 { font-size: 1.2rem; color: var(--text-strong); margin-bottom: 20px; }
 .form-group { margin-bottom: 14px; }
-.form-group label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
-.form-group input {
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-darkest);
-  color: var(--text-strong);
-  font-size: 0.9rem;
-  outline: none;
-  transition: border-color 0.15s;
-}
+.form-group label { display: block; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin-bottom: 5px; }
+.form-group input { width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-darkest); color: var(--text-strong); font-size: .9rem; outline: none; transition: border-color .15s; }
 .form-group input:focus { border-color: var(--accent); }
-.form-group .hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
+.form-group .hint { font-size: .75rem; color: var(--text-muted); margin-top: 4px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.error-msg { background: rgba(240,71,71,.12); border: 1px solid var(--red); border-radius: 6px; padding: 8px 12px; font-size: .85rem; color: var(--red); margin-bottom: 12px; }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 20px;
-}
+/* ══ CHAT SCREEN ══════════════════════════════════════════════════════ */
+#screen-chat { display: flex; height: 100vh; }
 
-.error-msg {
-  background: rgba(240,71,71,0.12);
-  border: 1px solid var(--red);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 0.85rem;
-  color: var(--red);
-  margin-bottom: 12px;
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   SCREEN: CHAT
-══════════════════════════════════════════════════════════════════════ */
-#screen-chat {
-  display: flex;
-  height: 100vh;
-}
-
-/* ── Sidebar ─────────────────────────────────────────────────────────── */
-#sidebar {
-  width: var(--sidebar-w);
-  background: var(--bg-dark);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-#sidebar-header {
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-#sidebar-header .server-name {
-  font-weight: 800;
-  font-size: 0.95rem;
-  color: var(--text-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-#back-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 2px 4px;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
+/* Sidebar */
+#sidebar { width: var(--sidebar-w); background: var(--bg-dark); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+#sidebar-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+#sidebar-header .server-name { font-weight: 800; font-size: .95rem; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#back-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 2px 4px; border-radius: 4px; flex-shrink: 0; }
 #back-btn:hover { background: var(--bg-light); color: var(--text); }
-
-#room-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
-}
-
-.room-header {
-  padding: 6px 8px 4px 12px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  border-radius: 4px;
-  margin: 0 4px;
-}
+#room-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.room-header { padding: 6px 8px 4px 12px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); display: flex; align-items: center; gap: 4px; cursor: pointer; border-radius: 4px; margin: 0 4px; }
 .room-header:hover { color: var(--text); background: var(--bg-light); }
-.room-arrow { font-size: 0.65rem; transition: transform 0.15s; }
+.room-arrow { font-size: .65rem; transition: transform .15s; }
 .room-arrow.open { transform: rotate(90deg); }
-
-.board-item {
-  padding: 5px 8px 5px 24px;
-  margin: 1px 4px;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.board-item { padding: 5px 8px 5px 24px; margin: 1px 4px; border-radius: 4px; font-size: .9rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .board-item::before { content: '#'; font-weight: 700; }
 .board-item:hover { background: var(--bg-light); color: var(--text); }
 .board-item.active { background: var(--bg-light); color: var(--text-strong); font-weight: 600; }
+#sidebar-user { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--bg-mid); }
+.user-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; color: #fff; flex-shrink: 0; }
+.user-name { font-size: .85rem; font-weight: 600; color: var(--text-strong); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-left: auto; flex-shrink: 0; }
 
-#sidebar-user {
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-mid);
-}
-.user-avatar {
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  background: var(--accent-dim);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-}
-.user-name {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.status-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--green);
+/* Main chat */
+#chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-darkest); }
+#chat-header { height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--bg-darkest); flex-shrink: 0; }
+#chat-header .board-title { font-weight: 700; font-size: 1rem; color: var(--text-strong); }
+#chat-header .board-title::before { content: '# '; color: var(--text-muted); font-weight: 400; }
+#chat-header .no-board { color: var(--text-muted); font-style: italic; }
+#toggle-members-btn {
   margin-left: auto;
-  flex-shrink: 0;
+  background: none; border: none;
+  color: var(--text-muted); cursor: pointer;
+  font-size: .85rem; font-weight: 600;
+  padding: 4px 8px; border-radius: 4px;
+  display: flex; align-items: center; gap: 5px;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
 }
+#toggle-members-btn:hover { background: var(--bg-light); color: var(--text); }
+#toggle-members-btn.active { color: var(--accent); }
 
-/* ── Main chat area ──────────────────────────────────────────────────── */
-#chat-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: var(--bg-darkest);
-}
-
-#chat-header {
-  height: 48px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-darkest);
-  flex-shrink: 0;
-}
-#chat-header .board-title {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-strong);
-}
-#chat-header .board-title::before {
-  content: '# ';
-  color: var(--text-muted);
-  font-weight: 400;
-}
-#chat-header .no-board {
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-#messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.msg-group {
-  display: flex;
-  gap: 12px;
-  padding: 4px 0;
-  border-radius: 4px;
-  transition: background 0.1s;
-}
-.msg-group:hover { background: rgba(255,255,255,0.025); }
-
-.msg-avatar {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: #fff;
-  margin-top: 2px;
-}
-
+#messages { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; }
+.msg-group { display: flex; gap: 12px; padding: 4px 8px; border-radius: 4px; transition: background .1s; }
+.msg-group:hover { background: rgba(255,255,255,.025); }
+.msg-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; color: #fff; margin-top: 2px; }
 .msg-body { flex: 1; min-width: 0; }
-.msg-meta {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-.msg-username {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--text-strong);
-}
-.msg-time {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-.msg-content {
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--text);
-  word-break: break-word;
-  white-space: pre-wrap;
+.msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.msg-username { font-weight: 700; font-size: .9rem; color: var(--text-strong); }
+.msg-time { font-size: .72rem; color: var(--text-muted); }
+.msg-content { font-size: .9rem; line-height: 1.5; color: var(--text); word-break: break-word; white-space: pre-wrap; user-select: text; }
+
+/* Attachments */
+.msg-image { max-width: 400px; max-height: 300px; border-radius: 8px; margin-top: 6px; display: block; cursor: zoom-in; object-fit: contain; border: 1px solid var(--border); }
+.msg-file-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 6px; padding: 8px 12px;
+  background: var(--bg-light); border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; text-decoration: none;
+  color: var(--text); font-size: .85rem;
+  transition: border-color .15s;
   user-select: text;
 }
+.msg-file-chip:hover { border-color: var(--accent); }
+.msg-file-chip .icon { font-size: 1.2rem; }
+.msg-file-chip .fname { font-weight: 600; color: var(--text-strong); }
 
-.empty-chat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  gap: 10px;
+/* Image lightbox */
+#lightbox {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.85);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; cursor: zoom-out;
 }
-.empty-chat .icon { font-size: 3rem; }
-.empty-chat p { font-size: 0.95rem; }
+#lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 6px; }
 
-#input-area {
-  padding: 12px 20px 16px;
-  flex-shrink: 0;
+/* Input area */
+#input-area { padding: 0 20px 16px; flex-shrink: 0; }
+
+/* Attach preview */
+#attach-preview {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-mid); border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0; border-bottom: none;
+  padding: 8px 14px; font-size: .85rem; color: var(--text);
 }
+#attach-preview .attach-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#attach-preview .attach-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1rem; padding: 0 2px; line-height: 1; }
+#attach-preview .attach-remove:hover { color: var(--red); }
+#attach-preview.hidden + #input-wrap { border-radius: 8px; }
+#attach-preview:not(.hidden) + #input-wrap { border-radius: 0 0 8px 8px; }
+
 #input-wrap {
-  display: flex;
-  align-items: center;
-  background: var(--bg-light);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  padding: 0 14px;
-  gap: 10px;
-  transition: border-color 0.15s;
+  display: flex; align-items: center;
+  background: var(--bg-light); border-radius: 8px;
+  border: 1px solid var(--border); padding: 0 12px; gap: 8px;
+  transition: border-color .15s;
 }
 #input-wrap:focus-within { border-color: var(--accent-dim); }
-
-#msg-input {
-  flex: 1;
-  background: none;
-  border: none;
-  outline: none;
-  padding: 12px 0;
-  font-size: 0.93rem;
-  color: var(--text-strong);
-  resize: none;
+#attach-btn {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 1.2rem; padding: 4px 2px;
+  transition: color .15s; line-height: 1; flex-shrink: 0;
 }
+#attach-btn:hover { color: var(--accent); }
+#attach-btn:disabled { opacity: .3; cursor: default; }
+#msg-input { flex: 1; background: none; border: none; outline: none; padding: 12px 0; font-size: .93rem; color: var(--text-strong); resize: none; }
 #msg-input::placeholder { color: var(--text-muted); }
-
-#send-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 1.3rem;
-  padding: 4px 2px;
-  transition: color 0.15s;
-  line-height: 1;
-}
+#send-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.3rem; padding: 4px 2px; transition: color .15s; line-height: 1; flex-shrink: 0; }
 #send-btn:hover { color: var(--accent); }
-#send-btn:disabled { opacity: 0.3; cursor: default; }
+#send-btn:disabled { opacity: .3; cursor: default; }
 
-/* ── Loading spinner ─────────────────────────────────────────────────── */
-.spinner {
-  width: 18px; height: 18px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  display: inline-block;
+/* Members panel */
+#members-panel {
+  width: var(--members-w);
+  background: var(--bg-dark);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  flex-shrink: 0;
+  transition: width .2s ease, opacity .2s ease;
+  overflow: hidden;
 }
+#members-panel.collapsed { width: 0; opacity: 0; border-left: none; }
+#members-panel-inner { width: var(--members-w); padding: 12px 10px; overflow-y: auto; flex: 1; }
+.members-section-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 8px 6px 4px; }
+.member-row { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 4px; }
+.member-row:hover { background: var(--bg-light); }
+.member-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.member-dot.online  { background: var(--green); }
+.member-dot.offline { background: var(--text-muted); }
+.member-name { font-size: .88rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.msg-placeholder { color: var(--text-muted); font-style: italic; font-size: .85rem; padding: 8px 0; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Toast notification ──────────────────────────────────────────────── */
-#toast {
-  position: fixed;
-  bottom: 20px; left: 50%;
-  transform: translateX(-50%) translateY(80px);
-  background: var(--bg-light);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 18px;
-  font-size: 0.88rem;
-  color: var(--text);
-  transition: transform 0.25s ease;
-  pointer-events: none;
-  z-index: 200;
-}
+#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bg-light); border: 1px solid var(--border); border-radius: 8px; padding: 10px 18px; font-size: .88rem; color: var(--text); transition: transform .25s ease; pointer-events: none; z-index: 300; }
 #toast.show { transform: translateX(-50%) translateY(0); }
 #toast.error { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
 
-<!-- ══ SCREEN: SERVER LIST ══════════════════════════════════════════════ -->
+<!-- SERVER LIST -->
 <div id="screen-servers">
   <div class="servers-header">
     <h1>CHRISCORD</h1>
     <p>Self-hosted chat — your homelab, your rules.</p>
   </div>
-
-  <div class="server-list" id="server-list">
-    <!-- Populated by JS -->
-  </div>
-
-  <button class="btn-add-server" id="open-add-btn">
-    ＋  Add a Server
-  </button>
-  <p class="empty-hint hidden" id="no-servers-hint">
-    No servers yet — add one above to get started.
-  </p>
+  <div class="server-list" id="server-list"></div>
+  <button class="btn-add-server" id="open-add-btn">＋  Add a Server</button>
+  <p class="empty-hint hidden" id="no-servers-hint">No servers yet — add one above to get started.</p>
 </div>
 
-<!-- ══ MODAL: ADD SERVER ════════════════════════════════════════════════ -->
+<!-- ADD SERVER MODAL -->
 <div class="modal-overlay hidden" id="modal-add">
   <div class="modal">
     <h2>Add a Server</h2>
-
     <div class="error-msg hidden" id="add-error"></div>
-
     <div class="form-group">
       <label>Domain / IP</label>
       <input id="f-domain" type="text" placeholder="chris-domain1.com  or  192.168.1.10:7070" autocomplete="off">
@@ -565,7 +284,6 @@ input, button, textarea { font-family: inherit; }
       <label>Username</label>
       <input id="f-username" type="text" placeholder="How you appear in chat" maxlength="32" autocomplete="off">
     </div>
-
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancel-add-btn">Cancel</button>
       <button class="btn btn-primary" id="connect-btn">Connect</button>
@@ -573,20 +291,16 @@ input, button, textarea { font-family: inherit; }
   </div>
 </div>
 
-<!-- ══ SCREEN: CHAT ═════════════════════════════════════════════════════ -->
+<!-- CHAT SCREEN -->
 <div id="screen-chat" class="hidden">
 
-  <!-- Sidebar -->
+  <!-- Left sidebar -->
   <div id="sidebar">
     <div id="sidebar-header">
       <span class="server-name" id="sidebar-server-name">Server</span>
       <button id="back-btn" title="Back to server list">✕</button>
     </div>
-
-    <div id="room-list">
-      <!-- Populated by JS -->
-    </div>
-
+    <div id="room-list"></div>
     <div id="sidebar-user">
       <div class="user-avatar" id="user-avatar">?</div>
       <span class="user-name" id="user-name-label">username</span>
@@ -594,74 +308,86 @@ input, button, textarea { font-family: inherit; }
     </div>
   </div>
 
-  <!-- Main content -->
+  <!-- Main chat -->
   <div id="chat-main">
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
+      <button id="toggle-members-btn" title="Toggle member list">👥 Members</button>
     </div>
 
-    <div id="messages">
-      <div class="empty-chat">
-        <div class="icon">💬</div>
-        <p>Pick a room and board from the sidebar</p>
-      </div>
-    </div>
+    <div id="messages"></div>
 
     <div id="input-area">
+      <div id="attach-preview" class="hidden">
+        <span class="icon">📎</span>
+        <span class="attach-name" id="attach-name-label"></span>
+        <button class="attach-remove" id="attach-remove-btn" title="Remove attachment">✕</button>
+      </div>
       <div id="input-wrap">
+        <button id="attach-btn" disabled title="Attach a file">＋</button>
         <textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea>
         <button id="send-btn" disabled>➤</button>
       </div>
     </div>
   </div>
+
+  <!-- Right: members panel -->
+  <div id="members-panel" class="collapsed">
+    <div id="members-panel-inner">
+      <div class="members-section-label">Online</div>
+      <div id="members-online"></div>
+      <div class="members-section-label" style="margin-top:12px">Offline</div>
+      <div id="members-offline"></div>
+    </div>
+  </div>
 </div>
 
-<!-- ══ TOAST ════════════════════════════════════════════════════════════ -->
+<!-- Image lightbox -->
+<div id="lightbox" class="hidden">
+  <img id="lightbox-img" src="" alt="">
+</div>
+
 <div id="toast"></div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────
 const state = {
-  servers:         [],
-  rooms:           [],
-  boardsByRoom:    {},   // roomId → Board[]
-  expandedRooms:   new Set(),
-  selectedRoomId:  null,
-  selectedBoardId: null,
-  username:        '',
-  serverName:      '',
-  messages:        [],
-  wsConnected:     false,
+  servers: [], rooms: [], boardsByRoom: {},
+  expandedRooms: new Set(),
+  selectedRoomId: null, selectedBoardId: null,
+  username: '', serverName: '',
+  messages: [],
+  wsConnected: false,
+  onlineUsers: [],
+  pendingAttach: null,   // { url, filename, mime } after upload
+  membersVisible: false,
 };
 
-// ── Colour palette for user avatars ────────────────────────────────────
-const AVATAR_COLOURS = [
-  '#7289da','#43b581','#faa61a','#f04747',
-  '#1abc9c','#e91e63','#9c27b0','#3f51b5',
-];
+const AVATAR_COLOURS = ['#7289da','#43b581','#faa61a','#f04747','#1abc9c','#e91e63','#9c27b0','#3f51b5'];
 function avatarColour(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return AVATAR_COLOURS[h % AVATAR_COLOURS.length];
 }
 
-// ── Screen management ──────────────────────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('[id^="screen-"]').forEach(el => el.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
 
-// ── Toast ──────────────────────────────────────────────────────────────
 let toastTimer;
 function toast(msg, isError = false) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.className   = 'show' + (isError ? ' error' : '');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
 }
 
-// ══ SERVER LIST ═══════════════════════════════════════════════════════
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══ SERVER LIST ════════════════════════════════════════════════════════
 
 async function loadServers() {
   state.servers = await window.go.main.App.GetServers();
@@ -672,19 +398,13 @@ function renderServers() {
   const list = document.getElementById('server-list');
   const hint = document.getElementById('no-servers-hint');
   list.innerHTML = '';
-
-  if (!state.servers || !state.servers.length) {
-    hint.classList.remove('hidden');
-    return;
-  }
+  if (!state.servers?.length) { hint.classList.remove('hidden'); return; }
   hint.classList.add('hidden');
-
   state.servers.forEach(s => {
     const card = document.createElement('div');
     card.className = 'server-card';
     const initial = (s.display_name || s.domain)[0].toUpperCase();
     const colour  = avatarColour(s.domain);
-
     card.innerHTML = `
       <div class="server-icon" style="background:${colour}">${initial}</div>
       <div class="server-info">
@@ -695,31 +415,22 @@ function renderServers() {
       <div class="server-actions">
         <button class="btn btn-ghost btn-sm remove-btn" data-domain="${esc(s.domain)}">✕</button>
         <button class="btn btn-primary btn-sm connect-server-btn"
-                data-domain="${esc(s.domain)}"
-                data-key="${esc(s.server_key)}"
-                data-user="${esc(s.last_username)}">Connect</button>
+          data-domain="${esc(s.domain)}" data-key="${esc(s.server_key)}" data-user="${esc(s.last_username)}">Connect</button>
       </div>`;
-
-    card.querySelector('.connect-server-btn').addEventListener('click', (e) => {
+    card.querySelector('.connect-server-btn').addEventListener('click', e => {
       const {domain, key, user} = e.currentTarget.dataset;
-      if (user) {
-        doConnect(domain, key, user);
-      } else {
-        openAddModal(domain, key);
-      }
+      user ? doConnect(domain, key, user) : openAddModal(domain, key);
     });
-
-    card.querySelector('.remove-btn').addEventListener('click', async (e) => {
+    card.querySelector('.remove-btn').addEventListener('click', async e => {
       e.stopPropagation();
       state.servers = await window.go.main.App.RemoveServer(e.currentTarget.dataset.domain);
       renderServers();
     });
-
     list.appendChild(card);
   });
 }
 
-// ══ ADD-SERVER MODAL ══════════════════════════════════════════════════
+// ══ ADD SERVER MODAL ═══════════════════════════════════════════════════
 
 function openAddModal(prefillDomain = '', prefillKey = '') {
   document.getElementById('f-domain').value   = prefillDomain;
@@ -729,10 +440,7 @@ function openAddModal(prefillDomain = '', prefillKey = '') {
   document.getElementById('modal-add').classList.remove('hidden');
   document.getElementById(prefillDomain ? 'f-username' : 'f-domain').focus();
 }
-
-function closeAddModal() {
-  document.getElementById('modal-add').classList.add('hidden');
-}
+function closeAddModal() { document.getElementById('modal-add').classList.add('hidden'); }
 
 async function submitAddServer() {
   const domain   = document.getElementById('f-domain').value.trim();
@@ -740,127 +448,98 @@ async function submitAddServer() {
   const username = document.getElementById('f-username').value.trim();
   const errEl    = document.getElementById('add-error');
   const btn      = document.getElementById('connect-btn');
-
-  if (!domain || !username) {
-    errEl.textContent = 'Domain and username are required.';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
+  if (!domain || !username) { errEl.textContent = 'Domain and username are required.'; errEl.classList.remove('hidden'); return; }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
   errEl.classList.add('hidden');
-
-  try {
-    await doConnect(domain, key, username);
-    closeAddModal();
-  } catch (err) {
-    errEl.textContent = String(err);
-    errEl.classList.remove('hidden');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Connect';
-  }
+  try { await doConnect(domain, key, username); closeAddModal(); }
+  catch (err) { errEl.textContent = String(err); errEl.classList.remove('hidden'); }
+  finally { btn.disabled = false; btn.textContent = 'Connect'; }
 }
 
-// ══ CONNECT ═══════════════════════════════════════════════════════════
+// ══ CONNECT ════════════════════════════════════════════════════════════
 
 async function doConnect(domain, serverKey, username) {
-  try {
-    await window.go.main.App.Connect(domain, serverKey, username);
-  } catch (err) {
-    toast(String(err), true);
-    throw err;
-  }
+  try { await window.go.main.App.Connect(domain, serverKey, username); }
+  catch (err) { toast(String(err), true); throw err; }
 
-  state.username   = await window.go.main.App.GetUsername();
-  state.serverName = domain; // will be updated with real name below
-  state.rooms      = [];
+  state.username      = await window.go.main.App.GetUsername();
+  state.rooms         = [];
   state.boardsByRoom  = {};
   state.expandedRooms = new Set();
   state.selectedRoomId  = null;
   state.selectedBoardId = null;
   state.messages        = [];
+  state.onlineUsers     = [];
+  state.pendingAttach   = null;
   state.wsConnected     = true;
 
-  // Update server list (new server may have been saved)
   state.servers = await window.go.main.App.GetServers();
   const saved = state.servers.find(s => s.domain === domain);
-  if (saved) state.serverName = saved.display_name || domain;
+  state.serverName = saved?.display_name || domain;
 
   showChatScreen();
   await loadRooms();
 }
 
-// ══ CHAT SCREEN ═══════════════════════════════════════════════════════
+// ══ CHAT SCREEN ════════════════════════════════════════════════════════
 
 function showChatScreen() {
   showScreen('screen-chat');
-
   document.getElementById('sidebar-server-name').textContent = state.serverName;
   document.getElementById('user-name-label').textContent     = state.username;
-
   const av = document.getElementById('user-avatar');
-  av.textContent        = state.username[0].toUpperCase();
-  av.style.background   = avatarColour(state.username);
+  av.textContent      = state.username[0].toUpperCase();
+  av.style.background = avatarColour(state.username);
 
-  document.getElementById('board-title-placeholder').className = 'no-board';
+  document.getElementById('board-title-placeholder').className   = 'no-board';
   document.getElementById('board-title-placeholder').textContent = 'Select a board to start chatting';
-  document.getElementById('messages').innerHTML =
-    '<div class="empty-chat"><div class="icon">💬</div><p>Pick a room and board from the sidebar</p></div>';
+  document.getElementById('messages').innerHTML = '';
   document.getElementById('msg-input').placeholder = 'Select a board to chat';
   document.getElementById('msg-input').disabled    = true;
   document.getElementById('send-btn').disabled     = true;
+  document.getElementById('attach-btn').disabled   = true;
+  clearAttach();
+
+  // Members panel hidden by default
+  state.membersVisible = false;
+  document.getElementById('members-panel').classList.add('collapsed');
+  document.getElementById('toggle-members-btn').classList.remove('active');
 }
 
 async function loadRooms() {
-  try {
-    state.rooms = await window.go.main.App.GetRooms() || [];
-  } catch (err) {
-    toast('Failed to load rooms: ' + err, true);
-    state.rooms = [];
-  }
+  try { state.rooms = await window.go.main.App.GetRooms() || []; }
+  catch (err) { toast('Failed to load rooms: ' + err, true); state.rooms = []; }
   renderSidebar();
-
-  // Auto-expand first room
-  if (state.rooms.length) {
-    toggleRoom(state.rooms[0].id);
-  }
+  if (state.rooms.length) toggleRoom(state.rooms[0].id);
 }
 
 function renderSidebar() {
   const list = document.getElementById('room-list');
   list.innerHTML = '';
-
   if (!state.rooms.length) {
     list.innerHTML = '<div style="padding:12px 16px;color:var(--text-muted);font-size:.83rem">No rooms yet.<br>Ask the owner to create some.</div>';
     return;
   }
-
   state.rooms.forEach(room => {
-    const isOpen   = state.expandedRooms.has(room.id);
-    const boards   = state.boardsByRoom[room.id] || null;
-
-    // Room header
+    const isOpen = state.expandedRooms.has(room.id);
+    const boards = state.boardsByRoom[room.id] ?? null;
     const header = document.createElement('div');
     header.className = 'room-header';
     header.innerHTML = `<span class="room-arrow ${isOpen ? 'open' : ''}">▶</span> ${esc(room.name)}`;
     header.addEventListener('click', () => toggleRoom(room.id));
     list.appendChild(header);
-
-    // Boards under this room
     if (isOpen) {
       if (boards === null) {
-        // Still loading
-        const loading = document.createElement('div');
-        loading.style.cssText = 'padding:4px 12px;';
-        loading.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>';
-        list.appendChild(loading);
+        const l = document.createElement('div');
+        l.style.cssText = 'padding:4px 12px';
+        l.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>';
+        list.appendChild(l);
       } else if (!boards.length) {
-        const empty = document.createElement('div');
-        empty.style.cssText = 'padding:4px 24px;font-size:.8rem;color:var(--text-muted)';
-        empty.textContent = 'No boards';
-        list.appendChild(empty);
+        const e = document.createElement('div');
+        e.style.cssText = 'padding:4px 24px;font-size:.8rem;color:var(--text-muted)';
+        e.textContent = 'No boards';
+        list.appendChild(e);
       } else {
         boards.forEach(board => {
           const item = document.createElement('div');
@@ -881,13 +560,9 @@ async function toggleRoom(roomId) {
   } else {
     state.expandedRooms.add(roomId);
     renderSidebar();
-    // Load boards if not cached
     if (!state.boardsByRoom[roomId]) {
-      try {
-        state.boardsByRoom[roomId] = await window.go.main.App.GetBoards(roomId) || [];
-      } catch {
-        state.boardsByRoom[roomId] = [];
-      }
+      try { state.boardsByRoom[roomId] = await window.go.main.App.GetBoards(roomId) || []; }
+      catch { state.boardsByRoom[roomId] = []; }
       renderSidebar();
     }
   }
@@ -897,56 +572,100 @@ async function selectBoard(boardId, boardName) {
   if (state.selectedBoardId === boardId) return;
   state.selectedBoardId = boardId;
   state.messages = [];
+  clearAttach();
 
-  // Update header
   const hdr = document.getElementById('board-title-placeholder');
   hdr.className   = 'board-title';
   hdr.textContent = boardName;
 
-  // Enable input
   document.getElementById('msg-input').placeholder = `Message  #${boardName}`;
   document.getElementById('msg-input').disabled    = false;
   document.getElementById('send-btn').disabled     = false;
+  document.getElementById('attach-btn').disabled   = false;
   document.getElementById('msg-input').focus();
 
-  // Clear messages
-  const msgEl = document.getElementById('messages');
-  msgEl.innerHTML = '<div class="msg-placeholder" style="color:var(--text-muted);font-style:italic;font-size:.85rem;padding:8px 0">Loading history…</div>';
-
+  document.getElementById('messages').innerHTML =
+    '<div class="msg-placeholder">Loading history…</div>';
   renderSidebar();
 
-  // Subscribe — server will reply with history then live messages
+  try { await window.go.main.App.SubscribeBoard(boardId); }
+  catch (err) { toast('Subscribe failed: ' + err, true); }
+}
+
+// ══ MEMBERS PANEL ══════════════════════════════════════════════════════
+
+function toggleMembers() {
+  state.membersVisible = !state.membersVisible;
+  const panel = document.getElementById('members-panel');
+  const btn   = document.getElementById('toggle-members-btn');
+  if (state.membersVisible) { panel.classList.remove('collapsed'); btn.classList.add('active'); }
+  else                      { panel.classList.add('collapsed');    btn.classList.remove('active'); }
+}
+
+function renderMembers(onlineList) {
+  state.onlineUsers = onlineList || [];
+  const onlineEl  = document.getElementById('members-online');
+  const offlineEl = document.getElementById('members-offline');
+  onlineEl.innerHTML  = '';
+  offlineEl.innerHTML = '';
+
+  state.onlineUsers.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'member-row';
+    const colour = avatarColour(name);
+    row.innerHTML = `
+      <div class="user-avatar" style="background:${colour};width:24px;height:24px;font-size:.7rem">${name[0].toUpperCase()}</div>
+      <span class="member-name">${esc(name)}</span>
+      <div class="member-dot online" style="margin-left:auto"></div>`;
+    onlineEl.appendChild(row);
+  });
+  if (!state.onlineUsers.length) {
+    onlineEl.innerHTML = '<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">Nobody online</div>';
+  }
+  offlineEl.innerHTML = '<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">—</div>';
+}
+
+// ══ FILE ATTACH ════════════════════════════════════════════════════════
+
+async function pickAndAttach() {
   try {
-    await window.go.main.App.SubscribeBoard(boardId);
+    const filePath = await window.go.main.App.PickFile();
+    if (!filePath) return;
+
+    toast('Uploading…');
+    const result = await window.go.main.App.UploadFile(filePath);
+    if (!result) return;
+
+    state.pendingAttach = result;
+    document.getElementById('attach-name-label').textContent = result.filename;
+    document.getElementById('attach-preview').classList.remove('hidden');
+    toast('File ready to send');
   } catch (err) {
-    toast('Subscribe failed: ' + err, true);
+    toast('Upload failed: ' + err, true);
   }
 }
 
-// ── Message rendering ──────────────────────────────────────────────────
+function clearAttach() {
+  state.pendingAttach = null;
+  document.getElementById('attach-preview').classList.add('hidden');
+  document.getElementById('attach-name-label').textContent = '';
+}
+
+// ══ MESSAGES ═══════════════════════════════════════════════════════════
 
 function renderMessages() {
   const container = document.getElementById('messages');
   container.innerHTML = '';
-
   if (!state.messages.length) {
-    container.innerHTML = '<div class="msg-placeholder" style="color:var(--text-muted);font-style:italic;font-size:.85rem;padding:8px 0">No messages yet. Say hi!</div>';
+    container.innerHTML = '<div class="msg-placeholder">No messages yet. Say hi!</div>';
     return;
   }
-
-  state.messages.forEach(msg => {
-    container.appendChild(buildMsgEl(msg));
-  });
-
+  state.messages.forEach(msg => container.appendChild(buildMsgEl(msg)));
   container.scrollTop = container.scrollHeight;
 }
 
 function appendMessage(msg) {
   const container = document.getElementById('messages');
-  // Only remove the dedicated placeholder — never wipe real messages.
-  // The old `querySelector('div[style]')` was matching message avatars
-  // (which have style="background:...") and calling innerHTML='' on every
-  // incoming message, which is why history kept disappearing.
   container.querySelector('.msg-placeholder')?.remove();
   container.appendChild(buildMsgEl(msg));
   container.scrollTop = container.scrollHeight;
@@ -966,38 +685,90 @@ function buildMsgEl(msg) {
         <span class="msg-username">${esc(msg.username)}</span>
         <span class="msg-time">${time}</span>
       </div>
-      <div class="msg-content">${esc(msg.content)}</div>
+      ${msg.content ? `<div class="msg-content">${esc(msg.content)}</div>` : ''}
     </div>`;
+
+  // Attachment rendering
+  if (msg.attachment_url) {
+    const mime = msg.attachment_mime || '';
+    const body = div.querySelector('.msg-body');
+    if (mime.startsWith('image/')) {
+      // Inline image — resolved to full URL by the Go side at send time,
+      // but when coming from history it's a relative path, so resolve here.
+      const imgEl = document.createElement('img');
+      imgEl.className = 'msg-image';
+      imgEl.alt       = msg.attachment_name || 'image';
+      // resolve full URL
+      resolveAttachURL(msg.attachment_url).then(url => { imgEl.src = url; });
+      imgEl.addEventListener('click', () => openLightbox(imgEl.src));
+      body.appendChild(imgEl);
+    } else {
+      // Generic file download chip
+      const chip = document.createElement('a');
+      chip.className = 'msg-file-chip';
+      chip.innerHTML = `<span class="icon">📄</span><span class="fname">${esc(msg.attachment_name || 'File')}</span><span style="color:var(--text-muted);font-size:.75rem;margin-left:4px">↓ download</span>`;
+      chip.addEventListener('click', async () => {
+        const url = await resolveAttachURL(msg.attachment_url);
+        window.open(url, '_blank');
+      });
+      body.appendChild(chip);
+    }
+  }
   return div;
+}
+
+async function resolveAttachURL(relOrAbs) {
+  if (relOrAbs.startsWith('http')) return relOrAbs;
+  return await window.go.main.App.GetFileURL(relOrAbs);
+}
+
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.remove('hidden');
 }
 
 function formatTime(iso) {
   if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
+  try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  catch { return ''; }
 }
 
-// ── Send message ───────────────────────────────────────────────────────
+// ══ SEND ═══════════════════════════════════════════════════════════════
 
 async function sendMessage() {
   const input   = document.getElementById('msg-input');
   const content = input.value.trim();
-  if (!content || !state.selectedBoardId) return;
+  const attach  = state.pendingAttach;
+
+  if (!content && !attach) return;
+  if (!state.selectedBoardId) return;
 
   input.value = '';
   autoResize(input);
+  const savedAttach = attach;
+  clearAttach();
 
   try {
-    await window.go.main.App.SendMessage(state.selectedBoardId, content);
+    let attachURL  = null, attachName = null, attachMime = null;
+    if (savedAttach) {
+      attachURL  = savedAttach.url;
+      attachName = savedAttach.filename;
+      attachMime = savedAttach.mime;
+    }
+    await window.go.main.App.SendMessage(
+      state.selectedBoardId, content,
+      attachURL, attachName, attachMime
+    );
   } catch (err) {
     toast('Send failed: ' + err, true);
-    input.value = content; // restore on failure
+    input.value = content;
+    if (savedAttach) {
+      state.pendingAttach = savedAttach;
+      document.getElementById('attach-name-label').textContent = savedAttach.filename;
+      document.getElementById('attach-preview').classList.remove('hidden');
+    }
   }
 }
-
-// ── Back / disconnect ──────────────────────────────────────────────────
 
 async function goBack() {
   state.wsConnected = false;
@@ -1007,55 +778,38 @@ async function goBack() {
   showScreen('screen-servers');
 }
 
-// ── Auto-resize textarea ───────────────────────────────────────────────
-
 function autoResize(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
-// ── HTML escape ────────────────────────────────────────────────────────
-
-function esc(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// ══ WAILS EVENTS ══════════════════════════════════════════════════════
+// ══ WAILS INIT ═════════════════════════════════════════════════════════
 
 window.addEventListener('load', () => {
-  // Wait for Wails runtime to be injected
   const ready = setInterval(() => {
-    if (window.runtime && window.go) {
-      clearInterval(ready);
-      init();
-    }
+    if (window.runtime && window.go) { clearInterval(ready); init(); }
   }, 50);
 });
 
 function init() {
-  // ── Go → JS events ────────────────────────────────────────────────
-  window.runtime.EventsOn('chat:history', (payload) => {
-    // payload is now { board_id, messages } — verify it's for the current board
-    // before replacing state, so an out-of-order or stale history can't wipe live chat.
+  // Go → JS events
+  window.runtime.EventsOn('chat:history', payload => {
     const msgs    = Array.isArray(payload) ? payload : (payload?.messages ?? []);
     const boardId = payload?.board_id ?? null;
-
-    if (boardId && boardId !== state.selectedBoardId) return; // stale, ignore
-
+    if (boardId && boardId !== state.selectedBoardId) return;
     state.messages = msgs;
     renderMessages();
   });
 
-  window.runtime.EventsOn('chat:message', (msg) => {
-    // Only show if we're looking at this board
-    if (msg && msg.board_id === state.selectedBoardId) {
+  window.runtime.EventsOn('chat:message', msg => {
+    if (msg?.board_id === state.selectedBoardId) {
       state.messages.push(msg);
       appendMessage(msg);
     }
+  });
+
+  window.runtime.EventsOn('chat:users', users => {
+    renderMembers(users || []);
   });
 
   window.runtime.EventsOn('ws:disconnected', () => {
@@ -1065,39 +819,32 @@ function init() {
     }
   });
 
-  // ── UI event listeners ─────────────────────────────────────────────
+  // UI listeners
   document.getElementById('open-add-btn').addEventListener('click', () => openAddModal());
   document.getElementById('cancel-add-btn').addEventListener('click', closeAddModal);
   document.getElementById('connect-btn').addEventListener('click', submitAddServer);
   document.getElementById('back-btn').addEventListener('click', goBack);
   document.getElementById('send-btn').addEventListener('click', sendMessage);
+  document.getElementById('attach-btn').addEventListener('click', pickAndAttach);
+  document.getElementById('attach-remove-btn').addEventListener('click', clearAttach);
+  document.getElementById('toggle-members-btn').addEventListener('click', toggleMembers);
 
-  document.getElementById('msg-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  document.getElementById('msg-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
-  document.getElementById('msg-input').addEventListener('input', (e) => autoResize(e.target));
+  document.getElementById('msg-input').addEventListener('input', e => autoResize(e.target));
 
-  // Close modal on overlay click
-  document.getElementById('modal-add').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeAddModal();
-  });
+  document.getElementById('modal-add').addEventListener('click', e => { if (e.target === e.currentTarget) closeAddModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAddModal(); });
 
-  // Escape closes modal
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeAddModal();
+  document.getElementById('lightbox').addEventListener('click', () => {
+    document.getElementById('lightbox').classList.add('hidden');
   });
 
-  // ── Enter key in add-server form ────────────────────────────────
   ['f-domain','f-key','f-username'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submitAddServer();
-    });
+    document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') submitAddServer(); });
   });
 
-  // ── Load initial server list ─────────────────────────────────────
   loadServers();
   showScreen('screen-servers');
 }

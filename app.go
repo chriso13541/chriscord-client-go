@@ -5,8 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -14,32 +15,21 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App holds all application state and exposes methods to the frontend.
-// Every exported method is automatically available in JS as:
-//
-//	await window.go.main.App.MethodName(args...)
 type App struct {
-	ctx context.Context
-
-	// Connection state
-	mu       sync.Mutex       // guards ws and token/domain/username
-	writeMu  sync.Mutex       // gorilla ws writes are not concurrent-safe
-	ws       *websocket.Conn
-	token    string
-	domain   string
+	ctx     context.Context
+	mu      sync.Mutex
+	writeMu sync.Mutex
+	ws      *websocket.Conn
+	token   string
+	domain  string
 	username string
-
-	// Persisted server list
 	servers []SavedServer
 }
 
-func NewApp() *App {
-	return &App{}
-}
+func NewApp() *App { return &App{} }
 
-// startup is called by Wails when the app initialises.
 func (a *App) startup(ctx context.Context) {
-	a.ctx    = ctx
+	a.ctx     = ctx
 	a.servers = loadServers()
 }
 
@@ -61,23 +51,19 @@ func httpToWS(httpURL string) string {
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 
 func (a *App) doGET(path string, out interface{}) error {
-	url := normaliseHTTP(a.domain) + path
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", normaliseHTTP(a.domain)+path, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("X-Session-Token", a.token)
-
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("network error: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
 		var e map[string]string
-		json.Unmarshal(body, &e)
+		json.NewDecoder(resp.Body).Decode(&e)
 		if msg, ok := e["error"]; ok {
 			return fmt.Errorf("%s", msg)
 		}
@@ -93,7 +79,6 @@ func postJSON(url string, body, out interface{}) error {
 		return fmt.Errorf("network error: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
 		var e map[string]string
 		json.NewDecoder(resp.Body).Decode(&e)
@@ -110,7 +95,6 @@ func postJSON(url string, body, out interface{}) error {
 
 // ── Exposed to frontend ───────────────────────────────────────────────────────
 
-// GetServers returns the saved server list.
 func (a *App) GetServers() []SavedServer {
 	if a.servers == nil {
 		return []SavedServer{}
@@ -118,15 +102,12 @@ func (a *App) GetServers() []SavedServer {
 	return a.servers
 }
 
-// GetServerInfo fetches the public /api/info from a server without connecting.
 func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
-	url := normaliseHTTP(domain) + "/api/info"
-	resp, err := http.Get(url)
+	resp, err := http.Get(normaliseHTTP(domain) + "/api/info")
 	if err != nil {
 		return nil, fmt.Errorf("cannot reach server: %w", err)
 	}
 	defer resp.Body.Close()
-
 	var info ServerInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		return nil, err
@@ -134,27 +115,20 @@ func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
 	return &info, nil
 }
 
-// Connect joins a server, saves it, and opens a WebSocket connection.
 func (a *App) Connect(domain, serverKey, username string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	// Close any existing connection
 	if a.ws != nil {
 		a.ws.Close()
 		a.ws = nil
 	}
 
 	base := normaliseHTTP(domain)
-
-	// Join the server — get a session token
-	joinBody := map[string]interface{}{
-		"username": username,
-	}
+	joinBody := map[string]interface{}{"username": username}
 	if serverKey != "" {
 		joinBody["server_key"] = serverKey
 	}
-
 	var joinResp JoinResponse
 	if err := postJSON(base+"/api/join", joinBody, &joinResp); err != nil {
 		return err
@@ -164,51 +138,41 @@ func (a *App) Connect(domain, serverKey, username string) error {
 	a.token    = joinResp.Token
 	a.username = joinResp.Username
 
-	// Fetch server name for display
 	displayName := domain
 	if info, err := a.GetServerInfo(domain); err == nil {
 		displayName = info.Name
 	}
 
-	// Save/update this server in the list
 	a.servers = upsertServer(a.servers, SavedServer{
-		Domain:       domain,
-		ServerKey:    serverKey,
-		DisplayName:  displayName,
-		LastUsername: a.username,
+		Domain: domain, ServerKey: serverKey,
+		DisplayName: displayName, LastUsername: a.username,
 	})
 	saveServers(a.servers)
 
-	// Open WebSocket
 	wsURL := httpToWS(base) + "/ws?token=" + a.token
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		return fmt.Errorf("websocket failed: %w", err)
 	}
 	a.ws = conn
-
-	// Read loop in background
 	go a.wsReader(conn)
-
 	return nil
 }
 
-// serverMsg is every packet the server sends over WebSocket.
+// serverMsg covers every packet the server can send.
 type serverMsg struct {
 	Type     string        `json:"type"`
-	BoardID  string        `json:"board_id"`           // present in "history"
-	Data     *ChatMessage  `json:"data"`               // present in "message"
-	Messages []ChatMessage `json:"messages"`            // present in "history"
+	BoardID  string        `json:"board_id"`
+	Data     *ChatMessage  `json:"data"`
+	Messages []ChatMessage `json:"messages"`
+	Users    []string      `json:"users"`
 }
 
-// historyEvent is what we emit to the frontend for "chat:history".
-// Carrying board_id lets the JS verify the history is still relevant.
 type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
 }
 
-// wsReader runs in its own goroutine and forwards server messages to the frontend.
 func (a *App) wsReader(conn *websocket.Conn) {
 	defer func() {
 		a.mu.Lock()
@@ -224,12 +188,10 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		if err != nil {
 			return
 		}
-
 		var msg serverMsg
 		if err := json.Unmarshal(raw, &msg); err != nil {
 			continue
 		}
-
 		switch msg.Type {
 		case "message":
 			if msg.Data != nil {
@@ -240,11 +202,12 @@ func (a *App) wsReader(conn *websocket.Conn) {
 				BoardID:  msg.BoardID,
 				Messages: msg.Messages,
 			})
+		case "users":
+			runtime.EventsEmit(a.ctx, "chat:users", msg.Users)
 		}
 	}
 }
 
-// GetRooms returns the list of rooms for the current server.
 func (a *App) GetRooms() ([]Room, error) {
 	var rooms []Room
 	if err := a.doGET("/api/rooms", &rooms); err != nil {
@@ -253,7 +216,6 @@ func (a *App) GetRooms() ([]Room, error) {
 	return rooms, nil
 }
 
-// GetBoards returns boards for a given room.
 func (a *App) GetBoards(roomID string) ([]Board, error) {
 	var boards []Board
 	if err := a.doGET("/api/rooms/"+roomID+"/boards", &boards); err != nil {
@@ -262,58 +224,123 @@ func (a *App) GetBoards(roomID string) ([]Board, error) {
 	return boards, nil
 }
 
-// SubscribeBoard tells the server we want messages for this board.
-// The server will respond with a history payload followed by live messages.
 func (a *App) SubscribeBoard(boardID string) error {
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
-
 	a.mu.Lock()
 	conn := a.ws
 	a.mu.Unlock()
-
 	if conn == nil {
 		return fmt.Errorf("not connected")
 	}
-
-	msg, _ := json.Marshal(map[string]string{
-		"type":     "subscribe",
-		"board_id": boardID,
-	})
+	msg, _ := json.Marshal(map[string]string{"type": "subscribe", "board_id": boardID})
 	return conn.WriteMessage(websocket.TextMessage, msg)
 }
 
-// SendMessage sends a chat message to the currently subscribed board.
-func (a *App) SendMessage(boardID, content string) error {
+func (a *App) SendMessage(boardID, content string, attachURL, attachName, attachMime *string) error {
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
-
 	a.mu.Lock()
 	conn := a.ws
 	a.mu.Unlock()
-
 	if conn == nil {
 		return fmt.Errorf("not connected")
 	}
-
-	msg, _ := json.Marshal(map[string]string{
+	payload := map[string]interface{}{
 		"type":     "message",
 		"board_id": boardID,
 		"content":  content,
-	})
+	}
+	if attachURL != nil {
+		payload["attachment_url"]  = *attachURL
+		payload["attachment_name"] = *attachName
+		payload["attachment_mime"] = *attachMime
+	}
+	msg, _ := json.Marshal(payload)
 	return conn.WriteMessage(websocket.TextMessage, msg)
 }
 
-// GetUsername returns the current logged-in username.
-func (a *App) GetUsername() string {
-	return a.username
+// PickFile opens a native file dialog and returns the chosen path.
+func (a *App) PickFile() (string, error) {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Attach a file",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil || path == "" {
+		return "", err
+	}
+	return path, nil
 }
 
-// Disconnect closes the WebSocket and clears session state.
+// UploadFile sends a file to the server and returns {url, filename, mime}.
+func (a *App) UploadFile(filePath string) (*UploadResult, error) {
+	a.mu.Lock()
+	domain := a.domain
+	token  := a.token
+	a.mu.Unlock()
+
+	if domain == "" {
+		return nil, fmt.Errorf("not connected")
+	}
+
+	// Read file from disk
+	fileBytes, err := readFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read file: %w", err)
+	}
+
+	// Build multipart body
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	filename := filepath.Base(filePath)
+	fw, err := w.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, err
+	}
+	fw.Write(fileBytes)
+	w.Close()
+
+	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/upload", &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("X-Session-Token", token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("upload failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		var e map[string]string
+		json.NewDecoder(resp.Body).Decode(&e)
+		return nil, fmt.Errorf("%s", e["error"])
+	}
+
+	var result UploadResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetFileURL returns the full URL for a server-relative file path.
+func (a *App) GetFileURL(path string) string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return normaliseHTTP(a.domain) + path
+}
+
+func (a *App) GetUsername() string { return a.username }
+
 func (a *App) Disconnect() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-
 	if a.ws != nil {
 		a.ws.Close()
 		a.ws = nil
@@ -323,7 +350,6 @@ func (a *App) Disconnect() {
 	a.username = ""
 }
 
-// RemoveServer deletes a saved server from the list.
 func (a *App) RemoveServer(domain string) []SavedServer {
 	a.servers = removeServer(a.servers, domain)
 	saveServers(a.servers)
