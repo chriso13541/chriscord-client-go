@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -165,12 +168,19 @@ type serverMsg struct {
 	BoardID  string        `json:"board_id"`
 	Data     *ChatMessage  `json:"data"`
 	Messages []ChatMessage `json:"messages"`
-	Users    []string      `json:"users"`
+	// users packet
+	Online  []string `json:"online"`
+	All     []string `json:"all"`
 }
 
 type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
+}
+
+type usersEvent struct {
+	Online []string `json:"online"`
+	All    []string `json:"all"`
 }
 
 func (a *App) wsReader(conn *websocket.Conn) {
@@ -203,7 +213,10 @@ func (a *App) wsReader(conn *websocket.Conn) {
 				Messages: msg.Messages,
 			})
 		case "users":
-			runtime.EventsEmit(a.ctx, "chat:users", msg.Users)
+			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{
+				Online: msg.Online,
+				All:    msg.All,
+			})
 		}
 	}
 }
@@ -265,8 +278,11 @@ func (a *App) PickFile() (string, error) {
 	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Attach a file",
 		Filters: []runtime.FileFilter{
-			{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"},
 			{DisplayName: "All Files", Pattern: "*"},
+			{DisplayName: "Images",    Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"},
+			{DisplayName: "Video",     Pattern: "*.mp4;*.webm;*.mov;*.mkv;*.avi"},
+			{DisplayName: "Audio",     Pattern: "*.mp3;*.ogg;*.wav;*.flac;*.m4a"},
+			{DisplayName: "Documents", Pattern: "*.pdf;*.doc;*.docx;*.txt;*.zip"},
 		},
 	})
 	if err != nil || path == "" {
@@ -275,7 +291,8 @@ func (a *App) PickFile() (string, error) {
 	return path, nil
 }
 
-// UploadFile sends a file to the server and returns {url, filename, mime}.
+// UploadFile streams a file from disk to the server without loading it all into memory.
+// This handles large videos without OOM.
 func (a *App) UploadFile(filePath string) (*UploadResult, error) {
 	a.mu.Lock()
 	domain := a.domain
@@ -286,31 +303,44 @@ func (a *App) UploadFile(filePath string) (*UploadResult, error) {
 		return nil, fmt.Errorf("not connected")
 	}
 
-	// Read file from disk
-	fileBytes, err := readFile(filePath)
+	// Open the file for streaming — do NOT read it all into memory.
+	f, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("could not read file: %w", err)
+		return nil, fmt.Errorf("could not open file: %w", err)
 	}
+	defer f.Close()
 
-	// Build multipart body
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
 	filename := filepath.Base(filePath)
-	fw, err := w.CreateFormFile("file", filename)
-	if err != nil {
-		return nil, err
-	}
-	fw.Write(fileBytes)
-	w.Close()
 
-	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/upload", &buf)
+	// Build the multipart body as a pipe so we never buffer the whole file.
+	pr, pw := io.Pipe()
+	mw := multipart.NewWriter(pw)
+
+	go func() {
+		fw, err := mw.CreateFormFile("file", filename)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		if _, err := io.Copy(fw, f); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		mw.Close()
+		pw.Close()
+	}()
+
+	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/upload", pr)
 	if err != nil {
+		pr.CloseWithError(err)
 		return nil, err
 	}
-	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Content-Type", mw.FormDataContentType())
 	req.Header.Set("X-Session-Token", token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// Use a client with a generous timeout for large files (10 min).
+	client := &http.Client{Timeout: 10 * 60 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("upload failed: %w", err)
 	}
@@ -319,7 +349,10 @@ func (a *App) UploadFile(filePath string) (*UploadResult, error) {
 	if resp.StatusCode >= 400 {
 		var e map[string]string
 		json.NewDecoder(resp.Body).Decode(&e)
-		return nil, fmt.Errorf("%s", e["error"])
+		if msg, ok := e["error"]; ok {
+			return nil, fmt.Errorf("%s", msg)
+		}
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
 	var result UploadResult

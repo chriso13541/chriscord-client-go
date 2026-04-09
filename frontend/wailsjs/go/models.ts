@@ -64,6 +64,22 @@ export namespace main {
 	        this.requires_key = source["requires_key"];
 	    }
 	}
+	export class UploadResult {
+	    url: string;
+	    filename: string;
+	    mime: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UploadResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.filename = source["filename"];
+	        this.mime = source["mime"];
+	    }
+	}
 
 }
 

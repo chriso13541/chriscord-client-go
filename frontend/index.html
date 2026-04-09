@@ -166,6 +166,8 @@ input, button, textarea { font-family: inherit; }
 
 /* Attachments */
 .msg-image { max-width: 400px; max-height: 300px; border-radius: 8px; margin-top: 6px; display: block; cursor: zoom-in; object-fit: contain; border: 1px solid var(--border); }
+.msg-video { max-width: 480px; border-radius: 8px; margin-top: 6px; display: block; border: 1px solid var(--border); background: #000; }
+.msg-audio { width: 320px; margin-top: 6px; display: block; }
 .msg-file-chip {
   display: inline-flex; align-items: center; gap: 8px;
   margin-top: 6px; padding: 8px 12px;
@@ -501,10 +503,12 @@ function showChatScreen() {
   document.getElementById('attach-btn').disabled   = true;
   clearAttach();
 
-  // Members panel hidden by default
-  state.membersVisible = false;
-  document.getElementById('members-panel').classList.add('collapsed');
-  document.getElementById('toggle-members-btn').classList.remove('active');
+  // Restore members panel preference from localStorage
+  state.membersVisible = localStorage.getItem('membersVisible') === 'true';
+  const panel2 = document.getElementById('members-panel');
+  const btn2   = document.getElementById('toggle-members-btn');
+  if (state.membersVisible) { panel2.classList.remove('collapsed'); btn2.classList.add('active'); }
+  else                      { panel2.classList.add('collapsed');    btn2.classList.remove('active'); }
 }
 
 async function loadRooms() {
@@ -596,33 +600,48 @@ async function selectBoard(boardId, boardName) {
 
 function toggleMembers() {
   state.membersVisible = !state.membersVisible;
+  localStorage.setItem('membersVisible', state.membersVisible);
   const panel = document.getElementById('members-panel');
   const btn   = document.getElementById('toggle-members-btn');
   if (state.membersVisible) { panel.classList.remove('collapsed'); btn.classList.add('active'); }
   else                      { panel.classList.add('collapsed');    btn.classList.remove('active'); }
 }
 
-function renderMembers(onlineList) {
-  state.onlineUsers = onlineList || [];
+function renderMembers(payload) {
+  const online  = payload?.online ?? [];
+  const all     = payload?.all    ?? [];
+  state.onlineUsers = online;
+
+  const onlineSet = new Set(online);
+  const offline   = all.filter(u => !onlineSet.has(u));
+
   const onlineEl  = document.getElementById('members-online');
   const offlineEl = document.getElementById('members-offline');
   onlineEl.innerHTML  = '';
   offlineEl.innerHTML = '';
 
-  state.onlineUsers.forEach(name => {
-    const row = document.createElement('div');
+  function memberRow(name, isOnline) {
+    const row    = document.createElement('div');
     row.className = 'member-row';
     const colour = avatarColour(name);
     row.innerHTML = `
-      <div class="user-avatar" style="background:${colour};width:24px;height:24px;font-size:.7rem">${name[0].toUpperCase()}</div>
-      <span class="member-name">${esc(name)}</span>
-      <div class="member-dot online" style="margin-left:auto"></div>`;
-    onlineEl.appendChild(row);
-  });
-  if (!state.onlineUsers.length) {
+      <div class="user-avatar" style="background:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div>
+      <span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}</span>
+      <div class="member-dot ${isOnline?'online':'offline'}" style="margin-left:auto"></div>`;
+    return row;
+  }
+
+  if (online.length) {
+    online.forEach(name => onlineEl.appendChild(memberRow(name, true)));
+  } else {
     onlineEl.innerHTML = '<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">Nobody online</div>';
   }
-  offlineEl.innerHTML = '<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">—</div>';
+
+  if (offline.length) {
+    offline.forEach(name => offlineEl.appendChild(memberRow(name, false)));
+  } else {
+    offlineEl.innerHTML = '<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">—</div>';
+  }
 }
 
 // ══ FILE ATTACH ════════════════════════════════════════════════════════
@@ -692,16 +711,30 @@ function buildMsgEl(msg) {
   if (msg.attachment_url) {
     const mime = msg.attachment_mime || '';
     const body = div.querySelector('.msg-body');
+
     if (mime.startsWith('image/')) {
-      // Inline image — resolved to full URL by the Go side at send time,
-      // but when coming from history it's a relative path, so resolve here.
       const imgEl = document.createElement('img');
       imgEl.className = 'msg-image';
       imgEl.alt       = msg.attachment_name || 'image';
-      // resolve full URL
       resolveAttachURL(msg.attachment_url).then(url => { imgEl.src = url; });
       imgEl.addEventListener('click', () => openLightbox(imgEl.src));
       body.appendChild(imgEl);
+
+    } else if (mime.startsWith('video/')) {
+      const vid = document.createElement('video');
+      vid.className = 'msg-video';
+      vid.controls  = true;
+      vid.preload   = 'metadata';
+      resolveAttachURL(msg.attachment_url).then(url => { vid.src = url; });
+      body.appendChild(vid);
+
+    } else if (mime.startsWith('audio/')) {
+      const aud = document.createElement('audio');
+      aud.className = 'msg-audio';
+      aud.controls  = true;
+      resolveAttachURL(msg.attachment_url).then(url => { aud.src = url; });
+      body.appendChild(aud);
+
     } else {
       // Generic file download chip
       const chip = document.createElement('a');
@@ -808,8 +841,8 @@ function init() {
     }
   });
 
-  window.runtime.EventsOn('chat:users', users => {
-    renderMembers(users || []);
+  window.runtime.EventsOn('chat:users', payload => {
+    renderMembers(payload || {});
   });
 
   window.runtime.EventsOn('ws:disconnected', () => {

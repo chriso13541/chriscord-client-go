@@ -8,6 +8,8 @@ export function Disconnect():Promise<void>;
 
 export function GetBoards(arg1:string):Promise<Array<main.Board>>;
 
+export function GetFileURL(arg1:string):Promise<string>;
+
 export function GetRooms():Promise<Array<main.Room>>;
 
 export function GetServerInfo(arg1:string):Promise<main.ServerInfo>;
@@ -16,8 +18,12 @@ export function GetServers():Promise<Array<main.SavedServer>>;
 
 export function GetUsername():Promise<string>;
 
+export function PickFile():Promise<string>;
+
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
-export function SendMessage(arg1:string,arg2:string):Promise<void>;
+export function SendMessage(arg1:string,arg2:string,arg3:any,arg4:any,arg5:any):Promise<void>;
 
 export function SubscribeBoard(arg1:string):Promise<void>;
+
+export function UploadFile(arg1:string):Promise<main.UploadResult>;

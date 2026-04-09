@@ -14,6 +14,10 @@ export function GetBoards(arg1) {
   return window['go']['main']['App']['GetBoards'](arg1);
 }
 
+export function GetFileURL(arg1) {
+  return window['go']['main']['App']['GetFileURL'](arg1);
+}
+
 export function GetRooms() {
   return window['go']['main']['App']['GetRooms']();
 }
@@ -30,14 +34,22 @@ export function GetUsername() {
   return window['go']['main']['App']['GetUsername']();
 }
 
+export function PickFile() {
+  return window['go']['main']['App']['PickFile']();
+}
+
 export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
 }
 
-export function SendMessage(arg1, arg2) {
-  return window['go']['main']['App']['SendMessage'](arg1, arg2);
+export function SendMessage(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SubscribeBoard(arg1) {
   return window['go']['main']['App']['SubscribeBoard'](arg1);
+}
+
+export function UploadFile(arg1) {
+  return window['go']['main']['App']['UploadFile'](arg1);
 }
