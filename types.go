@@ -1,5 +1,9 @@
 package main
 
+// SavedServer is the on-disk record for one host we've joined. Identity now
+// lives at the account level (see account.go), not here — every host uses
+// whichever account is currently unlocked, so this just tracks connection
+// details: the join key, a display name, and the username we last joined as.
 type SavedServer struct {
 	Domain       string `json:"domain"`
 	ServerKey    string `json:"server_key"`
@@ -12,9 +16,32 @@ type ServerInfo struct {
 	RequiresKey bool   `json:"requires_key"`
 }
 
+type ChallengeResponse struct {
+	Nonce string `json:"nonce"`
+}
+
 type JoinResponse struct {
-	Token    string `json:"token"`
-	Username string `json:"username"`
+	Token       string `json:"token"`
+	Username    string `json:"username"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// AccountView is what's safe to expose to the frontend for the active
+// account — never the public key, and nothing from identity.json.
+type AccountView struct {
+	Username    string `json:"username"`
+	Fingerprint string `json:"fingerprint"`
+	HasAvatar   bool   `json:"has_avatar"`
+}
+
+// AccountSummary describes a locally saved account without unlocking it.
+// account.json is stored in plaintext (it's just a display name), so this
+// is available before any passphrase is entered — enough to list accounts
+// for a future switcher.
+type AccountSummary struct {
+	Slug      string `json:"slug"`
+	Username  string `json:"username"`
+	HasAvatar bool   `json:"has_avatar"`
 }
 
 type Room struct {
@@ -44,6 +71,16 @@ type ChatMessage struct {
 	Attachments []Attachment `json:"attachments"`
 	Edited      bool         `json:"edited"`
 	CreatedAt   string       `json:"created_at"`
+}
+
+// SearchResult is a ChatMessage plus which board (and its room) it came
+// from — only meaningful for server-wide search, which spans every
+// channel. The embedded ChatMessage's fields are promoted into the same
+// JSON object by encoding/json, matching the server's #[serde(flatten)].
+type SearchResult struct {
+	ChatMessage
+	BoardName string `json:"board_name"`
+	RoomID    string `json:"room_id"`
 }
 
 type UploadResult struct {

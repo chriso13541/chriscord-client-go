@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,14 +22,16 @@ import (
 )
 
 type App struct {
-	ctx      context.Context
-	mu       sync.Mutex
-	writeMu  sync.Mutex
-	ws       *websocket.Conn
-	token    string
-	domain   string
-	username string
-	servers  []SavedServer
+	ctx         context.Context
+	mu          sync.Mutex
+	writeMu     sync.Mutex
+	ws          *websocket.Conn
+	token       string
+	domain      string
+	username    string
+	fingerprint string
+	account     *Account
+	servers     []SavedServer
 }
 
 func NewApp() *App { return &App{} }
@@ -86,6 +91,76 @@ func (a *App) GetServers() []SavedServer {
 	return a.servers
 }
 
+// ── Account ──────────────────────────────────────────────────────────────
+
+// HasAccount reports whether an account is set up locally — the frontend
+// uses this at startup to decide between onboarding and the unlock prompt.
+func (a *App) HasAccount() bool { return HasAnyAccount() }
+
+// ListAccounts is available for a future account switcher; not wired into
+// any UI flow yet, but doesn't unlock anything to produce its answer.
+func (a *App) ListAccounts() []AccountSummary { return ListAccounts() }
+
+func (a *App) CreateAccount(username, passphrase, pfpPath string) (*AccountView, error) {
+	acct, err := CreateAccount(username, passphrase, pfpPath)
+	if err != nil { return nil, err }
+	a.mu.Lock(); a.account = acct; a.mu.Unlock()
+	return acct.View(), nil
+}
+
+func (a *App) ImportAccount(sourcePath, passphrase string) (*AccountView, error) {
+	acct, err := ImportAccount(sourcePath, passphrase)
+	if err != nil { return nil, err }
+	a.mu.Lock(); a.account = acct; a.mu.Unlock()
+	return acct.View(), nil
+}
+
+// UnlockAccount decrypts the active account into memory for this session.
+// Called once per launch; after this, every Connect() reuses the decrypted
+// key without touching disk again.
+func (a *App) UnlockAccount(passphrase string) (*AccountView, error) {
+	acct, err := UnlockActiveAccount(passphrase)
+	if err != nil { return nil, err }
+	a.mu.Lock(); a.account = acct; a.mu.Unlock()
+	return acct.View(), nil
+}
+
+func (a *App) ExportAccount(destPath string) error {
+	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
+	if slug == "" { return fmt.Errorf("no account unlocked") }
+	return ExportAccount(slug, destPath)
+}
+
+func (a *App) GetAccountInfo() *AccountView {
+	a.mu.Lock(); defer a.mu.Unlock()
+	return a.account.View()
+}
+
+func (a *App) PickAccountFile() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Select account_key.zip",
+		Filters: []runtime.FileFilter{{DisplayName: "Account key", Pattern: "*.zip"}},
+	})
+}
+
+func (a *App) PickAccountFolder() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Select account folder"})
+}
+
+func (a *App) PickPfp() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Select profile picture",
+		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg"}},
+	})
+}
+
+func (a *App) PickExportDestination() (string, error) {
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title: "Export account key", DefaultFilename: "account_key.zip",
+		Filters: []runtime.FileFilter{{DisplayName: "Account key", Pattern: "*.zip"}},
+	})
+}
+
 func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
 	resp, err := http.Get(normaliseHTTP(domain) + "/api/info")
 	if err != nil { return nil, fmt.Errorf("cannot reach server: %w", err) }
@@ -95,20 +170,54 @@ func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
 	return &info, nil
 }
 
-func (a *App) Connect(domain, serverKey, username string) error {
+// requestChallenge asks the host for a nonce to sign, proving control of
+// publicKeyHex without ever sending the private key over the wire.
+func requestChallenge(base, publicKeyHex string) (string, error) {
+	var resp ChallengeResponse
+	body := map[string]string{"public_key": publicKeyHex}
+	if err := postJSON(base+"/api/challenge", body, &resp); err != nil {
+		return "", fmt.Errorf("challenge failed: %w", err)
+	}
+	return resp.Nonce, nil
+}
+
+// Connect joins domain using whichever account is currently unlocked (see
+// UnlockAccount). The username comes from the account, not per-server —
+// one identity, same name everywhere, same as Discord.
+func (a *App) Connect(domain, serverKey string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.account == nil { return fmt.Errorf("no account unlocked") }
 	if a.ws != nil { a.ws.Close(); a.ws = nil }
 
 	base := normaliseHTTP(domain)
-	joinBody := map[string]interface{}{"username": username}
+	pubHex := hex.EncodeToString(a.account.PublicKey)
+
+	// 1. Get a nonce bound to our public key.
+	nonce, err := requestChallenge(base, pubHex)
+	if err != nil { return err }
+
+	// 2. Sign the *raw* nonce bytes (the server hex-decodes before verifying),
+	// not the hex string itself.
+	nonceBytes, err := hex.DecodeString(nonce)
+	if err != nil { return fmt.Errorf("server sent a malformed nonce: %w", err) }
+	signature := ed25519.Sign(a.account.PrivateKey, nonceBytes)
+
+	// 3. Join with the signed nonce.
+	joinBody := map[string]interface{}{
+		"username":   a.account.Username,
+		"public_key": pubHex,
+		"nonce":      nonce,
+		"signature":  hex.EncodeToString(signature),
+	}
 	if serverKey != "" { joinBody["server_key"] = serverKey }
 	var joinResp JoinResponse
 	if err := postJSON(base+"/api/join", joinBody, &joinResp); err != nil { return err }
 
-	a.domain   = domain
-	a.token    = joinResp.Token
-	a.username = joinResp.Username
+	a.domain      = domain
+	a.token       = joinResp.Token
+	a.username    = joinResp.Username
+	a.fingerprint = joinResp.Fingerprint
 
 	displayName := domain
 	if info, err := a.GetServerInfo(domain); err == nil { displayName = info.Name }
@@ -177,6 +286,26 @@ func (a *App) GetRooms() ([]Room, error) {
 func (a *App) GetBoards(roomID string) ([]Board, error) {
 	var boards []Board
 	return boards, a.doGET("/api/rooms/"+roomID+"/boards", &boards)
+}
+
+// SearchServer searches every board's message content on this host, not
+// just one channel — "rooms" render as categories inside one connected
+// server, not separate joinable spaces, so search spans all of them by
+// default.
+func (a *App) SearchServer(query string) ([]SearchResult, error) {
+	var results []SearchResult
+	path := "/api/search?q=" + url.QueryEscape(query)
+	return results, a.doGET(path, &results)
+}
+
+// GetMessagesBefore fetches one page of messages older than beforeID, for
+// "load older" when scrolling to the top of a board's history. Page size is
+// fixed server-side (messages::HISTORY_PAGE) — see the matching constant in
+// frontend/index.html.
+func (a *App) GetMessagesBefore(boardID, beforeID string) ([]ChatMessage, error) {
+	var msgs []ChatMessage
+	path := "/api/boards/" + boardID + "/messages?before=" + url.QueryEscape(beforeID)
+	return msgs, a.doGET(path, &msgs)
 }
 
 func (a *App) SubscribeBoard(boardID string) error {
@@ -301,6 +430,27 @@ func (a *App) UploadFile(filePath string) (*UploadResult, error) {
 	return &result, nil
 }
 
+// DownloadFile prompts a native Save dialog and streams url's contents to
+// the chosen path. suggestedName pre-fills the dialog's filename.
+func (a *App) DownloadFile(url, suggestedName string) error {
+	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title: "Save file", DefaultFilename: suggestedName,
+	})
+	if err != nil { return err }
+	if dest == "" { return nil } // user cancelled
+
+	resp, err := http.Get(url)
+	if err != nil { return fmt.Errorf("download failed: %w", err) }
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 { return fmt.Errorf("download failed: HTTP %d", resp.StatusCode) }
+
+	out, err := os.Create(dest)
+	if err != nil { return fmt.Errorf("could not create %s: %w", dest, err) }
+	defer out.Close()
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
 // GetFileURL returns the full URL for a server-relative path.
 func (a *App) GetFileURL(path string) string {
 	a.mu.Lock(); defer a.mu.Unlock()
@@ -330,10 +480,14 @@ func (a *App) FetchLinkPreview(url string) (*LinkPreview, error) {
 
 func (a *App) GetUsername() string { return a.username }
 
+// GetFingerprint returns the current session's identity fingerprint
+// (first 16 hex chars of the public key), as returned by /api/join.
+func (a *App) GetFingerprint() string { return a.fingerprint }
+
 func (a *App) Disconnect() {
 	a.mu.Lock(); defer a.mu.Unlock()
 	if a.ws != nil { a.ws.Close(); a.ws = nil }
-	a.token = ""; a.domain = ""; a.username = ""
+	a.token = ""; a.domain = ""; a.username = ""; a.fingerprint = ""
 }
 
 func (a *App) RemoveServer(domain string) []SavedServer {

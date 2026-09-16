@@ -24,7 +24,10 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 14, G: 17, B: 23, A: 255},
-		OnStartup:        app.startup,
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
+		},
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
 		},

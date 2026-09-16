@@ -1,5 +1,37 @@
 export namespace main {
 	
+	export class AccountSummary {
+	    slug: string;
+	    username: string;
+	    has_avatar: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AccountSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.slug = source["slug"];
+	        this.username = source["username"];
+	        this.has_avatar = source["has_avatar"];
+	    }
+	}
+	export class AccountView {
+	    username: string;
+	    fingerprint: string;
+	    has_avatar: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AccountView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.username = source["username"];
+	        this.fingerprint = source["fingerprint"];
+	        this.has_avatar = source["has_avatar"];
+	    }
+	}
 	export class Attachment {
 	    url: string;
 	    name: string;
@@ -31,6 +63,48 @@ export namespace main {
 	        this.room_id = source["room_id"];
 	        this.name = source["name"];
 	    }
+	}
+	export class ChatMessage {
+	    id: string;
+	    board_id: string;
+	    username: string;
+	    content: string;
+	    attachments: Attachment[];
+	    edited: boolean;
+	    created_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChatMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.board_id = source["board_id"];
+	        this.username = source["username"];
+	        this.content = source["content"];
+	        this.attachments = this.convertValues(source["attachments"], Attachment);
+	        this.edited = source["edited"];
+	        this.created_at = source["created_at"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class LinkPreview {
 	    url: string;
@@ -85,6 +159,52 @@ export namespace main {
 	        this.display_name = source["display_name"];
 	        this.last_username = source["last_username"];
 	    }
+	}
+	export class SearchResult {
+	    id: string;
+	    board_id: string;
+	    username: string;
+	    content: string;
+	    attachments: Attachment[];
+	    edited: boolean;
+	    created_at: string;
+	    board_name: string;
+	    room_id: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SearchResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.board_id = source["board_id"];
+	        this.username = source["username"];
+	        this.content = source["content"];
+	        this.attachments = this.convertValues(source["attachments"], Attachment);
+	        this.edited = source["edited"];
+	        this.created_at = source["created_at"];
+	        this.board_name = source["board_name"];
+	        this.room_id = source["room_id"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ServerInfo {
 	    name: string;

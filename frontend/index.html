@@ -81,6 +81,8 @@ input,button,textarea { font-family:inherit; }
 .status-dot { width:8px; height:8px; border-radius:50%; background:var(--green); margin-left:auto; flex-shrink:0; }
 
 /* Main chat */
+#main-column { flex:1; display:flex; flex-direction:column; min-width:0; }
+#content-row { flex:1; display:flex; min-height:0; }
 #chat-main { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-darkest); position:relative; }
 #chat-header { height:48px; padding:0 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; flex-shrink:0; }
 #chat-header .board-title { font-weight:700; font-size:1rem; color:var(--text-strong); }
@@ -89,17 +91,30 @@ input,button,textarea { font-family:inherit; }
 #toggle-members-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
 #toggle-members-btn:hover { background:var(--bg-light); color:var(--text); }
 #toggle-members-btn.active { color:var(--accent); }
+#search-box { display:flex; align-items:center; background:var(--bg-mid); border:1px solid var(--border); border-radius:6px; padding:0 4px 0 10px; width:160px; flex-shrink:0; transition:border-color .15s,width .15s; }
+#search-box:focus-within { border-color:var(--accent-dim); width:190px; }
+#msg-search-input { flex:1; min-width:0; background:none; border:none; outline:none; padding:6px 4px 6px 0; font-size:.83rem; color:var(--text-strong); }
+#msg-search-input::placeholder { color:var(--text-muted); }
+#msg-search-btn,#msg-search-clear { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.8rem; padding:4px 5px; line-height:1; flex-shrink:0; }
+#msg-search-btn:hover,#msg-search-clear:hover { color:var(--accent); }
 
 /* Drop overlay */
-#drop-overlay { position:absolute; inset:48px 0 0 0; background:rgba(114,137,218,.12); border:3px dashed var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; z-index:50; pointer-events:none; font-size:1.4rem; font-weight:700; color:var(--accent); gap:12px; }
+#drop-overlay { position:absolute; inset:0; background:rgba(114,137,218,.12); border:3px dashed var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; z-index:50; pointer-events:none; font-size:1.4rem; font-weight:700; color:var(--accent); gap:12px; }
 
-#messages { flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; }
+#messages { flex:1; overflow-y:auto; overflow-anchor:none; padding:16px 20px; display:flex; flex-direction:column; }
 
 /* Messages */
 .msg-group { display:flex; gap:12px; padding:4px 8px; border-radius:4px; transition:background .1s; position:relative; }
 .msg-group:hover { background:rgba(255,255,255,.025); }
 .msg-group:hover .msg-actions { opacity:1; }
 .msg-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; color:#fff; margin-top:2px; }
+/* Message grouping — consecutive messages from the same author within a
+   short window collapse into one visual block, Discord-style: no repeated
+   avatar/username, tighter spacing, timestamp only reveals on hover. */
+.msg-group.grouped { padding-top:0; }
+.msg-avatar-time { background:transparent !important; }
+.msg-avatar-time .hover-time { font-size:.68rem; color:var(--text-muted); opacity:0; transition:opacity .1s; white-space:nowrap; }
+.msg-group:hover .msg-avatar-time .hover-time { opacity:1; }
 .msg-body { flex:1; min-width:0; }
 .msg-meta { display:flex; align-items:baseline; gap:8px; margin-bottom:2px; }
 .msg-username { font-weight:700; font-size:.9rem; color:var(--text-strong); }
@@ -122,11 +137,11 @@ input,button,textarea { font-family:inherit; }
 
 /* Multi-image grid */
 .img-grid { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; max-width:500px; }
-.img-grid-1 .grid-img { max-width:400px; max-height:300px; }
-.img-grid-2 .grid-img, .img-grid-3 .grid-img, .img-grid-4 .grid-img { width:calc(50% - 2px); max-height:200px; }
-.grid-img { object-fit:cover; border-radius:4px; cursor:zoom-in; display:block; border:1px solid var(--border); }
+.img-grid-1 .grid-img { width:400px; max-width:100%; height:260px; }
+.img-grid-2 .grid-img, .img-grid-3 .grid-img, .img-grid-4 .grid-img { width:calc(50% - 2px); height:180px; }
+.grid-img { object-fit:cover; border-radius:4px; cursor:zoom-in; display:block; border:1px solid var(--border); background:var(--bg-mid); }
 
-.msg-video { max-width:480px; border-radius:8px; margin-top:6px; display:block; border:1px solid var(--border); background:#000; }
+.msg-video { width:480px; max-width:100%; height:270px; object-fit:cover; border-radius:8px; margin-top:6px; display:block; border:1px solid var(--border); background:#000; }
 .msg-audio { width:320px; margin-top:6px; display:block; }
 .msg-file-chip { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:8px 12px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--text); font-size:.85rem; transition:border-color .15s; user-select:text; }
 .msg-file-chip:hover { border-color:var(--accent); }
@@ -146,10 +161,12 @@ input,button,textarea { font-family:inherit; }
 .msg-action-btn { background:var(--bg-light); border:1px solid var(--border); border-radius:4px; color:var(--text-muted); cursor:pointer; font-size:.9rem; padding:2px 7px; line-height:1.4; transition:background .1s,color .1s; }
 .msg-action-btn:hover { background:var(--bg-mid); color:var(--text); }
 .msg-dropdown { position:absolute; top:26px; right:0; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px; padding:4px; min-width:150px; z-index:60; box-shadow:0 4px 20px rgba(0,0,0,.4); }
+.msg-dropdown.dropdown-up { top:auto; bottom:26px; }
 .msg-dropdown-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:4px; font-size:.85rem; cursor:pointer; color:var(--text); white-space:nowrap; }
 .msg-dropdown-item:hover { background:var(--bg-light); }
 .msg-dropdown-item.danger { color:var(--red); }
 .msg-dropdown-item.danger:hover { background:rgba(240,71,71,.12); }
+.msg-dropdown-item .dd-label { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:200; cursor:zoom-out; }
@@ -179,7 +196,20 @@ input,button,textarea { font-family:inherit; }
 /* Members panel */
 #members-panel { width:var(--members-w); background:var(--bg-dark); border-left:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; transition:width .2s ease,opacity .2s ease; overflow:hidden; }
 #members-panel.collapsed { width:0; opacity:0; border-left:none; }
-#members-panel-inner { width:var(--members-w); padding:12px 10px; overflow-y:auto; flex:1; }
+#members-panel.searching { width:calc(var(--members-w) * 1.5); }
+#members-panel-inner { padding:12px 10px; overflow-y:auto; flex:1; }
+#results-summary { display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text-muted); padding-bottom:10px; margin-bottom:8px; border-bottom:1px solid var(--border); }
+#results-summary .clear-results { background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:auto; font-size:.78rem; padding:2px 5px; border-radius:4px; flex-shrink:0; }
+#results-summary .clear-results:hover { background:var(--bg-light); color:var(--text); }
+.search-result-row { padding:6px; border-radius:6px; margin-bottom:2px; cursor:pointer; }
+.search-result-row:hover { background:var(--bg-light); }
+.sr-head { display:flex; align-items:center; gap:6px; margin-bottom:2px; flex-wrap:wrap; row-gap:2px; }
+.sr-avatar { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.62rem; font-weight:700; color:#fff; flex-shrink:0; }
+.sr-channel { font-size:.66rem; color:var(--text-muted); background:var(--bg-mid); padding:1px 5px; border-radius:3px; flex-shrink:0; }
+.sr-user { font-size:.78rem; font-weight:600; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sr-time { font-size:.66rem; color:var(--text-muted); margin-left:auto; flex-shrink:0; }
+.sr-content { font-size:.8rem; color:var(--text); line-height:1.35; word-break:break-word; }
+.sr-attach { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
 .members-section-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); padding:8px 6px 4px; }
 .member-row { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:4px; }
 .member-row:hover { background:var(--bg-light); }
@@ -191,18 +221,79 @@ input,button,textarea { font-family:inherit; }
 .msg-placeholder { color:var(--text-muted); font-style:italic; font-size:.85rem; padding:8px 0; }
 .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; display:inline-block; }
 @keyframes spin { to { transform:rotate(360deg); } }
-#toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--bg-light); border:1px solid var(--border); border-radius:8px; padding:10px 18px; font-size:.88rem; color:var(--text); transition:transform .25s ease; pointer-events:none; z-index:300; }
+#toast { position:fixed; bottom:20px; left:50%; max-width:min(420px,80vw); text-align:center; transform:translateX(-50%) translateY(150%); background:var(--bg-light); border:1px solid var(--border); border-radius:8px; padding:10px 18px; font-size:.88rem; color:var(--text); transition:transform .25s ease; pointer-events:none; z-index:300; }
 #toast.show { transform:translateX(-50%) translateY(0); }
 #toast.error { border-color:var(--red); color:var(--red); }
+
+/* ACCOUNT GATE */
+#screen-account-gate { display:flex; align-items:center; justify-content:center; height:100vh; padding:20px; }
+.gate-card { width:100%; max-width:420px; background:var(--bg-dark); border:1px solid var(--border); border-radius:12px; padding:32px 30px; }
+.gate-card .servers-header { margin-bottom:24px; }
+.gate-tabs { display:flex; gap:4px; margin-bottom:20px; background:var(--bg-darkest); border-radius:8px; padding:3px; }
+.gate-tab { flex:1; text-align:center; padding:8px; border-radius:6px; font-size:.85rem; font-weight:600; cursor:pointer; color:var(--text-muted); transition:background .15s,color .15s; }
+.gate-tab.active { background:var(--bg-light); color:var(--text-strong); }
+.gate-link { text-align:center; margin-top:16px; font-size:.82rem; color:var(--text-muted); }
+.gate-link a, .signed-in-as a { color:var(--accent); cursor:pointer; text-decoration:none; }
+.gate-link a:hover, .signed-in-as a:hover { text-decoration:underline; }
+.signed-in-as { text-align:center; font-size:.82rem; color:var(--text-muted); margin-top:10px; }
 </style>
 </head>
 <body>
 
-<div id="screen-servers">
+<div id="screen-account-gate" class="hidden">
+  <div class="gate-card">
+    <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your homelab, your rules.</p></div>
+
+    <!-- Shown when an account already exists locally and just needs unlocking -->
+    <div id="gate-unlock" class="hidden">
+      <div class="error-msg hidden" id="unlock-error"></div>
+      <div class="form-group"><label>Passphrase</label><input id="unlock-passphrase" type="password" placeholder="Unlock your account" autocomplete="off"></div>
+      <button class="btn btn-primary" id="unlock-btn" style="width:100%;margin-top:6px">Unlock</button>
+      <div class="gate-link">Not you? <a id="unlock-import-link">Import a different account key</a></div>
+    </div>
+
+    <!-- Shown on first run, before any account exists locally -->
+    <div id="gate-onboard" class="hidden">
+      <div class="gate-tabs">
+        <div class="gate-tab active" id="tab-create">Create Account</div>
+        <div class="gate-tab" id="tab-import">Import Account</div>
+      </div>
+
+      <div id="onboard-create">
+        <div class="error-msg hidden" id="create-error"></div>
+        <div class="form-group">
+          <button class="btn btn-ghost btn-sm" id="create-pick-pfp-btn" type="button">Choose profile picture (optional)</button>
+          <div class="hint" id="create-pfp-selected"></div>
+        </div>
+        <div class="form-group"><label>Username</label><input id="create-username" type="text" placeholder="How you'll appear everywhere" maxlength="32" autocomplete="off"></div>
+        <div class="form-group"><label>Passphrase</label><input id="create-passphrase" type="password" placeholder="Protects your account key at rest" autocomplete="off"></div>
+        <div class="form-group"><label>Confirm Passphrase</label><input id="create-passphrase-confirm" type="password" placeholder="Type it again" autocomplete="off"></div>
+        <button class="btn btn-primary" id="create-account-btn" style="width:100%;margin-top:6px">Create Account</button>
+      </div>
+
+      <div id="onboard-import" class="hidden">
+        <div class="error-msg hidden" id="import-error"></div>
+        <div class="form-group">
+          <label>Account Key</label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" id="import-pick-zip-btn" type="button" style="flex:1">Choose .zip</button>
+            <button class="btn btn-ghost" id="import-pick-folder-btn" type="button" style="flex:1">Choose folder</button>
+          </div>
+          <div class="hint" id="import-selected-path">No account key selected yet.</div>
+        </div>
+        <div class="form-group"><label>Passphrase</label><input id="import-passphrase" type="password" placeholder="The passphrase this key was created with" autocomplete="off"></div>
+        <button class="btn btn-primary" id="import-account-btn" style="width:100%;margin-top:6px">Import Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="screen-servers" class="hidden">
   <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your homelab, your rules.</p></div>
   <div class="server-list" id="server-list"></div>
   <button class="btn-add-server" id="open-add-btn">＋  Add a Server</button>
   <p class="empty-hint hidden" id="no-servers-hint">No servers yet — add one above to get started.</p>
+  <div class="signed-in-as" id="signed-in-as"></div>
 </div>
 
 <div class="modal-overlay hidden" id="modal-add">
@@ -211,7 +302,6 @@ input,button,textarea { font-family:inherit; }
     <div class="error-msg hidden" id="add-error"></div>
     <div class="form-group"><label>Domain / IP</label><input id="f-domain" type="text" placeholder="chris-domain1.com  or  192.168.1.10:7070" autocomplete="off"><div class="hint">The address of the homelab running chriscord-server.</div></div>
     <div class="form-group"><label>Join Key <span style="font-weight:400;text-transform:none;letter-spacing:0">(leave blank if server is open)</span></label><input id="f-key" type="text" placeholder="e.g. a3f9bc12" autocomplete="off"></div>
-    <div class="form-group"><label>Username</label><input id="f-username" type="text" placeholder="How you appear in chat" maxlength="32" autocomplete="off"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancel-add-btn">Cancel</button>
       <button class="btn btn-primary" id="connect-btn">Connect</button>
@@ -244,26 +334,41 @@ input,button,textarea { font-family:inherit; }
       <div class="status-dot" id="status-dot"></div>
     </div>
   </div>
-  <div id="chat-main">
+  <div id="main-column">
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
       <button id="toggle-members-btn" title="Toggle member list">👥 Members</button>
-    </div>
-    <div id="drop-overlay" class="hidden">📂 Drop files to attach</div>
-    <div id="messages"></div>
-    <div id="input-area">
-      <div id="attach-queue" class="empty"></div>
-      <div id="input-wrap">
-        <button id="attach-btn" disabled title="Attach files (or drag & drop)">＋</button>
-        <textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea>
-        <button id="send-btn" disabled>➤</button>
+      <div id="search-box">
+        <input id="msg-search-input" type="text" placeholder="Search" autocomplete="off">
+        <button id="msg-search-clear" class="hidden" title="Clear search">✕</button>
+        <button id="msg-search-btn" title="Search">🔍</button>
       </div>
     </div>
-  </div>
-  <div id="members-panel" class="collapsed">
-    <div id="members-panel-inner">
-      <div class="members-section-label">Online</div><div id="members-online"></div>
-      <div class="members-section-label" style="margin-top:12px">Offline</div><div id="members-offline"></div>
+    <div id="content-row">
+      <div id="chat-main">
+        <div id="drop-overlay" class="hidden">📂 Drop files to attach</div>
+        <div id="messages"></div>
+        <div id="input-area">
+          <div id="attach-queue" class="empty"></div>
+          <div id="input-wrap">
+            <button id="attach-btn" disabled title="Attach files (or drag & drop)">＋</button>
+            <textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea>
+            <button id="send-btn" disabled>➤</button>
+          </div>
+        </div>
+      </div>
+      <div id="members-panel" class="collapsed">
+        <div id="members-panel-inner">
+          <div id="members-normal">
+            <div class="members-section-label">Online</div><div id="members-online"></div>
+            <div class="members-section-label" style="margin-top:12px">Offline</div><div id="members-offline"></div>
+          </div>
+          <div id="members-results" class="hidden">
+            <div id="results-summary"></div>
+            <div id="results-list"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -274,12 +379,15 @@ input,button,textarea { font-family:inherit; }
 <script>
 const state = {
   servers:[],rooms:[],boardsByRoom:{},expandedRooms:new Set(),
-  selectedRoomId:null,selectedBoardId:null,
+  selectedRoomId:null,selectedBoardId:null,selectedBoardName:'',domain:'',
   username:'',serverName:'',messages:[],
   wsConnected:false,onlineUsers:[],
   attachQueue:[],membersVisible:false,
   activeDropdown:null,
   pendingDeleteId:null,
+  account:null,
+  oldestByBoard:{},exhaustedBoards:new Set(),loadingOlder:false,
+  searchActive:false,
 };
 
 const AVATAR_COLOURS=['#7289da','#43b581','#faa61a','#f04747','#1abc9c','#e91e63','#9c27b0','#3f51b5'];
@@ -288,6 +396,112 @@ function showScreen(id){document.querySelectorAll('[id^="screen-"]').forEach(el=
 let toastTimer;
 function toast(msg,isError=false){const el=document.getElementById('toast');el.textContent=msg;el.className='show'+(isError?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3500);}
 function esc(str){return String(str??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── ACCOUNT GATE ─────────────────────────────────────────────────
+// Runs before anything else: either the account you set up locally just
+// needs its passphrase, or there's no account yet and you create/import one.
+let pickedPfpPath='';
+let pickedImportPath='';
+
+async function boot(){
+  showScreen('screen-account-gate');
+  const hasAccount=await window.go.main.App.HasAccount();
+  showGateView(hasAccount?'unlock':'onboard');
+}
+
+function showGateView(view){
+  document.getElementById('gate-unlock').classList.toggle('hidden',view!=='unlock');
+  document.getElementById('gate-onboard').classList.toggle('hidden',view!=='onboard');
+  if(view==='unlock')document.getElementById('unlock-passphrase').focus();
+}
+
+function setGateTab(tab){
+  document.getElementById('tab-create').classList.toggle('active',tab==='create');
+  document.getElementById('tab-import').classList.toggle('active',tab==='import');
+  document.getElementById('onboard-create').classList.toggle('hidden',tab!=='create');
+  document.getElementById('onboard-import').classList.toggle('hidden',tab!=='import');
+}
+
+// Called once an account is unlocked/created/imported — same next step
+// regardless of which of the three got us here.
+async function enterApp(accountView){
+  state.account=accountView||null;
+  const el=document.getElementById('signed-in-as');
+  if(el){
+    el.innerHTML=state.account?`Signed in as <strong>${esc(state.account.username)}</strong> · <a id="export-account-link">Export Account Key</a>`:'';
+    document.getElementById('export-account-link')?.addEventListener('click',exportAccount);
+  }
+  showScreen('screen-servers');
+  await loadServers();
+}
+
+async function submitUnlock(){
+  const pass=document.getElementById('unlock-passphrase').value;
+  const errEl=document.getElementById('unlock-error'),btn=document.getElementById('unlock-btn');
+  if(!pass){errEl.textContent='Enter your passphrase.';errEl.classList.remove('hidden');return;}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
+  try{
+    const acct=await window.go.main.App.UnlockAccount(pass);
+    document.getElementById('unlock-passphrase').value='';
+    await enterApp(acct);
+  }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
+  finally{btn.disabled=false;btn.textContent='Unlock';}
+}
+
+async function pickCreatePfp(){
+  try{
+    const path=await window.go.main.App.PickPfp();
+    if(!path)return;
+    pickedPfpPath=path;
+    document.getElementById('create-pfp-selected').textContent='Selected: '+path.split(/[\\/]/).pop();
+  }catch(err){/* dialog cancelled — nothing to do */}
+}
+
+async function submitCreateAccount(){
+  const username=document.getElementById('create-username').value.trim();
+  const pass=document.getElementById('create-passphrase').value;
+  const confirmPass=document.getElementById('create-passphrase-confirm').value;
+  const errEl=document.getElementById('create-error'),btn=document.getElementById('create-account-btn');
+  if(!username){errEl.textContent='Username is required.';errEl.classList.remove('hidden');return;}
+  if(!pass){errEl.textContent='Passphrase is required.';errEl.classList.remove('hidden');return;}
+  if(pass!==confirmPass){errEl.textContent="Passphrases don't match.";errEl.classList.remove('hidden');return;}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
+  try{
+    const acct=await window.go.main.App.CreateAccount(username,pass,pickedPfpPath);
+    await enterApp(acct);
+  }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
+  finally{btn.disabled=false;btn.textContent='Create Account';}
+}
+
+async function pickImportZip(){
+  try{const path=await window.go.main.App.PickAccountFile();if(!path)return;pickedImportPath=path;document.getElementById('import-selected-path').textContent='Selected: '+path.split(/[\\/]/).pop();}
+  catch(err){/* dialog cancelled */}
+}
+async function pickImportFolder(){
+  try{const path=await window.go.main.App.PickAccountFolder();if(!path)return;pickedImportPath=path;document.getElementById('import-selected-path').textContent='Selected: '+path.split(/[\\/]/).pop();}
+  catch(err){/* dialog cancelled */}
+}
+async function submitImportAccount(){
+  const pass=document.getElementById('import-passphrase').value;
+  const errEl=document.getElementById('import-error'),btn=document.getElementById('import-account-btn');
+  if(!pickedImportPath){errEl.textContent='Choose an account_key.zip or folder first.';errEl.classList.remove('hidden');return;}
+  if(!pass){errEl.textContent='Enter the passphrase for this account key.';errEl.classList.remove('hidden');return;}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
+  try{
+    const acct=await window.go.main.App.ImportAccount(pickedImportPath,pass);
+    await enterApp(acct);
+  }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
+  finally{btn.disabled=false;btn.textContent='Import Account';}
+}
+
+async function exportAccount(){
+  try{
+    const dest=await window.go.main.App.PickExportDestination();
+    if(!dest)return;
+    await window.go.main.App.ExportAccount(dest);
+    toast('Account key exported.');
+  }catch(err){toast(String(err),true);}
+}
 
 // ── URL detection ────────────────────────────────────────────────
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
@@ -319,32 +533,38 @@ function renderServers(){
       <div class="server-info"><div class="name">${esc(s.display_name||s.domain)}</div><div class="domain">${esc(s.domain)}</div>${s.last_username?`<div class="lastuser">@${esc(s.last_username)}</div>`:''}</div>
       <div class="server-actions">
         <button class="btn btn-ghost btn-sm remove-btn" data-domain="${esc(s.domain)}">✕</button>
-        <button class="btn btn-primary btn-sm connect-server-btn" data-domain="${esc(s.domain)}" data-key="${esc(s.server_key)}" data-user="${esc(s.last_username)}">Connect</button>
+        <button class="btn btn-primary btn-sm connect-server-btn" data-domain="${esc(s.domain)}" data-key="${esc(s.server_key)}">Connect</button>
       </div>`;
-    card.querySelector('.connect-server-btn').addEventListener('click',e=>{const{domain,key,user}=e.currentTarget.dataset;user?doConnect(domain,key,user):openAddModal(domain,key);});
+    card.querySelector('.connect-server-btn').addEventListener('click',async e=>{
+      const{domain,key}=e.currentTarget.dataset,btn=e.currentTarget;
+      btn.disabled=true;
+      try{await doConnect(domain,key);}catch(err){/* doConnect already toasted */}
+      finally{btn.disabled=false;}
+    });
     card.querySelector('.remove-btn').addEventListener('click',async e=>{e.stopPropagation();state.servers=await window.go.main.App.RemoveServer(e.currentTarget.dataset.domain);renderServers();});
     list.appendChild(card);
   });
 }
 
 // ── ADD SERVER MODAL ─────────────────────────────────────────────
-function openAddModal(d='',k=''){document.getElementById('f-domain').value=d;document.getElementById('f-key').value=k;document.getElementById('f-username').value='';document.getElementById('add-error').classList.add('hidden');document.getElementById('modal-add').classList.remove('hidden');document.getElementById(d?'f-username':'f-domain').focus();}
+function openAddModal(d='',k=''){document.getElementById('f-domain').value=d;document.getElementById('f-key').value=k;document.getElementById('add-error').classList.add('hidden');document.getElementById('modal-add').classList.remove('hidden');document.getElementById('f-domain').focus();}
 function closeAddModal(){document.getElementById('modal-add').classList.add('hidden');}
 async function submitAddServer(){
-  const domain=document.getElementById('f-domain').value.trim(),key=document.getElementById('f-key').value.trim(),username=document.getElementById('f-username').value.trim();
+  const domain=document.getElementById('f-domain').value.trim(),key=document.getElementById('f-key').value.trim();
   const errEl=document.getElementById('add-error'),btn=document.getElementById('connect-btn');
-  if(!domain||!username){errEl.textContent='Domain and username are required.';errEl.classList.remove('hidden');return;}
+  if(!domain){errEl.textContent='Domain is required.';errEl.classList.remove('hidden');return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
-  try{await doConnect(domain,key,username);closeAddModal();}
+  try{await doConnect(domain,key);closeAddModal();}
   catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
   finally{btn.disabled=false;btn.textContent='Connect';}
 }
 
 // ── CONNECT ──────────────────────────────────────────────────────
-async function doConnect(domain,serverKey,username){
-  try{await window.go.main.App.Connect(domain,serverKey,username);}
+async function doConnect(domain,serverKey){
+  try{await window.go.main.App.Connect(domain,serverKey);}
   catch(err){toast(String(err),true);throw err;}
   state.username=await window.go.main.App.GetUsername();
+  state.domain=domain;
   state.rooms=[];state.boardsByRoom={};state.expandedRooms=new Set();
   state.selectedRoomId=null;state.selectedBoardId=null;state.messages=[];
   state.onlineUsers=[];state.attachQueue=[];state.wsConnected=true;
@@ -367,15 +587,39 @@ function showChatScreen(){
   document.getElementById('msg-input').disabled=true;
   document.getElementById('send-btn').disabled=true;
   document.getElementById('attach-btn').disabled=true;
+  document.getElementById('msg-search-input').placeholder='Search '+state.serverName;
+  exitSearch();
   clearAttachQueue();
   state.membersVisible=localStorage.getItem('membersVisible')==='true';
   const panel=document.getElementById('members-panel'),btn=document.getElementById('toggle-members-btn');
   if(state.membersVisible){panel.classList.remove('collapsed');btn.classList.add('active');}
   else{panel.classList.add('collapsed');btn.classList.remove('active');}
 }
+// Remembers the last board you were in, per server, so a fresh launch drops
+// you back where you left off instead of always asking you to pick again.
+function getLastBoard(domain){
+  if(!domain)return null;
+  try{return JSON.parse(localStorage.getItem('lastBoard:'+domain));}catch{return null;}
+}
+function setLastBoard(domain,roomId,boardId,boardName){
+  if(!domain)return;
+  localStorage.setItem('lastBoard:'+domain,JSON.stringify({roomId,boardId,boardName}));
+}
+
 async function loadRooms(){
   try{state.rooms=await window.go.main.App.GetRooms()||[];}catch(err){toast('Failed to load rooms: '+err,true);state.rooms=[];}
-  renderSidebar();if(state.rooms.length)toggleRoom(state.rooms[0].id);
+  if(!state.rooms.length){renderSidebar();return;}
+
+  const remembered=getLastBoard(state.domain);
+  const targetRoomId=(remembered&&state.rooms.some(r=>r.id===remembered.roomId))?remembered.roomId:state.rooms[0].id;
+  renderSidebar();
+  await toggleRoom(targetRoomId);
+
+  const boards=state.boardsByRoom[targetRoomId]||[];
+  if(!boards.length)return; // nothing to select — leaves the "pick a board" placeholder up, which is correct here
+  const remaining=(remembered&&remembered.roomId===targetRoomId)?boards.find(b=>b.id===remembered.boardId):null;
+  const target=remaining||boards[0];
+  await selectBoard(target.id,target.name,targetRoomId);
 }
 function renderSidebar(){
   const list=document.getElementById('room-list');list.innerHTML='';
@@ -388,7 +632,7 @@ function renderSidebar(){
     if(isOpen){
       if(boards===null){const l=document.createElement('div');l.style.cssText='padding:4px 12px';l.innerHTML='<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>';list.appendChild(l);}
       else if(!boards.length){const e=document.createElement('div');e.style.cssText='padding:4px 24px;font-size:.8rem;color:var(--text-muted)';e.textContent='No boards';list.appendChild(e);}
-      else boards.forEach(board=>{const item=document.createElement('div');item.className='board-item'+(state.selectedBoardId===board.id?' active':'');item.textContent=board.name;item.addEventListener('click',()=>selectBoard(board.id,board.name));list.appendChild(item);});
+      else boards.forEach(board=>{const item=document.createElement('div');item.className='board-item'+(state.selectedBoardId===board.id?' active':'');item.textContent=board.name;item.addEventListener('click',()=>selectBoard(board.id,board.name,room.id));list.appendChild(item);});
     }
   });
 }
@@ -399,15 +643,17 @@ async function toggleRoom(roomId){
     if(!state.boardsByRoom[roomId]){try{state.boardsByRoom[roomId]=await window.go.main.App.GetBoards(roomId)||[];}catch{state.boardsByRoom[roomId]=[];}renderSidebar();}
   }
 }
-async function selectBoard(boardId,boardName){
+async function selectBoard(boardId,boardName,roomId){
   if(state.selectedBoardId===boardId)return;
-  state.selectedBoardId=boardId;state.messages=[];clearAttachQueue();
+  state.selectedBoardId=boardId;state.selectedBoardName=boardName;state.selectedRoomId=roomId??state.selectedRoomId;state.messages=[];clearAttachQueue();
+  exitSearch();
   const hdr=document.getElementById('board-title-placeholder');hdr.className='board-title';hdr.textContent=boardName;
   document.getElementById('msg-input').placeholder=`Message  #${boardName}`;
   document.getElementById('msg-input').disabled=false;document.getElementById('send-btn').disabled=false;document.getElementById('attach-btn').disabled=false;
   document.getElementById('msg-input').focus();
   document.getElementById('messages').innerHTML='<div class="msg-placeholder">Loading history…</div>';
   renderSidebar();
+  setLastBoard(state.domain,state.selectedRoomId,boardId,boardName);
   try{await window.go.main.App.SubscribeBoard(boardId);}catch(err){toast('Subscribe failed: '+err,true);}
 }
 
@@ -417,6 +663,15 @@ function toggleMembers(){
   const panel=document.getElementById('members-panel'),btn=document.getElementById('toggle-members-btn');
   if(state.membersVisible){panel.classList.remove('collapsed');btn.classList.add('active');}
   else{panel.classList.add('collapsed');btn.classList.remove('active');}
+}
+// Opens the members panel if it's currently collapsed — used so search
+// results have somewhere visible to land, without touching the panel if
+// it's already open.
+function ensureMembersPanelOpen(){
+  if(state.membersVisible)return;
+  state.membersVisible=true;localStorage.setItem('membersVisible','true');
+  document.getElementById('members-panel').classList.remove('collapsed');
+  document.getElementById('toggle-members-btn').classList.add('active');
 }
 function renderMembers(payload){
   const online=payload?.online??[],all=payload?.all??[];
@@ -500,13 +755,17 @@ function initDragDrop(){
     toast('Drag & drop requires using the ＋ button in this version of Wails. Use ＋ to attach files.',true);
   });
 
-  // Register Wails native drop handler if available
+  // Register Wails native drop handler if available.
+  // useDropTarget:false — we already track hover/highlight ourselves via
+  // dragenter/dragleave above, so we don't need Wails' own CSS-marker-based
+  // target matching (which requires an element styled with
+  // --wails-drop-target: drop; we deliberately don't use that mechanism).
   try {
     if(typeof window.runtime?.OnFileDrop==='function'){
       window.runtime.OnFileDrop(async(x,y,paths)=>{
         if(!state.selectedBoardId||!paths?.length)return;
         await queueFiles(paths);
-      },true);
+      },false);
     }
   } catch(e) {
     // OnFileDrop not available in this Wails version — that's fine
@@ -557,35 +816,209 @@ function openExternalURL(url){
 }
 
 // ── MESSAGES ─────────────────────────────────────────────────────
-function renderMessages(){
-  const c=document.getElementById('messages');c.innerHTML='';
+// Consecutive messages from the same author within this window are grouped
+// into one visual block (matches Discord's default behaviour).
+const GROUP_WINDOW_MS = 7*60*1000;
+function isGroupedWith(prev,msg){
+  if(!prev||prev.username!==msg.username)return false;
+  const t1=Date.parse(prev.created_at),t2=Date.parse(msg.created_at);
+  if(!isFinite(t1)||!isFinite(t2))return false;
+  return (t2-t1)>=0 && (t2-t1)<GROUP_WINDOW_MS;
+}
+
+// Must match the server's messages::HISTORY_PAGE — used to tell whether a
+// page we just received was a full page (there may be more before it) or a
+// short one (we've reached the actual start of the channel).
+const HISTORY_PAGE = 50;
+
+function renderMessages(stickToBottom=true){
+  const c=document.getElementById('messages');
+  const prevScrollTop=c.scrollTop,prevScrollHeight=c.scrollHeight;
+  c.innerHTML='';
   if(!state.messages.length){c.innerHTML='<div class="msg-placeholder">No messages yet. Say hi!</div>';return;}
-  state.messages.forEach(m=>c.appendChild(buildMsgEl(m)));
-  c.scrollTop=c.scrollHeight;
+  if(state.exhaustedBoards.has(state.selectedBoardId)){
+    const top=document.createElement('div');top.className='msg-placeholder';top.style.textAlign='center';
+    top.textContent='— Beginning of the channel —';c.appendChild(top);
+  }
+  state.messages.forEach((m,i)=>c.appendChild(buildMsgEl(m,isGroupedWith(state.messages[i-1],m))));
+  if(stickToBottom)c.scrollTop=c.scrollHeight;
+  else c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
 }
 function appendMessage(msg){
   const c=document.getElementById('messages');
   c.querySelector('.msg-placeholder')?.remove();
-  c.appendChild(buildMsgEl(msg));c.scrollTop=c.scrollHeight;
+  // Read the previous message straight from the DOM rather than state.messages —
+  // callers push onto state.messages before calling this, so its array index
+  // would already point at msg itself.
+  const last=c.lastElementChild;
+  const prev=(last&&last.classList.contains('msg-group'))?{username:last.dataset.username,created_at:last.dataset.ts}:null;
+  const wasNearBottom=(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
+  c.appendChild(buildMsgEl(msg,isGroupedWith(prev,msg)));
+  if(wasNearBottom)c.scrollTop=c.scrollHeight;
+  // else: leave the scroll position alone — don't pull someone back down to
+  // live chat just because a message arrived while they were scrolled up
+  // reading (or loading) history.
+}
+// Removes one message without touching any other rendered node except,
+// where necessary, the one immediately after it. Used for both delete
+// paths instead of a full renderMessages() — rebuilding the entire list
+// (which could be ~100 nodes) on every single delete is what caused visible
+// jank when several deletes happen in quick succession, especially while
+// scrolling. The only reason this needs any care at all rather than a
+// plain element.remove() is grouping: if the deleted message was a group's
+// leader (the one showing the avatar/username), the message right after it
+// needs to recompute whether it's still grouped — now against whatever
+// message is newly adjacent to it — and only gets rebuilt if that actually
+// changes.
+function removeMessageFromDOM(id){
+  const c=document.getElementById('messages');
+  const prevScrollTop=c.scrollTop,prevScrollHeight=c.scrollHeight;
+
+  const idx=state.messages.findIndex(m=>m.id===id);
+  if(idx===-1)return; // not currently loaded — e.g. it was on a page we've since scrolled past
+  state.messages.splice(idx,1);
+
+  document.querySelector(`.msg-group[data-id="${CSS.escape(id)}"]`)?.remove();
+
+  if(!state.messages.length){
+    c.innerHTML='<div class="msg-placeholder">No messages yet. Say hi!</div>';
+    return;
+  }
+
+  const prevMsg=idx>0?state.messages[idx-1]:null;
+  const nextMsg=idx<state.messages.length?state.messages[idx]:null; // was at idx+1 before the splice
+  if(nextMsg){
+    const nextEl=document.querySelector(`.msg-group[data-id="${CSS.escape(nextMsg.id)}"]`);
+    const shouldBeGrouped=isGroupedWith(prevMsg,nextMsg);
+    if(nextEl&&shouldBeGrouped!==nextEl.classList.contains('grouped')){
+      nextEl.replaceWith(buildMsgEl(nextMsg,shouldBeGrouped));
+    }
+  }
+
+  c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
 }
 
-function buildMsgEl(msg){
+// Fetches one older page when the user scrolls near the top of history.
+// Guarded against overlapping calls and against boards already known to
+// have no more history (exhaustedBoards).
+async function loadOlderMessages(){
+  const boardId=state.selectedBoardId;
+  if(!boardId||state.loadingOlder||state.exhaustedBoards.has(boardId))return;
+  const oldest=state.oldestByBoard[boardId];
+  if(!oldest)return;
+  state.loadingOlder=true;
+  const c=document.getElementById('messages');
+  let spinner=c.querySelector('#older-spinner');
+  if(!spinner){
+    spinner=document.createElement('div');spinner.id='older-spinner';
+    spinner.style.cssText='text-align:center;padding:8px';
+    spinner.innerHTML='<span class="spinner" style="width:14px;height:14px;border-width:1.5px"></span>';
+    c.prepend(spinner);
+  }
+  try{
+    const older=await window.go.main.App.GetMessagesBefore(boardId,oldest)||[];
+    spinner.remove();
+    if(boardId!==state.selectedBoardId)return; // switched boards while this was in flight
+    if(!older.length){state.exhaustedBoards.add(boardId);return;}
+    state.messages=older.concat(state.messages);
+    state.oldestByBoard[boardId]=older[0].id;
+    if(older.length<HISTORY_PAGE)state.exhaustedBoards.add(boardId);
+    renderMessages(false);
+  }catch(err){spinner.remove();toast('Failed to load older messages: '+err,true);}
+  finally{state.loadingOlder=false;}
+}
+
+// ── SEARCH ───────────────────────────────────────────────────────
+// Searches every board on the server, not just the one you're viewing —
+// results appear in the members panel, swapped in for the online/offline
+// list. The live channel underneath is untouched, same as Discord's search
+// results panel.
+async function runSearch(){
+  const input=document.getElementById('msg-search-input');
+  const q=input.value.trim();
+  if(!state.domain){toast('Connect to a server first',true);return;}
+  if(!q){exitSearch();return;}
+  try{
+    const results=await window.go.main.App.SearchServer(q)||[];
+    showSearchResults(results,q);
+  }catch(err){toast('Search failed: '+err,true);}
+}
+function showSearchResults(results,q){
+  state.searchActive=true;
+  document.getElementById('msg-search-clear').classList.remove('hidden');
+  ensureMembersPanelOpen();
+  document.getElementById('members-panel').classList.add('searching');
+  document.getElementById('members-normal').classList.add('hidden');
+  document.getElementById('members-results').classList.remove('hidden');
+
+  const summary=document.getElementById('results-summary');
+  summary.innerHTML=`<span>${results.length} result${results.length===1?'':'s'} for "${esc(q)}"</span>`+
+    `<button class="clear-results" title="Back to members">✕</button>`;
+  summary.querySelector('.clear-results').addEventListener('click',exitSearch);
+
+  const list=document.getElementById('results-list');list.innerHTML='';
+  if(!results.length){list.innerHTML='<div style="font-size:.8rem;color:var(--text-muted);padding:4px 2px">No messages found.</div>';return;}
+  results.forEach(m=>list.appendChild(buildSearchResultRow(m)));
+}
+function exitSearch(){
+  state.searchActive=false;
+  document.getElementById('msg-search-input').value='';
+  document.getElementById('msg-search-clear').classList.add('hidden');
+  document.getElementById('members-panel').classList.remove('searching');
+  document.getElementById('members-results').classList.add('hidden');
+  document.getElementById('members-normal').classList.remove('hidden');
+}
+// Closes search and switches to wherever a result came from — expanding
+// its room/category in the sidebar first if it isn't already, so the
+// destination doesn't look like it appeared out of nowhere.
+async function jumpToSearchResult(msg){
+  exitSearch();
+  if(!state.expandedRooms.has(msg.room_id)){
+    state.expandedRooms.add(msg.room_id);
+    if(!state.boardsByRoom[msg.room_id]){
+      try{state.boardsByRoom[msg.room_id]=await window.go.main.App.GetBoards(msg.room_id)||[];}
+      catch{state.boardsByRoom[msg.room_id]=[];}
+    }
+  }
+  await selectBoard(msg.board_id,msg.board_name,msg.room_id);
+}
+// Compact result row for the narrow members-panel column — not the full
+// rich message bubble (avatar circle, attachments, edit/delete menu) used
+// in the main pane, which wouldn't fit this width. Clickable since results
+// can now come from any channel, not just the one you're already viewing.
+function buildSearchResultRow(msg){
+  const colour=avatarColour(msg.username),initial=msg.username[0].toUpperCase();
+  const time=formatTime(msg.created_at);
+  const hasAttach=(msg.attachments||[]).length>0;
+  const row=document.createElement('div');row.className='search-result-row';
+  row.innerHTML=`
+    <div class="sr-head"><div class="sr-avatar" style="background:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time">${time}</span></div>
+    ${msg.content?`<div class="sr-content">${esc(msg.content)}</div>`:''}
+    ${hasAttach?'<div class="sr-attach">📎 Attachment</div>':''}`;
+  row.addEventListener('click',()=>jumpToSearchResult(msg));
+  return row;
+}
+
+function buildMsgEl(msg,grouped){
   const colour=avatarColour(msg.username),initial=msg.username[0].toUpperCase();
   const time=formatTime(msg.created_at),isOwn=msg.username===state.username;
   const attachments=msg.attachments||[];
 
-  const div=document.createElement('div');div.className='msg-group';div.dataset.id=msg.id;
+  const div=document.createElement('div');
+  div.className='msg-group'+(grouped?' grouped':'');
+  div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
   div.innerHTML=`
-    <div class="msg-avatar" style="background:${colour}">${initial}</div>
+    ${grouped
+      ? `<div class="msg-avatar msg-avatar-time"><span class="hover-time">${time}</span></div>`
+      : `<div class="msg-avatar" style="background:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
-        <span class="msg-username">${esc(msg.username)}</span>
-        <span class="msg-time">${time}</span>
+        ${grouped?'':`<span class="msg-username">${esc(msg.username)}</span><span class="msg-time">${time}</span>`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}
       </div>
       ${msg.content?`<div class="msg-content">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
-    ${isOwn?`<div class="msg-actions"><button class="msg-action-btn" title="More options">⋯</button></div>`:''}`;
+    ${(isOwn||attachments.length)?`<div class="msg-actions"><button class="msg-action-btn" title="More options">⋯</button></div>`:''}`;
 
   const body=div.querySelector('.msg-body');
 
@@ -631,7 +1064,7 @@ function buildMsgEl(msg){
   if(msg.content)maybeRenderPreviews(div,msg.content);
 
   // 3-dot menu
-  if(isOwn){
+  if(isOwn||attachments.length){
     div.querySelector('.msg-action-btn')?.addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
   }
   return div;
@@ -643,13 +1076,35 @@ function toggleDropdown(msgEl,msg){
   const existing=msgEl.querySelector('.msg-dropdown');
   if(existing){existing.remove();state.activeDropdown=null;return;}
   const dd=document.createElement('div');dd.className='msg-dropdown';
-  const editItem=document.createElement('div');editItem.className='msg-dropdown-item';editItem.innerHTML='✏️  Edit message';
-  editItem.addEventListener('click',()=>{closeDropdown();startEdit(msgEl,msg);});
-  const delItem=document.createElement('div');delItem.className='msg-dropdown-item danger';delItem.innerHTML='🗑️  Delete message';
-  delItem.addEventListener('click',()=>{closeDropdown();showDeleteConfirm(msg.id);});
-  dd.appendChild(editItem);dd.appendChild(delItem);
+  const isOwn=msg.username===state.username;
+  (msg.attachments||[]).forEach(a=>{
+    const item=document.createElement('div');item.className='msg-dropdown-item';
+    item.innerHTML=`⬇️  <span class="dd-label" title="${esc(a.name||'file')}">Download ${esc(a.name||'file')}</span>`;
+    item.addEventListener('click',()=>{closeDropdown();downloadAttachment(a);});
+    dd.appendChild(item);
+  });
+  if(isOwn){
+    const editItem=document.createElement('div');editItem.className='msg-dropdown-item';editItem.innerHTML='✏️  Edit message';
+    editItem.addEventListener('click',()=>{closeDropdown();startEdit(msgEl,msg);});
+    const delItem=document.createElement('div');delItem.className='msg-dropdown-item danger';delItem.innerHTML='🗑️  Delete message';
+    delItem.addEventListener('click',()=>{closeDropdown();showDeleteConfirm(msg.id);});
+    dd.appendChild(editItem);dd.appendChild(delItem);
+  }
   msgEl.querySelector('.msg-actions').appendChild(dd);
   state.activeDropdown=dd;
+
+  // If the menu would extend past the visible message list (e.g. the last
+  // message in the channel, right above the input box), open it upward
+  // instead of downward so it's never rendered under the input area.
+  const messagesEl=document.getElementById('messages');
+  const ddRect=dd.getBoundingClientRect(),containerRect=messagesEl.getBoundingClientRect();
+  if(ddRect.bottom>containerRect.bottom)dd.classList.add('dropdown-up');
+}
+async function downloadAttachment(a){
+  try{
+    const url=await resolveAttachURL(a.url);
+    await window.go.main.App.DownloadFile(url,a.name||'file');
+  }catch(err){toast('Download failed: '+err,true);}
 }
 function closeDropdown(){document.querySelectorAll('.msg-dropdown').forEach(d=>d.remove());state.activeDropdown=null;}
 
@@ -668,8 +1123,7 @@ async function executeDelete(){
   if(!id)return;
   try{
     await window.go.main.App.DeleteMessage(id);
-    document.querySelector(`.msg-group[data-id="${CSS.escape(id)}"]`)?.remove();
-    state.messages=state.messages.filter(m=>m.id!==id);
+    removeMessageFromDOM(id);
   }catch(err){toast('Delete failed: '+err,true);}
 }
 
@@ -740,9 +1194,13 @@ function init(){
     const msgs=Array.isArray(payload)?payload:(payload?.messages??[]);
     const boardId=payload?.board_id??null;
     if(boardId&&boardId!==state.selectedBoardId)return;
-    state.messages=msgs;renderMessages();
+    state.messages=msgs;
+    state.oldestByBoard[state.selectedBoardId]=msgs[0]?.id||null;
+    if(msgs.length<HISTORY_PAGE)state.exhaustedBoards.add(state.selectedBoardId);
+    else state.exhaustedBoards.delete(state.selectedBoardId);
+    renderMessages();
   });
-  window.runtime.EventsOn('chat:message',msg=>{if(msg?.board_id===state.selectedBoardId){state.messages.push(msg);appendMessage(msg);}});
+  window.runtime.EventsOn('chat:message',msg=>{if(msg?.board_id===state.selectedBoardId){state.messages.push(msg);if(!state.searchActive)appendMessage(msg);}});
   window.runtime.EventsOn('chat:edit',ev=>{
     if(!ev||ev.board_id!==state.selectedBoardId)return;
     const m=state.messages.find(m=>m.id===ev.id);if(m){m.content=ev.content;m.edited=true;}
@@ -754,8 +1212,7 @@ function init(){
   });
   window.runtime.EventsOn('chat:delete',ev=>{
     if(!ev||ev.board_id!==state.selectedBoardId)return;
-    state.messages=state.messages.filter(m=>m.id!==ev.id);
-    document.querySelector(`.msg-group[data-id="${CSS.escape(ev.id)}"]`)?.remove();
+    removeMessageFromDOM(ev.id);
   });
   window.runtime.EventsOn('chat:users',payload=>renderMembers(payload||{}));
   window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);document.getElementById('status-dot').style.background='var(--red)';}});
@@ -770,18 +1227,34 @@ function init(){
   document.getElementById('confirm-cancel-btn').addEventListener('click',closeDeleteConfirm);
   document.getElementById('confirm-delete-btn').addEventListener('click',executeDelete);
 
+  document.getElementById('unlock-btn').addEventListener('click',submitUnlock);
+  document.getElementById('unlock-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')submitUnlock();});
+  document.getElementById('unlock-import-link').addEventListener('click',()=>showGateView('onboard'));
+  document.getElementById('tab-create').addEventListener('click',()=>setGateTab('create'));
+  document.getElementById('tab-import').addEventListener('click',()=>setGateTab('import'));
+  document.getElementById('create-pick-pfp-btn').addEventListener('click',pickCreatePfp);
+  document.getElementById('create-account-btn').addEventListener('click',submitCreateAccount);
+  document.getElementById('import-pick-zip-btn').addEventListener('click',pickImportZip);
+  document.getElementById('import-pick-folder-btn').addEventListener('click',pickImportFolder);
+  document.getElementById('import-account-btn').addEventListener('click',submitImportAccount);
+  ['create-username','create-passphrase','create-passphrase-confirm'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')submitCreateAccount();});});
+  document.getElementById('import-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')submitImportAccount();});
+
   document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
   document.getElementById('msg-input').addEventListener('input',e=>autoResize(e.target));
   document.getElementById('modal-add').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAddModal();});
   document.getElementById('modal-confirm-delete').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDeleteConfirm();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeDropdown();}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeDropdown();if(state.searchActive)exitSearch();}});
   document.addEventListener('click',()=>closeDropdown());
   document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.add('hidden'));
-  ['f-domain','f-key','f-username'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')submitAddServer();});});
+  document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();});
+  document.getElementById('msg-search-btn').addEventListener('click',runSearch);
+  document.getElementById('msg-search-clear').addEventListener('click',exitSearch);
+  document.getElementById('msg-search-input').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});
+  ['f-domain','f-key'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')submitAddServer();});});
 
   initDragDrop();
-  loadServers();
-  showScreen('screen-servers');
+  boot();
 }
 </script>
 </body>
