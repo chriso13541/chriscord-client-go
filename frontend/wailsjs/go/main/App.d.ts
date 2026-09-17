@@ -54,6 +54,8 @@ export function PickFiles():Promise<Array<string>>;
 
 export function PickPfp():Promise<string>;
 
+export function PingServer():Promise<number>;
+
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
 export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;

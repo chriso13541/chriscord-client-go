@@ -170,6 +170,21 @@ func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
 	return &info, nil
 }
 
+// PingServer times a real round trip to the currently connected host, in
+// milliseconds. Reuses the existing unauthenticated /api/info endpoint
+// rather than needing a dedicated ping route.
+func (a *App) PingServer() (int64, error) {
+	a.mu.Lock(); domain := a.domain; a.mu.Unlock()
+	if domain == "" { return 0, fmt.Errorf("not connected") }
+	client := &http.Client{Timeout: 5 * time.Second}
+	start := time.Now()
+	resp, err := client.Get(normaliseHTTP(domain) + "/api/info")
+	if err != nil { return 0, fmt.Errorf("ping failed: %w", err) }
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	return time.Since(start).Milliseconds(), nil
+}
+
 // requestChallenge asks the host for a nonce to sign, proving control of
 // publicKeyHex without ever sending the private key over the wire.
 func requestChallenge(base, publicKeyHex string) (string, error) {

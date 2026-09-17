@@ -77,12 +77,17 @@ input,button,textarea { font-family:inherit; }
 .board-item .board-hash { font-weight:700; margin-right:6px; flex-shrink:0; }
 .board-item .board-name { overflow:hidden; text-overflow:ellipsis; }
 .board-item:hover { background:var(--bg-light); color:var(--text); }
-.board-item.unread { color:var(--text); }
+.board-item.unread { color:var(--text-strong); }
 .board-item.active { background:var(--bg-light); color:var(--text-strong); font-weight:600; }
-#sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); }
+#sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); position:relative; }
 .user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; color:#fff; flex-shrink:0; }
 .user-name { font-size:.85rem; font-weight:600; color:var(--text-strong); }
-.status-dot { width:8px; height:8px; border-radius:50%; background:var(--green); margin-left:auto; flex-shrink:0; }
+.status-dot-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; margin-left:auto; flex-shrink:0; }
+.status-dot-btn:hover { background:var(--bg-light); }
+.status-dot { width:8px; height:8px; border-radius:50%; background:var(--green); flex-shrink:0; }
+#ping-popover { position:absolute; bottom:calc(100% + 8px); right:8px; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px; padding:10px 14px; box-shadow:0 4px 20px rgba(0,0,0,.4); z-index:150; min-width:130px; }
+#ping-popover .ping-value { font-weight:700; font-size:.85rem; color:var(--text-strong); }
+#ping-popover .ping-label { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
 
 /* Main chat */
 #main-column { flex:1; display:flex; flex-direction:column; min-width:0; }
@@ -349,7 +354,13 @@ input,button,textarea { font-family:inherit; }
     <div id="sidebar-user">
       <div class="user-avatar" id="user-avatar">?</div>
       <span class="user-name" id="user-name-label">username</span>
-      <div class="status-dot" id="status-dot"></div>
+      <button class="status-dot-btn" id="status-dot-btn" title="Connected">
+        <span class="status-dot" id="status-dot"></span>
+      </button>
+      <div id="ping-popover" class="hidden">
+        <div class="ping-value" id="ping-value">-- ms</div>
+        <div class="ping-label" id="ping-label"></div>
+      </div>
     </div>
   </div>
   <div id="main-column">
@@ -409,6 +420,7 @@ const state = {
   unreadBoards:new Set(),
   searchActive:false,
   zoomLevel:1,
+  lastPingMs:null,
 };
 
 // ── ZOOM ─────────────────────────────────────────────────────────
@@ -616,6 +628,58 @@ async function submitAddServer(){
 }
 
 // ── CONNECT ──────────────────────────────────────────────────────
+// ── CONNECTION STATUS / PING ─────────────────────────────────────
+// Single source of truth for the status dot's color and tooltip — anything
+// that changes connection state or ping should call this rather than
+// touching the dot directly, which is exactly what was missing before:
+// disconnect flipped it red directly with no corresponding reset anywhere,
+// so it could never recover without restarting the app.
+function updateStatusDotColor(){
+  const dot=document.getElementById('status-dot'),btn=document.getElementById('status-dot-btn');
+  if(!dot||!btn)return;
+  if(!state.wsConnected){
+    dot.style.background='var(--red)';
+    btn.title='Disconnected';
+    return;
+  }
+  if(state.lastPingMs!=null&&state.lastPingMs>100){
+    dot.style.background='var(--yellow)';
+    btn.title=`Connected · ${state.lastPingMs}ms (slow)`;
+  }else{
+    dot.style.background='var(--green)';
+    btn.title=state.lastPingMs!=null?`Connected · ${state.lastPingMs}ms`:'Connected';
+  }
+}
+const PING_MIN_INTERVAL_MS=5*60*1000; // don't let repeated clicks (or anything else) hit the server with ping requests more than once every 5 minutes
+let pingIntervalId=null,lastPingCheckAt=0;
+async function updatePingOnce(){
+  lastPingCheckAt=Date.now(); // recorded even on failure — a broken server shouldn't get hammered either
+  try{state.lastPingMs=await window.go.main.App.PingServer();}
+  catch{state.lastPingMs=null;}
+  updateStatusDotColor();
+}
+function startPingLoop(){
+  stopPingLoop();
+  updatePingOnce(); // always check once immediately on a fresh connect
+  pingIntervalId=setInterval(updatePingOnce,PING_MIN_INTERVAL_MS);
+}
+function stopPingLoop(){
+  if(pingIntervalId){clearInterval(pingIntervalId);pingIntervalId=null;}
+}
+async function togglePingPopover(e){
+  e.stopPropagation();
+  const pop=document.getElementById('ping-popover');
+  if(!pop.classList.contains('hidden')){pop.classList.add('hidden');return;}
+  pop.classList.remove('hidden');
+  if(Date.now()-lastPingCheckAt>=PING_MIN_INTERVAL_MS){
+    document.getElementById('ping-value').textContent='Pinging…';
+    document.getElementById('ping-label').textContent='';
+    await updatePingOnce();
+  }
+  document.getElementById('ping-value').textContent=state.lastPingMs!=null?`${state.lastPingMs} ms`:'Unreachable';
+  document.getElementById('ping-label').textContent=state.wsConnected?'Connected':'Disconnected';
+}
+
 async function doConnect(domain,serverKey){
   try{await window.go.main.App.Connect(domain,serverKey);}
   catch(err){toast(String(err),true);throw err;}
@@ -623,7 +687,8 @@ async function doConnect(domain,serverKey){
   state.domain=domain;
   state.rooms=[];state.boardsByRoom={};state.expandedRooms=new Set();state.unreadBoards=new Set();
   state.selectedRoomId=null;state.selectedBoardId=null;state.messages=[];
-  state.onlineUsers=[];state.attachQueue=[];state.wsConnected=true;
+  state.onlineUsers=[];state.attachQueue=[];state.wsConnected=true;state.lastPingMs=null;
+  updateStatusDotColor();startPingLoop();
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.display_name||domain;
@@ -1310,7 +1375,7 @@ async function sendMessage(){
 }
 
 async function goBack(){
-  state.wsConnected=false;await window.go.main.App.Disconnect();
+  state.wsConnected=false;stopPingLoop();await window.go.main.App.Disconnect();
   state.servers=await window.go.main.App.GetServers();renderServers();showScreen('screen-servers');
 }
 
@@ -1385,7 +1450,7 @@ function init(){
   });
   window.runtime.EventsOn('chat:users',payload=>renderMembers(payload||{}));
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
-  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);document.getElementById('status-dot').style.background='var(--red)';}});
+  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);state.wsConnected=false;stopPingLoop();updateStatusDotColor();}});
 
   document.getElementById('open-add-btn').addEventListener('click',()=>openAddModal());
   document.getElementById('cancel-add-btn').addEventListener('click',closeAddModal);
@@ -1420,6 +1485,8 @@ function init(){
   document.getElementById('modal-export').addEventListener('click',e=>{if(e.target===e.currentTarget)closeExportModal();});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeExportModal();closeDropdown();if(state.searchActive)exitSearch();}});
   document.addEventListener('click',()=>closeDropdown());
+  document.getElementById('status-dot-btn').addEventListener('click',togglePingPopover);
+  document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.add('hidden'));
   document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();});
   document.getElementById('msg-search-btn').addEventListener('click',runSearch);

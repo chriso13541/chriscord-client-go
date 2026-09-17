@@ -106,6 +106,10 @@ export function PickPfp() {
   return window['go']['main']['App']['PickPfp']();
 }
 
+export function PingServer() {
+  return window['go']['main']['App']['PingServer']();
+}
+
 export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
 }
