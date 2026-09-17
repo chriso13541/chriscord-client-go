@@ -274,6 +274,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:edit", editEvent{ID: msg.ID, BoardID: msg.BoardID, Content: msg.Content})
 		case "message_delete":
 			runtime.EventsEmit(a.ctx, "chat:delete", deleteEvent{ID: msg.ID, BoardID: msg.BoardID})
+		case "rooms_updated":
+			runtime.EventsEmit(a.ctx, "rooms:updated")
 		}
 	}
 }

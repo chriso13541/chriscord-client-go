@@ -30,8 +30,8 @@ export function EditMessage(arg1, arg2) {
   return window['go']['main']['App']['EditMessage'](arg1, arg2);
 }
 
-export function ExportAccount(arg1) {
-  return window['go']['main']['App']['ExportAccount'](arg1);
+export function ExportAccount(arg1, arg2) {
+  return window['go']['main']['App']['ExportAccount'](arg1, arg2);
 }
 
 export function FetchLinkPreview(arg1) {

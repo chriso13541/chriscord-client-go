@@ -16,7 +16,7 @@ export function DropFiles(arg1:Array<string>):Promise<void>;
 
 export function EditMessage(arg1:string,arg2:string):Promise<void>;
 
-export function ExportAccount(arg1:string):Promise<void>;
+export function ExportAccount(arg1:string,arg2:string):Promise<void>;
 
 export function FetchLinkPreview(arg1:string):Promise<main.LinkPreview>;
 
