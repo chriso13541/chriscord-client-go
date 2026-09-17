@@ -321,6 +321,18 @@ input,button,textarea { font-family:inherit; }
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="modal-export">
+  <div class="modal">
+    <h2>Export Account Key</h2>
+    <div class="error-msg hidden" id="export-error"></div>
+    <div class="form-group"><label>Passphrase</label><input id="export-passphrase" type="password" placeholder="Confirm your passphrase" autocomplete="off"><div class="hint">Protects the exported file — nobody can open it without this, including anything it carries with it like your saved servers' join keys.</div></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="export-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="export-confirm-btn">Export</button>
+    </div>
+  </div>
+</div>
+
 <div id="screen-chat" class="hidden">
   <div id="sidebar">
     <div id="sidebar-header">
@@ -429,7 +441,7 @@ async function enterApp(accountView){
   const el=document.getElementById('signed-in-as');
   if(el){
     el.innerHTML=state.account?`Signed in as <strong>${esc(state.account.username)}</strong> · <a id="export-account-link">Export Account Key</a>`:'';
-    document.getElementById('export-account-link')?.addEventListener('click',exportAccount);
+    document.getElementById('export-account-link')?.addEventListener('click',openExportModal);
   }
   showScreen('screen-servers');
   await loadServers();
@@ -494,13 +506,26 @@ async function submitImportAccount(){
   finally{btn.disabled=false;btn.textContent='Import Account';}
 }
 
-async function exportAccount(){
+function openExportModal(){
+  document.getElementById('export-passphrase').value='';
+  document.getElementById('export-error').classList.add('hidden');
+  document.getElementById('modal-export').classList.remove('hidden');
+  document.getElementById('export-passphrase').focus();
+}
+function closeExportModal(){document.getElementById('modal-export').classList.add('hidden');}
+async function confirmExport(){
+  const pass=document.getElementById('export-passphrase').value;
+  const errEl=document.getElementById('export-error'),btn=document.getElementById('export-confirm-btn');
+  if(!pass){errEl.textContent='Enter your passphrase.';errEl.classList.remove('hidden');return;}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
   try{
     const dest=await window.go.main.App.PickExportDestination();
-    if(!dest)return;
-    await window.go.main.App.ExportAccount(dest);
+    if(!dest){return;}
+    await window.go.main.App.ExportAccount(dest,pass);
+    closeExportModal();
     toast('Account key exported.');
-  }catch(err){toast(String(err),true);}
+  }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
+  finally{btn.disabled=false;btn.textContent='Export';}
 }
 
 // ── URL detection ────────────────────────────────────────────────
@@ -1244,7 +1269,11 @@ function init(){
   document.getElementById('msg-input').addEventListener('input',e=>autoResize(e.target));
   document.getElementById('modal-add').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAddModal();});
   document.getElementById('modal-confirm-delete').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDeleteConfirm();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeDropdown();if(state.searchActive)exitSearch();}});
+  document.getElementById('export-cancel-btn').addEventListener('click',closeExportModal);
+  document.getElementById('export-confirm-btn').addEventListener('click',confirmExport);
+  document.getElementById('export-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')confirmExport();});
+  document.getElementById('modal-export').addEventListener('click',e=>{if(e.target===e.currentTarget)closeExportModal();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeExportModal();closeDropdown();if(state.searchActive)exitSearch();}});
   document.addEventListener('click',()=>closeDropdown());
   document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.add('hidden'));
   document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();});

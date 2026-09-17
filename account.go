@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ed25519"
@@ -30,9 +31,11 @@ import (
 //   accounts/<fingerprint>/account.json   — username (plaintext, not secret)
 //   accounts/<fingerprint>/pfp.png        — optional, may not exist
 //
-// identity.json and account.json are exactly what gets zipped up for export
-// and exactly what gets read back on import — export/import are pure file
-// copies, never a re-encoding step.
+// identity.json and account.json are copied byte-for-byte into and out of
+// the exported archive — no re-encoding of those files themselves. The
+// archive as a whole gets one more layer of encryption on top for export,
+// covering everything inside it (including a bundled server-list snapshot
+// — see "Outer container encryption" below); that's the part that's new.
 
 // Argon2id parameters for deriving the AES-256 key from a passphrase.
 // ~64MB/3 passes/4 lanes is a deliberately "feel it for a second" cost —
@@ -304,6 +307,77 @@ func decryptIdentity(dir, passphrase string) (ed25519.PublicKey, ed25519.Private
 	return ed25519.PublicKey(pub), priv, nil
 }
 
+// ── Outer container encryption ──────────────────────────────────────────
+//
+// identity.json's private key is already encrypted at rest — that alone
+// protects the key material even in a plaintext zip. But unzipping an
+// exported account still exposes the username and pfp.png in the clear,
+// and once the export also carries the local server list (below), it
+// carries join keys too. So the exported file itself gets a second,
+// separate layer of encryption wrapping the whole archive — a different
+// derived key from a fresh salt, never reused from identity.json's own
+// encryption even though both come from the same passphrase.
+
+// Magic bytes identifying an encrypted account-key container, so import
+// can tell it apart from a plain zip (an older export, or a folder someone
+// zipped by hand without going through ExportAccount).
+var containerMagic = []byte("CCAK1")
+
+func encryptContainer(plainZip []byte, passphrase string) ([]byte, error) {
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("could not generate salt: %w", err)
+	}
+	key := argon2.IDKey([]byte(passphrase), salt, kdfTime, kdfMemKiB, kdfThreads, kdfKeyLen)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("could not generate nonce: %w", err)
+	}
+	ciphertext := gcm.Seal(nil, nonce, plainZip, nil)
+
+	out := make([]byte, 0, len(containerMagic)+len(salt)+len(nonce)+len(ciphertext))
+	out = append(out, containerMagic...)
+	out = append(out, salt...)
+	out = append(out, nonce...)
+	out = append(out, ciphertext...)
+	return out, nil
+}
+
+func decryptContainer(data []byte, passphrase string) ([]byte, error) {
+	if len(data) < len(containerMagic) || string(data[:len(containerMagic)]) != string(containerMagic) {
+		return nil, fmt.Errorf("not a valid account key file")
+	}
+	rest := data[len(containerMagic):]
+	const saltLen, nonceLen = 16, 12 // fixed sizes used by encryptContainer above
+	if len(rest) < saltLen+nonceLen {
+		return nil, fmt.Errorf("account key file is corrupt")
+	}
+	salt, nonce, ciphertext := rest[:saltLen], rest[saltLen:saltLen+nonceLen], rest[saltLen+nonceLen:]
+
+	key := argon2.IDKey([]byte(passphrase), salt, kdfTime, kdfMemKiB, kdfThreads, kdfKeyLen)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("incorrect passphrase")
+	}
+	return plain, nil
+}
+
 // ── Account lifecycle ────────────────────────────────────────────────────
 
 // CreateAccount generates a fresh Ed25519 identity, encrypts it under
@@ -383,14 +457,30 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	srcDir := sourcePath
 	cleanup := func() {}
 	if !info.IsDir() {
-		if !strings.EqualFold(filepath.Ext(sourcePath), ".zip") {
-			return nil, fmt.Errorf("expected a .zip file or a folder")
+		raw, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("could not read %s: %w", sourcePath, err)
 		}
+		// An encrypted container (current Export format) needs decrypting
+		// to get the raw zip bytes back; a plain .zip (an older export, or
+		// one assembled by hand) is used as-is. Either way we end up with
+		// zip bytes to extract — nothing on disk needs to be a real zip
+		// file for the encrypted case, it's decrypted straight into memory.
+		zipBytes := raw
+		if len(raw) >= len(containerMagic) && string(raw[:len(containerMagic)]) == string(containerMagic) {
+			zipBytes, err = decryptContainer(raw, passphrase)
+			if err != nil {
+				return nil, err
+			}
+		} else if !strings.EqualFold(filepath.Ext(sourcePath), ".zip") {
+			return nil, fmt.Errorf("expected an account key file or a folder")
+		}
+
 		tmp, err := os.MkdirTemp("", "chriscord-import-*")
 		if err != nil {
 			return nil, fmt.Errorf("could not create temp directory: %w", err)
 		}
-		if err := unzip(sourcePath, tmp); err != nil {
+		if err := unzipBytes(zipBytes, tmp); err != nil {
 			os.RemoveAll(tmp)
 			return nil, fmt.Errorf("could not extract account key: %w", err)
 		}
@@ -425,6 +515,7 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 		writeAccountMeta(destDir, "unnamed") // account.json is optional too — don't fail the import over it
 	}
 	copyOptionalPfp(filepath.Join(srcDir, "pfp.png"), destDir)
+	mergeServersIfPresent(filepath.Join(srcDir, "servers.json"))
 
 	account, err := unlockSlug(slug, passphrase)
 	if err != nil {
@@ -436,22 +527,52 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	return account, nil
 }
 
-// ExportAccount zips identity.json, account.json, and pfp.png (if present)
-// for an already-imported/created account. No re-encryption happens here —
-// identity.json is already encrypted at rest, so this is a plain archive op.
-func ExportAccount(slug, destZipPath string) error {
-	dir := filepath.Join(accountsDir(), slug)
-	if _, err := os.Stat(filepath.Join(dir, "identity.json")); err != nil {
-		return fmt.Errorf("no such account: %w", err)
-	}
-	out, err := os.Create(destZipPath)
+// mergeServersIfPresent folds a bundled server-list snapshot into this
+// install's own saved servers, keyed by domain. An existing local entry
+// for a domain is left alone rather than overwritten — the bundle is a
+// snapshot from whenever it was exported, and shouldn't clobber a join key
+// that's since been updated locally.
+func mergeServersIfPresent(path string) {
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("could not create %s: %w", destZipPath, err)
+		return // no servers.json in this bundle — nothing to do
 	}
-	defer out.Close()
-	zw := zip.NewWriter(out)
-	defer zw.Close()
+	var bundled []SavedServer
+	if err := json.Unmarshal(raw, &bundled); err != nil {
+		return
+	}
+	current := loadServers()
+	existing := make(map[string]bool, len(current))
+	for _, s := range current {
+		existing[s.Domain] = true
+	}
+	changed := false
+	for _, s := range bundled {
+		if !existing[s.Domain] {
+			current = upsertServer(current, s)
+			changed = true
+		}
+	}
+	if changed {
+		saveServers(current)
+	}
+}
 
+// ExportAccount zips identity.json, account.json, pfp.png (if present), and
+// a snapshot of the local saved-server list (if any) for an already-
+// imported/created account, then encrypts the whole archive under
+// passphrase — see "Outer container encryption" above for why. passphrase
+// must match the one this account's identity.json was encrypted under;
+// verified up front so a typo produces a clean error instead of a useless
+// file at the destination.
+func ExportAccount(slug, destPath, passphrase string) error {
+	dir := filepath.Join(accountsDir(), slug)
+	if _, _, err := decryptIdentity(dir, passphrase); err != nil {
+		return err // wrong passphrase, or the account itself is corrupt
+	}
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
 	for _, name := range []string{"identity.json", "account.json", "pfp.png"} {
 		srcPath := filepath.Join(dir, name)
 		if _, err := os.Stat(srcPath); err != nil {
@@ -461,7 +582,26 @@ func ExportAccount(slug, destZipPath string) error {
 			return err
 		}
 	}
-	return nil
+	// Bundle a snapshot of the local saved-server list too, so importing on
+	// a new machine doesn't mean re-adding every server by hand. This is
+	// exactly why the outer encryption above matters: a server's join key
+	// travels along with it now.
+	if servers := loadServers(); len(servers) > 0 {
+		if data, err := json.MarshalIndent(servers, "", "  "); err == nil {
+			if w, err := zw.Create("servers.json"); err == nil {
+				w.Write(data)
+			}
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return fmt.Errorf("could not build account key archive: %w", err)
+	}
+
+	encrypted, err := encryptContainer(buf.Bytes(), passphrase)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(destPath, encrypted, 0600)
 }
 
 // ── Small file/zip helpers ───────────────────────────────────────────────
@@ -495,15 +635,16 @@ func addFileToZip(zw *zip.Writer, srcPath, nameInZip string) error {
 	return err
 }
 
-// unzip extracts to destDir, rejecting any entry that would escape it
-// (zip-slip) — worth guarding since these zips are meant to be handed
-// around and could come from anywhere, including a repo you didn't create.
-func unzip(zipPath, destDir string) error {
-	r, err := zip.OpenReader(zipPath)
+// unzipBytes extracts in-memory zip data to destDir, rejecting any entry
+// that would escape it (zip-slip) — worth guarding since these bundles are
+// meant to be handed around and could come from anywhere, including a repo
+// you didn't create. Takes bytes rather than a file path because the
+// decrypted container's zip data never touches disk as an actual .zip file.
+func unzipBytes(data []byte, destDir string) error {
+	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return err
 	}
-	defer r.Close()
 	for _, f := range r.File {
 		cleanName := filepath.Clean(f.Name)
 		if strings.HasPrefix(cleanName, "..") || filepath.IsAbs(cleanName) {
