@@ -1,17 +1,37 @@
-// storage.go
 package main
 
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
-const serversFile = "chriscord_servers.json"
+const serversFileName = "chriscord_servers.json"
+
+func serversFilePath() string {
+	return filepath.Join(chriscordConfigDir(), serversFileName)
+}
 
 func loadServers() []SavedServer {
-	data, err := os.ReadFile(serversFile)
+	data, err := os.ReadFile(serversFilePath())
 	if err != nil {
-		return []SavedServer{}
+		// Fall back to the legacy location — a bare filename, which Go
+		// resolves relative to the current working directory (i.e. next to
+		// the executable). That's where this lived before server data
+		// moved into the proper per-user config directory alongside
+		// accounts. If found there, migrate it forward and remove the old
+		// copy, so nobody's saved server list just disappears and nothing
+		// chriscord-related is left sitting next to the exe.
+		legacy, legacyErr := os.ReadFile(serversFileName)
+		if legacyErr != nil {
+			return []SavedServer{}
+		}
+		data = legacy
+		if os.MkdirAll(chriscordConfigDir(), 0700) == nil {
+			if os.WriteFile(serversFilePath(), legacy, 0644) == nil {
+				os.Remove(serversFileName)
+			}
+		}
 	}
 	var servers []SavedServer
 	if err := json.Unmarshal(data, &servers); err != nil {
@@ -25,7 +45,8 @@ func saveServers(servers []SavedServer) {
 	if err != nil {
 		return
 	}
-	os.WriteFile(serversFile, data, 0644)
+	os.MkdirAll(chriscordConfigDir(), 0700) // ensure the directory exists before writing into it
+	os.WriteFile(serversFilePath(), data, 0644)
 }
 
 func upsertServer(servers []SavedServer, s SavedServer) []SavedServer {
