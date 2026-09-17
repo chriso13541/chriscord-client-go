@@ -223,6 +223,8 @@ input,button,textarea { font-family:inherit; }
 .member-name { font-size:.88rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .msg-placeholder { color:var(--text-muted); font-style:italic; font-size:.85rem; padding:8px 0; }
+.date-separator { display:flex; align-items:center; gap:12px; margin:16px 0 8px; color:var(--text-muted); font-size:.75rem; font-weight:600; }
+.date-separator::before, .date-separator::after { content:''; flex:1; height:1px; background:var(--border); }
 .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; display:inline-block; }
 @keyframes spin { to { transform:rotate(360deg); } }
 #toast { position:fixed; bottom:20px; left:50%; max-width:min(420px,80%); text-align:center; transform:translateX(-50%) translateY(150%); background:var(--bg-light); border:1px solid var(--border); border-radius:8px; padding:10px 18px; font-size:.88rem; color:var(--text); transition:transform .25s ease; pointer-events:none; z-index:300; }
@@ -949,7 +951,11 @@ function renderMessages(stickToBottom=true){
     const top=document.createElement('div');top.className='msg-placeholder';top.style.textAlign='center';
     top.textContent='— Beginning of the channel —';c.appendChild(top);
   }
-  state.messages.forEach((m,i)=>c.appendChild(buildMsgEl(m,isGroupedWith(state.messages[i-1],m))));
+  state.messages.forEach((m,i)=>{
+    const prevMsg=state.messages[i-1];
+    if(!prevMsg||dayKey(prevMsg.created_at)!==dayKey(m.created_at))c.appendChild(buildDateSeparator(m.created_at));
+    c.appendChild(buildMsgEl(m,isGroupedWith(prevMsg,m)));
+  });
   if(stickToBottom)c.scrollTop=c.scrollHeight;
   else c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
 }
@@ -961,6 +967,7 @@ function appendMessage(msg){
   // would already point at msg itself.
   const last=c.lastElementChild;
   const prev=(last&&last.classList.contains('msg-group'))?{username:last.dataset.username,created_at:last.dataset.ts}:null;
+  if(!prev||dayKey(prev.created_at)!==dayKey(msg.created_at))c.appendChild(buildDateSeparator(msg.created_at));
   const wasNearBottom=(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
   c.appendChild(buildMsgEl(msg,isGroupedWith(prev,msg)));
   if(wasNearBottom)c.scrollTop=c.scrollHeight;
@@ -985,17 +992,28 @@ function removeMessageFromDOM(id){
 
   const idx=state.messages.findIndex(m=>m.id===id);
   if(idx===-1)return; // not currently loaded — e.g. it was on a page we've since scrolled past
+  const removedMsg=state.messages[idx];
   state.messages.splice(idx,1);
+  const prevMsg=idx>0?state.messages[idx-1]:null;
+  const nextMsg=idx<state.messages.length?state.messages[idx]:null; // was at idx+1 before the splice
 
-  document.querySelector(`.msg-group[data-id="${CSS.escape(id)}"]`)?.remove();
+  const el=document.querySelector(`.msg-group[data-id="${CSS.escape(id)}"]`);
+  if(el){
+    // If this was the only message on its calendar day, its date separator
+    // — always its immediately preceding sibling — is now orphaned.
+    const wasOnlyOnItsDay = dayKey(removedMsg.created_at)!==(prevMsg&&dayKey(prevMsg.created_at))
+                          && dayKey(removedMsg.created_at)!==(nextMsg&&dayKey(nextMsg.created_at));
+    if(wasOnlyOnItsDay&&el.previousElementSibling?.classList.contains('date-separator')){
+      el.previousElementSibling.remove();
+    }
+    el.remove();
+  }
 
   if(!state.messages.length){
     c.innerHTML='<div class="msg-placeholder">No messages yet. Say hi!</div>';
     return;
   }
 
-  const prevMsg=idx>0?state.messages[idx-1]:null;
-  const nextMsg=idx<state.messages.length?state.messages[idx]:null; // was at idx+1 before the splice
   if(nextMsg){
     const nextEl=document.querySelector(`.msg-group[data-id="${CSS.escape(nextMsg.id)}"]`);
     const shouldBeGrouped=isGroupedWith(prevMsg,nextMsg);
@@ -1106,11 +1124,11 @@ async function jumpToSearchResult(msg){
 // can now come from any channel, not just the one you're already viewing.
 function buildSearchResultRow(msg){
   const colour=avatarColour(msg.username),initial=msg.username[0].toUpperCase();
-  const time=formatTime(msg.created_at);
+  const time=formatTime(msg.created_at),hoverTime=esc(formatHoverTime(msg.created_at));
   const hasAttach=(msg.attachments||[]).length>0;
   const row=document.createElement('div');row.className='search-result-row';
   row.innerHTML=`
-    <div class="sr-head"><div class="sr-avatar" style="background:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time">${time}</span></div>
+    <div class="sr-head"><div class="sr-avatar" style="background:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
     ${msg.content?`<div class="sr-content">${esc(msg.content)}</div>`:''}
     ${hasAttach?'<div class="sr-attach">📎 Attachment</div>':''}`;
   row.addEventListener('click',()=>jumpToSearchResult(msg));
@@ -1119,7 +1137,7 @@ function buildSearchResultRow(msg){
 
 function buildMsgEl(msg,grouped){
   const colour=avatarColour(msg.username),initial=msg.username[0].toUpperCase();
-  const time=formatTime(msg.created_at),isOwn=msg.username===state.username;
+  const time=formatTime(msg.created_at),hoverTime=esc(formatHoverTime(msg.created_at)),isOwn=msg.username===state.username;
   const attachments=msg.attachments||[];
 
   const div=document.createElement('div');
@@ -1127,11 +1145,11 @@ function buildMsgEl(msg,grouped){
   div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
   div.innerHTML=`
     ${grouped
-      ? `<div class="msg-avatar msg-avatar-time"><span class="hover-time">${time}</span></div>`
+      ? `<div class="msg-avatar msg-avatar-time"><span class="hover-time" title="${hoverTime}">${time}</span></div>`
       : `<div class="msg-avatar" style="background:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
-        ${grouped?'':`<span class="msg-username">${esc(msg.username)}</span><span class="msg-time">${time}</span>`}
+        ${grouped?'':`<span class="msg-username">${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}
       </div>
       ${msg.content?`<div class="msg-content">${renderTextWithLinks(msg.content)}</div>`:''}
@@ -1302,6 +1320,35 @@ async function resolveAttachURL(relOrAbs){
 }
 function openLightbox(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').classList.remove('hidden');}
 function formatTime(iso){if(!iso)return'';try{return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return'';}}
+// Calendar-day key for comparing whether two messages fall on the same day,
+// in the viewer's local time zone (not UTC) — matches how someone actually
+// perceives "today" vs "yesterday".
+function dayKey(iso){try{const d=new Date(iso);return isNaN(d)?null:d.toDateString();}catch{return null;}}
+// Full date for the always-shown date-separator banners — e.g. "September 15, 2026".
+function formatDateSeparator(iso){
+  try{return new Date(iso).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'});}
+  catch{return'';}
+}
+// Relative-day phrasing for the hover tooltip on an individual message's
+// timestamp — bare time for today, "Yesterday at ..." for yesterday, a full
+// date further back. The visible inline timestamp always just stays the
+// bare time (formatTime above); this is only the tooltip text.
+function formatHoverTime(iso){
+  try{
+    const d=new Date(iso);if(isNaN(d))return'';
+    const time=formatTime(iso);
+    const now=new Date();
+    if(dayKey(iso)===now.toDateString())return time;
+    const yesterday=new Date(now.getTime()-86400000);
+    if(dayKey(iso)===yesterday.toDateString())return`Yesterday at ${time}`;
+    return`${formatDateSeparator(iso)} ${time}`;
+  }catch{return'';}
+}
+function buildDateSeparator(iso){
+  const el=document.createElement('div');el.className='date-separator';
+  el.innerHTML=`<span>${esc(formatDateSeparator(iso))}</span>`;
+  return el;
+}
 function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
 
 // ── WAILS INIT ────────────────────────────────────────────────────
