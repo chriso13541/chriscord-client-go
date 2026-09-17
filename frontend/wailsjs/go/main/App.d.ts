@@ -28,6 +28,8 @@ export function GetFileURL(arg1:string):Promise<string>;
 
 export function GetFingerprint():Promise<string>;
 
+export function GetMessagesAround(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
+
 export function GetMessagesBefore(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
 
 export function GetRooms():Promise<Array<main.Room>>;

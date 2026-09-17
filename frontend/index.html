@@ -110,11 +110,21 @@ input,button,textarea { font-family:inherit; }
 /* Drop overlay */
 #drop-overlay { position:absolute; inset:0; background:rgba(114,137,218,.12); border:3px dashed var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; z-index:50; pointer-events:none; font-size:1.4rem; font-weight:700; color:var(--accent); gap:12px; }
 
+#messages-area { flex:1; display:flex; flex-direction:column; min-height:0; position:relative; }
 #messages { flex:1; overflow-y:auto; overflow-anchor:none; padding:16px 20px; display:flex; flex-direction:column; }
 
 /* Messages */
 .msg-group { display:flex; gap:12px; padding:4px 8px; border-radius:4px; transition:background .1s; position:relative; }
 .msg-group:hover { background:rgba(255,255,255,.025); }
+@keyframes msg-highlight-pulse {
+  0%   { background:transparent; }
+  15%  { background:rgba(255,255,255,.09); }
+  75%  { background:rgba(255,255,255,.09); }
+  100% { background:transparent; }
+}
+.msg-highlight { animation:msg-highlight-pulse 2s ease-in-out; }
+#jump-to-present-btn { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:var(--accent); color:#fff; border:none; border-radius:20px; padding:8px 18px; font-size:.83rem; font-weight:600; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.35); z-index:40; }
+#jump-to-present-btn:hover { background:var(--accent-dim); }
 .msg-group:hover .msg-actions { opacity:1; }
 .msg-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; color:#fff; margin-top:2px; }
 /* Message grouping — consecutive messages from the same author within a
@@ -376,7 +386,10 @@ input,button,textarea { font-family:inherit; }
     <div id="content-row">
       <div id="chat-main">
         <div id="drop-overlay" class="hidden">📂 Drop files to attach</div>
-        <div id="messages"></div>
+        <div id="messages-area">
+          <div id="messages"></div>
+          <button id="jump-to-present-btn" class="hidden">↓ Jump to Present</button>
+        </div>
         <div id="input-area">
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
@@ -421,6 +434,7 @@ const state = {
   searchActive:false,
   zoomLevel:1,
   lastPingMs:null,
+  viewingLive:true,
 };
 
 // ── ZOOM ─────────────────────────────────────────────────────────
@@ -1207,14 +1221,73 @@ function exitSearch(){
 // destination doesn't look like it appeared out of nowhere.
 async function jumpToSearchResult(msg){
   exitSearch();
-  if(!state.expandedRooms.has(msg.room_id)){
-    state.expandedRooms.add(msg.room_id);
-    if(!state.boardsByRoom[msg.room_id]){
-      try{state.boardsByRoom[msg.room_id]=await window.go.main.App.GetBoards(msg.room_id)||[];}
-      catch{state.boardsByRoom[msg.room_id]=[];}
+  if(msg.board_id!==state.selectedBoardId){
+    if(!state.expandedRooms.has(msg.room_id)){
+      state.expandedRooms.add(msg.room_id);
+      if(!state.boardsByRoom[msg.room_id]){
+        try{state.boardsByRoom[msg.room_id]=await window.go.main.App.GetBoards(msg.room_id)||[];}
+        catch{state.boardsByRoom[msg.room_id]=[];}
+      }
     }
+    await selectBoard(msg.board_id,msg.board_name,msg.room_id);
   }
-  await selectBoard(msg.board_id,msg.board_name,msg.room_id);
+  await jumpToMessageId(msg.id);
+}
+// Loads a window centered on a specific message and scrolls it into view —
+// this is what actually lands on the message, rather than just the channel
+// it's in. Marks the view as non-live, since this window may not (and
+// usually won't) extend all the way to the channel's current tail.
+async function jumpToMessageId(messageId){
+  const boardId=state.selectedBoardId;
+  if(!boardId)return;
+  try{
+    const around=await window.go.main.App.GetMessagesAround(boardId,messageId)||[];
+    if(!around.length){toast('Could not load that part of the conversation.',true);return;}
+    state.messages=around;
+    state.viewingLive=false;
+    state.oldestByBoard[boardId]=around[0].id;
+    state.exhaustedBoards.delete(boardId); // unknown whether this is the true start — scrolling up will find out
+    renderMessages();
+    scrollToAndHighlight(messageId);
+    updateJumpToPresentVisibility();
+  }catch(err){toast('Failed to jump to message: '+err,true);}
+}
+// Scrolls a message to the center of the view and pulses a highlight over
+// it — subtle (same shade family as the existing hover state) but held
+// long enough to actually notice. If the message was deleted since being
+// found (its id no longer has a matching row), the surrounding
+// conversation still loaded correctly — there's just nothing to point at.
+function scrollToAndHighlight(messageId){
+  const el=document.querySelector(`.msg-group[data-id="${CSS.escape(messageId)}"]`);
+  if(!el){toast('That message has since been deleted.');return;}
+  el.scrollIntoView({block:'center'});
+  el.classList.remove('msg-highlight'); void el.offsetWidth; // restart the animation if it's already mid-run
+  el.classList.add('msg-highlight');
+  el.addEventListener('animationend',()=>el.classList.remove('msg-highlight'),{once:true});
+}
+// Shows the button whenever there's somewhere meaningful to jump back to:
+// always while viewing a historical jump (there's a real gap to "now"),
+// or once scrolled far enough from the bottom during ordinary browsing.
+function updateJumpToPresentVisibility(){
+  const btn=document.getElementById('jump-to-present-btn');
+  if(!btn)return;
+  if(!state.viewingLive){btn.classList.remove('hidden');return;}
+  const c=document.getElementById('messages');
+  const nearBottom=(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
+  btn.classList.toggle('hidden',nearBottom);
+}
+async function jumpToPresent(){
+  const boardId=state.selectedBoardId;
+  if(!boardId)return;
+  if(state.viewingLive){
+    document.getElementById('messages').scrollTo({top:document.getElementById('messages').scrollHeight,behavior:'smooth'});
+    return;
+  }
+  // Viewing a historical snapshot with a gap to "now" — re-subscribing
+  // triggers a fresh history load of the actual live tail, the same as a
+  // normal channel switch.
+  try{await window.go.main.App.SubscribeBoard(boardId);}
+  catch(err){toast('Failed to jump to present: '+err,true);}
 }
 // Compact result row for the narrow members-panel column — not the full
 // rich message bubble (avatar circle, attachments, edit/delete menu) used
@@ -1461,11 +1534,18 @@ function init(){
     state.oldestByBoard[state.selectedBoardId]=msgs[0]?.id||null;
     if(msgs.length<HISTORY_PAGE)state.exhaustedBoards.add(state.selectedBoardId);
     else state.exhaustedBoards.delete(state.selectedBoardId);
+    state.viewingLive=true;
     renderMessages();
+    updateJumpToPresentVisibility();
   });
   window.runtime.EventsOn('chat:message',msg=>{
     if(!msg)return;
-    if(msg.board_id===state.selectedBoardId){state.messages.push(msg);appendMessage(msg);}
+    if(msg.board_id===state.selectedBoardId){
+      if(state.viewingLive){state.messages.push(msg);appendMessage(msg);}
+      // else: viewing a historical jump snapshot with a gap to "now" — this
+      // message will show up naturally once Jump to Present reloads the
+      // live tail; no need to track it in a window that doesn't reach there.
+    }
     else markBoardUnread(msg.board_id);
   });
   window.runtime.EventsOn('chat:edit',ev=>{
@@ -1521,7 +1601,8 @@ function init(){
   document.getElementById('status-dot-btn').addEventListener('click',togglePingPopover);
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.add('hidden'));
-  document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();});
+  document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();updateJumpToPresentVisibility();});
+  document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
   document.getElementById('msg-search-btn').addEventListener('click',runSearch);
   document.getElementById('msg-search-clear').addEventListener('click',exitSearch);
   document.getElementById('msg-search-input').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});

@@ -54,6 +54,10 @@ export function GetFingerprint() {
   return window['go']['main']['App']['GetFingerprint']();
 }
 
+export function GetMessagesAround(arg1, arg2) {
+  return window['go']['main']['App']['GetMessagesAround'](arg1, arg2);
+}
+
 export function GetMessagesBefore(arg1, arg2) {
   return window['go']['main']['App']['GetMessagesBefore'](arg1, arg2);
 }

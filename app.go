@@ -325,6 +325,15 @@ func (a *App) GetMessagesBefore(boardID, beforeID string) ([]ChatMessage, error)
 	return msgs, a.doGET(path, &msgs)
 }
 
+// GetMessagesAround fetches a window of messages centered on a specific
+// one, for jumping straight to a message (e.g. from a search result)
+// without paging backward through history to reach it.
+func (a *App) GetMessagesAround(boardID, messageID string) ([]ChatMessage, error) {
+	var msgs []ChatMessage
+	path := "/api/boards/" + boardID + "/messages/around/" + url.PathEscape(messageID)
+	return msgs, a.doGET(path, &msgs)
+}
+
 func (a *App) SubscribeBoard(boardID string) error {
 	a.writeMu.Lock(); defer a.writeMu.Unlock()
 	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
