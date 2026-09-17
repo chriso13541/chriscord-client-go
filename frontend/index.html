@@ -666,6 +666,39 @@ function startPingLoop(){
 function stopPingLoop(){
   if(pingIntervalId){clearInterval(pingIntervalId);pingIntervalId=null;}
 }
+
+// ── AUTO-RECONNECT ───────────────────────────────────────────────
+// A server can't push a "come back" signal to a client whose socket is
+// already dead — there's no channel left to deliver it over. So instead of
+// waiting to be told, the client just retries the connection itself on a
+// timer until it succeeds, which gets to the same place (no manual leave
+// and rejoin) without needing the server to do anything differently.
+const RECONNECT_INTERVAL_MS=5000;
+let reconnectTimerId=null;
+function scheduleReconnect(){
+  if(reconnectTimerId)return; // already have one pending
+  reconnectTimerId=setTimeout(attemptReconnect,RECONNECT_INTERVAL_MS);
+}
+function cancelReconnect(){
+  if(reconnectTimerId){clearTimeout(reconnectTimerId);reconnectTimerId=null;}
+}
+async function attemptReconnect(){
+  reconnectTimerId=null;
+  if(state.wsConnected||!state.domain)return; // already back some other way, or nothing to reconnect to
+  const serverKey=state.servers.find(s=>s.domain===state.domain)?.server_key||'';
+  try{
+    await window.go.main.App.Connect(state.domain,serverKey);
+    state.wsConnected=true;state.lastPingMs=null;
+    updateStatusDotColor();startPingLoop();
+    toast('Reconnected to server.');
+    await refreshRoomsAndBoards(); // pick up anything that changed while disconnected
+    if(state.selectedBoardId){
+      try{await window.go.main.App.SubscribeBoard(state.selectedBoardId);}catch{}
+    }
+  }catch(err){
+    scheduleReconnect(); // still down — try again shortly, silently (no toast spam per attempt)
+  }
+}
 async function togglePingPopover(e){
   e.stopPropagation();
   const pop=document.getElementById('ping-popover');
@@ -1375,7 +1408,7 @@ async function sendMessage(){
 }
 
 async function goBack(){
-  state.wsConnected=false;stopPingLoop();await window.go.main.App.Disconnect();
+  state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
   state.servers=await window.go.main.App.GetServers();renderServers();showScreen('screen-servers');
 }
 
@@ -1450,7 +1483,7 @@ function init(){
   });
   window.runtime.EventsOn('chat:users',payload=>renderMembers(payload||{}));
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
-  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);state.wsConnected=false;stopPingLoop();updateStatusDotColor();}});
+  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);state.wsConnected=false;state.lastPingMs=null;stopPingLoop();updateStatusDotColor();scheduleReconnect();}});
 
   document.getElementById('open-add-btn').addEventListener('click',()=>openAddModal());
   document.getElementById('cancel-add-btn').addEventListener('click',closeAddModal);
