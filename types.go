@@ -48,6 +48,7 @@ type Room struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	IsPrivate bool   `json:"is_private"`
+	RoomType  string `json:"room_type"` // "text" or "voice"
 }
 
 type Board struct {

@@ -250,14 +250,15 @@ func (a *App) Connect(domain, serverKey string) error {
 }
 
 type serverMsg struct {
-	Type     string        `json:"type"`
-	BoardID  string        `json:"board_id"`
-	Data     *ChatMessage  `json:"data"`
-	Messages []ChatMessage `json:"messages"`
-	Online   []string      `json:"online"`
-	All      []string      `json:"all"`
-	ID       string        `json:"id"`
-	Content  string        `json:"content"`
+	Type     string              `json:"type"`
+	BoardID  string              `json:"board_id"`
+	Data     *ChatMessage        `json:"data"`
+	Messages []ChatMessage       `json:"messages"`
+	Online   []string            `json:"online"`
+	All      []string            `json:"all"`
+	ID       string              `json:"id"`
+	Content  string              `json:"content"`
+	Channels map[string][]string `json:"channels"`
 }
 
 type historyEvent struct {
@@ -265,6 +266,7 @@ type historyEvent struct {
 	Messages []ChatMessage `json:"messages"`
 }
 type usersEvent  struct { Online []string `json:"online"`; All []string `json:"all"` }
+type voiceStateEvent struct { Channels map[string][]string `json:"channels"` }
 type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"` }
 type deleteEvent struct { ID string `json:"id"`; BoardID string `json:"board_id"` }
 
@@ -291,6 +293,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:delete", deleteEvent{ID: msg.ID, BoardID: msg.BoardID})
 		case "rooms_updated":
 			runtime.EventsEmit(a.ctx, "rooms:updated")
+		case "voice_state":
+			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels})
 		}
 	}
 }
@@ -339,6 +343,25 @@ func (a *App) SubscribeBoard(boardID string) error {
 	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
 	if conn == nil { return fmt.Errorf("not connected") }
 	msg, _ := json.Marshal(map[string]string{"type": "subscribe", "board_id": boardID})
+	return conn.WriteMessage(websocket.TextMessage, msg)
+}
+
+// JoinVoiceChannel connects presence to a voice board. The server validates
+// the board actually belongs to a voice-type room; joining a different
+// channel while already in one moves you, with no separate leave needed.
+func (a *App) JoinVoiceChannel(boardID string) error {
+	a.writeMu.Lock(); defer a.writeMu.Unlock()
+	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
+	if conn == nil { return fmt.Errorf("not connected") }
+	msg, _ := json.Marshal(map[string]string{"type": "join_voice", "board_id": boardID})
+	return conn.WriteMessage(websocket.TextMessage, msg)
+}
+
+func (a *App) LeaveVoiceChannel() error {
+	a.writeMu.Lock(); defer a.writeMu.Unlock()
+	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
+	if conn == nil { return fmt.Errorf("not connected") }
+	msg, _ := json.Marshal(map[string]string{"type": "leave_voice"})
 	return conn.WriteMessage(websocket.TextMessage, msg)
 }
 

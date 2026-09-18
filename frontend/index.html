@@ -79,6 +79,14 @@ input,button,textarea { font-family:inherit; }
 .board-item:hover { background:var(--bg-light); color:var(--text); }
 .board-item.unread { color:var(--text-strong); }
 .board-item.active { background:var(--bg-light); color:var(--text-strong); font-weight:600; }
+.voice-item { padding:5px 8px 5px 12px; margin:1px 4px; border-radius:4px; font-size:.9rem; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:6px; }
+.voice-item:hover { background:var(--bg-light); color:var(--text); }
+.voice-item.joined { color:var(--green); }
+.voice-count { margin-left:auto; font-size:.72rem; color:var(--text-muted); background:var(--bg-mid); border-radius:8px; padding:1px 6px; flex-shrink:0; }
+.voice-occupants { padding:2px 12px 4px 34px; font-size:.75rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.83rem; color:var(--green); }
+#voice-connected-bar #voice-leave-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.9rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+#voice-connected-bar #voice-leave-btn:hover { background:var(--bg-light); color:var(--red); }
 #sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); position:relative; }
 .user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; color:#fff; flex-shrink:0; }
 .user-name { font-size:.85rem; font-weight:600; color:var(--text-strong); }
@@ -361,6 +369,10 @@ input,button,textarea { font-family:inherit; }
       <button id="back-btn" title="Back">✕</button>
     </div>
     <div id="room-list"></div>
+    <div id="voice-connected-bar" class="hidden">
+      <span id="voice-connected-name"></span>
+      <button id="voice-leave-btn" title="Disconnect from voice">✕</button>
+    </div>
     <div id="sidebar-user">
       <div class="user-avatar" id="user-avatar">?</div>
       <span class="user-name" id="user-name-label">username</span>
@@ -435,6 +447,7 @@ const state = {
   zoomLevel:1,
   lastPingMs:null,
   viewingLive:true,
+  voiceChannels:{},
 };
 
 // ── ZOOM ─────────────────────────────────────────────────────────
@@ -735,7 +748,8 @@ async function doConnect(domain,serverKey){
   state.rooms=[];state.boardsByRoom={};state.expandedRooms=new Set();state.unreadBoards=new Set();
   state.selectedRoomId=null;state.selectedBoardId=null;state.messages=[];
   state.onlineUsers=[];state.attachQueue=[];state.wsConnected=true;state.lastPingMs=null;
-  updateStatusDotColor();startPingLoop();
+  state.voiceChannels={};
+  updateStatusDotColor();startPingLoop();updateVoiceConnectedBar();
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.display_name||domain;
@@ -833,12 +847,27 @@ function renderSidebar(){
   if(!state.rooms.length){list.innerHTML='<div style="padding:12px 16px;color:var(--text-muted);font-size:.83rem">No rooms yet.<br>Ask the owner to create some.</div>';return;}
   state.rooms.forEach(room=>{
     const isOpen=state.expandedRooms.has(room.id),boards=state.boardsByRoom[room.id]??null;
+    const isVoiceRoom=room.room_type==='voice';
     const header=document.createElement('div');header.className='room-header';
-    header.innerHTML=`<span class="room-arrow ${isOpen?'open':''}">▶</span> ${esc(room.name)}`;
+    header.innerHTML=`<span class="room-arrow ${isOpen?'open':''}">▶</span> ${isVoiceRoom?'🔊 ':''}${esc(room.name)}`;
     header.addEventListener('click',()=>toggleRoom(room.id));list.appendChild(header);
     if(isOpen){
       if(boards===null){const l=document.createElement('div');l.style.cssText='padding:4px 12px';l.innerHTML='<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>';list.appendChild(l);}
       else if(!boards.length){const e=document.createElement('div');e.style.cssText='padding:4px 24px;font-size:.8rem;color:var(--text-muted)';e.textContent='No boards';list.appendChild(e);}
+      else if(isVoiceRoom)boards.forEach(board=>{
+        const occupants=state.voiceChannels[board.id]||[];
+        const isJoined=occupants.includes(state.username);
+        const item=document.createElement('div');
+        item.className='voice-item'+(isJoined?' joined':'');
+        item.innerHTML=`<span>🔊</span><span class="board-name">${esc(board.name)}</span>${occupants.length?`<span class="voice-count">${occupants.length}</span>`:''}`;
+        item.addEventListener('click',()=>toggleVoiceChannel(board.id));
+        list.appendChild(item);
+        if(occupants.length){
+          const sub=document.createElement('div');sub.className='voice-occupants';
+          sub.textContent=occupants.join(', ');
+          list.appendChild(sub);
+        }
+      });
       else boards.forEach(board=>{
         const isActive=state.selectedBoardId===board.id,isUnread=state.unreadBoards.has(board.id)&&!isActive;
         const item=document.createElement('div');
@@ -849,6 +878,35 @@ function renderSidebar(){
       });
     }
   });
+}
+// Joins a voice channel if not currently in it, or leaves if it's the one
+// you're already in — no actual audio yet, this is presence-only, the
+// foundation the real media layer will build on.
+async function toggleVoiceChannel(boardId){
+  const occupants=state.voiceChannels[boardId]||[];
+  const alreadyIn=occupants.includes(state.username);
+  try{
+    if(alreadyIn)await window.go.main.App.LeaveVoiceChannel();
+    else await window.go.main.App.JoinVoiceChannel(boardId);
+  }catch(err){toast('Voice action failed: '+err,true);}
+}
+// Keeps the persistent "connected to voice" bar in sync — always visible
+// (not just while that room happens to be expanded) so leaving is never
+// more than one click away regardless of where you've scrolled or
+// navigated to.
+function updateVoiceConnectedBar(){
+  const bar=document.getElementById('voice-connected-bar');
+  if(!bar)return;
+  const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
+  if(!entry){bar.classList.add('hidden');return;}
+  const boardId=entry[0];
+  let boardName=boardId;
+  for(const list of Object.values(state.boardsByRoom)){
+    const b=(list||[]).find(b=>b.id===boardId);
+    if(b){boardName=b.name;break;}
+  }
+  document.getElementById('voice-connected-name').textContent=`🔊 ${boardName}`;
+  bar.classList.remove('hidden');
 }
 async function toggleRoom(roomId){
   if(state.expandedRooms.has(roomId)){state.expandedRooms.delete(roomId);renderSidebar();}
@@ -1235,8 +1293,7 @@ async function jumpToSearchResult(msg){
 }
 // Loads a window centered on a specific message and scrolls it into view —
 // this is what actually lands on the message, rather than just the channel
-// it's in. Marks the view as non-live, since this window may not (and
-// usually won't) extend all the way to the channel's current tail.
+// it's in.
 async function jumpToMessageId(messageId){
   const boardId=state.selectedBoardId;
   if(!boardId)return;
@@ -1244,9 +1301,22 @@ async function jumpToMessageId(messageId){
     const around=await window.go.main.App.GetMessagesAround(boardId,messageId)||[];
     if(!around.length){toast('Could not load that part of the conversation.',true);return;}
     state.messages=around;
-    state.viewingLive=false;
     state.oldestByBoard[boardId]=around[0].id;
     state.exhaustedBoards.delete(boardId); // unknown whether this is the true start — scrolling up will find out
+
+    // Did this window actually reach the live tail, or stop short because
+    // the server's "after" fetch was capped? get_messages_around returns up
+    // to AROUND_HALF messages after the target; if fewer than that came
+    // back, its query came up short naturally rather than hitting the cap —
+    // meaning there's nothing beyond what we loaded, so this is effectively
+    // live and the ordinary distance-based button logic should apply,
+    // instead of always showing the button just because this came from a
+    // search jump.
+    const AROUND_HALF=Math.floor(HISTORY_PAGE/2);
+    const targetIdx=around.findIndex(m=>m.id===messageId);
+    const messagesAfterTarget=targetIdx===-1?AROUND_HALF:(around.length-1-targetIdx);
+    state.viewingLive=messagesAfterTarget<AROUND_HALF;
+
     renderMessages();
     scrollToAndHighlight(messageId);
     updateJumpToPresentVisibility();
@@ -1272,9 +1342,16 @@ function updateJumpToPresentVisibility(){
   const btn=document.getElementById('jump-to-present-btn');
   if(!btn)return;
   if(!state.viewingLive){btn.classList.remove('hidden');return;}
+  const THRESHOLD=100; // roughly matches Discord's own "well over 100 messages back" bar
   const c=document.getElementById('messages');
-  const nearBottom=(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
-  btn.classList.toggle('hidden',nearBottom);
+  const containerBottom=c.getBoundingClientRect().bottom;
+  const items=c.querySelectorAll('.msg-group');
+  let countBelow=0;
+  for(let i=items.length-1;i>=0&&countBelow<THRESHOLD;i--){
+    if(items[i].getBoundingClientRect().top>containerBottom)countBelow++;
+    else break; // messages are in document order — once one's visible, everything before it is too
+  }
+  btn.classList.toggle('hidden',countBelow<THRESHOLD);
 }
 async function jumpToPresent(){
   const boardId=state.selectedBoardId;
@@ -1482,6 +1559,7 @@ async function sendMessage(){
 
 async function goBack(){
   state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
+  state.voiceChannels={};updateVoiceConnectedBar();
   state.servers=await window.go.main.App.GetServers();renderServers();showScreen('screen-servers');
 }
 
@@ -1563,7 +1641,12 @@ function init(){
   });
   window.runtime.EventsOn('chat:users',payload=>renderMembers(payload||{}));
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
-  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);state.wsConnected=false;state.lastPingMs=null;stopPingLoop();updateStatusDotColor();scheduleReconnect();}});
+  window.runtime.EventsOn('voice:state',payload=>{
+    state.voiceChannels=payload?.channels||{};
+    renderSidebar();
+    updateVoiceConnectedBar();
+  });
+  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);state.wsConnected=false;state.lastPingMs=null;state.voiceChannels={};stopPingLoop();updateStatusDotColor();updateVoiceConnectedBar();renderSidebar();scheduleReconnect();}});
 
   document.getElementById('open-add-btn').addEventListener('click',()=>openAddModal());
   document.getElementById('cancel-add-btn').addEventListener('click',closeAddModal);
@@ -1603,6 +1686,9 @@ function init(){
   document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.add('hidden'));
   document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();updateJumpToPresentVisibility();});
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
+  document.getElementById('voice-leave-btn').addEventListener('click',async()=>{
+    try{await window.go.main.App.LeaveVoiceChannel();}catch(err){toast('Failed to leave voice: '+err,true);}
+  });
   document.getElementById('msg-search-btn').addEventListener('click',runSearch);
   document.getElementById('msg-search-clear').addEventListener('click',exitSearch);
   document.getElementById('msg-search-input').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});
