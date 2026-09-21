@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gordonklaus/portaudio"
 	"github.com/gorilla/websocket"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -32,6 +33,8 @@ type App struct {
 	fingerprint string
 	account     *Account
 	servers     []SavedServer
+	voice       *VoiceSession
+	voiceMu     sync.Mutex
 }
 
 func NewApp() *App { return &App{} }
@@ -39,6 +42,9 @@ func NewApp() *App { return &App{} }
 func (a *App) startup(ctx context.Context) {
 	a.ctx    = ctx
 	a.servers = loadServers()
+	if err := portaudio.Initialize(); err != nil {
+		runtime.LogWarningf(ctx, "portaudio init failed, voice audio won't work: %v", err)
+	}
 }
 
 func normaliseHTTP(domain string) string {
@@ -250,15 +256,19 @@ func (a *App) Connect(domain, serverKey string) error {
 }
 
 type serverMsg struct {
-	Type     string              `json:"type"`
-	BoardID  string              `json:"board_id"`
-	Data     *ChatMessage        `json:"data"`
-	Messages []ChatMessage       `json:"messages"`
-	Online   []string            `json:"online"`
-	All      []string            `json:"all"`
-	ID       string              `json:"id"`
-	Content  string              `json:"content"`
-	Channels map[string][]string `json:"channels"`
+	Type          string              `json:"type"`
+	BoardID       string              `json:"board_id"`
+	Data          *ChatMessage        `json:"data"`
+	Messages      []ChatMessage       `json:"messages"`
+	Online        []string            `json:"online"`
+	All           []string            `json:"all"`
+	ID            string              `json:"id"`
+	Content       string              `json:"content"`
+	Channels      map[string][]string `json:"channels"`
+	SDP           string              `json:"sdp"`
+	Candidate     string              `json:"candidate"`
+	SDPMid        string              `json:"sdp_mid"`
+	SDPMLineIndex *uint16             `json:"sdp_mline_index"`
 }
 
 type historyEvent struct {
@@ -295,6 +305,13 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
 			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels})
+			for boardID, roster := range msg.Channels {
+				a.refreshVoiceIfNeeded(boardID, roster)
+			}
+		case "voice_answer":
+			a.handleVoiceAnswer(msg.SDP)
+		case "voice_ice":
+			a.handleVoiceICE(msg.Candidate, msg.SDPMid, msg.SDPMLineIndex)
 		}
 	}
 }
@@ -346,24 +363,9 @@ func (a *App) SubscribeBoard(boardID string) error {
 	return conn.WriteMessage(websocket.TextMessage, msg)
 }
 
-// JoinVoiceChannel connects presence to a voice board. The server validates
-// the board actually belongs to a voice-type room; joining a different
-// channel while already in one moves you, with no separate leave needed.
-func (a *App) JoinVoiceChannel(boardID string) error {
-	a.writeMu.Lock(); defer a.writeMu.Unlock()
-	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
-	if conn == nil { return fmt.Errorf("not connected") }
-	msg, _ := json.Marshal(map[string]string{"type": "join_voice", "board_id": boardID})
-	return conn.WriteMessage(websocket.TextMessage, msg)
-}
-
-func (a *App) LeaveVoiceChannel() error {
-	a.writeMu.Lock(); defer a.writeMu.Unlock()
-	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
-	if conn == nil { return fmt.Errorf("not connected") }
-	msg, _ := json.Marshal(map[string]string{"type": "leave_voice"})
-	return conn.WriteMessage(websocket.TextMessage, msg)
-}
+// JoinVoiceChannel and LeaveVoiceChannel now live in voice.go, alongside
+// the actual WebRTC session they establish — this used to be a
+// presence-only stub here.
 
 func (a *App) SendMessage(boardID, content string, attachments []Attachment) error {
 	a.writeMu.Lock(); defer a.writeMu.Unlock()

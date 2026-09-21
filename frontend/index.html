@@ -11,7 +11,7 @@
   --border:#2e3248; --accent:#7289da; --accent-dim:#4e5d94;
   --green:#43b581; --red:#f04747; --yellow:#faa61a;
   --text:#dcddde; --text-muted:#72767d; --text-strong:#ffffff;
-  --sidebar-w:220px; --members-w:200px;
+  --sidebar-w:330px; --members-w:200px;
 }
 html { height:100%; }
 body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg-darkest); color:var(--text); height:100%; overflow:hidden; user-select:none; }
@@ -64,33 +64,37 @@ input,button,textarea { font-family:inherit; }
 /* Sidebar */
 #sidebar { width:var(--sidebar-w); background:var(--bg-dark); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
 #sidebar-header { padding:14px 16px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-#sidebar-header .server-name { font-weight:800; font-size:.95rem; color:var(--text-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#sidebar-header .server-name { font-weight:800; font-size:1.05rem; color:var(--text-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #back-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; padding:2px 4px; border-radius:4px; flex-shrink:0; }
 #back-btn:hover { background:var(--bg-light); color:var(--text); }
 #room-list { flex:1; overflow-y:auto; padding:8px 0; }
-.room-header { padding:6px 8px 4px 12px; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; border-radius:4px; margin:0 4px; }
+.room-header { padding:6px 8px 4px 12px; font-size:.79rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; border-radius:4px; margin:0 4px; }
 .room-header:hover { color:var(--text); background:var(--bg-light); }
-.room-arrow { font-size:.65rem; transition:transform .15s; }
+.room-arrow { font-size:.72rem; transition:transform .15s; }
 .room-arrow.open { transform:rotate(90deg); }
-.board-item { padding:5px 8px 5px 12px; margin:1px 4px; border-radius:4px; font-size:.9rem; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.board-item .unread-dot { display:inline-block; width:12px; flex-shrink:0; text-align:center; color:var(--text-strong); font-size:.7rem; }
+.board-item { padding:5px 8px 5px 12px; margin:1px 4px; border-radius:4px; font-size:.99rem; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.board-item .unread-dot { display:inline-block; width:12px; flex-shrink:0; text-align:center; color:var(--text-strong); font-size:.77rem; }
 .board-item .board-hash { font-weight:700; margin-right:6px; flex-shrink:0; }
 .board-item .board-name { overflow:hidden; text-overflow:ellipsis; }
 .board-item:hover { background:var(--bg-light); color:var(--text); }
 .board-item.unread { color:var(--text-strong); }
 .board-item.active { background:var(--bg-light); color:var(--text-strong); font-weight:600; }
-.voice-item { padding:5px 8px 5px 12px; margin:1px 4px; border-radius:4px; font-size:.9rem; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:6px; }
+.voice-item { padding:5px 8px 5px 12px; margin:1px 4px; border-radius:4px; font-size:.99rem; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:6px; }
 .voice-item:hover { background:var(--bg-light); color:var(--text); }
 .voice-item.joined { color:var(--green); }
-.voice-count { margin-left:auto; font-size:.72rem; color:var(--text-muted); background:var(--bg-mid); border-radius:8px; padding:1px 6px; flex-shrink:0; }
-.voice-occupants { padding:2px 12px 4px 34px; font-size:.75rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.83rem; color:var(--green); }
-#voice-connected-bar #voice-leave-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.9rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+.voice-count { margin-left:auto; font-size:.79rem; color:var(--text-muted); background:var(--bg-mid); border-radius:8px; padding:1px 6px; flex-shrink:0; }
+.voice-occupant-row { display:flex; align-items:center; gap:6px; padding:2px 12px 2px 30px; }
+.voice-occupant-avatar { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#fff; flex-shrink:0; }
+.voice-occupant-name { font-size:.86rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.91rem; color:var(--green); }
+#voice-connected-bar #voice-leave-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.99rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
 #voice-connected-bar #voice-leave-btn:hover { background:var(--bg-light); color:var(--red); }
 #sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); position:relative; }
-.user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; color:#fff; flex-shrink:0; }
-.user-name { font-size:.85rem; font-weight:600; color:var(--text-strong); }
-.status-dot-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; margin-left:auto; flex-shrink:0; }
+.user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.94rem; color:#fff; flex-shrink:0; }
+.user-name { font-size:.94rem; font-weight:600; color:var(--text-strong); }
+.settings-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; font-size:.95rem; margin-left:auto; flex-shrink:0; }
+.settings-btn:hover { background:var(--bg-light); }
+.status-dot-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; flex-shrink:0; }
 .status-dot-btn:hover { background:var(--bg-light); }
 .status-dot { width:8px; height:8px; border-radius:50%; background:var(--green); flex-shrink:0; }
 #ping-popover { position:absolute; bottom:calc(100% + 8px); right:8px; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px; padding:10px 14px; box-shadow:0 4px 20px rgba(0,0,0,.4); z-index:150; min-width:130px; }
@@ -197,6 +201,21 @@ input,button,textarea { font-family:inherit; }
 
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:200; cursor:zoom-out; }
+#settings-modal { position:fixed; inset:0; background:var(--bg-darkest); z-index:500; display:flex; }
+#settings-tabs { width:220px; flex-shrink:0; background:var(--bg-dark); padding:56px 12px 12px; overflow-y:auto; }
+.settings-tab { padding:8px 12px; margin-bottom:2px; border-radius:4px; font-size:.9rem; font-weight:600; color:var(--text-muted); cursor:pointer; }
+.settings-tab:hover { background:var(--bg-light); color:var(--text); }
+.settings-tab.active { background:var(--bg-light); color:var(--text-strong); }
+#settings-content { flex:1; padding:56px 40px; overflow-y:auto; max-width:640px; }
+.settings-tab-pane { display:none; }
+.settings-tab-pane.active { display:block; }
+.settings-tab-pane h2 { font-size:1.3rem; margin-bottom:20px; }
+.settings-label { display:block; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); margin:18px 0 6px; }
+.settings-label:first-of-type { margin-top:0; }
+#settings-mic-select, #settings-speaker-select { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
+.settings-hint { margin-top:20px; font-size:.8rem; color:var(--text-muted); line-height:1.5; }
+#settings-close-btn { position:absolute; top:20px; right:24px; background:none; border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer; padding:6px 10px; border-radius:4px; z-index:1; }
+#settings-close-btn:hover { background:var(--bg-light); color:var(--text); }
 #lightbox img { max-width:92%; max-height:92%; object-fit:contain; border-radius:6px; }
 
 /* Input area */
@@ -376,6 +395,7 @@ input,button,textarea { font-family:inherit; }
     <div id="sidebar-user">
       <div class="user-avatar" id="user-avatar">?</div>
       <span class="user-name" id="user-name-label">username</span>
+      <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
       <button class="status-dot-btn" id="status-dot-btn" title="Connected">
         <span class="status-dot" id="status-dot"></span>
       </button>
@@ -428,6 +448,22 @@ input,button,textarea { font-family:inherit; }
 </div>
 
 <div id="lightbox" class="hidden"><img id="lightbox-img" src="" alt=""></div>
+<div id="settings-modal" class="hidden">
+  <button id="settings-close-btn" title="Close (Esc)">✕</button>
+  <div id="settings-tabs">
+    <div class="settings-tab active" data-tab="voice">Voice</div>
+  </div>
+  <div id="settings-content">
+    <div id="settings-tab-voice" class="settings-tab-pane active">
+      <h2>Voice Settings</h2>
+      <label class="settings-label">Microphone</label>
+      <select id="settings-mic-select"><option>Loading devices…</option></select>
+      <label class="settings-label">Speaker</label>
+      <select id="settings-speaker-select"><option>Loading devices…</option></select>
+      <p class="settings-hint">Device selection is saved but not wired up to a live call yet — that's the next piece.</p>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -787,6 +823,14 @@ function setLastBoard(domain,roomId,boardId,boardName){
   if(!domain)return;
   localStorage.setItem('lastBoard:'+domain,JSON.stringify({roomId,boardId,boardName}));
 }
+function getExpandedRooms(domain){
+  if(!domain)return new Set();
+  try{return new Set(JSON.parse(localStorage.getItem('expandedRooms:'+domain))||[]);}catch{return new Set();}
+}
+function saveExpandedRooms(domain){
+  if(!domain)return;
+  localStorage.setItem('expandedRooms:'+domain,JSON.stringify([...state.expandedRooms]));
+}
 
 async function loadRooms(){
   try{state.rooms=await window.go.main.App.GetRooms()||[];}catch(err){toast('Failed to load rooms: '+err,true);state.rooms=[];}
@@ -794,8 +838,13 @@ async function loadRooms(){
 
   const remembered=getLastBoard(state.domain);
   const targetRoomId=(remembered&&state.rooms.some(r=>r.id===remembered.roomId))?remembered.roomId:state.rooms[0].id;
+
+  // Restore whichever rooms were expanded last session (plus whichever room
+  // holds the last-viewed board), rather than every room starting collapsed
+  // on every fresh connect.
+  const toExpand=new Set([...getExpandedRooms(state.domain),targetRoomId].filter(id=>state.rooms.some(r=>r.id===id)));
+  await Promise.all([...toExpand].map(id=>ensureRoomExpanded(id)));
   renderSidebar();
-  await toggleRoom(targetRoomId);
 
   const boards=state.boardsByRoom[targetRoomId]||[];
   if(!boards.length)return; // nothing to select — leaves the "pick a board" placeholder up, which is correct here
@@ -816,14 +865,16 @@ async function refreshRoomsAndBoards(){
   state.rooms=rooms;
 
   const validRoomIds=new Set(rooms.map(r=>r.id));
+  let anyRemoved=false;
   for(const roomId of [...state.expandedRooms]){
     if(!validRoomIds.has(roomId)){
-      state.expandedRooms.delete(roomId);delete state.boardsByRoom[roomId];
+      state.expandedRooms.delete(roomId);delete state.boardsByRoom[roomId];anyRemoved=true;
       continue;
     }
     try{state.boardsByRoom[roomId]=await window.go.main.App.GetBoards(roomId)||[];}
     catch{state.boardsByRoom[roomId]=[];}
   }
+  if(anyRemoved)saveExpandedRooms(state.domain);
 
   if(state.selectedBoardId){
     const stillExists=(state.boardsByRoom[state.selectedRoomId]||[]).some(b=>b.id===state.selectedBoardId);
@@ -844,7 +895,7 @@ async function refreshRoomsAndBoards(){
 }
 function renderSidebar(){
   const list=document.getElementById('room-list');list.innerHTML='';
-  if(!state.rooms.length){list.innerHTML='<div style="padding:12px 16px;color:var(--text-muted);font-size:.83rem">No rooms yet.<br>Ask the owner to create some.</div>';return;}
+  if(!state.rooms.length){list.innerHTML='<div style="padding:12px 16px;color:var(--text-muted);font-size:.91rem">No rooms yet.<br>Ask the owner to create some.</div>';return;}
   state.rooms.forEach(room=>{
     const isOpen=state.expandedRooms.has(room.id),boards=state.boardsByRoom[room.id]??null;
     const isVoiceRoom=room.room_type==='voice';
@@ -853,7 +904,7 @@ function renderSidebar(){
     header.addEventListener('click',()=>toggleRoom(room.id));list.appendChild(header);
     if(isOpen){
       if(boards===null){const l=document.createElement('div');l.style.cssText='padding:4px 12px';l.innerHTML='<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>';list.appendChild(l);}
-      else if(!boards.length){const e=document.createElement('div');e.style.cssText='padding:4px 24px;font-size:.8rem;color:var(--text-muted)';e.textContent='No boards';list.appendChild(e);}
+      else if(!boards.length){const e=document.createElement('div');e.style.cssText='padding:4px 24px;font-size:.88rem;color:var(--text-muted)';e.textContent='No boards';list.appendChild(e);}
       else if(isVoiceRoom)boards.forEach(board=>{
         const occupants=state.voiceChannels[board.id]||[];
         const isJoined=occupants.includes(state.username);
@@ -863,9 +914,11 @@ function renderSidebar(){
         item.addEventListener('click',()=>toggleVoiceChannel(board.id));
         list.appendChild(item);
         if(occupants.length){
-          const sub=document.createElement('div');sub.className='voice-occupants';
-          sub.textContent=occupants.join(', ');
-          list.appendChild(sub);
+          occupants.forEach(user=>{
+            const row=document.createElement('div');row.className='voice-occupant-row';
+            row.innerHTML=`<span class="voice-occupant-avatar" style="background:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span>`;
+            list.appendChild(row);
+          });
         }
       });
       else boards.forEach(board=>{
@@ -887,7 +940,11 @@ async function toggleVoiceChannel(boardId){
   const alreadyIn=occupants.includes(state.username);
   try{
     if(alreadyIn)await window.go.main.App.LeaveVoiceChannel();
-    else await window.go.main.App.JoinVoiceChannel(boardId);
+    else{
+      const micLabel=localStorage.getItem('audioMicLabel')||'';
+      const speakerLabel=localStorage.getItem('audioSpeakerLabel')||'';
+      await window.go.main.App.JoinVoiceChannel(boardId,micLabel,speakerLabel);
+    }
   }catch(err){toast('Voice action failed: '+err,true);}
 }
 // Keeps the persistent "connected to voice" bar in sync — always visible
@@ -908,12 +965,72 @@ function updateVoiceConnectedBar(){
   document.getElementById('voice-connected-name').textContent=`🔊 ${boardName}`;
   bar.classList.remove('hidden');
 }
+
+// ── SETTINGS ─────────────────────────────────────────────────────
+// Generic tab list + content pane, matching Discord's own settings shape —
+// adding a future tab is just one more .settings-tab + .settings-tab-pane
+// pair, not a structural change to this switching logic.
+function openSettings(){
+  document.getElementById('settings-modal').classList.remove('hidden');
+  populateAudioDeviceDropdowns();
+}
+function closeSettings(){
+  document.getElementById('settings-modal').classList.add('hidden');
+}
+function switchSettingsTab(name){
+  document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
+}
+// Lists real microphones/speakers via the standard Web Audio API — no
+// native code or cgo needed, since Wails' webview is Chromium-based and
+// this is a standard, stable browser API. Selection doesn't do anything
+// live yet, but is saved so the real audio pipeline can read it later
+// without another round of settings-UI work.
+async function populateAudioDeviceDropdowns(){
+  const micSelect=document.getElementById('settings-mic-select'),spkSelect=document.getElementById('settings-speaker-select');
+  // Device labels stay blank until mic permission has been granted at
+  // least once — request it now just to unlock real names, then
+  // immediately stop the stream rather than holding the mic open.
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    stream.getTracks().forEach(t=>t.stop());
+  }catch{ /* denied or no mic present — devices still list, just without friendly labels */ }
+
+  let devices=[];
+  try{devices=await navigator.mediaDevices.enumerateDevices();}
+  catch(err){micSelect.innerHTML='<option>Could not list devices</option>';spkSelect.innerHTML='<option>Could not list devices</option>';return;}
+
+  const mics=devices.filter(d=>d.kind==='audioinput'),speakers=devices.filter(d=>d.kind==='audiooutput');
+  const savedMic=localStorage.getItem('audioMicId'),savedSpeaker=localStorage.getItem('audioSpeakerId');
+
+  micSelect.innerHTML=mics.length
+    ? mics.map((d,i)=>`<option value="${esc(d.deviceId)}">${esc(d.label||'Microphone '+(i+1))}</option>`).join('')
+    : '<option>No microphones found</option>';
+  spkSelect.innerHTML=speakers.length
+    ? speakers.map((d,i)=>`<option value="${esc(d.deviceId)}">${esc(d.label||'Speaker '+(i+1))}</option>`).join('')
+    : '<option>No speakers found</option>';
+
+  if(savedMic&&mics.some(d=>d.deviceId===savedMic))micSelect.value=savedMic;
+  if(savedSpeaker&&speakers.some(d=>d.deviceId===savedSpeaker))spkSelect.value=savedSpeaker;
+}
+
+// Expands a room without toggling — used to restore previously-expanded
+// rooms on load, where re-collapsing an already-expanded one would be wrong.
+async function ensureRoomExpanded(roomId){
+  if(state.expandedRooms.has(roomId))return;
+  state.expandedRooms.add(roomId);
+  if(!state.boardsByRoom[roomId]){
+    try{state.boardsByRoom[roomId]=await window.go.main.App.GetBoards(roomId)||[];}
+    catch{state.boardsByRoom[roomId]=[];}
+  }
+}
 async function toggleRoom(roomId){
   if(state.expandedRooms.has(roomId)){state.expandedRooms.delete(roomId);renderSidebar();}
   else{
     state.expandedRooms.add(roomId);renderSidebar();
     if(!state.boardsByRoom[roomId]){try{state.boardsByRoom[roomId]=await window.go.main.App.GetBoards(roomId)||[];}catch{state.boardsByRoom[roomId]=[];}renderSidebar();}
   }
+  saveExpandedRooms(state.domain);
 }
 // Flags a board as having activity you haven't seen — only re-renders the
 // sidebar on the actual transition into "unread", not on every subsequent
@@ -1646,6 +1763,12 @@ function init(){
     renderSidebar();
     updateVoiceConnectedBar();
   });
+  window.runtime.EventsOn('voice:error',msg=>toast('Voice: '+msg,true));
+  window.runtime.EventsOn('voice:connectionState',connState=>{
+    if(connState==='failed'||connState==='disconnected'){
+      toast('Voice connection '+connState+' — you may need to rejoin.',true);
+    }
+  });
   window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);state.wsConnected=false;state.lastPingMs=null;state.voiceChannels={};stopPingLoop();updateStatusDotColor();updateVoiceConnectedBar();renderSidebar();scheduleReconnect();}});
 
   document.getElementById('open-add-btn').addEventListener('click',()=>openAddModal());
@@ -1689,6 +1812,18 @@ function init(){
   document.getElementById('voice-leave-btn').addEventListener('click',async()=>{
     try{await window.go.main.App.LeaveVoiceChannel();}catch(err){toast('Failed to leave voice: '+err,true);}
   });
+  document.getElementById('settings-btn').addEventListener('click',openSettings);
+  document.getElementById('settings-close-btn').addEventListener('click',closeSettings);
+  document.querySelectorAll('.settings-tab').forEach(t=>t.addEventListener('click',()=>switchSettingsTab(t.dataset.tab)));
+  document.getElementById('settings-mic-select').addEventListener('change',e=>{
+    localStorage.setItem('audioMicId',e.target.value);
+    localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');
+  });
+  document.getElementById('settings-speaker-select').addEventListener('change',e=>{
+    localStorage.setItem('audioSpeakerId',e.target.value);
+    localStorage.setItem('audioSpeakerLabel',e.target.selectedOptions[0]?.textContent||'');
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('settings-modal').classList.contains('hidden'))closeSettings();});
   document.getElementById('msg-search-btn').addEventListener('click',runSearch);
   document.getElementById('msg-search-clear').addEventListener('click',exitSearch);
   document.getElementById('msg-search-input').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});

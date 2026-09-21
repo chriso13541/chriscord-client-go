@@ -130,6 +130,7 @@ export namespace main {
 	    id: string;
 	    name: string;
 	    is_private: boolean;
+	    room_type: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Room(source);
@@ -140,6 +141,7 @@ export namespace main {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.is_private = source["is_private"];
+	        this.room_type = source["room_type"];
 	    }
 	}
 	export class SavedServer {
