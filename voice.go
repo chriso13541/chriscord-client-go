@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"runtime"
 	"strings"
 	"sync"
@@ -39,16 +41,20 @@ type voiceRemoteSource struct {
 // without a rewrite, since the actual capture/encode/decode/mix pipeline
 // here doesn't care how many times a negotiation happens over its life.
 type VoiceSession struct {
+	ctx         context.Context
 	boardID     string
 	micName     string
 	speakerName string
 	lastRoster  map[string]bool
+	rosterKnown bool // false until the first voice_state after this session started
 	pc          *webrtc.PeerConnection
 	localTrack  *webrtc.TrackLocalStaticSample
 	encoder     *opus.Encoder
 
-	captureStream *portaudio.Stream
-	captureBuf    []int16
+	captureStream   *portaudio.Stream
+	captureBuf      []int16
+	wasSpeaking     bool // only touched from within the capture goroutine — no mutex needed
+	quietFrameCount int
 
 	playStream *portaudio.Stream
 	playBuf    []int16
@@ -161,6 +167,7 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string) error {
 	}
 
 	session := &VoiceSession{
+		ctx:         a.ctx,
 		boardID:     boardID,
 		micName:     micName,
 		speakerName: speakerName,
@@ -289,6 +296,15 @@ func (a *App) refreshVoiceIfNeeded(boardID string, roster []string) {
 	for _, u := range roster {
 		newRoster[u] = true
 	}
+	if !session.rosterKnown {
+		// First update since this session started — reflects our own
+		// join completing, not a real change. Record it as the baseline
+		// without refreshing; we already have a fresh connection from
+		// starting this session in the first place.
+		session.lastRoster = newRoster
+		session.rosterKnown = true
+		return
+	}
 	if len(newRoster) == len(session.lastRoster) {
 		same := true
 		for u := range newRoster {
@@ -358,12 +374,16 @@ func (s *VoiceSession) startCapture(micName string) error {
 			case <-s.stopped:
 				stream.Stop()
 				stream.Close()
+				if s.wasSpeaking {
+					wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
+				}
 				return
 			default:
 			}
 			if err := stream.Read(); err != nil {
 				return
 			}
+			s.updateSpeakingState()
 			n, err := s.encoder.Encode(s.captureBuf, encoded)
 			if err != nil {
 				continue
@@ -373,6 +393,49 @@ func (s *VoiceSession) startCapture(micName string) error {
 		}
 	}()
 	return <-started
+}
+
+// Rough threshold for "this frame contains speech" against int16 PCM
+// (range -32768..32767) — a reasonable starting point, not precisely
+// tuned against real hardware; may need adjusting once tested against an
+// actual microphone and room. speakingHangoverFrames keeps the indicator
+// on through brief pauses between words rather than flickering on every
+// syllable break — quick to detect the start of speech, slower to detect
+// the end, which is how real voice-activity detectors behave.
+const (
+	speakingRMSThreshold   = 600
+	speakingHangoverFrames = 15 // ~300ms at the 20ms frame size used here
+)
+
+func rmsLevel(samples []int16) float64 {
+	if len(samples) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, v := range samples {
+		f := float64(v)
+		sum += f * f
+	}
+	return math.Sqrt(sum / float64(len(samples)))
+}
+
+// updateSpeakingState runs once per captured frame and emits voice:speaking
+// only when the speaking/not-speaking state actually changes, not on every
+// frame.
+func (s *VoiceSession) updateSpeakingState() {
+	if rmsLevel(s.captureBuf) > speakingRMSThreshold {
+		s.quietFrameCount = 0
+		if !s.wasSpeaking {
+			s.wasSpeaking = true
+			wailsruntime.EventsEmit(s.ctx, "voice:speaking", true)
+		}
+		return
+	}
+	s.quietFrameCount++
+	if s.wasSpeaking && s.quietFrameCount > speakingHangoverFrames {
+		s.wasSpeaking = false
+		wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
+	}
 }
 
 func (s *VoiceSession) startPlayback(speakerName string) error {

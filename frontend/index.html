@@ -91,6 +91,7 @@ input,button,textarea { font-family:inherit; }
 #voice-connected-bar #voice-leave-btn:hover { background:var(--bg-light); color:var(--red); }
 #sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); position:relative; }
 .user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.94rem; color:#fff; flex-shrink:0; }
+.user-avatar.speaking { box-shadow:0 0 0 3px var(--green); }
 .user-name { font-size:.94rem; font-weight:600; color:var(--text-strong); }
 .settings-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; font-size:.95rem; margin-left:auto; flex-shrink:0; }
 .settings-btn:hover { background:var(--bg-light); }
@@ -955,7 +956,7 @@ function updateVoiceConnectedBar(){
   const bar=document.getElementById('voice-connected-bar');
   if(!bar)return;
   const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
-  if(!entry){bar.classList.add('hidden');return;}
+  if(!entry){bar.classList.add('hidden');document.getElementById('user-avatar').classList.remove('speaking');return;}
   const boardId=entry[0];
   let boardName=boardId;
   for(const list of Object.values(state.boardsByRoom)){
@@ -1764,6 +1765,9 @@ function init(){
     updateVoiceConnectedBar();
   });
   window.runtime.EventsOn('voice:error',msg=>toast('Voice: '+msg,true));
+  window.runtime.EventsOn('voice:speaking',speaking=>{
+    document.getElementById('user-avatar').classList.toggle('speaking',!!speaking);
+  });
   window.runtime.EventsOn('voice:connectionState',connState=>{
     if(connState==='failed'||connState==='disconnected'){
       toast('Voice connection '+connState+' — you may need to rejoin.',true);
