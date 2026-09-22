@@ -68,6 +68,10 @@ export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;
 
 export function SendMessage(arg1:string,arg2:string,arg3:Array<main.Attachment>):Promise<void>;
 
+export function StartMicTest(arg1:string,arg2:string):Promise<void>;
+
+export function StopMicTest():Promise<void>;
+
 export function SubscribeBoard(arg1:string):Promise<void>;
 
 export function UnlockAccount(arg1:string):Promise<main.AccountView>;

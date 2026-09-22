@@ -23,18 +23,20 @@ import (
 )
 
 type App struct {
-	ctx         context.Context
-	mu          sync.Mutex
-	writeMu     sync.Mutex
-	ws          *websocket.Conn
-	token       string
-	domain      string
-	username    string
-	fingerprint string
-	account     *Account
-	servers     []SavedServer
-	voice       *VoiceSession
-	voiceMu     sync.Mutex
+	ctx              context.Context
+	mu               sync.Mutex
+	writeMu          sync.Mutex
+	ws               *websocket.Conn
+	token            string
+	domain           string
+	username         string
+	fingerprint      string
+	account          *Account
+	servers          []SavedServer
+	voice            *VoiceSession
+	voiceMu          sync.Mutex
+	voiceRefreshMu   sync.Mutex
+	voiceRefreshTmr  *time.Timer
 }
 
 func NewApp() *App { return &App{} }

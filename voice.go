@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gordonklaus/portaudio"
 	"github.com/hraban/opus"
@@ -319,11 +320,31 @@ func (a *App) refreshVoiceIfNeeded(boardID string, roster []string) {
 	}
 	session.lastRoster = newRoster
 	micName, speakerName := session.micName, session.speakerName
-	go func() {
+
+	// Debounce rather than reconnecting immediately: if several roster
+	// changes arrive in quick succession — two people joining moments
+	// apart is a completely normal case — reacting to each one
+	// individually tears down and restarts the connection every time,
+	// which cancels whatever negotiation was already in progress and can
+	// starve it of the time it needs to ever actually finish. Waiting for
+	// things to settle first means one reconnect reflecting the final
+	// roster, not one per incremental change.
+	a.voiceRefreshMu.Lock()
+	if a.voiceRefreshTmr != nil {
+		a.voiceRefreshTmr.Stop()
+	}
+	a.voiceRefreshTmr = time.AfterFunc(1500*time.Millisecond, func() {
+		a.voiceMu.Lock()
+		current := a.voice
+		a.voiceMu.Unlock()
+		if current == nil || current.boardID != boardID {
+			return // left this channel, or moved to a different one, while waiting
+		}
 		if err := a.startVoiceSession(boardID, micName, speakerName); err != nil {
 			wailsruntime.EventsEmit(a.ctx, "voice:error", fmt.Sprintf("failed to refresh voice connection: %v", err))
 		}
-	}()
+	})
+	a.voiceRefreshMu.Unlock()
 }
 
 func (s *VoiceSession) startCapture(micName string) error {
@@ -565,4 +586,122 @@ func (s *VoiceSession) close() {
 			s.pc.Close()
 		}
 	})
+}
+
+// ── MIC TEST ─────────────────────────────────────────────────────
+// A pure local loopback — captured audio gets written straight back out
+// to the selected speaker, with no encoding, no network, and no server
+// involved at all. Exists purely so device selection and the whole local
+// capture/playback pipeline can be verified on their own, separately from
+// whether a call actually connects.
+type micTestSession struct {
+	captureStream *portaudio.Stream
+	playStream    *portaudio.Stream
+	stopped       chan struct{}
+	closeOnce     sync.Once
+}
+
+var (
+	micTestMu   sync.Mutex
+	micTestSess *micTestSession
+)
+
+func (a *App) StartMicTest(micName, speakerName string) error {
+	micTestMu.Lock()
+	if micTestSess != nil {
+		micTestMu.Unlock()
+		return fmt.Errorf("mic test already running")
+	}
+	micTestMu.Unlock()
+
+	inDevice, err := findDeviceByName(micName, true)
+	if err != nil {
+		return fmt.Errorf("no microphone available: %w", err)
+	}
+	outDevice, err := findDeviceByName(speakerName, false)
+	if err != nil {
+		return fmt.Errorf("no speaker available: %w", err)
+	}
+
+	started := make(chan error, 1)
+	go func() {
+		// Same reasoning as VoiceSession's capture/playback above — the
+		// whole lifecycle of both streams stays on one locked OS thread.
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		captureBuf := make([]int16, voiceFrameSize)
+		playBuf := make([]int16, voiceFrameSize)
+
+		inParams := portaudio.StreamParameters{
+			Input:           portaudio.StreamDeviceParameters{Device: inDevice, Channels: voiceChannels, Latency: inDevice.DefaultLowInputLatency},
+			SampleRate:      voiceSampleRate,
+			FramesPerBuffer: voiceFrameSize,
+		}
+		inStream, err := portaudio.OpenStream(inParams, captureBuf)
+		if err != nil {
+			started <- fmt.Errorf("open microphone: %w", err)
+			return
+		}
+		outParams := portaudio.StreamParameters{
+			Output:          portaudio.StreamDeviceParameters{Device: outDevice, Channels: voiceChannels, Latency: outDevice.DefaultLowOutputLatency},
+			SampleRate:      voiceSampleRate,
+			FramesPerBuffer: voiceFrameSize,
+		}
+		outStream, err := portaudio.OpenStream(outParams, playBuf)
+		if err != nil {
+			inStream.Close()
+			started <- fmt.Errorf("open speaker: %w", err)
+			return
+		}
+		if err := inStream.Start(); err != nil {
+			inStream.Close()
+			outStream.Close()
+			started <- fmt.Errorf("start microphone: %w", err)
+			return
+		}
+		if err := outStream.Start(); err != nil {
+			inStream.Stop()
+			inStream.Close()
+			outStream.Close()
+			started <- fmt.Errorf("start speaker: %w", err)
+			return
+		}
+
+		sess := &micTestSession{captureStream: inStream, playStream: outStream, stopped: make(chan struct{})}
+		micTestMu.Lock()
+		micTestSess = sess
+		micTestMu.Unlock()
+		started <- nil
+
+		for {
+			select {
+			case <-sess.stopped:
+				inStream.Stop()
+				inStream.Close()
+				outStream.Stop()
+				outStream.Close()
+				return
+			default:
+			}
+			if err := inStream.Read(); err != nil {
+				return
+			}
+			copy(playBuf, captureBuf)
+			if err := outStream.Write(); err != nil {
+				return
+			}
+		}
+	}()
+	return <-started
+}
+
+func (a *App) StopMicTest() {
+	micTestMu.Lock()
+	sess := micTestSess
+	micTestSess = nil
+	micTestMu.Unlock()
+	if sess != nil {
+		sess.closeOnce.Do(func() { close(sess.stopped) })
+	}
 }

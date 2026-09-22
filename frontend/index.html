@@ -215,6 +215,9 @@ input,button,textarea { font-family:inherit; }
 .settings-label:first-of-type { margin-top:0; }
 #settings-mic-select, #settings-speaker-select { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
 .settings-hint { margin-top:20px; font-size:.8rem; color:var(--text-muted); line-height:1.5; }
+.settings-secondary-btn { margin-top:14px; padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.85rem; cursor:pointer; }
+.settings-secondary-btn:hover { background:var(--bg-light); }
+.settings-secondary-btn.active { background:var(--red); border-color:var(--red); color:#fff; }
 #settings-close-btn { position:absolute; top:20px; right:24px; background:none; border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer; padding:6px 10px; border-radius:4px; z-index:1; }
 #settings-close-btn:hover { background:var(--bg-light); color:var(--text); }
 #lightbox img { max-width:92%; max-height:92%; object-fit:contain; border-radius:6px; }
@@ -461,7 +464,8 @@ input,button,textarea { font-family:inherit; }
       <select id="settings-mic-select"><option>Loading devices…</option></select>
       <label class="settings-label">Speaker</label>
       <select id="settings-speaker-select"><option>Loading devices…</option></select>
-      <p class="settings-hint">Device selection is saved but not wired up to a live call yet — that's the next piece.</p>
+      <button id="settings-mic-test-btn" class="settings-secondary-btn">🎙️ Test Voice</button>
+      <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker — a quick way to check your device selection works before joining an actual call.</p>
     </div>
   </div>
 </div>
@@ -977,6 +981,27 @@ function openSettings(){
 }
 function closeSettings(){
   document.getElementById('settings-modal').classList.add('hidden');
+  if(micTestRunning)stopMicTest();
+}
+let micTestRunning=false;
+async function toggleMicTest(){
+  const btn=document.getElementById('settings-mic-test-btn');
+  if(micTestRunning){stopMicTest();return;}
+  const micLabel=document.getElementById('settings-mic-select').selectedOptions[0]?.textContent||'';
+  const speakerLabel=document.getElementById('settings-speaker-select').selectedOptions[0]?.textContent||'';
+  try{
+    await window.go.main.App.StartMicTest(micLabel,speakerLabel);
+    micTestRunning=true;
+    btn.textContent='⏹ Stop Test';
+    btn.classList.add('active');
+  }catch(err){toast('Could not start mic test: '+err,true);}
+}
+function stopMicTest(){
+  micTestRunning=false;
+  const btn=document.getElementById('settings-mic-test-btn');
+  btn.textContent='🎙️ Test Voice';
+  btn.classList.remove('active');
+  window.go.main.App.StopMicTest().catch(()=>{});
 }
 function switchSettingsTab(name){
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
@@ -1818,6 +1843,7 @@ function init(){
   });
   document.getElementById('settings-btn').addEventListener('click',openSettings);
   document.getElementById('settings-close-btn').addEventListener('click',closeSettings);
+  document.getElementById('settings-mic-test-btn').addEventListener('click',toggleMicTest);
   document.querySelectorAll('.settings-tab').forEach(t=>t.addEventListener('click',()=>switchSettingsTab(t.dataset.tab)));
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
