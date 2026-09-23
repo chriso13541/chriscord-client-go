@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -565,10 +566,18 @@ func mergeServersIfPresent(path string) {
 // must match the one this account's identity.json was encrypted under;
 // verified up front so a typo produces a clean error instead of a useless
 // file at the destination.
-func ExportAccount(slug, destPath, passphrase string) error {
+//
+// The saved file is named from its own content rather than whatever
+// filename destPath had: account_<first 8 hex chars of the encrypted
+// file's own sha256>.zip, written into the same directory destPath named.
+// This is purely to make multiple exported files easy to tell apart at a
+// glance when someone has several sitting around — the hash has no
+// security role here, the passphrase does all of that. Returns the actual
+// final path, since it differs from destPath.
+func ExportAccount(slug, destPath, passphrase string) (string, error) {
 	dir := filepath.Join(accountsDir(), slug)
 	if _, _, err := decryptIdentity(dir, passphrase); err != nil {
-		return err // wrong passphrase, or the account itself is corrupt
+		return "", err // wrong passphrase, or the account itself is corrupt
 	}
 
 	var buf bytes.Buffer
@@ -579,7 +588,7 @@ func ExportAccount(slug, destPath, passphrase string) error {
 			continue // pfp.png especially is commonly absent — skip quietly
 		}
 		if err := addFileToZip(zw, srcPath, name); err != nil {
-			return err
+			return "", err
 		}
 	}
 	// Bundle a snapshot of the local saved-server list too, so importing on
@@ -594,14 +603,20 @@ func ExportAccount(slug, destPath, passphrase string) error {
 		}
 	}
 	if err := zw.Close(); err != nil {
-		return fmt.Errorf("could not build account key archive: %w", err)
+		return "", fmt.Errorf("could not build account key archive: %w", err)
 	}
 
 	encrypted, err := encryptContainer(buf.Bytes(), passphrase)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return os.WriteFile(destPath, encrypted, 0600)
+
+	sum := sha256.Sum256(encrypted)
+	finalPath := filepath.Join(filepath.Dir(destPath), fmt.Sprintf("account_%s.zip", hex.EncodeToString(sum[:4])))
+	if err := os.WriteFile(finalPath, encrypted, 0600); err != nil {
+		return "", err
+	}
+	return finalPath, nil
 }
 
 // ── Small file/zip helpers ───────────────────────────────────────────────

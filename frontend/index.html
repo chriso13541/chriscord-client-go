@@ -643,9 +643,10 @@ async function confirmExport(){
   try{
     const dest=await window.go.main.App.PickExportDestination();
     if(!dest){return;}
-    await window.go.main.App.ExportAccount(dest,pass);
+    const finalPath=await window.go.main.App.ExportAccount(dest,pass);
     closeExportModal();
-    toast('Account key exported.');
+    const finalName=finalPath.split(/[\\/]/).pop();
+    toast(`Account key exported as ${finalName}.`);
   }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
   finally{btn.disabled=false;btn.textContent='Export';}
 }

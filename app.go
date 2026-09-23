@@ -134,9 +134,9 @@ func (a *App) UnlockAccount(passphrase string) (*AccountView, error) {
 	return acct.View(), nil
 }
 
-func (a *App) ExportAccount(destPath, passphrase string) error {
+func (a *App) ExportAccount(destPath, passphrase string) (string, error) {
 	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
-	if slug == "" { return fmt.Errorf("no account unlocked") }
+	if slug == "" { return "", fmt.Errorf("no account unlocked") }
 	return ExportAccount(slug, destPath, passphrase)
 }
 
