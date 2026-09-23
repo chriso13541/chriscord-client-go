@@ -86,6 +86,10 @@ export function ImportAccount(arg1, arg2) {
   return window['go']['main']['App']['ImportAccount'](arg1, arg2);
 }
 
+export function IsMuted() {
+  return window['go']['main']['App']['IsMuted']();
+}
+
 export function JoinVoiceChannel(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['JoinVoiceChannel'](arg1, arg2, arg3, arg4);
 }
@@ -144,6 +148,10 @@ export function StopMicTest() {
 
 export function SubscribeBoard(arg1) {
   return window['go']['main']['App']['SubscribeBoard'](arg1);
+}
+
+export function ToggleMute() {
+  return window['go']['main']['App']['ToggleMute']();
 }
 
 export function UnlockAccount(arg1) {

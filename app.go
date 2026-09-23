@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gordonklaus/portaudio"
@@ -37,6 +38,7 @@ type App struct {
 	voiceMu          sync.Mutex
 	voiceRefreshMu   sync.Mutex
 	voiceRefreshTmr  *time.Timer
+	voiceMuted       atomic.Bool
 }
 
 func NewApp() *App { return &App{} }

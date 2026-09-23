@@ -44,6 +44,8 @@ export function HasAccount():Promise<boolean>;
 
 export function ImportAccount(arg1:string,arg2:string):Promise<main.AccountView>;
 
+export function IsMuted():Promise<boolean>;
+
 export function JoinVoiceChannel(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<void>;
 
 export function LeaveVoiceChannel():Promise<void>;
@@ -73,6 +75,8 @@ export function StartMicTest(arg1:string,arg2:string):Promise<void>;
 export function StopMicTest():Promise<void>;
 
 export function SubscribeBoard(arg1:string):Promise<void>;
+
+export function ToggleMute():Promise<boolean>;
 
 export function UnlockAccount(arg1:string):Promise<main.AccountView>;
 

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gordonklaus/portaudio"
@@ -57,6 +58,11 @@ type VoiceSession struct {
 	captureBuf      []int16
 	wasSpeaking     bool // only touched from within the capture goroutine — no mutex needed
 	quietFrameCount int
+	// Points at the App's own voiceMuted flag, not an owned value — a
+	// roster-change refresh tears down and rebuilds this whole session,
+	// and muting shouldn't silently reset just because someone else
+	// joined or left in the background. See App.voiceMuted.
+	muted *atomic.Bool
 
 	playStream *portaudio.Stream
 	playBuf    []int16
@@ -127,6 +133,7 @@ func (a *App) JoinVoiceChannel(boardID, micName, speakerName string, knownOthers
 
 func (a *App) LeaveVoiceChannel() error {
 	a.stopVoiceSession()
+	a.voiceMuted.Store(false)
 
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
@@ -135,6 +142,32 @@ func (a *App) LeaveVoiceChannel() error {
 	}
 	msg, _ := json.Marshal(map[string]string{"type": "leave_voice"})
 	return a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
+// ToggleMute flips whether this participant's microphone audio is being
+// transmitted during the current voice session, and returns the new
+// muted state. Purely client-side — muting simply stops sending anything
+// at all, so the server and other participants never need to know or be
+// told; there's nothing to forward when nothing gets sent. No-ops
+// (returns false) if not currently in a voice call. The flag lives on
+// the App, not the session, so it survives a roster-change refresh
+// tearing down and rebuilding the underlying connection.
+func (a *App) ToggleMute() bool {
+	a.voiceMu.Lock()
+	inCall := a.voice != nil
+	a.voiceMu.Unlock()
+	if !inCall {
+		return false
+	}
+	newState := !a.voiceMuted.Load()
+	a.voiceMuted.Store(newState)
+	return newState
+}
+
+// IsMuted reports the current mute state, for the UI to sync against
+// (e.g. on startup or after a reconnect) without toggling it.
+func (a *App) IsMuted() bool {
+	return a.voiceMuted.Load()
 }
 
 // startVoiceSession tears down any existing session (this IS the "refresh"
@@ -204,6 +237,7 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 		encoder:     encoder,
 		remotes:     make(map[string]*voiceRemoteSource),
 		stopped:     make(chan struct{}),
+		muted:       &a.voiceMuted,
 	}
 
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -441,6 +475,20 @@ func (s *VoiceSession) startCapture(micName string) error {
 			}
 			if err := stream.Read(); err != nil {
 				return
+			}
+			if s.muted.Load() {
+				// Still draining the stream above to keep it healthy, but
+				// nothing gets encoded or sent while muted — this is a
+				// real "not transmitting" mute, not just silence sent
+				// over the wire. Also clear the local speaking indicator
+				// if it was on, since it would be misleading to show
+				// "speaking" while muted.
+				if s.wasSpeaking {
+					s.wasSpeaking = false
+					s.quietFrameCount = 0
+					wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
+				}
+				continue
 			}
 			s.updateSpeakingState()
 			n, err := s.encoder.Encode(s.captureBuf, encoded)

@@ -87,7 +87,10 @@ input,button,textarea { font-family:inherit; }
 .voice-occupant-avatar { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#fff; flex-shrink:0; }
 .voice-occupant-name { font-size:.86rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.91rem; color:var(--green); }
-#voice-connected-bar #voice-leave-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.99rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+#voice-connected-bar #voice-mute-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.95rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+#voice-connected-bar #voice-mute-btn:hover { background:var(--bg-light); color:var(--text); }
+#voice-connected-bar #voice-mute-btn.muted { color:var(--red); }
+#voice-connected-bar #voice-leave-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.99rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
 #voice-connected-bar #voice-leave-btn:hover { background:var(--bg-light); color:var(--red); }
 #sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); position:relative; }
 .user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.94rem; color:#fff; flex-shrink:0; }
@@ -394,6 +397,7 @@ input,button,textarea { font-family:inherit; }
     <div id="room-list"></div>
     <div id="voice-connected-bar" class="hidden">
       <span id="voice-connected-name"></span>
+      <button id="voice-mute-btn" title="Mute microphone">🎤</button>
       <button id="voice-leave-btn" title="Disconnect from voice">✕</button>
     </div>
     <div id="sidebar-user">
@@ -961,7 +965,7 @@ function updateVoiceConnectedBar(){
   const bar=document.getElementById('voice-connected-bar');
   if(!bar)return;
   const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
-  if(!entry){bar.classList.add('hidden');document.getElementById('user-avatar').classList.remove('speaking');return;}
+  if(!entry){bar.classList.add('hidden');document.getElementById('user-avatar').classList.remove('speaking');setMuteButtonState(false);return;}
   const boardId=entry[0];
   let boardName=boardId;
   for(const list of Object.values(state.boardsByRoom)){
@@ -970,6 +974,20 @@ function updateVoiceConnectedBar(){
   }
   document.getElementById('voice-connected-name').textContent=`🔊 ${boardName}`;
   bar.classList.remove('hidden');
+  window.go.main.App.IsMuted().then(setMuteButtonState).catch(()=>{});
+}
+function setMuteButtonState(muted){
+  const btn=document.getElementById('voice-mute-btn');
+  if(!btn)return;
+  btn.textContent=muted?'🔇':'🎤';
+  btn.title=muted?'Unmute microphone':'Mute microphone';
+  btn.classList.toggle('muted',muted);
+}
+async function toggleMute(){
+  try{
+    const muted=await window.go.main.App.ToggleMute();
+    setMuteButtonState(muted);
+  }catch(err){toast('Failed to toggle mute: '+err,true);}
 }
 
 // ── SETTINGS ─────────────────────────────────────────────────────
@@ -1839,6 +1857,7 @@ function init(){
   document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.add('hidden'));
   document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();updateJumpToPresentVisibility();});
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
+  document.getElementById('voice-mute-btn').addEventListener('click',toggleMute);
   document.getElementById('voice-leave-btn').addEventListener('click',async()=>{
     try{await window.go.main.App.LeaveVoiceChannel();}catch(err){toast('Failed to leave voice: '+err,true);}
   });
