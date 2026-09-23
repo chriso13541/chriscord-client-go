@@ -448,7 +448,7 @@ func UnlockActiveAccount(passphrase string) (*Account, error) {
 // ImportAccount accepts either a directory or a .zip containing
 // identity.json (+ optional account.json / pfp.png), copies it into local
 // account storage under its own fingerprint, and unlocks it. This is the
-// exact mirror of ExportAccount — the files aren't re-encoded, just moved.
+// exact mirror of buildAccountExport — the files aren't re-encoded, just moved.
 func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	info, err := os.Stat(sourcePath)
 	if err != nil {
@@ -559,25 +559,23 @@ func mergeServersIfPresent(path string) {
 	}
 }
 
-// ExportAccount zips identity.json, account.json, pfp.png (if present), and
-// a snapshot of the local saved-server list (if any) for an already-
-// imported/created account, then encrypts the whole archive under
+// buildAccountExport zips identity.json, account.json, pfp.png (if
+// present), and a snapshot of the local saved-server list (if any) for an
+// already-imported/created account, then encrypts the whole archive under
 // passphrase — see "Outer container encryption" above for why. passphrase
 // must match the one this account's identity.json was encrypted under;
-// verified up front so a typo produces a clean error instead of a useless
-// file at the destination.
-//
-// The saved file is named from its own content rather than whatever
-// filename destPath had: account_<first 8 hex chars of the encrypted
-// file's own sha256>.zip, written into the same directory destPath named.
-// This is purely to make multiple exported files easy to tell apart at a
-// glance when someone has several sitting around — the hash has no
-// security role here, the passphrase does all of that. Returns the actual
-// final path, since it differs from destPath.
-func ExportAccount(slug, destPath, passphrase string) (string, error) {
+// verified up front so a typo produces a clean error rather than a
+// useless result. Returns the encrypted bytes and a filename derived from
+// their own content — account_<first 8 hex chars of their sha256>.zip —
+// without writing anything to disk, so the caller can show that name as
+// the save dialog's suggested filename before the user picks a location,
+// rather than suggesting one name and silently saving under another. The
+// hash has no security role here; it's purely to make several exported
+// files easy to tell apart at a glance.
+func buildAccountExport(slug, passphrase string) ([]byte, string, error) {
 	dir := filepath.Join(accountsDir(), slug)
 	if _, _, err := decryptIdentity(dir, passphrase); err != nil {
-		return "", err // wrong passphrase, or the account itself is corrupt
+		return nil, "", err // wrong passphrase, or the account itself is corrupt
 	}
 
 	var buf bytes.Buffer
@@ -588,7 +586,7 @@ func ExportAccount(slug, destPath, passphrase string) (string, error) {
 			continue // pfp.png especially is commonly absent — skip quietly
 		}
 		if err := addFileToZip(zw, srcPath, name); err != nil {
-			return "", err
+			return nil, "", err
 		}
 	}
 	// Bundle a snapshot of the local saved-server list too, so importing on
@@ -603,20 +601,16 @@ func ExportAccount(slug, destPath, passphrase string) (string, error) {
 		}
 	}
 	if err := zw.Close(); err != nil {
-		return "", fmt.Errorf("could not build account key archive: %w", err)
+		return nil, "", fmt.Errorf("could not build account key archive: %w", err)
 	}
 
 	encrypted, err := encryptContainer(buf.Bytes(), passphrase)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
-
 	sum := sha256.Sum256(encrypted)
-	finalPath := filepath.Join(filepath.Dir(destPath), fmt.Sprintf("account_%s.zip", hex.EncodeToString(sum[:4])))
-	if err := os.WriteFile(finalPath, encrypted, 0600); err != nil {
-		return "", err
-	}
-	return finalPath, nil
+	finalName := fmt.Sprintf("account_%s.zip", hex.EncodeToString(sum[:4]))
+	return encrypted, finalName, nil
 }
 
 // ── Small file/zip helpers ───────────────────────────────────────────────

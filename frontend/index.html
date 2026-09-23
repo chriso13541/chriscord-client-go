@@ -641,9 +641,8 @@ async function confirmExport(){
   if(!pass){errEl.textContent='Enter your passphrase.';errEl.classList.remove('hidden');return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
   try{
-    const dest=await window.go.main.App.PickExportDestination();
-    if(!dest){return;}
-    const finalPath=await window.go.main.App.ExportAccount(dest,pass);
+    const finalPath=await window.go.main.App.ExportAccount(pass);
+    if(!finalPath){return;} // user canceled the save dialog
     closeExportModal();
     const finalName=finalPath.split(/[\\/]/).pop();
     toast(`Account key exported as ${finalName}.`);

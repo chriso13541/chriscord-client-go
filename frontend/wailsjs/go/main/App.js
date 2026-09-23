@@ -30,8 +30,8 @@ export function EditMessage(arg1, arg2) {
   return window['go']['main']['App']['EditMessage'](arg1, arg2);
 }
 
-export function ExportAccount(arg1, arg2) {
-  return window['go']['main']['App']['ExportAccount'](arg1, arg2);
+export function ExportAccount(arg1) {
+  return window['go']['main']['App']['ExportAccount'](arg1);
 }
 
 export function FetchLinkPreview(arg1) {
@@ -112,10 +112,6 @@ export function PickAccountFile() {
 
 export function PickAccountFolder() {
   return window['go']['main']['App']['PickAccountFolder']();
-}
-
-export function PickExportDestination() {
-  return window['go']['main']['App']['PickExportDestination']();
 }
 
 export function PickFiles() {

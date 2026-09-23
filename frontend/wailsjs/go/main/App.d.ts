@@ -16,7 +16,7 @@ export function DropFiles(arg1:Array<string>):Promise<void>;
 
 export function EditMessage(arg1:string,arg2:string):Promise<void>;
 
-export function ExportAccount(arg1:string,arg2:string):Promise<string>;
+export function ExportAccount(arg1:string):Promise<string>;
 
 export function FetchLinkPreview(arg1:string):Promise<main.LinkPreview>;
 
@@ -57,8 +57,6 @@ export function ListAccounts():Promise<Array<main.AccountSummary>>;
 export function PickAccountFile():Promise<string>;
 
 export function PickAccountFolder():Promise<string>;
-
-export function PickExportDestination():Promise<string>;
 
 export function PickFiles():Promise<Array<string>>;
 

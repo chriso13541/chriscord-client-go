@@ -134,10 +134,27 @@ func (a *App) UnlockAccount(passphrase string) (*AccountView, error) {
 	return acct.View(), nil
 }
 
-func (a *App) ExportAccount(destPath, passphrase string) (string, error) {
+func (a *App) ExportAccount(passphrase string) (string, error) {
 	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
 	if slug == "" { return "", fmt.Errorf("no account unlocked") }
-	return ExportAccount(slug, destPath, passphrase)
+	encrypted, finalName, err := buildAccountExport(slug, passphrase)
+	if err != nil {
+		return "", err
+	}
+	destPath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title: "Export account key", DefaultFilename: finalName,
+		Filters: []runtime.FileFilter{{DisplayName: "Account key", Pattern: "*.zip"}},
+	})
+	if err != nil {
+		return "", err
+	}
+	if destPath == "" {
+		return "", nil // user canceled the dialog — not an error, just nothing to save
+	}
+	if err := os.WriteFile(destPath, encrypted, 0600); err != nil {
+		return "", err
+	}
+	return destPath, nil
 }
 
 func (a *App) GetAccountInfo() *AccountView {
@@ -160,13 +177,6 @@ func (a *App) PickPfp() (string, error) {
 	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Select profile picture",
 		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg"}},
-	})
-}
-
-func (a *App) PickExportDestination() (string, error) {
-	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title: "Export account key", DefaultFilename: "account_key.zip",
-		Filters: []runtime.FileFilter{{DisplayName: "Account key", Pattern: "*.zip"}},
 	})
 }
 
