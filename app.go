@@ -39,6 +39,7 @@ type App struct {
 	voiceRefreshMu   sync.Mutex
 	voiceRefreshTmr  *time.Timer
 	voiceMuted       atomic.Bool
+	voiceDeafened    atomic.Bool
 }
 
 func NewApp() *App { return &App{} }

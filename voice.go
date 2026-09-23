@@ -63,6 +63,8 @@ type VoiceSession struct {
 	// and muting shouldn't silently reset just because someone else
 	// joined or left in the background. See App.voiceMuted.
 	muted *atomic.Bool
+	// Same reasoning and pattern as muted above — points at App.voiceDeafened.
+	deafened *atomic.Bool
 
 	playStream *portaudio.Stream
 	playBuf    []int16
@@ -134,6 +136,7 @@ func (a *App) JoinVoiceChannel(boardID, micName, speakerName string, knownOthers
 func (a *App) LeaveVoiceChannel() error {
 	a.stopVoiceSession()
 	a.voiceMuted.Store(false)
+	a.voiceDeafened.Store(false)
 
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
@@ -168,6 +171,36 @@ func (a *App) ToggleMute() bool {
 // (e.g. on startup or after a reconnect) without toggling it.
 func (a *App) IsMuted() bool {
 	return a.voiceMuted.Load()
+}
+
+// ToggleDeafen flips whether incoming audio from everyone else is being
+// played, and returns the new deafened state. Deafening also mutes — the
+// standard "can't hear anyone, so stop sending too" expectation from
+// other voice chat apps — but undeafening does NOT automatically restore
+// mute; that stays a separate, explicit choice, same as elsewhere. Purely
+// client-side, same as mute: deafened audio is still received and
+// decoded as normal, just not written to the output device, so nothing
+// needs telling the server or other participants. No-ops (returns false)
+// if not currently in a voice call.
+func (a *App) ToggleDeafen() bool {
+	a.voiceMu.Lock()
+	inCall := a.voice != nil
+	a.voiceMu.Unlock()
+	if !inCall {
+		return false
+	}
+	newState := !a.voiceDeafened.Load()
+	a.voiceDeafened.Store(newState)
+	if newState {
+		a.voiceMuted.Store(true)
+	}
+	return newState
+}
+
+// IsDeafened reports the current deafen state, for the UI to sync
+// against without toggling it.
+func (a *App) IsDeafened() bool {
+	return a.voiceDeafened.Load()
 }
 
 // startVoiceSession tears down any existing session (this IS the "refresh"
@@ -238,6 +271,7 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 		remotes:     make(map[string]*voiceRemoteSource),
 		stopped:     make(chan struct{}),
 		muted:       &a.voiceMuted,
+		deafened:    &a.voiceDeafened,
 	}
 
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -592,6 +626,7 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			for i := range s.playBuf {
 				s.playBuf[i] = 0
 			}
+			deafened := s.deafened.Load()
 			s.remotesMu.Lock()
 			for _, r := range s.remotes {
 				r.mu.Lock()
@@ -599,14 +634,16 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				if n > voiceFrameSize {
 					n = voiceFrameSize
 				}
-				for i := 0; i < n; i++ {
-					sum := int32(s.playBuf[i]) + int32(r.buf[i])
-					if sum > 32767 {
-						sum = 32767
-					} else if sum < -32768 {
-						sum = -32768
+				if !deafened {
+					for i := 0; i < n; i++ {
+						sum := int32(s.playBuf[i]) + int32(r.buf[i])
+						if sum > 32767 {
+							sum = 32767
+						} else if sum < -32768 {
+							sum = -32768
+						}
+						s.playBuf[i] = int16(sum)
 					}
-					s.playBuf[i] = int16(sum)
 				}
 				r.buf = r.buf[n:]
 				r.mu.Unlock()
@@ -685,6 +722,16 @@ type micTestSession struct {
 	playStream    *portaudio.Stream
 	stopped       chan struct{}
 	closeOnce     sync.Once
+
+	// Only set when starting this test auto-deafened an active call, to
+	// isolate the test's own loopback audio from live call audio playing
+	// at the same time. Remembers the exact pre-test state so StopMicTest
+	// restores it precisely — including leaving someone who was already
+	// deafened before the test untouched — rather than assuming
+	// "undeafened and unmuted" is always the right end state.
+	autoDeafened    bool
+	preTestMuted    bool
+	preTestDeafened bool
 }
 
 var (
@@ -709,7 +756,37 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 		return fmt.Errorf("no speaker available: %w", err)
 	}
 
+	// If a voice call is active, isolate the test's own loopback audio
+	// from it by deafening for the duration — otherwise live call audio
+	// and the test's mic-to-speaker loopback would play simultaneously
+	// and be hard to tell apart. Only auto-deafen if not already
+	// deafened, and remember the exact pre-test state either way so
+	// StopMicTest can restore it precisely.
+	var autoDeafened, preTestMuted, preTestDeafened bool
+	a.voiceMu.Lock()
+	inCall := a.voice != nil
+	a.voiceMu.Unlock()
+	if inCall {
+		preTestMuted = a.voiceMuted.Load()
+		preTestDeafened = a.voiceDeafened.Load()
+		if !preTestDeafened {
+			autoDeafened = true
+			a.voiceDeafened.Store(true)
+			a.voiceMuted.Store(true)
+		}
+	}
+
 	started := make(chan error, 1)
+	// If setup fails partway through below, the auto-deafen above already
+	// applied but no session object will exist for StopMicTest to revert
+	// it from — this covers that so a failed test never leaves an active
+	// call stuck deafened.
+	revertAutoDeafen := func() {
+		if autoDeafened {
+			a.voiceDeafened.Store(preTestDeafened)
+			a.voiceMuted.Store(preTestMuted)
+		}
+	}
 	go func() {
 		// Same reasoning as VoiceSession's capture/playback above — the
 		// whole lifecycle of both streams stays on one locked OS thread.
@@ -726,6 +803,7 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 		}
 		inStream, err := portaudio.OpenStream(inParams, captureBuf)
 		if err != nil {
+			revertAutoDeafen()
 			started <- fmt.Errorf("open microphone: %w", err)
 			return
 		}
@@ -737,12 +815,14 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 		outStream, err := portaudio.OpenStream(outParams, playBuf)
 		if err != nil {
 			inStream.Close()
+			revertAutoDeafen()
 			started <- fmt.Errorf("open speaker: %w", err)
 			return
 		}
 		if err := inStream.Start(); err != nil {
 			inStream.Close()
 			outStream.Close()
+			revertAutoDeafen()
 			started <- fmt.Errorf("start microphone: %w", err)
 			return
 		}
@@ -750,11 +830,15 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 			inStream.Stop()
 			inStream.Close()
 			outStream.Close()
+			revertAutoDeafen()
 			started <- fmt.Errorf("start speaker: %w", err)
 			return
 		}
 
-		sess := &micTestSession{captureStream: inStream, playStream: outStream, stopped: make(chan struct{})}
+		sess := &micTestSession{
+			captureStream: inStream, playStream: outStream, stopped: make(chan struct{}),
+			autoDeafened: autoDeafened, preTestMuted: preTestMuted, preTestDeafened: preTestDeafened,
+		}
 		micTestMu.Lock()
 		micTestSess = sess
 		micTestMu.Unlock()
@@ -789,5 +873,9 @@ func (a *App) StopMicTest() {
 	micTestMu.Unlock()
 	if sess != nil {
 		sess.closeOnce.Do(func() { close(sess.stopped) })
+		if sess.autoDeafened {
+			a.voiceDeafened.Store(sess.preTestDeafened)
+			a.voiceMuted.Store(sess.preTestMuted)
+		}
 	}
 }
