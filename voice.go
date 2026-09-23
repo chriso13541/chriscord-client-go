@@ -45,6 +45,7 @@ type voiceRemoteSource struct {
 // here doesn't care how many times a negotiation happens over its life.
 type VoiceSession struct {
 	ctx         context.Context
+	app         *App // back-reference so the capture loop can signal speaking state to the server
 	boardID     string
 	micName     string
 	speakerName string
@@ -147,6 +148,38 @@ func (a *App) LeaveVoiceChannel() error {
 	return a.ws.WriteMessage(websocket.TextMessage, msg)
 }
 
+// sendSpeaking tells the server this participant's local speaking state
+// changed, for it to rebroadcast to everyone else — so a speaking
+// indicator can show up next to their avatar server-wide, not just
+// locally to themselves. Best-effort: silently does nothing if not
+// currently connected, same as any other send during a voice session
+// that might be in the middle of a reconnect.
+func (a *App) sendSpeaking(boardID string, speaking bool) {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil {
+		return
+	}
+	msg, _ := json.Marshal(map[string]interface{}{"type": "speaking", "board_id": boardID, "speaking": speaking})
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
+// sendVoiceMuteState tells the server this participant's mute/deafen
+// state changed, for it to rebroadcast to everyone else — so a mute or
+// deafen icon can show up next to their name. Best-effort, same as
+// sendSpeaking above.
+func (a *App) sendVoiceMuteState(boardID string, muted, deafened bool) {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil {
+		return
+	}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"type": "voice_mute_state", "board_id": boardID, "muted": muted, "deafened": deafened,
+	})
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
 // ToggleMute flips whether this participant's microphone audio is being
 // transmitted during the current voice session, and returns the new
 // muted state. Purely client-side — muting simply stops sending anything
@@ -157,13 +190,14 @@ func (a *App) LeaveVoiceChannel() error {
 // tearing down and rebuilding the underlying connection.
 func (a *App) ToggleMute() bool {
 	a.voiceMu.Lock()
-	inCall := a.voice != nil
+	session := a.voice
 	a.voiceMu.Unlock()
-	if !inCall {
+	if session == nil {
 		return false
 	}
 	newState := !a.voiceMuted.Load()
 	a.voiceMuted.Store(newState)
+	a.sendVoiceMuteState(session.boardID, newState, a.voiceDeafened.Load())
 	return newState
 }
 
@@ -183,14 +217,15 @@ func (a *App) IsMuted() bool {
 // if not currently in a voice call.
 func (a *App) ToggleDeafen() bool {
 	a.voiceMu.Lock()
-	inCall := a.voice != nil
+	session := a.voice
 	a.voiceMu.Unlock()
-	if !inCall {
+	if session == nil {
 		return false
 	}
 	newState := !a.voiceDeafened.Load()
 	a.voiceDeafened.Store(newState)
 	a.voiceMuted.Store(newState)
+	a.sendVoiceMuteState(session.boardID, newState, newState)
 	return newState
 }
 
@@ -258,6 +293,7 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 
 	session := &VoiceSession{
 		ctx:         a.ctx,
+		app:         a,
 		boardID:     boardID,
 		micName:     micName,
 		speakerName: speakerName,
@@ -500,6 +536,7 @@ func (s *VoiceSession) startCapture(micName string) error {
 				stream.Close()
 				if s.wasSpeaking {
 					wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
+					s.app.sendSpeaking(s.boardID, false)
 				}
 				return
 			default:
@@ -518,6 +555,7 @@ func (s *VoiceSession) startCapture(micName string) error {
 					s.wasSpeaking = false
 					s.quietFrameCount = 0
 					wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
+					s.app.sendSpeaking(s.boardID, false)
 				}
 				continue
 			}
@@ -566,6 +604,7 @@ func (s *VoiceSession) updateSpeakingState() {
 		if !s.wasSpeaking {
 			s.wasSpeaking = true
 			wailsruntime.EventsEmit(s.ctx, "voice:speaking", true)
+			s.app.sendSpeaking(s.boardID, true)
 		}
 		return
 	}
@@ -573,6 +612,7 @@ func (s *VoiceSession) updateSpeakingState() {
 	if s.wasSpeaking && s.quietFrameCount > speakingHangoverFrames {
 		s.wasSpeaking = false
 		wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
+		s.app.sendSpeaking(s.boardID, false)
 	}
 }
 

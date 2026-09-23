@@ -274,6 +274,19 @@ type serverMsg struct {
 	Candidate     string              `json:"candidate"`
 	SDPMid        string              `json:"sdp_mid"`
 	SDPMLineIndex *uint16             `json:"sdp_mline_index"`
+	Username      string              `json:"username"`
+	Speaking      bool                `json:"speaking"`
+	Muted         bool                `json:"muted"`
+	Deafened      bool                `json:"deafened"`
+	Statuses      []VoiceStatusEntry  `json:"statuses"`
+}
+
+// VoiceStatusEntry is one participant's mute/deafen status, as sent in a
+// voice_status_snapshot when joining a voice channel already in progress.
+type VoiceStatusEntry struct {
+	Username string `json:"username"`
+	Muted    bool   `json:"muted"`
+	Deafened bool   `json:"deafened"`
 }
 
 type historyEvent struct {
@@ -284,6 +297,21 @@ type usersEvent  struct { Online []string `json:"online"`; All []string `json:"a
 type voiceStateEvent struct { Channels map[string][]string `json:"channels"` }
 type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"` }
 type deleteEvent struct { ID string `json:"id"`; BoardID string `json:"board_id"` }
+type voiceSpeakingEvent struct {
+	BoardID  string `json:"board_id"`
+	Username string `json:"username"`
+	Speaking bool   `json:"speaking"`
+}
+type voiceMuteStateEvent struct {
+	BoardID  string `json:"board_id"`
+	Username string `json:"username"`
+	Muted    bool   `json:"muted"`
+	Deafened bool   `json:"deafened"`
+}
+type voiceStatusSnapshotEvent struct {
+	BoardID  string             `json:"board_id"`
+	Statuses []VoiceStatusEntry `json:"statuses"`
+}
 
 func (a *App) wsReader(conn *websocket.Conn) {
 	defer func() {
@@ -317,6 +345,12 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.handleVoiceAnswer(msg.SDP)
 		case "voice_ice":
 			a.handleVoiceICE(msg.Candidate, msg.SDPMid, msg.SDPMLineIndex)
+		case "voice_speaking":
+			runtime.EventsEmit(a.ctx, "voice:peer_speaking", voiceSpeakingEvent{BoardID: msg.BoardID, Username: msg.Username, Speaking: msg.Speaking})
+		case "voice_mute_state":
+			runtime.EventsEmit(a.ctx, "voice:peer_mute_state", voiceMuteStateEvent{BoardID: msg.BoardID, Username: msg.Username, Muted: msg.Muted, Deafened: msg.Deafened})
+		case "voice_status_snapshot":
+			runtime.EventsEmit(a.ctx, "voice:status_snapshot", voiceStatusSnapshotEvent{BoardID: msg.BoardID, Statuses: msg.Statuses})
 		}
 	}
 }

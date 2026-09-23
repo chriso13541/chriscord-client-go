@@ -86,6 +86,8 @@ input,button,textarea { font-family:inherit; }
 .voice-occupant-row { display:flex; align-items:center; gap:6px; padding:2px 12px 2px 30px; }
 .voice-occupant-avatar { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#fff; flex-shrink:0; }
 .voice-occupant-name { font-size:.86rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.voice-occupant-avatar.speaking { box-shadow:0 0 0 2px var(--green); }
+.voice-occupant-status { margin-left:auto; font-size:.72rem; flex-shrink:0; color:var(--red); }
 #voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.91rem; color:var(--green); }
 #voice-connected-bar .voice-bar-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.95rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
 #voice-connected-bar .voice-bar-btn:hover { background:var(--bg-light); color:var(--text); }
@@ -496,6 +498,8 @@ const state = {
   lastPingMs:null,
   viewingLive:true,
   voiceChannels:{},
+  voiceSpeaking:{},
+  voiceMuteStatus:{},
 };
 
 // ── ZOOM ─────────────────────────────────────────────────────────
@@ -928,7 +932,12 @@ function renderSidebar(){
         if(occupants.length){
           occupants.forEach(user=>{
             const row=document.createElement('div');row.className='voice-occupant-row';
-            row.innerHTML=`<span class="voice-occupant-avatar" style="background:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span>`;
+            row.dataset.board=board.id;row.dataset.user=user;
+            const key=`${board.id}:${user}`;
+            const speaking=!!state.voiceSpeaking[key];
+            const status=state.voiceMuteStatus[key]||{muted:false,deafened:false};
+            const statusIcon=status.deafened?'🎧':(status.muted?'🎤':'');
+            row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" style="background:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span>${statusIcon?`<span class="voice-occupant-status">${statusIcon}</span>`:''}`;
             list.appendChild(row);
           });
         }
@@ -1831,6 +1840,25 @@ function init(){
   window.runtime.EventsOn('voice:error',msg=>toast('Voice: '+msg,true));
   window.runtime.EventsOn('voice:speaking',speaking=>{
     document.getElementById('user-avatar').classList.toggle('speaking',!!speaking);
+  });
+  window.runtime.EventsOn('voice:peer_speaking',e=>{
+    const key=`${e.board_id}:${e.username}`;
+    state.voiceSpeaking[key]=e.speaking;
+    const row=document.querySelector(`.voice-occupant-row[data-board="${CSS.escape(e.board_id)}"][data-user="${CSS.escape(e.username)}"]`);
+    if(row){
+      const avatar=row.querySelector('.voice-occupant-avatar');
+      if(avatar)avatar.classList.toggle('speaking',!!e.speaking);
+    }
+  });
+  window.runtime.EventsOn('voice:peer_mute_state',e=>{
+    state.voiceMuteStatus[`${e.board_id}:${e.username}`]={muted:e.muted,deafened:e.deafened};
+    renderSidebar();
+  });
+  window.runtime.EventsOn('voice:status_snapshot',e=>{
+    for(const s of (e.statuses||[])){
+      state.voiceMuteStatus[`${e.board_id}:${s.username}`]={muted:s.muted,deafened:s.deafened};
+    }
+    renderSidebar();
   });
   window.runtime.EventsOn('voice:connectionState',connState=>{
     if(connState==='failed'||connState==='disconnected'){
