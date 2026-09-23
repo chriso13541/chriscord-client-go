@@ -948,7 +948,8 @@ async function toggleVoiceChannel(boardId){
     else{
       const micLabel=localStorage.getItem('audioMicLabel')||'';
       const speakerLabel=localStorage.getItem('audioSpeakerLabel')||'';
-      await window.go.main.App.JoinVoiceChannel(boardId,micLabel,speakerLabel);
+      const knownOthers=occupants.filter(u=>u!==state.username);
+      await window.go.main.App.JoinVoiceChannel(boardId,micLabel,speakerLabel,knownOthers);
     }
   }catch(err){toast('Voice action failed: '+err,true);}
 }

@@ -44,7 +44,7 @@ export function HasAccount():Promise<boolean>;
 
 export function ImportAccount(arg1:string,arg2:string):Promise<main.AccountView>;
 
-export function JoinVoiceChannel(arg1:string,arg2:string,arg3:string):Promise<void>;
+export function JoinVoiceChannel(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<void>;
 
 export function LeaveVoiceChannel():Promise<void>;
 

@@ -106,7 +106,7 @@ func findDeviceByName(name string, wantInput bool) (*portaudio.DeviceInfo, error
 // should treat "connected" as a separate, later state signaled over the
 // existing voice:state mechanism plus connection-state events emitted
 // below.
-func (a *App) JoinVoiceChannel(boardID, micName, speakerName string) error {
+func (a *App) JoinVoiceChannel(boardID, micName, speakerName string, knownOthers []string) error {
 	a.writeMu.Lock()
 	conn := a.ws
 	a.writeMu.Unlock()
@@ -114,8 +114,8 @@ func (a *App) JoinVoiceChannel(boardID, micName, speakerName string) error {
 		return fmt.Errorf("not connected")
 	}
 
-	log.Printf("voice: JoinVoiceChannel called for board %s (explicit user join)", boardID)
-	if err := a.startVoiceSession(boardID, micName, speakerName, "initial join"); err != nil {
+	log.Printf("voice: JoinVoiceChannel called for board %s (explicit user join, known others: %v)", boardID, knownOthers)
+	if err := a.startVoiceSession(boardID, micName, speakerName, knownOthers, "initial join"); err != nil {
 		return fmt.Errorf("failed to start voice session: %w", err)
 	}
 
@@ -141,9 +141,16 @@ func (a *App) LeaveVoiceChannel() error {
 // path — a roster-change re-join is handled identically to a first-time
 // join, see startup.go/wsReader's voice:state handling) and builds a fresh
 // one: opens mic capture, creates the PeerConnection, wires local and
-// remote track handling, and sends the initial offer.
-func (a *App) startVoiceSession(boardID, micName, speakerName, reason string) error {
-	log.Printf("voice: startVoiceSession(board=%s, reason=%q) — tearing down any existing session and sending a fresh offer", boardID, reason)
+// remote track handling, and sends the initial offer. knownOthers is the
+// currently-known roster of the channel (excluding self) — the offer
+// declares one receive-only placeholder transceiver per entry, in this
+// exact order, so the server has somewhere valid to attach each
+// participant's audio without needing to add media sections the offer
+// never asked for. Always declares at least one placeholder even with no
+// known others, to avoid a known pion/webrtc-rs bug where a single-media-
+// section offer's on_track callback never fires at all.
+func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOthers []string, reason string) error {
+	log.Printf("voice: startVoiceSession(board=%s, reason=%q, knownOthers=%v) — tearing down any existing session and sending a fresh offer", boardID, reason, knownOthers)
 	a.stopVoiceSession()
 
 	encoder, err := opus.NewEncoder(voiceSampleRate, voiceChannels, opus.AppVoIP)
@@ -168,6 +175,22 @@ func (a *App) startVoiceSession(boardID, micName, speakerName, reason string) er
 	if _, err := pc.AddTrack(localTrack); err != nil {
 		pc.Close()
 		return fmt.Errorf("add local track: %w", err)
+	}
+
+	// One receive-only placeholder per known other, always at least one —
+	// see the function comment above for why even the solo case needs
+	// this. expected_others (sent with the offer below) is what tells the
+	// server which placeholder, by position, belongs to which username.
+	placeholderCount := len(knownOthers)
+	if placeholderCount < 1 {
+		placeholderCount = 1
+	}
+	for i := 0; i < placeholderCount; i++ {
+		if _, err := pc.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio, webrtc.RTPTransceiverInit{
+			Direction: webrtc.RTPTransceiverDirectionRecvonly,
+		}); err != nil {
+			log.Printf("voice: failed to add placeholder transceiver %d: %v", i, err)
+		}
 	}
 
 	session := &VoiceSession{
@@ -234,7 +257,9 @@ func (a *App) startVoiceSession(boardID, micName, speakerName, reason string) er
 	if a.ws == nil {
 		return fmt.Errorf("not connected")
 	}
-	msg, _ := json.Marshal(map[string]string{"type": "voice_offer", "board_id": boardID, "sdp": offer.SDP})
+	msg, _ := json.Marshal(map[string]interface{}{
+		"type": "voice_offer", "board_id": boardID, "sdp": offer.SDP, "expected_others": knownOthers,
+	})
 	return a.ws.WriteMessage(websocket.TextMessage, msg)
 }
 
@@ -346,8 +371,14 @@ func (a *App) refreshVoiceIfNeeded(boardID string, roster []string) {
 			log.Printf("voice: debounced refresh for board %s fired but no longer relevant — skipping", boardID)
 			return // left this channel, or moved to a different one, while waiting
 		}
-		log.Printf("voice: debounced refresh for board %s firing now", boardID)
-		if err := a.startVoiceSession(boardID, micName, speakerName, "debounced roster refresh"); err != nil {
+		others := make([]string, 0, len(current.lastRoster))
+		for u := range current.lastRoster {
+			if u != a.username {
+				others = append(others, u)
+			}
+		}
+		log.Printf("voice: debounced refresh for board %s firing now (others: %v)", boardID, others)
+		if err := a.startVoiceSession(boardID, micName, speakerName, others, "debounced roster refresh"); err != nil {
 			wailsruntime.EventsEmit(a.ctx, "voice:error", fmt.Sprintf("failed to refresh voice connection: %v", err))
 		}
 	})

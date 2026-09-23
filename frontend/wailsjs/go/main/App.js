@@ -86,8 +86,8 @@ export function ImportAccount(arg1, arg2) {
   return window['go']['main']['App']['ImportAccount'](arg1, arg2);
 }
 
-export function JoinVoiceChannel(arg1, arg2, arg3) {
-  return window['go']['main']['App']['JoinVoiceChannel'](arg1, arg2, arg3);
+export function JoinVoiceChannel(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['JoinVoiceChannel'](arg1, arg2, arg3, arg4);
 }
 
 export function LeaveVoiceChannel() {
