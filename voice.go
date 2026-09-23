@@ -174,10 +174,9 @@ func (a *App) IsMuted() bool {
 }
 
 // ToggleDeafen flips whether incoming audio from everyone else is being
-// played, and returns the new deafened state. Deafening also mutes — the
-// standard "can't hear anyone, so stop sending too" expectation from
-// other voice chat apps — but undeafening does NOT automatically restore
-// mute; that stays a separate, explicit choice, same as elsewhere. Purely
+// played, and returns the new deafened state. Deafening also mutes, and
+// undeafening also unmutes — a clean, symmetric toggle rather than
+// leaving mute as a separate thing to manage after undeafening. Purely
 // client-side, same as mute: deafened audio is still received and
 // decoded as normal, just not written to the output device, so nothing
 // needs telling the server or other participants. No-ops (returns false)
@@ -191,9 +190,7 @@ func (a *App) ToggleDeafen() bool {
 	}
 	newState := !a.voiceDeafened.Load()
 	a.voiceDeafened.Store(newState)
-	if newState {
-		a.voiceMuted.Store(true)
-	}
+	a.voiceMuted.Store(newState)
 	return newState
 }
 

@@ -9,7 +9,7 @@
 :root {
   --bg-darkest:#0e1117; --bg-dark:#1a1d27; --bg-mid:#20232f; --bg-light:#2a2d3e;
   --border:#2e3248; --accent:#7289da; --accent-dim:#4e5d94;
-  --green:#43b581; --red:#f04747; --yellow:#faa61a;
+  --green:#43b581; --red:#f04747; --red-light:#f47373; --yellow:#faa61a;
   --text:#dcddde; --text-muted:#72767d; --text-strong:#ffffff;
   --sidebar-w:330px; --members-w:200px;
 }
@@ -89,7 +89,8 @@ input,button,textarea { font-family:inherit; }
 #voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.91rem; color:var(--green); }
 #voice-connected-bar .voice-bar-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.95rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
 #voice-connected-bar .voice-bar-btn:hover { background:var(--bg-light); color:var(--text); }
-#voice-connected-bar .voice-bar-btn.muted { color:var(--red); }
+#voice-connected-bar .voice-bar-btn.muted { background:var(--red); }
+#voice-connected-bar .voice-bar-btn.muted:hover { background:var(--red-light); }
 #voice-connected-bar #voice-deafen-btn { margin-left:auto; }
 #voice-connected-bar #voice-leave-btn { font-size:.99rem; }
 #voice-connected-bar #voice-leave-btn:hover { color:var(--red); }
@@ -982,14 +983,12 @@ function updateVoiceConnectedBar(){
 function setMuteButtonState(muted){
   const btn=document.getElementById('voice-mute-btn');
   if(!btn)return;
-  btn.textContent=muted?'🔇':'🎤';
   btn.title=muted?'Unmute microphone':'Mute microphone';
   btn.classList.toggle('muted',muted);
 }
 function setDeafenButtonState(deafened){
   const btn=document.getElementById('voice-deafen-btn');
   if(!btn)return;
-  btn.textContent=deafened?'🙉':'🎧';
   btn.title=deafened?'Undeafen':'Deafen';
   btn.classList.toggle('muted',deafened);
 }

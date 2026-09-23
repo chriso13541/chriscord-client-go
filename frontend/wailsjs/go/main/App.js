@@ -86,6 +86,10 @@ export function ImportAccount(arg1, arg2) {
   return window['go']['main']['App']['ImportAccount'](arg1, arg2);
 }
 
+export function IsDeafened() {
+  return window['go']['main']['App']['IsDeafened']();
+}
+
 export function IsMuted() {
   return window['go']['main']['App']['IsMuted']();
 }
@@ -148,6 +152,10 @@ export function StopMicTest() {
 
 export function SubscribeBoard(arg1) {
   return window['go']['main']['App']['SubscribeBoard'](arg1);
+}
+
+export function ToggleDeafen() {
+  return window['go']['main']['App']['ToggleDeafen']();
 }
 
 export function ToggleMute() {
