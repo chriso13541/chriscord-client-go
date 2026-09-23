@@ -36,8 +36,6 @@ type App struct {
 	servers          []SavedServer
 	voice            *VoiceSession
 	voiceMu          sync.Mutex
-	voiceRefreshMu   sync.Mutex
-	voiceRefreshTmr  *time.Timer
 	voiceMuted       atomic.Bool
 	voiceDeafened    atomic.Bool
 }
@@ -338,13 +336,12 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
 			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels})
-			for boardID, roster := range msg.Channels {
-				a.refreshVoiceIfNeeded(boardID, roster)
-			}
 		case "voice_answer":
 			a.handleVoiceAnswer(msg.SDP)
 		case "voice_ice":
 			a.handleVoiceICE(msg.Candidate, msg.SDPMid, msg.SDPMLineIndex)
+		case "voice_renegotiate":
+			a.handleVoiceRenegotiate(msg.SDP)
 		case "voice_speaking":
 			runtime.EventsEmit(a.ctx, "voice:peer_speaking", voiceSpeakingEvent{BoardID: msg.BoardID, Username: msg.Username, Speaking: msg.Speaking})
 		case "voice_mute_state":

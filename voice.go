@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/gordonklaus/portaudio"
 	"github.com/hraban/opus"
@@ -49,8 +48,6 @@ type VoiceSession struct {
 	boardID     string
 	micName     string
 	speakerName string
-	lastRoster  map[string]bool
-	rosterKnown bool // false until the first voice_state after this session started
 	pc          *webrtc.PeerConnection
 	localTrack  *webrtc.TrackLocalStaticSample
 	encoder     *opus.Encoder
@@ -297,7 +294,6 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 		boardID:     boardID,
 		micName:     micName,
 		speakerName: speakerName,
-		lastRoster:  make(map[string]bool),
 		pc:          pc,
 		localTrack:  localTrack,
 		encoder:     encoder,
@@ -409,81 +405,45 @@ func (a *App) handleVoiceICE(candidate, sdpMid string, sdpMLineIndex *uint16) {
 	_ = session.pc.AddICECandidate(init)
 }
 
-// refreshVoiceIfNeeded re-offers on the current voice board when the
-// roster changes — called from wsReader on every "voice_state" update.
-// This is the client-driven half of the "simple" reconnect-on-roster-
-// change design: the server doesn't push anyone to refresh, every
-// participant in the affected channel independently notices the roster
-// differs from what it last connected with and re-joins from scratch.
-func (a *App) refreshVoiceIfNeeded(boardID string, roster []string) {
+// handleVoiceRenegotiate applies a server-initiated renegotiation to the
+// CURRENT, already-established PeerConnection — this is the seamless
+// mid-call update mechanism: when someone else joins the channel after
+// this session already exists, the server adds a transceiver to this
+// exact connection and sends a fresh offer for it, rather than this
+// client tearing anything down and re-joining from scratch. Nothing about
+// the existing capture/playback streams, mute/deafen state, or already-
+// flowing audio to/from anyone else is touched — only the underlying
+// PeerConnection negotiates a new media section and answers it.
+func (a *App) handleVoiceRenegotiate(sdp string) {
 	a.voiceMu.Lock()
 	session := a.voice
 	a.voiceMu.Unlock()
-	if session == nil || session.boardID != boardID {
+	if session == nil {
 		return
 	}
-	newRoster := make(map[string]bool, len(roster))
-	for _, u := range roster {
-		newRoster[u] = true
-	}
-	if !session.rosterKnown {
-		// First update since this session started — reflects our own
-		// join completing, not a real change. Record it as the baseline
-		// without refreshing; we already have a fresh connection from
-		// starting this session in the first place.
-		log.Printf("voice: first roster update for board %s (%v) — treating as baseline, no refresh", boardID, roster)
-		session.lastRoster = newRoster
-		session.rosterKnown = true
+	offer := webrtc.SessionDescription{Type: webrtc.SDPTypeOffer, SDP: sdp}
+	if err := session.pc.SetRemoteDescription(offer); err != nil {
+		log.Printf("voice: renegotiate SetRemoteDescription failed: %v", err)
 		return
 	}
-	if len(newRoster) == len(session.lastRoster) {
-		same := true
-		for u := range newRoster {
-			if !session.lastRoster[u] {
-				same = false
-				break
-			}
-		}
-		if same {
-			return // roster hasn't actually changed — nothing to do
-		}
+	answer, err := session.pc.CreateAnswer(nil)
+	if err != nil {
+		log.Printf("voice: renegotiate CreateAnswer failed: %v", err)
+		return
 	}
-	session.lastRoster = newRoster
-	micName, speakerName := session.micName, session.speakerName
-
-	// Debounce rather than reconnecting immediately: if several roster
-	// changes arrive in quick succession — two people joining moments
-	// apart is a completely normal case — reacting to each one
-	// individually tears down and restarts the connection every time,
-	// which cancels whatever negotiation was already in progress and can
-	// starve it of the time it needs to ever actually finish. Waiting for
-	// things to settle first means one reconnect reflecting the final
-	// roster, not one per incremental change.
-	log.Printf("voice: roster for board %s changed to %v — scheduling debounced refresh in 1.5s (resetting any pending one)", boardID, roster)
-	a.voiceRefreshMu.Lock()
-	if a.voiceRefreshTmr != nil {
-		a.voiceRefreshTmr.Stop()
+	if err := session.pc.SetLocalDescription(answer); err != nil {
+		log.Printf("voice: renegotiate SetLocalDescription failed: %v", err)
+		return
 	}
-	a.voiceRefreshTmr = time.AfterFunc(1500*time.Millisecond, func() {
-		a.voiceMu.Lock()
-		current := a.voice
-		a.voiceMu.Unlock()
-		if current == nil || current.boardID != boardID {
-			log.Printf("voice: debounced refresh for board %s fired but no longer relevant — skipping", boardID)
-			return // left this channel, or moved to a different one, while waiting
-		}
-		others := make([]string, 0, len(current.lastRoster))
-		for u := range current.lastRoster {
-			if u != a.username {
-				others = append(others, u)
-			}
-		}
-		log.Printf("voice: debounced refresh for board %s firing now (others: %v)", boardID, others)
-		if err := a.startVoiceSession(boardID, micName, speakerName, others, "debounced roster refresh"); err != nil {
-			wailsruntime.EventsEmit(a.ctx, "voice:error", fmt.Sprintf("failed to refresh voice connection: %v", err))
-		}
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil {
+		return
+	}
+	msg, _ := json.Marshal(map[string]string{
+		"type": "voice_renegotiate_answer", "board_id": session.boardID, "sdp": answer.SDP,
 	})
-	a.voiceRefreshMu.Unlock()
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
 }
 
 func (s *VoiceSession) startCapture(micName string) error {
