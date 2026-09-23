@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"runtime"
 	"strings"
@@ -113,7 +114,8 @@ func (a *App) JoinVoiceChannel(boardID, micName, speakerName string) error {
 		return fmt.Errorf("not connected")
 	}
 
-	if err := a.startVoiceSession(boardID, micName, speakerName); err != nil {
+	log.Printf("voice: JoinVoiceChannel called for board %s (explicit user join)", boardID)
+	if err := a.startVoiceSession(boardID, micName, speakerName, "initial join"); err != nil {
 		return fmt.Errorf("failed to start voice session: %w", err)
 	}
 
@@ -140,7 +142,8 @@ func (a *App) LeaveVoiceChannel() error {
 // join, see startup.go/wsReader's voice:state handling) and builds a fresh
 // one: opens mic capture, creates the PeerConnection, wires local and
 // remote track handling, and sends the initial offer.
-func (a *App) startVoiceSession(boardID, micName, speakerName string) error {
+func (a *App) startVoiceSession(boardID, micName, speakerName, reason string) error {
+	log.Printf("voice: startVoiceSession(board=%s, reason=%q) — tearing down any existing session and sending a fresh offer", boardID, reason)
 	a.stopVoiceSession()
 
 	encoder, err := opus.NewEncoder(voiceSampleRate, voiceChannels, opus.AppVoIP)
@@ -302,6 +305,7 @@ func (a *App) refreshVoiceIfNeeded(boardID string, roster []string) {
 		// join completing, not a real change. Record it as the baseline
 		// without refreshing; we already have a fresh connection from
 		// starting this session in the first place.
+		log.Printf("voice: first roster update for board %s (%v) — treating as baseline, no refresh", boardID, roster)
 		session.lastRoster = newRoster
 		session.rosterKnown = true
 		return
@@ -329,6 +333,7 @@ func (a *App) refreshVoiceIfNeeded(boardID string, roster []string) {
 	// starve it of the time it needs to ever actually finish. Waiting for
 	// things to settle first means one reconnect reflecting the final
 	// roster, not one per incremental change.
+	log.Printf("voice: roster for board %s changed to %v — scheduling debounced refresh in 1.5s (resetting any pending one)", boardID, roster)
 	a.voiceRefreshMu.Lock()
 	if a.voiceRefreshTmr != nil {
 		a.voiceRefreshTmr.Stop()
@@ -338,9 +343,11 @@ func (a *App) refreshVoiceIfNeeded(boardID string, roster []string) {
 		current := a.voice
 		a.voiceMu.Unlock()
 		if current == nil || current.boardID != boardID {
+			log.Printf("voice: debounced refresh for board %s fired but no longer relevant — skipping", boardID)
 			return // left this channel, or moved to a different one, while waiting
 		}
-		if err := a.startVoiceSession(boardID, micName, speakerName); err != nil {
+		log.Printf("voice: debounced refresh for board %s firing now", boardID)
+		if err := a.startVoiceSession(boardID, micName, speakerName, "debounced roster refresh"); err != nil {
 			wailsruntime.EventsEmit(a.ctx, "voice:error", fmt.Sprintf("failed to refresh voice connection: %v", err))
 		}
 	})
