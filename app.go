@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -243,17 +244,101 @@ func (a *App) SaveProfilePicture(pngDataURL string) error {
 	if err != nil {
 		return fmt.Errorf("invalid image data: %w", err)
 	}
-	dest := filepath.Join(accountsDir(), slug, "pfp.png")
+	dir := filepath.Join(accountsDir(), slug)
+	dest := filepath.Join(dir, "pfp.png")
 	if err := os.WriteFile(dest, data, 0600); err != nil {
 		return err
 	}
+	updatedAt := time.Now().Unix()
+	_ = updatePfpTimestamp(dir, updatedAt) // best-effort — the pfp itself is already saved regardless
 	a.mu.Lock()
 	if a.account != nil {
 		a.account.HasAvatar = true
 		a.account.AvatarPath = dest
+		a.account.PfpUpdatedAt = updatedAt
 	}
 	a.mu.Unlock()
+	a.sendPfpInfo(updatedAt) // tell the server right away, rather than waiting for the next reconnect
 	return nil
+}
+
+// sendPfpInfo reports this account's own pfp timestamp to the server, so
+// it can tell whether its cached copy (if any) is still current — sent
+// once on every connect, and again immediately whenever the picture
+// changes while already connected. Best-effort: silently does nothing if
+// not currently connected, matching the other send helpers in this file.
+func (a *App) sendPfpInfo(updatedAt int64) {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil {
+		return
+	}
+	msg, _ := json.Marshal(map[string]interface{}{"type": "pfp_info", "pfp_updated_at": updatedAt})
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
+// handlePfpRequest reads this account's own current pfp and uploads it —
+// called when the server reports it doesn't have a current cached copy
+// (see sendPfpInfo above for the other half of this handshake).
+func (a *App) handlePfpRequest() {
+	a.mu.Lock()
+	path := ""
+	updatedAt := int64(0)
+	if a.account != nil && a.account.HasAvatar {
+		path = a.account.AvatarPath
+		updatedAt = a.account.PfpUpdatedAt
+	}
+	a.mu.Unlock()
+	if path == "" {
+		return // nothing to upload — the server asked before we had anything, or we don't have a pfp at all
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Printf("pfp: failed to read own pfp for upload: %v", err)
+		return
+	}
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil {
+		return
+	}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"type": "pfp_upload", "pfp_data": base64.StdEncoding.EncodeToString(data), "pfp_updated_at": updatedAt,
+	})
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
+// FetchUserPfp fetches another user's cached profile picture from the
+// server and returns it as a data URL, or "" if they have none cached —
+// nil error either way, since "no pfp" is a normal state, not a failure.
+func (a *App) FetchUserPfp(username string) (string, error) {
+	a.mu.Lock()
+	domain, token := a.domain, a.token
+	a.mu.Unlock()
+	if domain == "" || token == "" {
+		return "", fmt.Errorf("not connected")
+	}
+	req, err := http.NewRequest("GET", normaliseHTTP(domain)+"/api/pfp/"+url.PathEscape(username), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil // this user simply has no pfp cached — not an error
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
 }
 
 func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
@@ -341,6 +426,7 @@ func (a *App) Connect(domain, serverKey string) error {
 	if err != nil { return fmt.Errorf("websocket failed: %w", err) }
 	a.ws = conn
 	go a.wsReader(conn)
+	a.sendPfpInfo(a.account.PfpUpdatedAt)
 	return nil
 }
 
@@ -363,6 +449,7 @@ type serverMsg struct {
 	Muted         bool                `json:"muted"`
 	Deafened      bool                `json:"deafened"`
 	Statuses      []VoiceStatusEntry  `json:"statuses"`
+	PfpUpdatedAt  int64               `json:"updated_at"`
 }
 
 // VoiceStatusEntry is one participant's mute/deafen status, as sent in a
@@ -395,6 +482,9 @@ type voiceMuteStateEvent struct {
 type voiceStatusSnapshotEvent struct {
 	BoardID  string             `json:"board_id"`
 	Statuses []VoiceStatusEntry `json:"statuses"`
+}
+type pfpUpdatedEvent struct {
+	Username string `json:"username"`
 }
 
 func (a *App) wsReader(conn *websocket.Conn) {
@@ -434,6 +524,10 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "voice:peer_mute_state", voiceMuteStateEvent{BoardID: msg.BoardID, Username: msg.Username, Muted: msg.Muted, Deafened: msg.Deafened})
 		case "voice_status_snapshot":
 			runtime.EventsEmit(a.ctx, "voice:status_snapshot", voiceStatusSnapshotEvent{BoardID: msg.BoardID, Statuses: msg.Statuses})
+		case "pfp_request":
+			a.handlePfpRequest()
+		case "pfp_updated":
+			runtime.EventsEmit(a.ctx, "pfp:updated", pfpUpdatedEvent{Username: msg.Username})
 		}
 	}
 }

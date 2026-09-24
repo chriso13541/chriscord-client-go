@@ -38,6 +38,10 @@ export function FetchLinkPreview(arg1) {
   return window['go']['main']['App']['FetchLinkPreview'](arg1);
 }
 
+export function FetchUserPfp(arg1) {
+  return window['go']['main']['App']['FetchUserPfp'](arg1);
+}
+
 export function GetAccountInfo() {
   return window['go']['main']['App']['GetAccountInfo']();
 }

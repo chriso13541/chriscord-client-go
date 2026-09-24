@@ -528,6 +528,7 @@ const state = {
   voiceChannels:{},
   voiceSpeaking:{},
   voiceMuteStatus:{},
+  userPfps:{},
 };
 
 // ── ZOOM ─────────────────────────────────────────────────────────
@@ -967,6 +968,7 @@ function renderSidebar(){
             const statusIcon=status.deafened?'🎧':(status.muted?'🎤':'');
             row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" style="background:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span>${statusIcon?`<span class="voice-occupant-status">${statusIcon}</span>`:''}`;
             list.appendChild(row);
+            applyUserAvatar(row.querySelector('.voice-occupant-avatar'),user);
           });
         }
       });
@@ -1255,6 +1257,41 @@ async function updateSidebarAvatar(){
     av.textContent=state.username[0].toUpperCase();
     av.style.background=avatarColour(state.username);
   }
+}
+
+// Applies another user's cached pfp to an avatar element if we have one on
+// hand, leaving the colored-circle-with-initial fallback already in the
+// element's markup untouched otherwise. Fetches and caches per username on
+// first use — since the occupant list re-renders often (roster changes,
+// speaking/mute updates), this is what keeps that from refetching the same
+// picture over and over. state.userPfps holds three possible states per
+// username: absent (never tried), '' (tried, this user has none), or a
+// data URL (tried, found one) — pfpFetchInFlight guards against kicking
+// off a second fetch while the first is still pending.
+const pfpFetchInFlight=new Set();
+function applyUserAvatar(el,user){
+  if(!el)return;
+  const cached=state.userPfps[user];
+  if(cached){
+    el.style.backgroundImage=`url("${cached}")`;
+    el.textContent='';
+    return;
+  }
+  if(user in state.userPfps || pfpFetchInFlight.has(user))return;
+  pfpFetchInFlight.add(user);
+  window.go.main.App.FetchUserPfp(user).then(dataUrl=>{
+    state.userPfps[user]=dataUrl||'';
+    pfpFetchInFlight.delete(user);
+    if(dataUrl){
+      // Re-query rather than reuse the `el` passed in above — the
+      // occupant list may well have re-rendered while this fetch was in
+      // flight, making that original element stale.
+      document.querySelectorAll(`.voice-occupant-row[data-user="${CSS.escape(user)}"] .voice-occupant-avatar`).forEach(a=>{
+        a.style.backgroundImage=`url("${dataUrl}")`;
+        a.textContent='';
+      });
+    }
+  }).catch(()=>{pfpFetchInFlight.delete(user);});
 }
 
 // Lists real microphones/speakers via the standard Web Audio API — no
@@ -2061,6 +2098,10 @@ function init(){
       state.voiceMuteStatus[`${e.board_id}:${s.username}`]={muted:s.muted,deafened:s.deafened};
     }
     renderSidebar();
+  });
+  window.runtime.EventsOn('pfp:updated',e=>{
+    delete state.userPfps[e.username];
+    document.querySelectorAll(`.voice-occupant-row[data-user="${CSS.escape(e.username)}"] .voice-occupant-avatar`).forEach(el=>applyUserAvatar(el,e.username));
   });
   window.runtime.EventsOn('voice:connectionState',connState=>{
     if(connState==='failed'||connState==='disconnected'){

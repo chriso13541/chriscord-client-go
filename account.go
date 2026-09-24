@@ -63,8 +63,9 @@ type encryptedIdentity struct {
 }
 
 type accountMeta struct {
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"created_at"`
+	Username      string    `json:"username"`
+	CreatedAt     time.Time `json:"created_at"`
+	PfpUpdatedAt  int64     `json:"pfp_updated_at,omitempty"`
 }
 
 // Account is the unlocked, in-memory identity. Never marshaled to JSON and
@@ -76,6 +77,11 @@ type Account struct {
 	PrivateKey ed25519.PrivateKey
 	HasAvatar  bool
 	AvatarPath string
+	// Unix timestamp of when this account's own pfp was last changed, 0 if
+	// it's never had one — this is what gets reported to the server on
+	// connect so it can tell whether its own cached copy, if any, is still
+	// current, without needing to re-upload every single time.
+	PfpUpdatedAt int64
 }
 
 func (a *Account) View() *AccountView {
@@ -179,6 +185,26 @@ func readAccountMeta(dir string) (*accountMeta, error) {
 
 func writeAccountMeta(dir, username string) error {
 	m := accountMeta{Username: username, CreatedAt: time.Now().UTC()}
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "account.json"), data, 0600)
+}
+
+// updatePfpTimestamp updates just the PfpUpdatedAt field in this account's
+// account.json, preserving everything else already recorded there — unlike
+// writeAccountMeta above, which is only ever meant to run once, at account
+// creation, and would otherwise incorrectly reset CreatedAt on every call.
+func updatePfpTimestamp(dir string, updatedAt int64) error {
+	m, err := readAccountMeta(dir)
+	if err != nil {
+		// account.json is treated as optional/best-effort elsewhere in
+		// this file too — missing is not a reason to fail the pfp save
+		// itself, just start a fresh one.
+		m = &accountMeta{CreatedAt: time.Now().UTC()}
+	}
+	m.PfpUpdatedAt = updatedAt
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return err
@@ -411,9 +437,14 @@ func CreateAccount(username, passphrase, pfpSourcePath string) (*Account, error)
 	}
 
 	avatarPath, hasAvatar := pfpIfExists(dir)
+	var pfpUpdatedAt int64
+	if hasAvatar {
+		pfpUpdatedAt = time.Now().Unix()
+		_ = updatePfpTimestamp(dir, pfpUpdatedAt) // best-effort — a missing account.json here shouldn't fail account creation
+	}
 	return &Account{
 		Slug: slug, Username: username, PublicKey: pub, PrivateKey: priv,
-		HasAvatar: hasAvatar, AvatarPath: avatarPath,
+		HasAvatar: hasAvatar, AvatarPath: avatarPath, PfpUpdatedAt: pfpUpdatedAt,
 	}, nil
 }
 
@@ -426,13 +457,15 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	}
 	meta, err := readAccountMeta(dir)
 	username := "unnamed"
+	var pfpUpdatedAt int64
 	if err == nil {
 		username = meta.Username
+		pfpUpdatedAt = meta.PfpUpdatedAt
 	}
 	avatarPath, hasAvatar := pfpIfExists(dir)
 	return &Account{
 		Slug: slug, Username: username, PublicKey: pub, PrivateKey: priv,
-		HasAvatar: hasAvatar, AvatarPath: avatarPath,
+		HasAvatar: hasAvatar, AvatarPath: avatarPath, PfpUpdatedAt: pfpUpdatedAt,
 	}, nil
 }
 

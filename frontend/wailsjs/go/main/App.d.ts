@@ -20,6 +20,8 @@ export function ExportAccount(arg1:string):Promise<string>;
 
 export function FetchLinkPreview(arg1:string):Promise<main.LinkPreview>;
 
+export function FetchUserPfp(arg1:string):Promise<string>;
+
 export function GetAccountInfo():Promise<main.AccountView>;
 
 export function GetBoards(arg1:string):Promise<Array<main.Board>>;
