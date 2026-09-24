@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -178,6 +179,81 @@ func (a *App) PickPfp() (string, error) {
 		Title:   "Select profile picture",
 		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg"}},
 	})
+}
+
+// ReadImageAsDataURL reads an arbitrary image file — typically one just
+// picked via PickPfp — and returns it as a data URL, so the frontend can
+// load it into an <img>/canvas for cropping. Wails doesn't give JS direct
+// filesystem access to a path picked from a native file dialog, so this
+// is the bridge for that.
+func (a *App) ReadImageAsDataURL(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	mime := "image/png"
+	lower := strings.ToLower(path)
+	if strings.HasSuffix(lower, ".jpg") || strings.HasSuffix(lower, ".jpeg") {
+		mime = "image/jpeg"
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+// GetProfilePicture returns the current account's own profile picture as
+// a data URL, or "" if it doesn't have one — an account without a pfp is
+// a completely normal, expected state, not a failure, so this returns a
+// nil error either way; a read failure is treated the same as "no pfp"
+// rather than surfaced, since there's nothing actionable the caller could
+// do about it besides showing the same empty state anyway.
+func (a *App) GetProfilePicture() (string, error) {
+	a.mu.Lock()
+	path := ""
+	if a.account != nil && a.account.HasAvatar {
+		path = a.account.AvatarPath
+	}
+	a.mu.Unlock()
+	if path == "" {
+		return "", nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", nil
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+// SaveProfilePicture decodes a PNG data URL — the cropped result from the
+// frontend's own canvas — and saves it as the current account's pfp.png,
+// overwriting any existing one.
+func (a *App) SaveProfilePicture(pngDataURL string) error {
+	a.mu.Lock()
+	slug := ""
+	if a.account != nil {
+		slug = a.account.Slug
+	}
+	a.mu.Unlock()
+	if slug == "" {
+		return fmt.Errorf("no account unlocked")
+	}
+	const prefix = "data:image/png;base64,"
+	if !strings.HasPrefix(pngDataURL, prefix) {
+		return fmt.Errorf("expected a PNG data URL")
+	}
+	data, err := base64.StdEncoding.DecodeString(pngDataURL[len(prefix):])
+	if err != nil {
+		return fmt.Errorf("invalid image data: %w", err)
+	}
+	dest := filepath.Join(accountsDir(), slug, "pfp.png")
+	if err := os.WriteFile(dest, data, 0600); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	if a.account != nil {
+		a.account.HasAvatar = true
+		a.account.AvatarPath = dest
+	}
+	a.mu.Unlock()
+	return nil
 }
 
 func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {

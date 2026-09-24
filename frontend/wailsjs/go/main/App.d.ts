@@ -32,6 +32,8 @@ export function GetMessagesAround(arg1:string,arg2:string):Promise<Array<main.Ch
 
 export function GetMessagesBefore(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
 
+export function GetProfilePicture():Promise<string>;
+
 export function GetRooms():Promise<Array<main.Room>>;
 
 export function GetServerInfo(arg1:string):Promise<main.ServerInfo>;
@@ -64,7 +66,11 @@ export function PickPfp():Promise<string>;
 
 export function PingServer():Promise<number>;
 
+export function ReadImageAsDataURL(arg1:string):Promise<string>;
+
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
+
+export function SaveProfilePicture(arg1:string):Promise<void>;
 
 export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;
 

@@ -62,6 +62,10 @@ export function GetMessagesBefore(arg1, arg2) {
   return window['go']['main']['App']['GetMessagesBefore'](arg1, arg2);
 }
 
+export function GetProfilePicture() {
+  return window['go']['main']['App']['GetProfilePicture']();
+}
+
 export function GetRooms() {
   return window['go']['main']['App']['GetRooms']();
 }
@@ -126,8 +130,16 @@ export function PingServer() {
   return window['go']['main']['App']['PingServer']();
 }
 
+export function ReadImageAsDataURL(arg1) {
+  return window['go']['main']['App']['ReadImageAsDataURL'](arg1);
+}
+
 export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
+}
+
+export function SaveProfilePicture(arg1) {
+  return window['go']['main']['App']['SaveProfilePicture'](arg1);
 }
 
 export function SearchServer(arg1) {

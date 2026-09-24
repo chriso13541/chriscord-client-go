@@ -22,7 +22,7 @@ input,button,textarea { font-family:inherit; }
 ::-webkit-scrollbar-thumb { background:var(--bg-light); border-radius:3px; }
 
 /* SERVER LIST */
-#screen-servers { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; height:100%; padding:40px 20px; overflow-y:auto; }
+#screen-servers { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; height:100%; padding:40px 20px; overflow-y:auto; position:relative; }
 .servers-header { text-align:center; margin-bottom:32px; }
 .servers-header h1 { font-size:2rem; color:var(--accent); letter-spacing:4px; font-weight:800; }
 .servers-header p { color:var(--text-muted); margin-top:6px; font-size:.9rem; }
@@ -101,6 +101,8 @@ input,button,textarea { font-family:inherit; }
 .user-avatar.speaking { box-shadow:0 0 0 3px var(--green); }
 .user-name { font-size:.94rem; font-weight:600; color:var(--text-strong); }
 .settings-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; font-size:.95rem; margin-left:auto; flex-shrink:0; }
+#settings-btn-servers { position:absolute; top:20px; right:20px; margin-left:0; font-size:1.2rem; color:var(--text-muted); }
+#settings-btn-servers:hover { color:var(--text); }
 .settings-btn:hover { background:var(--bg-light); }
 .status-dot-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; flex-shrink:0; }
 .status-dot-btn:hover { background:var(--bg-light); }
@@ -222,6 +224,12 @@ input,button,textarea { font-family:inherit; }
 .settings-label:first-of-type { margin-top:0; }
 #settings-mic-select, #settings-speaker-select { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
 .settings-hint { margin-top:20px; font-size:.8rem; color:var(--text-muted); line-height:1.5; }
+#pfp-current-display { display:flex; align-items:center; gap:16px; margin-bottom:8px; }
+#pfp-current-circle { width:80px; height:80px; border-radius:50%; background-size:cover; background-position:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:700; color:#fff; }
+#pfp-cropper-viewport { width:256px; height:256px; border-radius:50%; overflow:hidden; position:relative; background:var(--bg-darkest); cursor:grab; margin-bottom:16px; -webkit-user-select:none; user-select:none; touch-action:none; }
+#pfp-cropper-viewport.dragging { cursor:grabbing; }
+#pfp-cropper-img { position:absolute; top:0; left:0; transform-origin:top left; pointer-events:none; max-width:none; }
+#pfp-zoom-slider { width:256px; display:block; margin-bottom:16px; }
 .settings-secondary-btn { margin-top:14px; padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.85rem; cursor:pointer; }
 .settings-secondary-btn:hover { background:var(--bg-light); }
 .settings-secondary-btn.active { background:var(--red); border-color:var(--red); color:#fff; }
@@ -348,6 +356,7 @@ input,button,textarea { font-family:inherit; }
 </div>
 
 <div id="screen-servers" class="hidden">
+  <button class="settings-btn" id="settings-btn-servers" title="Settings">⚙️</button>
   <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your homelab, your rules.</p></div>
   <div class="server-list" id="server-list"></div>
   <button class="btn-add-server" id="open-add-btn">＋  Add a Server</button>
@@ -464,9 +473,28 @@ input,button,textarea { font-family:inherit; }
 <div id="settings-modal" class="hidden">
   <button id="settings-close-btn" title="Close (Esc)">✕</button>
   <div id="settings-tabs">
+    <div class="settings-tab" data-tab="profile">Profile</div>
     <div class="settings-tab active" data-tab="voice">Voice</div>
   </div>
   <div id="settings-content">
+    <div id="settings-tab-profile" class="settings-tab-pane">
+      <h2>Profile</h2>
+      <div id="pfp-current-display">
+        <div id="pfp-current-circle"></div>
+        <button class="settings-secondary-btn" id="pfp-choose-btn">Choose Image</button>
+      </div>
+      <div id="pfp-cropper-wrap" class="hidden">
+        <div id="pfp-cropper-viewport">
+          <img id="pfp-cropper-img" draggable="false" alt="">
+        </div>
+        <input type="range" id="pfp-zoom-slider" min="1" max="3" step="0.01" value="1">
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="pfp-cancel-btn">Cancel</button>
+          <button class="btn btn-primary" id="pfp-save-btn">Save</button>
+        </div>
+      </div>
+      <p class="settings-hint" id="pfp-hint">Drag the image to reposition it, and use the slider to zoom.</p>
+    </div>
     <div id="settings-tab-voice" class="settings-tab-pane active">
       <h2>Voice Settings</h2>
       <label class="settings-label">Microphone</label>
@@ -813,7 +841,7 @@ function showChatScreen(){
   showScreen('screen-chat');
   document.getElementById('sidebar-server-name').textContent=state.serverName;
   document.getElementById('user-name-label').textContent=state.username;
-  const av=document.getElementById('user-avatar');av.textContent=state.username[0].toUpperCase();av.style.background=avatarColour(state.username);
+  updateSidebarAvatar();
   document.getElementById('board-title-placeholder').className='no-board';
   document.getElementById('board-title-placeholder').textContent='Select a board to start chatting';
   document.getElementById('messages').innerHTML='';
@@ -1026,10 +1054,12 @@ async function toggleMute(){
 function openSettings(){
   document.getElementById('settings-modal').classList.remove('hidden');
   populateAudioDeviceDropdowns();
+  loadCurrentPfp();
 }
 function closeSettings(){
   document.getElementById('settings-modal').classList.add('hidden');
   if(micTestRunning)stopMicTest();
+  if(pfpCrop.img)closePfpCropper();
 }
 let micTestRunning=false;
 async function toggleMicTest(){
@@ -1055,6 +1085,163 @@ function switchSettingsTab(name){
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
 }
+
+// ── PROFILE PICTURE CROPPER ──────────────────────────────────────
+// A Discord-style circular cropper: the picked image is shown at a scale
+// that always fully covers a fixed circular viewport (like CSS
+// object-fit:cover), the user can drag to reposition and use a slider to
+// zoom in further, and panning is clamped so the image can never be
+// dragged to reveal empty space at the edges. Saving renders exactly what
+// the viewport shows onto a same-size canvas with a circular clip, so the
+// exported PNG matches the on-screen preview exactly.
+const PFP_VIEWPORT=256;
+const pfpCrop={img:null,naturalW:0,naturalH:0,baseScale:1,zoom:1,tx:0,ty:0,dragging:false,startX:0,startY:0,startTx:0,startTy:0};
+
+async function loadCurrentPfp(){
+  const circle=document.getElementById('pfp-current-circle');
+  let dataUrl='';
+  try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){}
+  if(dataUrl){
+    circle.style.backgroundImage=`url(${dataUrl})`;
+    circle.style.background='';
+    circle.textContent='';
+  }else{
+    circle.style.backgroundImage='';
+    circle.style.background=avatarColour(state.username||'?');
+    circle.textContent=(state.username||'?')[0].toUpperCase();
+  }
+}
+
+async function pickNewPfp(){
+  try{
+    const path=await window.go.main.App.PickPfp();
+    if(!path)return;
+    const dataUrl=await window.go.main.App.ReadImageAsDataURL(path);
+    openPfpCropper(dataUrl);
+  }catch(err){toast('Could not load image: '+err,true);}
+}
+
+function openPfpCropper(dataUrl){
+  const img=document.getElementById('pfp-cropper-img');
+  img.onload=()=>{
+    pfpCrop.img=img;
+    pfpCrop.naturalW=img.naturalWidth;
+    pfpCrop.naturalH=img.naturalHeight;
+    pfpCrop.baseScale=Math.max(PFP_VIEWPORT/pfpCrop.naturalW,PFP_VIEWPORT/pfpCrop.naturalH);
+    pfpCrop.zoom=1;
+    centerPfpCrop();
+    document.getElementById('pfp-zoom-slider').value='1';
+    applyPfpTransform();
+    document.getElementById('pfp-cropper-wrap').classList.remove('hidden');
+    document.getElementById('pfp-current-display').classList.add('hidden');
+  };
+  img.src=dataUrl;
+}
+
+function centerPfpCrop(){
+  const scale=pfpCrop.baseScale*pfpCrop.zoom;
+  pfpCrop.tx=(PFP_VIEWPORT-pfpCrop.naturalW*scale)/2;
+  pfpCrop.ty=(PFP_VIEWPORT-pfpCrop.naturalH*scale)/2;
+}
+
+function clampPfpPan(){
+  const scale=pfpCrop.baseScale*pfpCrop.zoom;
+  const dispW=pfpCrop.naturalW*scale,dispH=pfpCrop.naturalH*scale;
+  pfpCrop.tx=Math.min(0,Math.max(PFP_VIEWPORT-dispW,pfpCrop.tx));
+  pfpCrop.ty=Math.min(0,Math.max(PFP_VIEWPORT-dispH,pfpCrop.ty));
+}
+
+function applyPfpTransform(){
+  const scale=pfpCrop.baseScale*pfpCrop.zoom;
+  pfpCrop.img.style.transform=`translate(${pfpCrop.tx}px,${pfpCrop.ty}px) scale(${scale})`;
+}
+
+function onPfpZoomChange(){
+  const newZoom=parseFloat(document.getElementById('pfp-zoom-slider').value);
+  const oldScale=pfpCrop.baseScale*pfpCrop.zoom;
+  // Zoom anchored at the viewport center, so the same part of the image
+  // stays centered as zoom changes rather than the image jumping around.
+  const cx=(PFP_VIEWPORT/2-pfpCrop.tx)/oldScale;
+  const cy=(PFP_VIEWPORT/2-pfpCrop.ty)/oldScale;
+  pfpCrop.zoom=newZoom;
+  const newScale=pfpCrop.baseScale*pfpCrop.zoom;
+  pfpCrop.tx=PFP_VIEWPORT/2-cx*newScale;
+  pfpCrop.ty=PFP_VIEWPORT/2-cy*newScale;
+  clampPfpPan();
+  applyPfpTransform();
+}
+
+function onPfpDragStart(e){
+  if(!pfpCrop.img)return;
+  pfpCrop.dragging=true;
+  const p=e.touches?e.touches[0]:e;
+  pfpCrop.startX=p.clientX;pfpCrop.startY=p.clientY;
+  pfpCrop.startTx=pfpCrop.tx;pfpCrop.startTy=pfpCrop.ty;
+  document.getElementById('pfp-cropper-viewport').classList.add('dragging');
+  e.preventDefault();
+}
+function onPfpDragMove(e){
+  if(!pfpCrop.dragging)return;
+  const p=e.touches?e.touches[0]:e;
+  pfpCrop.tx=pfpCrop.startTx+(p.clientX-pfpCrop.startX);
+  pfpCrop.ty=pfpCrop.startTy+(p.clientY-pfpCrop.startY);
+  clampPfpPan();
+  applyPfpTransform();
+}
+function onPfpDragEnd(){
+  pfpCrop.dragging=false;
+  document.getElementById('pfp-cropper-viewport').classList.remove('dragging');
+}
+
+function closePfpCropper(){
+  document.getElementById('pfp-cropper-wrap').classList.add('hidden');
+  document.getElementById('pfp-current-display').classList.remove('hidden');
+  pfpCrop.img=null;
+}
+
+async function savePfpCrop(){
+  const btn=document.getElementById('pfp-save-btn');
+  btn.disabled=true;
+  try{
+    const canvas=document.createElement('canvas');
+    canvas.width=PFP_VIEWPORT;canvas.height=PFP_VIEWPORT;
+    const ctx=canvas.getContext('2d');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(PFP_VIEWPORT/2,PFP_VIEWPORT/2,PFP_VIEWPORT/2,0,Math.PI*2);
+    ctx.clip();
+    const scale=pfpCrop.baseScale*pfpCrop.zoom;
+    ctx.drawImage(pfpCrop.img,pfpCrop.tx,pfpCrop.ty,pfpCrop.naturalW*scale,pfpCrop.naturalH*scale);
+    ctx.restore();
+    const dataUrl=canvas.toDataURL('image/png');
+    await window.go.main.App.SaveProfilePicture(dataUrl);
+    closePfpCropper();
+    await loadCurrentPfp();
+    updateSidebarAvatar();
+    toast('Profile picture updated.');
+  }catch(err){toast('Could not save profile picture: '+err,true);}
+  finally{btn.disabled=false;}
+}
+
+// Updates the sidebar's own avatar to show the saved pfp if one exists,
+// falling back to the existing colored-circle-with-initial otherwise —
+// called on entering a server and whenever the pfp changes.
+async function updateSidebarAvatar(){
+  const av=document.getElementById('user-avatar');
+  if(!av)return;
+  let dataUrl='';
+  try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){}
+  if(dataUrl){
+    av.style.backgroundImage=`url(${dataUrl})`;
+    av.style.background='';
+    av.textContent='';
+  }else{
+    av.style.backgroundImage='';
+    av.textContent=state.username[0].toUpperCase();
+    av.style.background=avatarColour(state.username);
+  }
+}
+
 // Lists real microphones/speakers via the standard Web Audio API — no
 // native code or cgo needed, since Wails' webview is Chromium-based and
 // this is a standard, stable browser API. Selection doesn't do anything
@@ -1911,8 +2098,22 @@ function init(){
     try{await window.go.main.App.LeaveVoiceChannel();}catch(err){toast('Failed to leave voice: '+err,true);}
   });
   document.getElementById('settings-btn').addEventListener('click',openSettings);
+  document.getElementById('settings-btn-servers').addEventListener('click',openSettings);
   document.getElementById('settings-close-btn').addEventListener('click',closeSettings);
   document.getElementById('settings-mic-test-btn').addEventListener('click',toggleMicTest);
+  document.getElementById('pfp-choose-btn').addEventListener('click',pickNewPfp);
+  document.getElementById('pfp-cancel-btn').addEventListener('click',closePfpCropper);
+  document.getElementById('pfp-save-btn').addEventListener('click',savePfpCrop);
+  document.getElementById('pfp-zoom-slider').addEventListener('input',onPfpZoomChange);
+  {
+    const vp=document.getElementById('pfp-cropper-viewport');
+    vp.addEventListener('mousedown',onPfpDragStart);
+    window.addEventListener('mousemove',onPfpDragMove);
+    window.addEventListener('mouseup',onPfpDragEnd);
+    vp.addEventListener('touchstart',onPfpDragStart,{passive:false});
+    window.addEventListener('touchmove',onPfpDragMove,{passive:false});
+    window.addEventListener('touchend',onPfpDragEnd);
+  }
   document.querySelectorAll('.settings-tab').forEach(t=>t.addEventListener('click',()=>switchSettingsTab(t.dataset.tab)));
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
