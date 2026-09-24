@@ -217,7 +217,7 @@ func (a *App) GetProfilePicture() (string, error) {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", nil
+		return "", fmt.Errorf("pfp is set (%s) but couldn't be read: %w", path, err)
 	}
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
 }

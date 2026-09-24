@@ -97,7 +97,7 @@ input,button,textarea { font-family:inherit; }
 #voice-connected-bar #voice-leave-btn { font-size:.99rem; }
 #voice-connected-bar #voice-leave-btn:hover { color:var(--red); }
 #sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); position:relative; }
-.user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.94rem; color:#fff; flex-shrink:0; }
+.user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.94rem; color:#fff; flex-shrink:0; background-size:cover; background-position:center; }
 .user-avatar.speaking { box-shadow:0 0 0 3px var(--green); }
 .user-name { font-size:.94rem; font-weight:600; color:var(--text-strong); }
 .settings-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; font-size:.95rem; margin-left:auto; flex-shrink:0; }
@@ -1100,10 +1100,9 @@ const pfpCrop={img:null,naturalW:0,naturalH:0,baseScale:1,zoom:1,tx:0,ty:0,dragg
 async function loadCurrentPfp(){
   const circle=document.getElementById('pfp-current-circle');
   let dataUrl='';
-  try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){}
+  try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){console.error('GetProfilePicture failed:',err);}
   if(dataUrl){
-    circle.style.backgroundImage=`url(${dataUrl})`;
-    circle.style.background='';
+    circle.style.backgroundImage=`url("${dataUrl}")`;
     circle.textContent='';
   }else{
     circle.style.backgroundImage='';
@@ -1202,6 +1201,7 @@ function closePfpCropper(){
 async function savePfpCrop(){
   const btn=document.getElementById('pfp-save-btn');
   btn.disabled=true;
+  let dataUrl;
   try{
     const canvas=document.createElement('canvas');
     canvas.width=PFP_VIEWPORT;canvas.height=PFP_VIEWPORT;
@@ -1213,14 +1213,30 @@ async function savePfpCrop(){
     const scale=pfpCrop.baseScale*pfpCrop.zoom;
     ctx.drawImage(pfpCrop.img,pfpCrop.tx,pfpCrop.ty,pfpCrop.naturalW*scale,pfpCrop.naturalH*scale);
     ctx.restore();
-    const dataUrl=canvas.toDataURL('image/png');
+    dataUrl=canvas.toDataURL('image/png');
+  }catch(err){
+    console.error('pfp crop render failed:',err);
+    toast('Could not render the cropped image: '+err,true);
+    btn.disabled=false;
+    return;
+  }
+  // Apply immediately from the data already in hand, rather than waiting
+  // on a round trip to the backend and back just to redisplay what we
+  // already have — also means a save failure below doesn't make what you
+  // just cropped look like it silently vanished.
+  document.getElementById('pfp-current-circle').style.backgroundImage=`url("${dataUrl}")`;
+  document.getElementById('pfp-current-circle').textContent='';
+  const av=document.getElementById('user-avatar');
+  if(av){av.style.backgroundImage=`url("${dataUrl}")`;av.textContent='';}
+  closePfpCropper();
+  try{
     await window.go.main.App.SaveProfilePicture(dataUrl);
-    closePfpCropper();
-    await loadCurrentPfp();
-    updateSidebarAvatar();
     toast('Profile picture updated.');
-  }catch(err){toast('Could not save profile picture: '+err,true);}
-  finally{btn.disabled=false;}
+  }catch(err){
+    console.error('pfp save failed:',err);
+    toast('Shown here, but failed to save to disk: '+err,true);
+  }
+  btn.disabled=false;
 }
 
 // Updates the sidebar's own avatar to show the saved pfp if one exists,
@@ -1230,10 +1246,9 @@ async function updateSidebarAvatar(){
   const av=document.getElementById('user-avatar');
   if(!av)return;
   let dataUrl='';
-  try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){}
+  try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){console.error('GetProfilePicture failed:',err);}
   if(dataUrl){
-    av.style.backgroundImage=`url(${dataUrl})`;
-    av.style.background='';
+    av.style.backgroundImage=`url("${dataUrl}")`;
     av.textContent='';
   }else{
     av.style.backgroundImage='';
