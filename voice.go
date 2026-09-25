@@ -325,6 +325,7 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 	})
 
 	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+		log.Printf("voice: OnTrack fired, track id=%s", track.ID())
 		session.handleRemoteTrack(track)
 	})
 
@@ -419,6 +420,7 @@ func (a *App) handleVoiceRenegotiate(sdp string) {
 	session := a.voice
 	a.voiceMu.Unlock()
 	if session == nil {
+		log.Printf("voice: got a renegotiate offer but no active session")
 		return
 	}
 	offer := webrtc.SessionDescription{Type: webrtc.SDPTypeOffer, SDP: sdp}
@@ -438,12 +440,17 @@ func (a *App) handleVoiceRenegotiate(sdp string) {
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
 	if a.ws == nil {
+		log.Printf("voice: renegotiate answer ready but not connected, dropping")
 		return
 	}
 	msg, _ := json.Marshal(map[string]string{
 		"type": "voice_renegotiate_answer", "board_id": session.boardID, "sdp": answer.SDP,
 	})
-	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+	if err := a.ws.WriteMessage(websocket.TextMessage, msg); err != nil {
+		log.Printf("voice: failed to send renegotiate answer: %v", err)
+	} else {
+		log.Printf("voice: renegotiate answer sent successfully")
+	}
 }
 
 func (s *VoiceSession) startCapture(micName string) error {
