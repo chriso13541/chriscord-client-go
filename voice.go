@@ -121,14 +121,29 @@ func (a *App) JoinVoiceChannel(boardID, micName, speakerName string, knownOthers
 	}
 
 	log.Printf("voice: JoinVoiceChannel called for board %s (explicit user join, known others: %v)", boardID, knownOthers)
+
+	// join_voice has to reach the server, and be fully processed, before
+	// the offer below — it's what registers this participant in the
+	// server's own voice presence map, which is exactly what
+	// renegotiate_one reads to figure out who else is in the room and
+	// needs adding to everyone else's existing connections. Sending the
+	// offer first (as this used to) meant that renegotiation could run
+	// before the server had any record this participant existed at all,
+	// silently renegotiating nothing — this participant's own audio would
+	// still reach whoever they explicitly requested via knownOthers, but
+	// nobody who was already in the call before them would ever hear it.
+	a.writeMu.Lock()
+	msg, _ := json.Marshal(map[string]string{"type": "join_voice", "board_id": boardID})
+	err := a.ws.WriteMessage(websocket.TextMessage, msg)
+	a.writeMu.Unlock()
+	if err != nil {
+		return fmt.Errorf("failed to send join_voice: %w", err)
+	}
+
 	if err := a.startVoiceSession(boardID, micName, speakerName, knownOthers, "initial join"); err != nil {
 		return fmt.Errorf("failed to start voice session: %w", err)
 	}
-
-	a.writeMu.Lock()
-	defer a.writeMu.Unlock()
-	msg, _ := json.Marshal(map[string]string{"type": "join_voice", "board_id": boardID})
-	return a.ws.WriteMessage(websocket.TextMessage, msg)
+	return nil
 }
 
 func (a *App) LeaveVoiceChannel() error {
