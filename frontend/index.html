@@ -1280,6 +1280,7 @@ function applyUserAvatar(el,user){
   if(user in state.userPfps || pfpFetchInFlight.has(user))return;
   pfpFetchInFlight.add(user);
   window.go.main.App.FetchUserPfp(user).then(dataUrl=>{
+    console.log(`pfp: FetchUserPfp(${user}) returned ${dataUrl?dataUrl.length:0} chars`);
     state.userPfps[user]=dataUrl||'';
     pfpFetchInFlight.delete(user);
     if(dataUrl){
@@ -1390,8 +1391,9 @@ function renderMembers(payload){
   const onlineEl=document.getElementById('members-online'),offlineEl=document.getElementById('members-offline');
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
-    const row=document.createElement('div');row.className='member-row';const colour=avatarColour(name);
+    const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
     row.innerHTML=`<div class="user-avatar" style="background:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}</span><div class="member-dot ${isOnline?'online':'offline'}" style="margin-left:auto"></div>`;
+    applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
   if(online.length)online.forEach(n=>onlineEl.appendChild(memberRow(n,true)));
@@ -2102,6 +2104,7 @@ function init(){
   window.runtime.EventsOn('pfp:updated',e=>{
     delete state.userPfps[e.username];
     document.querySelectorAll(`.voice-occupant-row[data-user="${CSS.escape(e.username)}"] .voice-occupant-avatar`).forEach(el=>applyUserAvatar(el,e.username));
+    document.querySelectorAll(`.member-row[data-user="${CSS.escape(e.username)}"] .user-avatar`).forEach(el=>applyUserAvatar(el,e.username));
   });
   window.runtime.EventsOn('voice:connectionState',connState=>{
     if(connState==='failed'||connState==='disconnected'){

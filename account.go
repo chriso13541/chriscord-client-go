@@ -463,6 +463,16 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 		pfpUpdatedAt = meta.PfpUpdatedAt
 	}
 	avatarPath, hasAvatar := pfpIfExists(dir)
+	if hasAvatar && pfpUpdatedAt == 0 {
+		// A pfp that predates this timestamp field entirely — back-fill
+		// one from the file's own mtime so it's a real, stable value
+		// rather than 0, which the server treats as "no pfp at all" and
+		// so would otherwise never request this account's picture.
+		if info, statErr := os.Stat(avatarPath); statErr == nil {
+			pfpUpdatedAt = info.ModTime().Unix()
+			_ = updatePfpTimestamp(dir, pfpUpdatedAt) // best-effort — falls back to re-deriving the same mtime next unlock if this fails
+		}
+	}
 	return &Account{
 		Slug: slug, Username: username, PublicKey: pub, PrivateKey: priv,
 		HasAvatar: hasAvatar, AvatarPath: avatarPath, PfpUpdatedAt: pfpUpdatedAt,

@@ -297,6 +297,7 @@ func (a *App) handlePfpRequest() {
 		log.Printf("pfp: failed to read own pfp for upload: %v", err)
 		return
 	}
+	log.Printf("pfp: uploading %d bytes read from %s", len(data), path)
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
 	if a.ws == nil {
@@ -338,6 +339,7 @@ func (a *App) FetchUserPfp(username string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Printf("pfp: fetched %d bytes for %s", len(data), username)
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
 }
 
