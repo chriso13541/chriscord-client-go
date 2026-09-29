@@ -173,7 +173,9 @@ func (a *App) sendSpeaking(boardID string, speaking bool) {
 		return
 	}
 	msg, _ := json.Marshal(map[string]interface{}{"type": "speaking", "board_id": boardID, "speaking": speaking})
-	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+	if err := a.ws.WriteMessage(websocket.TextMessage, msg); err != nil {
+		log.Printf("voice: failed to send speaking=%v: %v", speaking, err)
+	}
 }
 
 // sendVoiceMuteState tells the server this participant's mute/deafen

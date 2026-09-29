@@ -1003,11 +1003,19 @@ async function toggleVoiceChannel(boardId){
 // (not just while that room happens to be expanded) so leaving is never
 // more than one click away regardless of where you've scrolled or
 // navigated to.
+// Records a participant's speaking state (so re-renders of the call list
+// keep it) and toggles the ring on their current row if it's on screen.
+function setSpeakingIndicator(boardId,user,speaking){
+  state.voiceSpeaking[`${boardId}:${user}`]=!!speaking;
+  const row=document.querySelector(`.voice-occupant-row[data-board="${CSS.escape(String(boardId))}"][data-user="${CSS.escape(user)}"]`);
+  const avatar=row&&row.querySelector('.voice-occupant-avatar');
+  if(avatar)avatar.classList.toggle('speaking',!!speaking);
+}
 function updateVoiceConnectedBar(){
   const bar=document.getElementById('voice-connected-bar');
   if(!bar)return;
   const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
-  if(!entry){bar.classList.add('hidden');document.getElementById('user-avatar').classList.remove('speaking');setMuteButtonState(false);setDeafenButtonState(false);return;}
+  if(!entry){bar.classList.add('hidden');setMuteButtonState(false);setDeafenButtonState(false);return;}
   const boardId=entry[0];
   let boardName=boardId;
   for(const list of Object.values(state.boardsByRoom)){
@@ -2120,17 +2128,19 @@ function init(){
     updateVoiceConnectedBar();
   });
   window.runtime.EventsOn('voice:error',msg=>toast('Voice: '+msg,true));
+  // Your OWN ring is driven straight from local voice detection, so it
+  // shows instantly and even when you're alone in the call — it no longer
+  // depends on the server echoing your own speaking state back to you.
+  // (The bottom-left sidebar ring from testing is gone; the call list is
+  // the one place speaking shows now.)
   window.runtime.EventsOn('voice:speaking',speaking=>{
-    document.getElementById('user-avatar').classList.toggle('speaking',!!speaking);
+    const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
+    if(entry)setSpeakingIndicator(entry[0],state.username,speaking);
   });
+  // Everyone else's rings come via the server's rebroadcast. Your own
+  // echo arrives here too, which is harmless — same key, same value.
   window.runtime.EventsOn('voice:peer_speaking',e=>{
-    const key=`${e.board_id}:${e.username}`;
-    state.voiceSpeaking[key]=e.speaking;
-    const row=document.querySelector(`.voice-occupant-row[data-board="${CSS.escape(e.board_id)}"][data-user="${CSS.escape(e.username)}"]`);
-    if(row){
-      const avatar=row.querySelector('.voice-occupant-avatar');
-      if(avatar)avatar.classList.toggle('speaking',!!e.speaking);
-    }
+    setSpeakingIndicator(e.board_id,e.username,e.speaking);
   });
   window.runtime.EventsOn('voice:peer_mute_state',e=>{
     state.voiceMuteStatus[`${e.board_id}:${e.username}`]={muted:e.muted,deafened:e.deafened};
