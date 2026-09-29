@@ -239,10 +239,19 @@ input,button,textarea { font-family:inherit; }
 
 /* Input area */
 #input-area { padding:0 20px 16px; flex-shrink:0; }
-#attach-queue { display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px 8px 0 0; border-bottom:none; }
+#attach-queue { display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; padding:8px 14px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px 8px 0 0; border-bottom:none; }
 #attach-queue.empty { display:none; }
 #attach-queue:not(.empty) + #input-wrap { border-radius:0 0 8px 8px; }
 .attach-chip { display:flex; align-items:center; gap:6px; background:var(--bg-light); border:1px solid var(--border); border-radius:6px; padding:4px 8px; font-size:.8rem; color:var(--text); max-width:200px; }
+/* Image attachments get a Discord-style preview tile instead of a chip */
+.attach-tile { position:relative; display:flex; flex-direction:column; gap:4px; width:150px; padding:6px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; font-size:.75rem; color:var(--text); }
+.attach-tile .tile-img { width:100%; height:120px; border-radius:4px; background:var(--bg-dark) center/contain no-repeat; }
+.attach-tile.pending .tile-img { opacity:.5; }
+.attach-tile.error .tile-img { opacity:.35; outline:2px solid var(--red); }
+.attach-tile .chip-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.attach-tile .tile-status { position:absolute; left:10px; top:10px; font-size:.7rem; background:rgba(0,0,0,.6); color:#fff; border-radius:4px; padding:1px 5px; }
+.attach-tile .chip-remove { position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; background:var(--bg-mid); border:1px solid var(--border); color:var(--text-muted); cursor:pointer; font-size:.8rem; line-height:1; padding:0; }
+.attach-tile .chip-remove:hover { color:var(--red); }
 .attach-chip .chip-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; }
 .attach-chip .chip-status { font-size:.7rem; color:var(--text-muted); flex-shrink:0; }
 .attach-chip .chip-remove { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; padding:0; line-height:1; flex-shrink:0; }
@@ -1452,14 +1461,25 @@ function renderMembers(payload){
 // ── ATTACH QUEUE ─────────────────────────────────────────────────
 let attachIdCounter=0;
 function clearAttachQueue(){state.attachQueue=[];renderAttachQueue();}
+const PREVIEWABLE_IMAGE=/\.(png|jpe?g|gif|webp|bmp|avif)$/i;
 function renderAttachQueue(){
   const el=document.getElementById('attach-queue');el.innerHTML='';
   if(!state.attachQueue.length){el.classList.add('empty');return;}
   el.classList.remove('empty');
   state.attachQueue.forEach(item=>{
-    const chip=document.createElement('div');chip.className='attach-chip';
-    const statusText=item.status==='pending'?'⏳':item.status==='error'?'✗':'✓';
-    chip.innerHTML=`<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><span class="chip-status">${statusText}</span><button class="chip-remove" data-id="${item.id}">✕</button>`;
+    let chip;
+    if(item.preview){
+      // Image: thumbnail tile, shown from the local file right away —
+      // before (and independent of) the upload finishing.
+      chip=document.createElement('div');chip.className='attach-tile '+item.status;
+      const status=item.status==='pending'?'Uploading…':item.status==='error'?'Failed':'';
+      chip.innerHTML=`<div class="tile-img"></div>${status?`<span class="tile-status">${status}</span>`:''}<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">✕</button>`;
+      chip.querySelector('.tile-img').style.backgroundImage=`url("${item.preview}")`;
+    }else{
+      chip=document.createElement('div');chip.className='attach-chip';
+      const statusText=item.status==='pending'?'⏳':item.status==='error'?'✗':'✓';
+      chip.innerHTML=`<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><span class="chip-status">${statusText}</span><button class="chip-remove" data-id="${item.id}">✕</button>`;
+    }
     chip.querySelector('.chip-remove').addEventListener('click',e=>{e.stopPropagation();const id=+e.currentTarget.dataset.id;state.attachQueue=state.attachQueue.filter(a=>a.id!==id);renderAttachQueue();});
     el.appendChild(chip);
   });
@@ -1468,8 +1488,16 @@ async function queueFiles(filePaths){
   for(const path of filePaths){
     const id=++attachIdCounter;
     const filename=path.replace(/\\/g,'/').split('/').pop();
-    state.attachQueue.push({id,filename,path,url:null,mime:null,status:'pending'});
+    state.attachQueue.push({id,filename,path,url:null,mime:null,status:'pending',preview:null});
     renderAttachQueue();
+    // Local preview in parallel with the upload (reads the file from disk,
+    // no network), same idea as Discord showing the picture before send.
+    if(PREVIEWABLE_IMAGE.test(filename)){
+      window.go.main.App.ReadImageAsDataURL(path).then(dataUrl=>{
+        const item=state.attachQueue.find(a=>a.id===id);
+        if(item){item.preview=dataUrl;renderAttachQueue();}
+      }).catch(err=>console.warn('attachment preview failed:',err));
+    }
     try{
       const result=await window.go.main.App.UploadFile(path);
       const item=state.attachQueue.find(a=>a.id===id);
@@ -1903,8 +1931,8 @@ function buildMsgEl(msg,grouped){
     grid.className=`img-grid img-grid-${Math.min(images.length,4)}`;
     images.slice(0,4).forEach(a=>{
       const img=document.createElement('img');img.className='grid-img';img.alt=a.name||'image';
-      resolveAttachURL(a.url).then(url=>{img.src=url;});
-      img.addEventListener('click',()=>resolveAttachURL(a.url).then(url=>openLightbox(url)));
+      getImageBlobURL(a.url).then(url=>{img.src=url;}).catch(err=>console.error('image load failed:',err));
+      img.addEventListener('click',()=>getImageBlobURL(a.url).then(url=>openLightbox(url)).catch(()=>{}));
       grid.appendChild(img);
     });
     body.appendChild(grid);
@@ -1914,14 +1942,14 @@ function buildMsgEl(msg,grouped){
   others.forEach(a=>{
     if(a.mime?.startsWith('video/')){
       const vid=document.createElement('video');vid.className='msg-video';vid.controls=true;vid.preload='metadata';
-      resolveAttachURL(a.url).then(url=>{vid.src=url;});body.appendChild(vid);
+      attachMediaSource(vid,a.url);body.appendChild(vid);
     }else if(a.mime?.startsWith('audio/')){
       const aud=document.createElement('audio');aud.className='msg-audio';aud.controls=true;
-      resolveAttachURL(a.url).then(url=>{aud.src=url;});body.appendChild(aud);
+      attachMediaSource(aud,a.url);body.appendChild(aud);
     }else{
       const chip=document.createElement('div');chip.className='msg-file-chip';
       chip.innerHTML=`<span>📄</span><span class="fname">${esc(a.name||'File')}</span><span style="color:var(--text-muted);font-size:.75rem;margin-left:4px">↓</span>`;
-      chip.addEventListener('click',async()=>{const url=await resolveAttachURL(a.url);window.runtime.BrowserOpenURL(url);});
+      chip.addEventListener('click',()=>downloadAttachment(a));
       body.appendChild(chip);
     }
   });
@@ -1950,14 +1978,14 @@ function toggleDropdown(msgEl,msg){
   const isOwn=msg.username===state.username;
   (msg.attachments||[]).forEach(a=>{
     const item=document.createElement('div');item.className='msg-dropdown-item';
-    item.innerHTML=`⬇️  <span class="dd-label" title="${esc(a.name||'file')}">Download ${esc(a.name||'file')}</span>`;
+    item.innerHTML=`<span class="dd-label" title="${esc(a.name||'file')}">Download ${esc(a.name||'file')}</span>`;
     item.addEventListener('click',()=>{closeDropdown();downloadAttachment(a);});
     dd.appendChild(item);
   });
   if(isOwn){
-    const editItem=document.createElement('div');editItem.className='msg-dropdown-item';editItem.innerHTML='✏️  Edit message';
+    const editItem=document.createElement('div');editItem.className='msg-dropdown-item';editItem.textContent='Edit';
     editItem.addEventListener('click',()=>{closeDropdown();startEdit(msgEl,msg);});
-    const delItem=document.createElement('div');delItem.className='msg-dropdown-item danger';delItem.innerHTML='🗑️  Delete message';
+    const delItem=document.createElement('div');delItem.className='msg-dropdown-item danger';delItem.textContent='Delete';
     delItem.addEventListener('click',()=>{closeDropdown();showDeleteConfirm(msg.id);});
     dd.appendChild(editItem);dd.appendChild(delItem);
   }
@@ -1971,10 +1999,20 @@ function toggleDropdown(msgEl,msg){
   const ddRect=dd.getBoundingClientRect(),containerRect=messagesEl.getBoundingClientRect();
   if(ddRect.bottom>containerRect.bottom)dd.classList.add('dropdown-up');
 }
+// Downloads go through the user's own browser, Discord-style: the server
+// is the CDN, and ?download=1 makes it answer with Content-Disposition:
+// attachment (under the original filename), so the browser saves the file
+// with its normal download UI/progress instead of opening it. The client
+// itself never touches the bytes — previously the Go side re-fetched the
+// whole file into a Save dialog on top of whatever the chat view had
+// already loaded to display it.
 async function downloadAttachment(a){
   try{
-    const url=await resolveAttachURL(a.url);
-    await window.go.main.App.DownloadFile(url,a.name||'file');
+    // Always a brand-new link (not the cached one used for display), so
+    // the browser gets the full 5 minutes to start the download.
+    const base=await getAttachLink(a.url,true);
+    const sep=base.includes('?')?'&':'?';
+    window.runtime.BrowserOpenURL(`${base}${sep}download=1&name=${encodeURIComponent(a.name||'file')}`);
   }catch(err){toast('Download failed: '+err,true);}
 }
 function closeDropdown(){document.querySelectorAll('.msg-dropdown').forEach(d=>d.remove());state.activeDropdown=null;}
@@ -1999,33 +2037,59 @@ async function executeDelete(){
 }
 
 // ── INLINE EDIT ───────────────────────────────────────────────────
+// Puts `content` into a message's text element, creating it (in its normal
+// spot, right under the name/time line and above any attachments) when the
+// message had no text before, and removing it when the text is now empty —
+// so an image-only message never gets a blank line. Shared by your own
+// edits and by chat:edit events for everyone else's.
+function setMessageContent(msgEl,content){
+  let c=msgEl.querySelector('.msg-content');
+  if(!content){if(c)c.remove();return;}
+  if(!c){
+    c=document.createElement('div');c.className='msg-content';
+    msgEl.querySelector('.msg-meta').insertAdjacentElement('afterend',c);
+  }
+  c.innerHTML=renderTextWithLinks(content);
+  c.querySelectorAll('.msg-link').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);});});
+}
+function markMessageEdited(msgEl){
+  const meta=msgEl.querySelector('.msg-meta');
+  if(meta&&!meta.querySelector('.msg-edited-tag')){const t=document.createElement('span');t.className='msg-edited-tag';t.textContent='(edited)';meta.appendChild(t);}
+}
+
 function startEdit(msgEl,msg){
-  const contentEl=msgEl.querySelector('.msg-content');if(!contentEl)return;
-  const original=msg.content;contentEl.style.display='none';
+  if(msgEl.querySelector('.msg-edit-wrap'))return; // already editing
+  const original=msg.content||'';
+  const hasAttachments=(msg.attachments||[]).length>0;
+  // An image-only message has no text element — the editor just goes where
+  // the text would be, so you can add a caption to it.
+  const contentEl=msgEl.querySelector('.msg-content');
+  if(contentEl)contentEl.style.display='none';
   const wrap=document.createElement('div');wrap.className='msg-edit-wrap';
   const ta=document.createElement('textarea');ta.className='msg-edit-input';ta.value=original;ta.rows=Math.min(original.split('\n').length+1,8);
+  if(!original)ta.placeholder='Add a message';
   const actions=document.createElement('div');actions.className='msg-edit-actions';
   const saveBtn=document.createElement('button');saveBtn.className='msg-edit-save';saveBtn.textContent='Save';
   const cancelBtn=document.createElement('button');cancelBtn.className='msg-edit-cancel';cancelBtn.textContent='Cancel';
-  cancelBtn.addEventListener('click',()=>{wrap.remove();contentEl.style.display='';});
+  const close=()=>{wrap.remove();const c=msgEl.querySelector('.msg-content');if(c)c.style.display='';};
+  cancelBtn.addEventListener('click',close);
   saveBtn.addEventListener('click',async()=>{
     const newContent=ta.value.trim();
-    if(!newContent||newContent===original){wrap.remove();contentEl.style.display='';return;}
+    // Text can be emptied only if there's still an attachment to show;
+    // otherwise the message would be blank (use Delete for that).
+    if(newContent===original||(!newContent&&!hasAttachments)){close();return;}
     try{
       await window.go.main.App.EditMessage(msg.id,newContent);
-      contentEl.innerHTML=renderTextWithLinks(newContent);
       msg.content=newContent;
-      const meta=msgEl.querySelector('.msg-meta');
-      if(!meta.querySelector('.msg-edited-tag')){const t=document.createElement('span');t.className='msg-edited-tag';t.textContent='(edited)';meta.appendChild(t);}
-      wrap.remove();contentEl.style.display='';
-      // Re-wire link clicks on updated content
-      contentEl.querySelectorAll('.msg-link').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);});});
+      close();
+      setMessageContent(msgEl,newContent);
+      markMessageEdited(msgEl);
     }catch(err){toast('Edit failed: '+err,true);}
   });
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveBtn.click();}if(e.key==='Escape')cancelBtn.click();});
   actions.appendChild(saveBtn);actions.appendChild(cancelBtn);
   wrap.appendChild(ta);wrap.appendChild(actions);
-  msgEl.querySelector('.msg-body').insertBefore(wrap,contentEl.nextSibling);
+  (contentEl||msgEl.querySelector('.msg-meta')).insertAdjacentElement('afterend',wrap);
   ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
 }
 
@@ -2039,6 +2103,10 @@ async function sendMessage(){
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
   input.value='';autoResize(input);
   const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime}));
+  // The picture you just sent is already in memory from its preview — seed
+  // the image cache so your own message shows it without downloading it
+  // straight back from the server.
+  readyAttachments.forEach(a=>{if(a.preview&&a.url&&!imageBlobs.has(a.url))imageBlobs.set(a.url,Promise.resolve(a.preview));});
   clearAttachQueue();
   try{await window.go.main.App.SendMessage(state.selectedBoardId,content,attachObjs);}
   catch(err){toast('Send failed: '+err,true);input.value=content;}
@@ -2050,9 +2118,70 @@ async function goBack(){
   state.servers=await window.go.main.App.GetServers();renderServers();showScreen('screen-servers');
 }
 
-async function resolveAttachURL(relOrAbs){
-  if(relOrAbs?.startsWith('http'))return relOrAbs;
-  return await window.go.main.App.GetFileURL(relOrAbs);
+// ── ATTACHMENT LINKS ─────────────────────────────────────────────
+// The server only serves /api/files with a short-lived link token (5 min,
+// minted per file for logged-in users via GetFileLink). Links are cached
+// here and reused until LINK_REUSE_MS, comfortably inside that window, so
+// re-renders keep hitting the same URL — and the webview's HTTP cache.
+const LINK_REUSE_MS=4*60*1000;
+const attachLinks=new Map(); // "/api/files/<name>" → {url, fetchedAt}
+async function getAttachLink(rel,fresh=false){
+  if(!rel||rel.startsWith('http'))return rel; // external link, not ours
+  const cached=attachLinks.get(rel);
+  if(!fresh&&cached&&Date.now()-cached.fetchedAt<LINK_REUSE_MS)return cached.url;
+  const url=await window.go.main.App.GetFileLink(rel);
+  attachLinks.set(rel,{url,fetchedAt:Date.now()});
+  return url;
+}
+
+// Images are fetched once per session and kept as blob: URLs, so an image
+// never re-downloads when the chat re-renders — even after its link has
+// expired. Capped so a long session in an image-heavy channel can't grow
+// without bound; the oldest are dropped (and re-fetched only if scrolled
+// back to).
+const IMAGE_CACHE_MAX=300;
+const imageBlobs=new Map(); // rel → Promise<blob URL>
+function getImageBlobURL(rel){
+  if(imageBlobs.has(rel)){
+    const p=imageBlobs.get(rel);imageBlobs.delete(rel);imageBlobs.set(rel,p); // mark most recent
+    return p;
+  }
+  const p=(async()=>{
+    const res=await fetch(await getAttachLink(rel));
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    return URL.createObjectURL(await res.blob());
+  })();
+  p.catch(()=>imageBlobs.delete(rel)); // let a failed load be retried later
+  imageBlobs.set(rel,p);
+  while(imageBlobs.size>IMAGE_CACHE_MAX){
+    const [oldRel,oldP]=imageBlobs.entries().next().value;
+    imageBlobs.delete(oldRel);
+    oldP.then(u=>URL.revokeObjectURL(u)).catch(()=>{});
+  }
+  return p;
+}
+
+// Video/audio stream straight from the link (range requests, so seeking
+// only fetches what's needed). A seek or resume after the link expired
+// gets a 403 → the element fires 'error' → swap in a fresh link and pick
+// up at the same spot. One retry per successful load, so a genuinely
+// missing file can't loop.
+function attachMediaSource(el,rel){
+  let retrying=false;
+  getAttachLink(rel).then(u=>{el.src=u;}).catch(err=>console.error('media link failed:',err));
+  el.addEventListener('loadeddata',()=>{retrying=false;});
+  el.addEventListener('error',async()=>{
+    if(retrying)return;
+    retrying=true;
+    const t=el.currentTime,wasPlaying=!el.paused;
+    try{
+      el.src=await getAttachLink(rel,true);
+      el.addEventListener('loadedmetadata',()=>{
+        if(t)el.currentTime=t;
+        if(wasPlaying)el.play().catch(()=>{});
+      },{once:true});
+    }catch(err){console.error('media link refresh failed:',err);}
+  });
 }
 function openLightbox(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').classList.remove('hidden');}
 function formatTime(iso){if(!iso)return'';try{return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return'';}}
@@ -2118,8 +2247,10 @@ function init(){
     const m=state.messages.find(m=>m.id===ev.id);if(m){m.content=ev.content;m.edited=true;}
     const el=document.querySelector(`.msg-group[data-id="${CSS.escape(ev.id)}"]`);
     if(el){
-      const c=el.querySelector('.msg-content');if(c){c.innerHTML=renderTextWithLinks(ev.content);c.querySelectorAll('.msg-link').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);});});}
-      const meta=el.querySelector('.msg-meta');if(meta&&!meta.querySelector('.msg-edited-tag')){const t=document.createElement('span');t.className='msg-edited-tag';t.textContent='(edited)';meta.appendChild(t);}
+      // Skip while you're editing this message yourself — your own save
+      // updates it once the editor closes.
+      if(!el.querySelector('.msg-edit-wrap'))setMessageContent(el,ev.content);
+      markMessageEdited(el);
     }
   });
   window.runtime.EventsOn('chat:delete',ev=>{

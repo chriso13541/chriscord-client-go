@@ -729,25 +729,23 @@ func (a *App) UploadFile(filePath string) (*UploadResult, error) {
 	return &result, nil
 }
 
-// DownloadFile prompts a native Save dialog and streams url's contents to
-// the chosen path. suggestedName pre-fills the dialog's filename.
-func (a *App) DownloadFile(url, suggestedName string) error {
-	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title: "Save file", DefaultFilename: suggestedName,
-	})
-	if err != nil { return err }
-	if dest == "" { return nil } // user cancelled
-
-	resp, err := http.Get(url)
-	if err != nil { return fmt.Errorf("download failed: %w", err) }
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 { return fmt.Errorf("download failed: HTTP %d", resp.StatusCode) }
-
-	out, err := os.Create(dest)
-	if err != nil { return fmt.Errorf("could not create %s: %w", dest, err) }
-	defer out.Close()
-	_, err = io.Copy(out, resp.Body)
-	return err
+// GetFileLink asks the server for a short-lived link to one attachment
+// (path is its "/api/files/<name>" URL from the message) and returns it as
+// an absolute URL. The server only serves /api/files to a valid, unexpired
+// link token — or a session token, which a plain <img>/<video> tag or the
+// user's browser can't send — so every inline display and every browser
+// download goes through one of these. Links last 5 minutes (server-side
+// LINK_TTL), checked when each request starts.
+func (a *App) GetFileLink(path string) (string, error) {
+	var resp struct {
+		URL string `json:"url"`
+	}
+	if err := a.doGET(path+"/link", &resp); err != nil {
+		return "", err
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return normaliseHTTP(a.domain) + resp.URL, nil
 }
 
 // GetFileURL returns the full URL for a server-relative path.
