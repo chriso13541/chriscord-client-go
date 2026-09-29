@@ -349,7 +349,14 @@ input,button,textarea { font-family:inherit; }
 .sr-user { font-size:.78rem; font-weight:600; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sr-time { font-size:.66rem; color:var(--text-muted); margin-left:auto; flex-shrink:0; }
 .sr-content { font-size:.8rem; color:var(--text); line-height:1.35; word-break:break-word; }
-.sr-attach { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
+.sr-attach { display:flex; align-items:center; gap:4px; font-size:.72rem; color:var(--text-muted); margin-top:3px; min-width:0; }
+.sr-attach span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Image attachments in pinned/search rows: small thumbnails at their own
+   aspect ratio (never cropped), same rounded look as the chat. */
+.sr-images { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+.sr-img { display:block; max-width:100%; max-height:140px; border-radius:6px; cursor:zoom-in; }
+.sr-images.multi .sr-img { max-width:calc(50% - 2px); max-height:90px; }
+.sr-img.loading { width:120px; height:80px; background:var(--bg-mid); }
 .members-section-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); padding:8px 6px 4px; }
 .member-row { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:4px; }
 .member-row:hover { background:var(--bg-light); }
@@ -2099,12 +2106,27 @@ async function jumpToPresent(){
 function buildSearchResultRow(msg){
   const colour=avatarColour(msg.username),initial=msg.username[0].toUpperCase();
   const time=formatTime(msg.created_at),hoverTime=esc(formatHoverTime(msg.created_at));
-  const hasAttach=(msg.attachments||[]).length>0;
+  const attachments=msg.attachments||[];
+  const images=attachments.filter(a=>a.mime?.startsWith('image/'));
+  const files=attachments.filter(a=>!a.mime?.startsWith('image/'));
   const row=document.createElement('div');row.className='search-result-row';
   row.innerHTML=`
     <div class="sr-head"><div class="sr-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
     ${msg.content?`<div class="sr-content">${esc(msg.content)}</div>`:''}
-    ${hasAttach?`<div class="sr-attach">${icon('attach_file')} Attachment</div>`:''}`;
+    ${images.length?`<div class="sr-images${images.length>1?' multi':''}"></div>`:''}
+    ${files.map(a=>`<div class="sr-attach" title="${esc(a.name||'File')}">${icon(fileTypeIcon(a.name,a.mime))}<span>${esc(a.name||'File')}</span></div>`).join('')}`;
+  // Image previews use the same session image cache as the chat, so a
+  // picture that's already on screen isn't downloaded again. Clicking one
+  // opens it in the image viewer; clicking anywhere else on the row still
+  // jumps to the message.
+  const imgWrap=row.querySelector('.sr-images');
+  images.slice(0,4).forEach(a=>{
+    const img=document.createElement('img');img.className='sr-img loading';img.alt=a.name||'image';
+    img.addEventListener('load',()=>img.classList.remove('loading'),{once:true});
+    getImageBlobURL(a.url).then(url=>{img.src=url;}).catch(err=>console.error('image load failed:',err));
+    img.addEventListener('click',e=>{e.stopPropagation();getImageBlobURL(a.url).then(url=>openLightbox(url,a,msg)).catch(()=>{});});
+    imgWrap.appendChild(img);
+  });
   applyUserAvatar(row.querySelector('.sr-avatar'),msg.username);
   row.addEventListener('click',()=>jumpToSearchResult(msg));
   return row;
