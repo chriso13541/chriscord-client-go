@@ -72,6 +72,7 @@ type ChatMessage struct {
 	Attachments []Attachment `json:"attachments"`
 	Edited      bool         `json:"edited"`
 	CreatedAt   string       `json:"created_at"`
+	Pinned      bool         `json:"pinned"`
 }
 
 // SearchResult is a ChatMessage plus which board (and its room) it came

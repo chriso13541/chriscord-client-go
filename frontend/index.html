@@ -127,7 +127,12 @@ input,button,textarea { font-family:inherit; }
 #chat-header .board-title { font-weight:700; font-size:1rem; color:var(--text-strong); }
 #chat-header .board-title::before { content:'# '; color:var(--text-muted); font-weight:400; }
 #chat-header .no-board { color:var(--text-muted); font-style:italic; }
-#toggle-members-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
+.header-icon-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px 6px; border-radius:4px; display:flex; align-items:center; transition:background .15s,color .15s; }
+.header-icon-btn:hover:not(:disabled) { background:var(--bg-light); color:var(--text); }
+.header-icon-btn.active { color:var(--accent); }
+.header-icon-btn:disabled { opacity:.35; cursor:default; }
+.header-icon-btn .ic { width:20px; height:20px; }
+#toggle-members-btn { margin-left:4px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
 #toggle-members-btn:hover { background:var(--bg-light); color:var(--text); }
 #toggle-members-btn.active { color:var(--accent); }
 #search-box { display:flex; align-items:center; background:var(--bg-mid); border:1px solid var(--border); border-radius:6px; padding:0 4px 0 10px; width:160px; flex-shrink:0; transition:border-color .15s,width .15s; }
@@ -328,6 +333,12 @@ input,button,textarea { font-family:inherit; }
 #members-panel.searching { width:calc(var(--members-w) * 1.5); }
 #members-panel-inner { padding:12px 10px; overflow-y:auto; flex:1; }
 #results-summary { display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text-muted); padding-bottom:10px; margin-bottom:8px; border-bottom:1px solid var(--border); }
+#results-summary .results-title { display:flex; align-items:center; gap:6px; font-weight:700; color:var(--text-strong); }
+#results-summary .results-title .ic { width:18px; height:18px; }
+.results-empty { display:flex; flex-direction:column; align-items:center; gap:8px; padding:28px 8px; text-align:center; font-size:.82rem; color:var(--text-muted); }
+.results-empty .ic { width:36px; height:36px; opacity:.6; }
+.msg-pin { display:inline-flex; align-self:center; margin-right:-4px; }
+.msg-pin-ic { width:15px; height:15px; color:var(--text-muted); }
 #results-summary .clear-results { background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:auto; font-size:.78rem; padding:2px 5px; border-radius:4px; flex-shrink:0; }
 #results-summary .clear-results:hover { background:var(--bg-light); color:var(--text); }
 .search-result-row { padding:6px; border-radius:6px; margin-bottom:2px; cursor:pointer; }
@@ -385,6 +396,7 @@ input,button,textarea { font-family:inherit; }
   <symbol id="ic-picture_as_pdf" viewBox="0 -960 960 960"><path d="M360-460h40v-80h40q17 0 28.5-11.5T480-580v-40q0-17-11.5-28.5T440-660h-80v200Zm40-120v-40h40v40h-40Zm120 120h80q17 0 28.5-11.5T640-500v-120q0-17-11.5-28.5T600-660h-80v200Zm40-40v-120h40v120h-40Zm120 40h40v-80h40v-40h-40v-40h40v-40h-80v200ZM320-240q-33 0-56.5-23.5T240-320v-480q0-33 23.5-56.5T320-880h480q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H320Zm0-80h480v-480H320v480ZM160-80q-33 0-56.5-23.5T80-160v-560h80v560h560v80H160Zm160-720v480-480Z"/></symbol>
   <symbol id="ic-play_arrow" viewBox="0 -960 960 960"><path d="M320-200v-560l440 280-440 280Zm80-280Zm0 134 210-134-210-134v268Z"/></symbol>
   <symbol id="ic-video_file" viewBox="0 -960 960 960"><path d="M360-240h160q17 0 28.5-11.5T560-280v-40l80 42v-164l-80 42v-40q0-17-11.5-28.5T520-480H360q-17 0-28.5 11.5T320-440v160q0 17 11.5 28.5T360-240ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ic-keep" viewBox="0 -960 960 960"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -534,6 +546,7 @@ input,button,textarea { font-family:inherit; }
   <div id="main-column">
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
+      <button id="toggle-pins-btn" class="header-icon-btn" title="Pinned messages" disabled><svg class="ic" aria-hidden="true"><use href="#ic-keep"/></svg></button>
       <button id="toggle-members-btn" title="Toggle member list"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg> Members</button>
       <div id="search-box">
         <input id="msg-search-input" type="text" placeholder="Search" autocomplete="off">
@@ -966,6 +979,8 @@ function showChatScreen(){
   document.getElementById('attach-btn').disabled=true;
   document.getElementById('msg-search-input').placeholder='Search '+state.serverName;
   exitSearch();
+  if(state.resultsMode)closeResultsPanel();
+  document.getElementById('toggle-pins-btn').disabled=true; // until a channel is picked
   clearAttachQueue();
   state.membersVisible=localStorage.getItem('membersVisible')==='true';
   const panel=document.getElementById('members-panel'),btn=document.getElementById('toggle-members-btn');
@@ -1525,7 +1540,9 @@ async function selectBoard(boardId,boardName,roomId){
   if(state.selectedBoardId===boardId)return;
   state.selectedBoardId=boardId;state.selectedBoardName=boardName;state.selectedRoomId=roomId??state.selectedRoomId;state.messages=[];clearAttachQueue();
   state.unreadBoards.delete(boardId);
+  const pinsWereOpen=state.resultsMode==='pins';
   exitSearch();
+  document.getElementById('toggle-pins-btn').disabled=false;
   const hdr=document.getElementById('board-title-placeholder');hdr.className='board-title';hdr.textContent=boardName;
   document.getElementById('msg-input').placeholder=`Message  #${boardName}`;
   document.getElementById('msg-input').disabled=false;document.getElementById('send-btn').disabled=false;document.getElementById('attach-btn').disabled=false;
@@ -1533,6 +1550,7 @@ async function selectBoard(boardId,boardName,roomId){
   document.getElementById('messages').innerHTML='<div class="msg-placeholder">Loading history…</div>';
   renderSidebar();
   setLastBoard(state.domain,state.selectedRoomId,boardId,boardName);
+  if(pinsWereOpen)showPinnedMessages(); // the pins list follows you to the new channel
   try{await window.go.main.App.SubscribeBoard(boardId);}catch(err){toast('Subscribe failed: '+err,true);}
 }
 
@@ -1761,7 +1779,9 @@ function openExternalURL(url){
 // into one visual block (matches Discord's default behaviour).
 const GROUP_WINDOW_MS = 7*60*1000;
 function isGroupedWith(prev,msg){
-  if(!prev||prev.username!==msg.username)return false;
+  // A pinned message always starts its own group, so its name line — and
+  // the pin icon beside it — is always shown.
+  if(!prev||prev.username!==msg.username||msg.pinned)return false;
   const t1=Date.parse(prev.created_at),t2=Date.parse(msg.created_at);
   if(!isFinite(t1)||!isFinite(t2))return false;
   return (t2-t1)>=0 && (t2-t1)<GROUP_WINDOW_MS;
@@ -1900,14 +1920,37 @@ async function runSearch(){
     showSearchResults(results,q);
   }catch(err){toast('Search failed: '+err,true);}
 }
-function showSearchResults(results,q){
-  if(!state.searchActive)state.membersWasOpenBeforeSearch=state.membersVisible; // only capture on the transition into search mode, not on every re-search
-  state.searchActive=true;
-  document.getElementById('msg-search-clear').classList.remove('hidden');
+// The members panel doubles as a results panel for search and for pinned
+// messages — only one at a time. Opening either remembers whether the
+// panel was open before, so closing puts it back the way it was.
+function openResultsPanel(mode){
+  if(!state.resultsMode)state.membersWasOpenBeforeSearch=state.membersVisible; // only on the transition into a results mode
+  state.resultsMode=mode;
+  state.searchActive=mode==='search';
+  document.getElementById('toggle-pins-btn').classList.toggle('active',mode==='pins');
   ensureMembersPanelOpen();
   document.getElementById('members-panel').classList.add('searching');
   document.getElementById('members-normal').classList.add('hidden');
   document.getElementById('members-results').classList.remove('hidden');
+}
+function closeResultsPanel(){
+  state.resultsMode=null;state.searchActive=false;
+  document.getElementById('toggle-pins-btn').classList.remove('active');
+  document.getElementById('members-panel').classList.remove('searching');
+  document.getElementById('members-results').classList.add('hidden');
+  document.getElementById('members-normal').classList.remove('hidden');
+  if(state.membersWasOpenBeforeSearch===false){
+    // A results view had to force the panel open — close it back up now
+    // that we're done, rather than leaving it open regardless.
+    document.getElementById('members-panel').classList.add('collapsed');
+    document.getElementById('toggle-members-btn').classList.remove('active');
+    state.membersVisible=false;localStorage.setItem('membersVisible','false');
+  }
+  state.membersWasOpenBeforeSearch=null;
+}
+function showSearchResults(results,q){
+  openResultsPanel('search');
+  document.getElementById('msg-search-clear').classList.remove('hidden');
 
   const summary=document.getElementById('results-summary');
   summary.innerHTML=`<span>${results.length} result${results.length===1?'':'s'} for "${esc(q)}"</span>`+
@@ -1919,26 +1962,49 @@ function showSearchResults(results,q){
   results.forEach(m=>list.appendChild(buildSearchResultRow(m)));
 }
 function exitSearch(){
-  state.searchActive=false;
   document.getElementById('msg-search-input').value='';
   document.getElementById('msg-search-clear').classList.add('hidden');
-  document.getElementById('members-panel').classList.remove('searching');
-  document.getElementById('members-results').classList.add('hidden');
-  document.getElementById('members-normal').classList.remove('hidden');
-  if(state.membersWasOpenBeforeSearch===false){
-    // Search had to force the panel open to show results — close it back
-    // up now that we're done, rather than leaving it open regardless.
-    document.getElementById('members-panel').classList.add('collapsed');
-    document.getElementById('toggle-members-btn').classList.remove('active');
-    state.membersVisible=false;localStorage.setItem('membersVisible','false');
+  if(state.resultsMode==='search')closeResultsPanel();
+}
+
+// ── PINNED MESSAGES ─────────────────────────────────────────────
+// The pin button beside Members toggles the current channel's pins in
+// the same panel search results use, and they jump the same way.
+function togglePins(){
+  if(state.resultsMode==='pins'){closeResultsPanel();return;}
+  if(state.resultsMode==='search')exitSearch();
+  showPinnedMessages();
+}
+async function showPinnedMessages(){
+  const boardId=state.selectedBoardId;
+  if(!boardId)return;
+  openResultsPanel('pins');
+  const summary=document.getElementById('results-summary');
+  summary.innerHTML=`<span class="results-title">${icon('keep')}Pinned Messages</span>`+
+    `<button class="clear-results" title="Close">${icon('close')}</button>`;
+  summary.querySelector('.clear-results').addEventListener('click',closeResultsPanel);
+  const list=document.getElementById('results-list');
+  let pins;
+  try{pins=await window.go.main.App.GetPinnedMessages(boardId)||[];}
+  catch(err){toast('Could not load pinned messages: '+err,true);return;}
+  // Bail if the panel was closed or moved to another channel meanwhile.
+  if(state.resultsMode!=='pins'||state.selectedBoardId!==boardId)return;
+  list.innerHTML='';
+  if(!pins.length){
+    list.innerHTML=`<div class="results-empty">${icon('keep')}<span>No pinned messages exist in #${esc(state.selectedBoardName||'')} yet.</span></div>`;
+    return;
   }
-  state.membersWasOpenBeforeSearch=null;
+  pins.forEach(m=>list.appendChild(buildSearchResultRow({...m,board_name:state.selectedBoardName,room_id:state.selectedRoomId})));
+}
+// Keeps an open pins list current when something in it changes.
+function refreshPinsIfOpen(boardId){
+  if(state.resultsMode==='pins'&&boardId===state.selectedBoardId)showPinnedMessages();
 }
 // Closes search and switches to wherever a result came from — expanding
 // its room/category in the sidebar first if it isn't already, so the
 // destination doesn't look like it appeared out of nowhere.
 async function jumpToSearchResult(msg){
-  exitSearch();
+  if(state.resultsMode==='search')exitSearch();else closeResultsPanel();
   if(msg.board_id!==state.selectedBoardId){
     if(!state.expandedRooms.has(msg.room_id)){
       state.expandedRooms.add(msg.room_id);
@@ -2058,12 +2124,12 @@ function buildMsgEl(msg,grouped){
       : `<div class="msg-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
-        ${grouped?'':`<span class="msg-username">${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
+        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username">${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}
       </div>
       ${msg.content?`<div class="msg-content">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
-    ${(isOwn||attachments.length)?`<div class="msg-actions"><button class="msg-action-btn" title="More options">${icon('more_horiz')}</button></div>`:''}`;
+    <div class="msg-actions"><button class="msg-action-btn" title="More options">${icon('more_horiz')}</button></div>`;
 
   // Grouped follow-up messages show a hover timestamp instead of an
   // avatar, so there's only something to apply on a group's first message.
@@ -2116,10 +2182,8 @@ function buildMsgEl(msg,grouped){
   // Async link preview (fire and forget)
   if(msg.content)maybeRenderPreviews(div,msg.content);
 
-  // 3-dot menu
-  if(isOwn||attachments.length){
-    div.querySelector('.msg-action-btn')?.addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
-  }
+  // 3-dot menu — on every message now, since anyone can Pin
+  div.querySelector('.msg-action-btn').addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
   return div;
 }
 
@@ -2136,6 +2200,13 @@ function toggleDropdown(msgEl,msg){
     item.addEventListener('click',()=>{closeDropdown();downloadAttachment(a);});
     dd.appendChild(item);
   });
+  const pinItem=document.createElement('div');pinItem.className='msg-dropdown-item';pinItem.textContent=msg.pinned?'Unpin':'Pin';
+  pinItem.addEventListener('click',async()=>{
+    closeDropdown();
+    try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}
+    catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
+  });
+  dd.appendChild(pinItem);
   if(isOwn){
     const editItem=document.createElement('div');editItem.className='msg-dropdown-item';editItem.textContent='Edit';
     editItem.addEventListener('click',()=>{closeDropdown();startEdit(msgEl,msg);});
@@ -2527,7 +2598,7 @@ function init(){
   });
   window.runtime.EventsOn('chat:edit',ev=>{
     if(!ev||ev.board_id!==state.selectedBoardId)return;
-    const m=state.messages.find(m=>m.id===ev.id);if(m){m.content=ev.content;m.edited=true;}
+    const m=state.messages.find(m=>m.id===ev.id);if(m){m.content=ev.content;m.edited=true;if(m.pinned)refreshPinsIfOpen(ev.board_id);}
     const el=document.querySelector(`.msg-group[data-id="${CSS.escape(ev.id)}"]`);
     if(el){
       // Skip while you're editing this message yourself — your own save
@@ -2539,6 +2610,19 @@ function init(){
   window.runtime.EventsOn('chat:delete',ev=>{
     if(!ev||ev.board_id!==state.selectedBoardId)return;
     removeMessageFromDOM(ev.id);
+    refreshPinsIfOpen(ev.board_id);
+  });
+  window.runtime.EventsOn('chat:pin',ev=>{
+    if(!ev||ev.board_id!==state.selectedBoardId)return;
+    const m=state.messages.find(m=>m.id===ev.id);
+    if(m&&m.pinned!==ev.pinned){
+      m.pinned=ev.pinned;
+      // Re-render in place: pinning can split a message out of its group
+      // (or let it rejoin one), so more than this one element may change.
+      renderMessages(false);
+    }
+    refreshPinsIfOpen(ev.board_id);
+    if(ev.pinned&&ev.by&&ev.by!==state.username)toast(`${ev.by} pinned a message`);
   });
   window.runtime.EventsOn('chat:users',payload=>renderMembers(payload||{}));
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
@@ -2590,6 +2674,7 @@ function init(){
   document.getElementById('send-btn').addEventListener('click',sendMessage);
   document.getElementById('attach-btn').addEventListener('click',pickAndAttach);
   document.getElementById('toggle-members-btn').addEventListener('click',toggleMembers);
+  document.getElementById('toggle-pins-btn').addEventListener('click',togglePins);
   document.getElementById('confirm-cancel-btn').addEventListener('click',closeDeleteConfirm);
   document.getElementById('confirm-delete-btn').addEventListener('click',executeDelete);
 
@@ -2614,7 +2699,7 @@ function init(){
   document.getElementById('export-confirm-btn').addEventListener('click',confirmExport);
   document.getElementById('export-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')confirmExport();});
   document.getElementById('modal-export').addEventListener('click',e=>{if(e.target===e.currentTarget)closeExportModal();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeExportModal();closeDropdown();if(state.searchActive)exitSearch();}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeExportModal();closeDropdown();if(state.searchActive)exitSearch();else if(state.resultsMode==='pins')closeResultsPanel();}});
   document.addEventListener('click',()=>closeDropdown());
   document.getElementById('status-dot-btn').addEventListener('click',togglePingPopover);
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));

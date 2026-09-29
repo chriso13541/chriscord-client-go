@@ -66,6 +66,10 @@ export function GetMessagesBefore(arg1, arg2) {
   return window['go']['main']['App']['GetMessagesBefore'](arg1, arg2);
 }
 
+export function GetPinnedMessages(arg1) {
+  return window['go']['main']['App']['GetPinnedMessages'](arg1);
+}
+
 export function GetProfilePicture() {
   return window['go']['main']['App']['GetProfilePicture']();
 }
@@ -152,6 +156,10 @@ export function SearchServer(arg1) {
 
 export function SendMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3);
+}
+
+export function SetMessagePinned(arg1, arg2) {
+  return window['go']['main']['App']['SetMessagePinned'](arg1, arg2);
 }
 
 export function StartMicTest(arg1, arg2) {

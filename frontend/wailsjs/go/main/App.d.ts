@@ -34,6 +34,8 @@ export function GetMessagesAround(arg1:string,arg2:string):Promise<Array<main.Ch
 
 export function GetMessagesBefore(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
 
+export function GetPinnedMessages(arg1:string):Promise<Array<main.ChatMessage>>;
+
 export function GetProfilePicture():Promise<string>;
 
 export function GetRooms():Promise<Array<main.Room>>;
@@ -77,6 +79,8 @@ export function SaveProfilePicture(arg1:string):Promise<void>;
 export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;
 
 export function SendMessage(arg1:string,arg2:string,arg3:Array<main.Attachment>):Promise<void>;
+
+export function SetMessagePinned(arg1:string,arg2:boolean):Promise<void>;
 
 export function StartMicTest(arg1:string,arg2:string):Promise<void>;
 

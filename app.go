@@ -482,6 +482,8 @@ type serverMsg struct {
 	Deafened      bool                `json:"deafened"`
 	Statuses      []VoiceStatusEntry  `json:"statuses"`
 	PfpUpdatedAt  int64               `json:"updated_at"`
+	Pinned        bool                `json:"pinned"`
+	By            string              `json:"by"`
 }
 
 // VoiceStatusEntry is one participant's mute/deafen status, as sent in a
@@ -500,6 +502,7 @@ type usersEvent  struct { Online []string `json:"online"`; All []string `json:"a
 type voiceStateEvent struct { Channels map[string][]string `json:"channels"` }
 type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"` }
 type deleteEvent struct { ID string `json:"id"`; BoardID string `json:"board_id"` }
+type pinEvent    struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Pinned bool `json:"pinned"`; By string `json:"by"` }
 type voiceSpeakingEvent struct {
 	BoardID  string `json:"board_id"`
 	Username string `json:"username"`
@@ -540,6 +543,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:edit", editEvent{ID: msg.ID, BoardID: msg.BoardID, Content: msg.Content})
 		case "message_delete":
 			runtime.EventsEmit(a.ctx, "chat:delete", deleteEvent{ID: msg.ID, BoardID: msg.BoardID})
+		case "message_pin":
+			runtime.EventsEmit(a.ctx, "chat:pin", pinEvent{ID: msg.ID, BoardID: msg.BoardID, Pinned: msg.Pinned, By: msg.By})
 		case "rooms_updated":
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
@@ -632,6 +637,37 @@ func (a *App) SendMessage(boardID, content string, attachments []Attachment) err
 func (a *App) DeleteMessage(msgID string) error {
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
 	req, err := http.NewRequest("DELETE", normaliseHTTP(domain)+"/api/messages/"+msgID, nil)
+	if err != nil { return err }
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil { return fmt.Errorf("network error: %w", err) }
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var e map[string]string; json.NewDecoder(resp.Body).Decode(&e)
+		if msg, ok := e["error"]; ok { return fmt.Errorf("%s", msg) }
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// GetPinnedMessages returns a board's pinned messages, most recently
+// pinned first.
+func (a *App) GetPinnedMessages(boardID string) ([]ChatMessage, error) {
+	var out []ChatMessage
+	err := a.doGET("/api/boards/"+boardID+"/pins", &out)
+	return out, err
+}
+
+// SetMessagePinned pins (PUT) or unpins (DELETE) a message. The server
+// broadcasts the change as message_pin, which is what updates every
+// client's view — including this one.
+func (a *App) SetMessagePinned(msgID string, pinned bool) error {
+	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
+	method := "PUT"
+	if !pinned {
+		method = "DELETE"
+	}
+	req, err := http.NewRequest(method, normaliseHTTP(domain)+"/api/messages/"+msgID+"/pin", nil)
 	if err != nil { return err }
 	req.Header.Set("X-Session-Token", token)
 	resp, err := http.DefaultClient.Do(req)

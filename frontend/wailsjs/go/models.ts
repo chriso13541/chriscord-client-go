@@ -72,6 +72,7 @@ export namespace main {
 	    attachments: Attachment[];
 	    edited: boolean;
 	    created_at: string;
+	    pinned: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatMessage(source);
@@ -86,6 +87,7 @@ export namespace main {
 	        this.attachments = this.convertValues(source["attachments"], Attachment);
 	        this.edited = source["edited"];
 	        this.created_at = source["created_at"];
+	        this.pinned = source["pinned"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -170,6 +172,7 @@ export namespace main {
 	    attachments: Attachment[];
 	    edited: boolean;
 	    created_at: string;
+	    pinned: boolean;
 	    board_name: string;
 	    room_id: string;
 	
@@ -186,6 +189,7 @@ export namespace main {
 	        this.attachments = this.convertValues(source["attachments"], Attachment);
 	        this.edited = source["edited"];
 	        this.created_at = source["created_at"];
+	        this.pinned = source["pinned"];
 	        this.board_name = source["board_name"];
 	        this.room_id = source["room_id"];
 	    }
