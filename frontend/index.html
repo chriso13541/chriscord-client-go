@@ -953,6 +953,10 @@ function renderSidebar(){
       else if(isVoiceRoom)boards.forEach(board=>{
         const occupants=state.voiceChannels[board.id]||[];
         const isJoined=occupants.includes(state.username);
+        // Not in this call: forget any speaking state for it, so nothing
+        // stale lights up (or lingers) if you join later — the server only
+        // sends live activity to people in the call anyway.
+        if(!isJoined)for(const k of Object.keys(state.voiceSpeaking))if(k.startsWith(board.id+':'))delete state.voiceSpeaking[k];
         const item=document.createElement('div');
         item.className='voice-item'+(isJoined?' joined':'');
         item.innerHTML=`<span>🔊</span><span class="board-name">${esc(board.name)}</span>${occupants.length?`<span class="voice-count">${occupants.length}</span>`:''}`;
@@ -1006,6 +1010,8 @@ async function toggleVoiceChannel(boardId){
 // Records a participant's speaking state (so re-renders of the call list
 // keep it) and toggles the ring on their current row if it's on screen.
 function setSpeakingIndicator(boardId,user,speaking){
+  // Only people in this same call see its activity.
+  if(!(state.voiceChannels[boardId]||[]).includes(state.username))return;
   state.voiceSpeaking[`${boardId}:${user}`]=!!speaking;
   const row=document.querySelector(`.voice-occupant-row[data-board="${CSS.escape(String(boardId))}"][data-user="${CSS.escape(user)}"]`);
   const avatar=row&&row.querySelector('.voice-occupant-avatar');
