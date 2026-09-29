@@ -1,0 +1,21 @@
+Third-party notices
+
+chriscord's own code is licensed separately from the third-party assets
+below. Each asset keeps its own license; using them does not change the
+license of chriscord itself.
+
+Material Symbols (UI icons)
+---------------------------
+
+- Source: https://github.com/google/material-design-icons (commit `bd8cb85`),
+  `symbols/web/*/materialsymbolsoutlined/*_24px.svg`
+- Copyright: Google LLC
+- License: Apache License 2.0 — full text in
+  `frontend/licenses/material-symbols-LICENSE.txt` (embedded in the app build)
+- Modifications: the SVG paths are combined into a single `<symbol>` sprite
+  at the top of `frontend/index.html`; the shapes themselves are unchanged.
+
+Icons used: add, arrow_downward, attach_file, call_end, check,
+chevron_right, close, description, download, error, folder_open, group,
+headphones, headset_off, mic, mic_off, more_horiz, progress_activity,
+search, send, settings, stop, volume_up, zoom_in.

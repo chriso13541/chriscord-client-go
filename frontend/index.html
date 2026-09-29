@@ -87,12 +87,20 @@ input,button,textarea { font-family:inherit; }
 .voice-occupant-avatar { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#fff; flex-shrink:0; background-size:cover; background-position:center; }
 .voice-occupant-name { font-size:.86rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .voice-occupant-avatar.speaking { box-shadow:0 0 0 2px var(--green); }
-.voice-occupant-status { margin-left:auto; font-size:.72rem; flex-shrink:0; color:var(--red); }
+.voice-occupant-status { margin-left:auto; display:flex; gap:2px; flex-shrink:0; color:var(--text-muted); }
+.voice-occupant-status .ic { width:16px; height:16px; }
+.voice-occupant-status .ic.off { color:var(--red); }
 #voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.91rem; color:var(--green); }
 #voice-connected-bar .voice-bar-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.95rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
 #voice-connected-bar .voice-bar-btn:hover { background:var(--bg-light); color:var(--text); }
-#voice-connected-bar .voice-bar-btn.muted { background:var(--red); }
-#voice-connected-bar .voice-bar-btn.muted:hover { background:var(--red-light); }
+#voice-connected-bar .voice-bar-btn { display:flex; align-items:center; }
+#voice-connected-bar .voice-bar-btn .ic { width:20px; height:20px; }
+#voice-connected-bar .voice-bar-btn.muted { color:var(--red); }
+#voice-connected-bar .voice-bar-btn.muted:hover { color:var(--red-light); }
+#voice-leave-btn:hover { color:var(--red) !important; }
+#voice-connected-name { display:flex; align-items:center; gap:5px; min-width:0; margin-right:auto; }
+#voice-connected-name span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#voice-connected-name .ic { width:16px; height:16px; }
 #voice-connected-bar #voice-deafen-btn { margin-left:auto; }
 #voice-connected-bar #voice-leave-btn { font-size:.99rem; }
 #voice-connected-bar #voice-leave-btn:hover { color:var(--red); }
@@ -177,10 +185,17 @@ input,button,textarea { font-family:inherit; }
 .link-preview-img { width:100%; height:200px; object-fit:contain; display:block; background:var(--bg-mid); }
 
 /* Multi-image grid */
-.img-grid { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; max-width:500px; }
-.img-grid-1 .grid-img { width:400px; max-width:100%; height:260px; }
-.img-grid-2 .grid-img, .img-grid-3 .grid-img, .img-grid-4 .grid-img { width:calc(50% - 2px); height:180px; }
-.grid-img { object-fit:contain; border-radius:4px; cursor:zoom-in; display:block; border:1px solid var(--border); background:var(--bg-mid); }
+/* Images keep their own aspect ratio — the box is sized to the picture
+   (never cropped, never letterboxed) and just capped, Discord-style.
+   Until the picture loads it holds a fixed-size placeholder so the chat
+   doesn't jump around; see sizeLoadedImage(). */
+.img-grid { display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px; margin-top:6px; max-width:520px; }
+.grid-img { display:block; width:auto; height:auto; border-radius:8px; cursor:zoom-in; }
+.img-grid-1 .grid-img { max-width:min(520px,100%); max-height:350px; }
+.img-grid-2 .grid-img, .img-grid-3 .grid-img, .img-grid-4 .grid-img { max-width:calc(50% - 2px); max-height:220px; }
+.grid-img.loading { background:var(--bg-mid); }
+.img-grid-1 .grid-img.loading { width:320px; max-width:100%; height:200px; }
+.img-grid-2 .grid-img.loading, .img-grid-3 .grid-img.loading, .img-grid-4 .grid-img.loading { width:calc(50% - 2px); height:160px; }
 
 .msg-video { width:480px; max-width:100%; height:270px; object-fit:contain; border-radius:8px; margin-top:6px; display:block; border:1px solid var(--border); background:#000; }
 .msg-audio { width:320px; margin-top:6px; display:block; }
@@ -209,8 +224,51 @@ input,button,textarea { font-family:inherit; }
 .msg-dropdown-item.danger:hover { background:rgba(240,71,71,.12); }
 .msg-dropdown-item .dd-label { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* Icons (Material Symbols sprite). Sized in em so they follow the
+   surrounding font size; filled with the current text colour. */
+.ic { width:1.25em; height:1.25em; fill:currentColor; flex-shrink:0; vertical-align:-.25em; }
+.ic.spin { animation:ic-spin 1s linear infinite; }
+@keyframes ic-spin { to { transform:rotate(360deg); } }
+.settings-btn { color:var(--text-muted); }
+.settings-btn:hover { color:var(--text); }
+.settings-btn .ic { width:20px; height:20px; }
+#back-btn, #msg-search-btn, #msg-search-clear, #attach-btn, #send-btn, .msg-action-btn, .clear-results, .remove-btn, .chip-remove { display:inline-flex; align-items:center; justify-content:center; }
+#back-btn .ic { width:18px; height:18px; }
+#attach-btn .ic, #send-btn .ic { width:22px; height:22px; }
+#msg-search-btn .ic, #msg-search-clear .ic { width:16px; height:16px; }
+.msg-action-btn .ic { width:18px; height:18px; }
+.room-arrow { display:inline-flex; }
+.room-arrow .ic { width:14px; height:14px; }
+.room-type-ic, .board-ic { width:16px; height:16px; }
+#toggle-members-btn .ic, #jump-to-present-btn .ic, .btn-add-server .ic { width:18px; height:18px; }
+#drop-overlay .ic { width:28px; height:28px; margin-right:8px; }
+.attach-chip .chip-status { display:inline-flex; }
+.attach-chip .chip-status .ic { width:14px; height:14px; }
+.attach-chip .chip-status .ok { color:var(--green); }
+.attach-chip .chip-status .err { color:var(--red); }
+.chip-remove .ic { width:14px; height:14px; }
+.msg-file-chip .file-ic { width:20px; height:20px; color:var(--text-muted); }
+.msg-file-chip .dl-ic { width:16px; height:16px; color:var(--text-muted); }
+.sr-attach .ic { width:14px; height:14px; }
+.settings-secondary-btn .ic { width:16px; height:16px; margin-right:4px; }
+
 /* Lightbox */
-#lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:200; cursor:zoom-out; }
+#lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
+#lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
+#lightbox-img { max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; transform-origin:center center; cursor:zoom-in; will-change:transform; }
+#lightbox-img.animating { transition:transform .15s ease-out; }
+#lightbox.zoomed #lightbox-img { cursor:grab; }
+#lightbox.zoomed.dragging #lightbox-img { cursor:grabbing; }
+#lb-sender { position:absolute; top:12px; left:16px; display:flex; align-items:center; gap:10px; padding:6px 12px 6px 6px; background:rgba(20,21,24,.85); border:1px solid var(--border); border-radius:10px; z-index:1; max-width:45%; }
+#lb-sender .lb-avatar { width:34px; height:34px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:.85rem; background-size:cover; background-position:center; }
+#lb-sender .lb-name { font-weight:600; color:var(--text-strong); font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#lb-sender .lb-time { font-size:.75rem; color:var(--text-muted); white-space:nowrap; }
+#lb-controls { position:absolute; top:12px; right:16px; display:flex; gap:8px; z-index:1; }
+.lb-group { display:flex; gap:2px; padding:4px; background:rgba(20,21,24,.85); border:1px solid var(--border); border-radius:10px; }
+.lb-btn { width:34px; height:34px; display:flex; align-items:center; justify-content:center; background:none; border:none; border-radius:6px; color:var(--text); cursor:pointer; padding:0; }
+.lb-btn:hover { background:var(--bg-light); color:var(--text-strong); }
+.lb-btn.active { color:var(--accent); }
+.lb-btn .ic { width:22px; height:22px; }
 #settings-modal { position:fixed; inset:0; background:var(--bg-darkest); z-index:500; display:flex; }
 #settings-tabs { width:220px; flex-shrink:0; background:var(--bg-dark); padding:56px 12px 12px; overflow-y:auto; }
 .settings-tab { padding:8px 12px; margin-bottom:2px; border-radius:4px; font-size:.9rem; font-weight:600; color:var(--text-muted); cursor:pointer; }
@@ -235,7 +293,6 @@ input,button,textarea { font-family:inherit; }
 .settings-secondary-btn.active { background:var(--red); border-color:var(--red); color:#fff; }
 #settings-close-btn { position:absolute; top:20px; right:24px; background:none; border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer; padding:6px 10px; border-radius:4px; z-index:1; }
 #settings-close-btn:hover { background:var(--bg-light); color:var(--text); }
-#lightbox img { max-width:92%; max-height:92%; object-fit:contain; border-radius:6px; }
 
 /* Input area */
 #input-area { padding:0 20px 16px; flex-shrink:0; }
@@ -315,6 +372,39 @@ input,button,textarea { font-family:inherit; }
 </style>
 </head>
 <body>
+<!-- UI icons: Google Material Symbols (Outlined, weight 400, unfilled),
+     from github.com/google/material-design-icons @ bd8cb85, Apache License 2.0
+     — see licenses/material-symbols-LICENSE.txt. Used via icon('name') in JS
+     or <svg class="ic"><use href="#ic-name"/></svg> in markup. To swap in
+     your own icon, replace that one <symbol>'s contents (and its viewBox, if
+     your SVG uses a different one); keep it a single-colour shape with no
+     fill set so it follows the text colour. -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
+  <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
+  <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
+  <symbol id="ic-call_end" viewBox="0 -960 960 960"><path d="m136-304-92-90q-12-12-12-28t12-28q88-95 203-142.5T480-640q118 0 232.5 47.5T916-450q12 12 12 28t-12 28l-92 90q-11 11-25.5 12t-26.5-8l-116-88q-8-6-12-14t-4-18v-114q-38-12-78-19t-82-7q-42 0-82 7t-78 19v114q0 10-4 18t-12 14l-116 88q-12 9-26.5 8T136-304Zm104-198q-29 15-56 34.5T128-424l40 40 72-56v-62Zm480 2v60l72 56 40-38q-29-26-56-45t-56-33Zm-480-2Zm480 2Z"/></symbol>
+  <symbol id="ic-check" viewBox="0 -960 960 960"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></symbol>
+  <symbol id="ic-chevron_right" viewBox="0 -960 960 960"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></symbol>
+  <symbol id="ic-close" viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></symbol>
+  <symbol id="ic-description" viewBox="0 -960 960 960"><path d="M320-240h320v-80H320v80Zm0-160h320v-80H320v80ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ic-download" viewBox="0 -960 960 960"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></symbol>
+  <symbol id="ic-error" viewBox="0 -960 960 960"><path d="M480-280q17 0 28.5-11.5T520-320q0-17-11.5-28.5T480-360q-17 0-28.5 11.5T440-320q0 17 11.5 28.5T480-280Zm-40-160h80v-240h-80v240Zm40 360q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ic-folder_open" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640H447l-80-80H160v480l96-320h684L837-217q-8 26-29.5 41.5T760-160H160Zm84-80h516l72-240H316l-72 240Zm0 0 72-240-72 240Zm-84-400v-80 80Z"/></symbol>
+  <symbol id="ic-group" viewBox="0 -960 960 960"><path d="M40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm720 0v-120q0-44-24.5-84.5T666-434q51 6 96 20.5t84 35.5q36 20 55 44.5t19 53.5v120H760ZM360-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Zm400-160q0 66-47 113t-113 47q-11 0-28-2.5t-28-5.5q27-32 41.5-71t14.5-81q0-42-14.5-81T544-792q14-5 28-6.5t28-1.5q66 0 113 47t47 113ZM120-240h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0 320Zm0-400Z"/></symbol>
+  <symbol id="ic-headphones" viewBox="0 -960 960 960"><path d="M360-120H200q-33 0-56.5-23.5T120-200v-280q0-75 28.5-140.5t77-114q48.5-48.5 114-77T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480v280q0 33-23.5 56.5T760-120H600v-320h160v-40q0-117-81.5-198.5T480-760q-117 0-198.5 81.5T200-480v40h160v320Zm-80-240h-80v160h80v-160Zm400 0v160h80v-160h-80Zm-400 0h-80 80Zm400 0h80-80Z"/></symbol>
+  <symbol id="ic-headset_off" viewBox="0 -960 960 960"><path d="m840-234-80-80v-86h-86l-80-80h166v-40q0-118-82-199t-198-81q-44 0-83.5 12.5T324-752l-58-56q45-35 99.5-53.5T480-880q74 0 139.5 28T734-775q49 49 77.5 114.5T840-520v286ZM480-40v-80h247l-40-40h-87v-87L221-626q-9 24-15 51.5t-6 54.5v40h160v320H200q-33 0-56.5-23.5T120-240v-280q0-45 10.5-87t30.5-80L27-820l57-56L875-84v44H480ZM200-240h80v-160h-80v160Zm0-160h80-80Zm474 0h86-86Z"/></symbol>
+  <symbol id="ic-mic" viewBox="0 -960 960 960"><path d="M480-400q-50 0-85-35t-35-85v-240q0-50 35-85t85-35q50 0 85 35t35 85v240q0 50-35 85t-85 35Zm0-240Zm-40 520v-123q-104-14-172-93t-68-184h80q0 83 58.5 141.5T480-320q83 0 141.5-58.5T680-520h80q0 105-68 184t-172 93v123h-80Zm40-360q17 0 28.5-11.5T520-520v-240q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760v240q0 17 11.5 28.5T480-480Z"/></symbol>
+  <symbol id="ic-mic_off" viewBox="0 -960 960 960"><path d="m710-362-58-58q14-23 21-48t7-52h80q0 44-13 83.5T710-362ZM480-594Zm112 112-72-72v-206q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760v126l-80-80v-46q0-50 35-85t85-35q50 0 85 35t35 85v240q0 11-2.5 20t-5.5 18ZM440-120v-123q-104-14-172-93t-68-184h80q0 83 57.5 141.5T480-320q34 0 64.5-10.5T600-360l57 57q-29 23-63.5 39T520-243v123h-80Zm352 64L56-792l56-56 736 736-56 56Z"/></symbol>
+  <symbol id="ic-more_horiz" viewBox="0 -960 960 960"><path d="M240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400Z"/></symbol>
+  <symbol id="ic-progress_activity" viewBox="0 -960 960 960"><path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q17 0 28.5 11.5T520-840q0 17-11.5 28.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q133 0 226.5-93.5T800-480q0-17 11.5-28.5T840-520q17 0 28.5 11.5T880-480q0 82-31.5 155t-86 127.5q-54.5 54.5-127 86T480-80Z"/></symbol>
+  <symbol id="ic-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+  <symbol id="ic-send" viewBox="0 -960 960 960"><path d="M120-160v-640l760 320-760 320Zm80-120 474-200-474-200v140l240 60-240 60v140Zm0 0v-400 400Z"/></symbol>
+  <symbol id="ic-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
+  <symbol id="ic-stop" viewBox="0 -960 960 960"><path d="M320-640v320-320Zm-80 400v-480h480v480H240Zm80-80h320v-320H320v320Z"/></symbol>
+  <symbol id="ic-volume_up" viewBox="0 -960 960 960"><path d="M560-131v-82q90-26 145-100t55-168q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 127-78 224.5T560-131ZM120-360v-240h160l200-200v640L280-360H120Zm440 40v-322q47 22 73.5 66t26.5 96q0 51-26.5 94.5T560-320ZM400-606l-86 86H200v80h114l86 86v-252ZM300-480Z"/></symbol>
+  <symbol id="ic-zoom_in" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Zm-40-60v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></symbol>
+</svg>
 
 <div id="screen-account-gate" class="hidden">
   <div class="gate-card">
@@ -365,10 +455,10 @@ input,button,textarea { font-family:inherit; }
 </div>
 
 <div id="screen-servers" class="hidden">
-  <button class="settings-btn" id="settings-btn-servers" title="Settings">⚙️</button>
+  <button class="settings-btn" id="settings-btn-servers" title="Settings"><svg class="ic" aria-hidden="true"><use href="#ic-settings"/></svg></button>
   <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your homelab, your rules.</p></div>
   <div class="server-list" id="server-list"></div>
-  <button class="btn-add-server" id="open-add-btn">＋  Add a Server</button>
+  <button class="btn-add-server" id="open-add-btn"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg> Add a Server</button>
   <p class="empty-hint hidden" id="no-servers-hint">No servers yet — add one above to get started.</p>
   <div class="signed-in-as" id="signed-in-as"></div>
 </div>
@@ -414,19 +504,19 @@ input,button,textarea { font-family:inherit; }
   <div id="sidebar">
     <div id="sidebar-header">
       <span class="server-name" id="sidebar-server-name">Server</span>
-      <button id="back-btn" title="Back">✕</button>
+      <button id="back-btn" title="Back"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
     </div>
     <div id="room-list"></div>
     <div id="voice-connected-bar" class="hidden">
       <span id="voice-connected-name"></span>
-      <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen">🎧</button>
-      <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone">🎤</button>
-      <button id="voice-leave-btn" class="voice-bar-btn" title="Disconnect from voice">✕</button>
+      <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
+      <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
+      <button id="voice-leave-btn" class="voice-bar-btn" title="Disconnect from voice"><svg class="ic" aria-hidden="true"><use href="#ic-call_end"/></svg></button>
     </div>
     <div id="sidebar-user">
       <div class="user-avatar" id="user-avatar">?</div>
       <span class="user-name" id="user-name-label">username</span>
-      <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
+      <button class="settings-btn" id="settings-btn" title="Settings"><svg class="ic" aria-hidden="true"><use href="#ic-settings"/></svg></button>
       <button class="status-dot-btn" id="status-dot-btn" title="Connected">
         <span class="status-dot" id="status-dot"></span>
       </button>
@@ -439,26 +529,26 @@ input,button,textarea { font-family:inherit; }
   <div id="main-column">
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
-      <button id="toggle-members-btn" title="Toggle member list">👥 Members</button>
+      <button id="toggle-members-btn" title="Toggle member list"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg> Members</button>
       <div id="search-box">
         <input id="msg-search-input" type="text" placeholder="Search" autocomplete="off">
-        <button id="msg-search-clear" class="hidden" title="Clear search">✕</button>
-        <button id="msg-search-btn" title="Search">🔍</button>
+        <button id="msg-search-clear" class="hidden" title="Clear search"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
+        <button id="msg-search-btn" title="Search"><svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg></button>
       </div>
     </div>
     <div id="content-row">
       <div id="chat-main">
-        <div id="drop-overlay" class="hidden">📂 Drop files to attach</div>
+        <div id="drop-overlay" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-folder_open"/></svg> Drop files to attach</div>
         <div id="messages-area">
           <div id="messages"></div>
-          <button id="jump-to-present-btn" class="hidden">↓ Jump to Present</button>
+          <button id="jump-to-present-btn" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-arrow_downward"/></svg> Jump to Present</button>
         </div>
         <div id="input-area">
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
-            <button id="attach-btn" disabled title="Attach files (or drag & drop)">＋</button>
+            <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
             <textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea>
-            <button id="send-btn" disabled>➤</button>
+            <button id="send-btn" disabled title="Send"><svg class="ic" aria-hidden="true"><use href="#ic-send"/></svg></button>
           </div>
         </div>
       </div>
@@ -478,9 +568,19 @@ input,button,textarea { font-family:inherit; }
   </div>
 </div>
 
-<div id="lightbox" class="hidden"><img id="lightbox-img" src="" alt=""></div>
+<div id="lightbox" class="hidden">
+  <div id="lb-sender"><div class="lb-avatar"></div><div style="min-width:0"><div class="lb-name"></div><div class="lb-time"></div></div></div>
+  <div id="lb-controls">
+    <div class="lb-group">
+      <button class="lb-btn" id="lb-zoom" title="Zoom"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_in"/></svg></button>
+      <button class="lb-btn" id="lb-save" title="Save image"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button>
+    </div>
+    <div class="lb-group"><button class="lb-btn" id="lb-close" title="Close"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
+  </div>
+  <div id="lb-stage"><img id="lightbox-img" src="" alt="" draggable="false"></div>
+</div>
 <div id="settings-modal" class="hidden">
-  <button id="settings-close-btn" title="Close (Esc)">✕</button>
+  <button id="settings-close-btn" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
   <div id="settings-tabs">
     <div class="settings-tab" data-tab="profile">Profile</div>
     <div class="settings-tab active" data-tab="voice">Voice</div>
@@ -510,7 +610,7 @@ input,button,textarea { font-family:inherit; }
       <select id="settings-mic-select"><option>Loading devices…</option></select>
       <label class="settings-label">Speaker</label>
       <select id="settings-speaker-select"><option>Loading devices…</option></select>
-      <button id="settings-mic-test-btn" class="settings-secondary-btn">🎙️ Test Voice</button>
+      <button id="settings-mic-test-btn" class="settings-secondary-btn"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg> Test Voice</button>
       <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker — a quick way to check your device selection works before joining an actual call.</p>
     </div>
   </div>
@@ -717,7 +817,7 @@ function renderServers(){
     card.innerHTML=`<div class="server-icon" style="background:${colour}">${initial}</div>
       <div class="server-info"><div class="name">${esc(s.display_name||s.domain)}</div><div class="domain">${esc(s.domain)}</div>${s.last_username?`<div class="lastuser">@${esc(s.last_username)}</div>`:''}</div>
       <div class="server-actions">
-        <button class="btn btn-ghost btn-sm remove-btn" data-domain="${esc(s.domain)}">✕</button>
+        <button class="btn btn-ghost btn-sm remove-btn" data-domain="${esc(s.domain)}" title="Remove">${icon('close')}</button>
         <button class="btn btn-primary btn-sm connect-server-btn" data-domain="${esc(s.domain)}" data-key="${esc(s.server_key)}">Connect</button>
       </div>`;
     card.querySelector('.connect-server-btn').addEventListener('click',async e=>{
@@ -954,7 +1054,7 @@ function renderSidebar(){
     const isOpen=state.expandedRooms.has(room.id),boards=state.boardsByRoom[room.id]??null;
     const isVoiceRoom=room.room_type==='voice';
     const header=document.createElement('div');header.className='room-header';
-    header.innerHTML=`<span class="room-arrow ${isOpen?'open':''}">▶</span> ${isVoiceRoom?'🔊 ':''}${esc(room.name)}`;
+    header.innerHTML=`<span class="room-arrow ${isOpen?'open':''}">${icon('chevron_right')}</span>${isVoiceRoom?icon('volume_up','room-type-ic'):''}<span class="room-name">${esc(room.name)}</span>`;
     header.addEventListener('click',()=>toggleRoom(room.id));list.appendChild(header);
     if(isOpen){
       if(boards===null){const l=document.createElement('div');l.style.cssText='padding:4px 12px';l.innerHTML='<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>';list.appendChild(l);}
@@ -968,7 +1068,7 @@ function renderSidebar(){
         if(!isJoined)for(const k of Object.keys(state.voiceSpeaking))if(k.startsWith(board.id+':'))delete state.voiceSpeaking[k];
         const item=document.createElement('div');
         item.className='voice-item'+(isJoined?' joined':'');
-        item.innerHTML=`<span>🔊</span><span class="board-name">${esc(board.name)}</span>${occupants.length?`<span class="voice-count">${occupants.length}</span>`:''}`;
+        item.innerHTML=`${icon('volume_up','board-ic')}<span class="board-name">${esc(board.name)}</span>${occupants.length?`<span class="voice-count">${occupants.length}</span>`:''}`;
         item.addEventListener('click',()=>toggleVoiceChannel(board.id));
         list.appendChild(item);
         if(occupants.length){
@@ -978,8 +1078,12 @@ function renderSidebar(){
             const key=`${board.id}:${user}`;
             const speaking=!!state.voiceSpeaking[key];
             const status=state.voiceMuteStatus[key]||{muted:false,deafened:false};
-            const statusIcon=status.deafened?'🎧':(status.muted?'🎤':'');
-            row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span>${statusIcon?`<span class="voice-occupant-status">${statusIcon}</span>`:''}`;
+            // Mic + headphones always shown beside each name: grey while
+            // on, the struck-through version in red while muted/deafened.
+            const statusIcons=
+              (status.muted?icon('mic_off','off'):icon('mic'))+
+              (status.deafened?icon('headset_off','off'):icon('headphones'));
+            row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
             list.appendChild(row);
             applyUserAvatar(row.querySelector('.voice-occupant-avatar'),user);
           });
@@ -1037,7 +1141,7 @@ function updateVoiceConnectedBar(){
     const b=(list||[]).find(b=>b.id===boardId);
     if(b){boardName=b.name;break;}
   }
-  document.getElementById('voice-connected-name').textContent=`🔊 ${boardName}`;
+  document.getElementById('voice-connected-name').innerHTML=`${icon('volume_up')}<span>${esc(boardName)}</span>`;
   bar.classList.remove('hidden');
   window.go.main.App.IsMuted().then(setMuteButtonState).catch(()=>{});
   window.go.main.App.IsDeafened().then(setDeafenButtonState).catch(()=>{});
@@ -1047,12 +1151,14 @@ function setMuteButtonState(muted){
   if(!btn)return;
   btn.title=muted?'Unmute microphone':'Mute microphone';
   btn.classList.toggle('muted',muted);
+  btn.innerHTML=icon(muted?'mic_off':'mic');
 }
 function setDeafenButtonState(deafened){
   const btn=document.getElementById('voice-deafen-btn');
   if(!btn)return;
   btn.title=deafened?'Undeafen':'Deafen';
   btn.classList.toggle('muted',deafened);
+  btn.innerHTML=icon(deafened?'headset_off':'headphones');
 }
 async function toggleDeafen(){
   try{
@@ -1095,14 +1201,14 @@ async function toggleMicTest(){
   try{
     await window.go.main.App.StartMicTest(micLabel,speakerLabel);
     micTestRunning=true;
-    btn.textContent='⏹ Stop Test';
+    btn.innerHTML=`${icon('stop')} Stop Test`;
     btn.classList.add('active');
   }catch(err){toast('Could not start mic test: '+err,true);}
 }
 function stopMicTest(){
   micTestRunning=false;
   const btn=document.getElementById('settings-mic-test-btn');
-  btn.textContent='🎙️ Test Voice';
+  btn.innerHTML=`${icon('mic')} Test Voice`;
   btn.classList.remove('active');
   window.go.main.App.StopMicTest().catch(()=>{});
 }
@@ -1473,12 +1579,12 @@ function renderAttachQueue(){
       // before (and independent of) the upload finishing.
       chip=document.createElement('div');chip.className='attach-tile '+item.status;
       const status=item.status==='pending'?'Uploading…':item.status==='error'?'Failed':'';
-      chip.innerHTML=`<div class="tile-img"></div>${status?`<span class="tile-status">${status}</span>`:''}<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">✕</button>`;
+      chip.innerHTML=`<div class="tile-img"></div>${status?`<span class="tile-status">${status}</span>`:''}<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
       chip.querySelector('.tile-img').style.backgroundImage=`url("${item.preview}")`;
     }else{
       chip=document.createElement('div');chip.className='attach-chip';
-      const statusText=item.status==='pending'?'⏳':item.status==='error'?'✗':'✓';
-      chip.innerHTML=`<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><span class="chip-status">${statusText}</span><button class="chip-remove" data-id="${item.id}">✕</button>`;
+      const statusIcon=item.status==='pending'?icon('progress_activity','spin'):item.status==='error'?icon('error','err'):icon('check','ok');
+      chip.innerHTML=`<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><span class="chip-status">${statusIcon}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
     }
     chip.querySelector('.chip-remove').addEventListener('click',e=>{e.stopPropagation();const id=+e.currentTarget.dataset.id;state.attachQueue=state.attachQueue.filter(a=>a.id!==id);renderAttachQueue();});
     el.appendChild(chip);
@@ -1540,7 +1646,7 @@ function initDragDrop(){
 
     // Fallback: browser File API doesn't give native paths in Wails.
     // Tell the user to use the attach button instead.
-    toast('Drag & drop requires using the ＋ button in this version of Wails. Use ＋ to attach files.',true);
+    toast('Drag & drop requires using the + button in this version of Wails. Use + to attach files.',true);
   });
 
   // Register Wails native drop handler if available.
@@ -1758,7 +1864,7 @@ function showSearchResults(results,q){
 
   const summary=document.getElementById('results-summary');
   summary.innerHTML=`<span>${results.length} result${results.length===1?'':'s'} for "${esc(q)}"</span>`+
-    `<button class="clear-results" title="Back to members">✕</button>`;
+    `<button class="clear-results" title="Back to members">${icon('close')}</button>`;
   summary.querySelector('.clear-results').addEventListener('click',exitSearch);
 
   const list=document.getElementById('results-list');list.innerHTML='';
@@ -1885,7 +1991,7 @@ function buildSearchResultRow(msg){
   row.innerHTML=`
     <div class="sr-head"><div class="sr-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
     ${msg.content?`<div class="sr-content">${esc(msg.content)}</div>`:''}
-    ${hasAttach?'<div class="sr-attach">📎 Attachment</div>':''}`;
+    ${hasAttach?`<div class="sr-attach">${icon('attach_file')} Attachment</div>`:''}`;
   applyUserAvatar(row.querySelector('.sr-avatar'),msg.username);
   row.addEventListener('click',()=>jumpToSearchResult(msg));
   return row;
@@ -1910,7 +2016,7 @@ function buildMsgEl(msg,grouped){
       </div>
       ${msg.content?`<div class="msg-content">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
-    ${(isOwn||attachments.length)?`<div class="msg-actions"><button class="msg-action-btn" title="More options">⋯</button></div>`:''}`;
+    ${(isOwn||attachments.length)?`<div class="msg-actions"><button class="msg-action-btn" title="More options">${icon('more_horiz')}</button></div>`:''}`;
 
   // Grouped follow-up messages show a hover timestamp instead of an
   // avatar, so there's only something to apply on a group's first message.
@@ -1930,9 +2036,10 @@ function buildMsgEl(msg,grouped){
     const grid=document.createElement('div');
     grid.className=`img-grid img-grid-${Math.min(images.length,4)}`;
     images.slice(0,4).forEach(a=>{
-      const img=document.createElement('img');img.className='grid-img';img.alt=a.name||'image';
+      const img=document.createElement('img');img.className='grid-img loading';img.alt=a.name||'image';
+      img.addEventListener('load',()=>sizeLoadedImage(img),{once:true});
       getImageBlobURL(a.url).then(url=>{img.src=url;}).catch(err=>console.error('image load failed:',err));
-      img.addEventListener('click',()=>getImageBlobURL(a.url).then(url=>openLightbox(url)).catch(()=>{}));
+      img.addEventListener('click',()=>getImageBlobURL(a.url).then(url=>openLightbox(url,a,msg)).catch(()=>{}));
       grid.appendChild(img);
     });
     body.appendChild(grid);
@@ -1948,7 +2055,7 @@ function buildMsgEl(msg,grouped){
       attachMediaSource(aud,a.url);body.appendChild(aud);
     }else{
       const chip=document.createElement('div');chip.className='msg-file-chip';
-      chip.innerHTML=`<span>📄</span><span class="fname">${esc(a.name||'File')}</span><span style="color:var(--text-muted);font-size:.75rem;margin-left:4px">↓</span>`;
+      chip.innerHTML=`${icon('description','file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
       chip.addEventListener('click',()=>downloadAttachment(a));
       body.appendChild(chip);
     }
@@ -2183,7 +2290,136 @@ function attachMediaSource(el,rel){
     }catch(err){console.error('media link refresh failed:',err);}
   });
 }
-function openLightbox(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').classList.remove('hidden');}
+// Swaps a message image from its loading placeholder to its real size
+// without the chat jumping: if you were at the bottom you stay there, and
+// if the image is above what you're reading, the scroll position absorbs
+// the change in height so the text on screen doesn't move.
+function sizeLoadedImage(img){
+  const c=document.getElementById('messages');
+  if(!img.isConnected||!c||!c.contains(img)){img.classList.remove('loading');return;}
+  const wasNearBottom=(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
+  const before=img.getBoundingClientRect();
+  img.classList.remove('loading');
+  if(wasNearBottom){c.scrollTop=c.scrollHeight;return;}
+  const delta=img.getBoundingClientRect().height-before.height;
+  if(delta&&before.bottom<=c.getBoundingClientRect().top)c.scrollTop+=delta;
+}
+
+// Markup for a UI icon from the sprite at the top of <body>.
+function icon(name,cls=''){return `<svg class="ic${cls?' '+cls:''}" aria-hidden="true"><use href="#ic-${name}"/></svg>`;}
+
+// ── LIGHTBOX ──────────────────────────────────────────────────────
+// Discord-style image viewer: sender card top-left (avatar, name, when it
+// was sent), controls top-right (zoom, save, close). Zoom starts from the
+// fitted preview: the zoom button / double-click toggle 2x at the point
+// clicked, the mouse wheel zooms smoothly around the cursor (1x–8x), and a
+// zoomed image can be dragged around. Clicking anywhere that isn't the
+// image or a control closes it, as does Escape.
+const LB_MAX_ZOOM=8, LB_STEP_ZOOM=2;
+const lb={open:false,scale:1,tx:0,ty:0,drag:null,dragged:false,attach:null};
+function openLightbox(src,attach,msg){
+  const box=document.getElementById('lightbox'),img=document.getElementById('lightbox-img');
+  lb.attach=attach||null;
+  lbReset(false);
+  img.src=src;
+  const sender=document.getElementById('lb-sender');
+  if(msg){
+    sender.style.display='';
+    const av=sender.querySelector('.lb-avatar');
+    av.dataset.pfpUser=msg.username;
+    setAvatarFallback(av,msg.username);
+    applyUserAvatar(av,msg.username);
+    sender.querySelector('.lb-name').textContent=msg.username;
+    const date=formatDateSeparator(msg.created_at),time=formatTime(msg.created_at);
+    sender.querySelector('.lb-time').textContent=date&&time?`${date} at ${time}`:(date||time);
+  }else sender.style.display='none';
+  document.getElementById('lb-save').style.display=attach?'':'none';
+  box.classList.remove('hidden');lb.open=true;
+}
+function closeLightbox(){
+  if(!lb.open)return;
+  lb.open=false;lb.drag=null;
+  const box=document.getElementById('lightbox');
+  box.classList.add('hidden');box.classList.remove('dragging');
+  document.getElementById('lightbox-img').src='';
+}
+function lbApply(animate){
+  const img=document.getElementById('lightbox-img');
+  img.classList.toggle('animating',!!animate);
+  img.style.transform=`translate(${lb.tx}px,${lb.ty}px) scale(${lb.scale})`;
+  document.getElementById('lightbox').classList.toggle('zoomed',lb.scale>1);
+  document.getElementById('lb-zoom').classList.toggle('active',lb.scale>1);
+}
+function lbReset(animate=true){lb.scale=1;lb.tx=0;lb.ty=0;lbApply(animate);}
+// Keeps a zoomed image from being dragged off-screen: it can pan only as
+// far as it overflows the stage, and sits centred on any axis it doesn't.
+function lbClampPan(){
+  const img=document.getElementById('lightbox-img'),stage=document.getElementById('lb-stage');
+  const maxX=Math.max(0,(img.offsetWidth*lb.scale-stage.clientWidth)/2);
+  const maxY=Math.max(0,(img.offsetHeight*lb.scale-stage.clientHeight)/2);
+  lb.tx=Math.min(maxX,Math.max(-maxX,lb.tx));
+  lb.ty=Math.min(maxY,Math.max(-maxY,lb.ty));
+}
+// Zooms to `scale`, keeping the point under client coords (cx,cy) fixed.
+function lbZoomAt(scale,cx,cy,animate){
+  scale=Math.min(LB_MAX_ZOOM,Math.max(1,scale));
+  const r=document.getElementById('lightbox-img').getBoundingClientRect();
+  const k=scale/lb.scale;
+  lb.tx+=(cx-(r.left+r.width/2))*(1-k);
+  lb.ty+=(cy-(r.top+r.height/2))*(1-k);
+  lb.scale=scale;
+  if(scale===1){lb.tx=0;lb.ty=0;}
+  lbClampPan();lbApply(animate);
+}
+function lbToggleZoom(cx,cy){
+  if(lb.scale>1){lbReset();return;}
+  const r=document.getElementById('lightbox-img').getBoundingClientRect();
+  lbZoomAt(LB_STEP_ZOOM,cx??r.left+r.width/2,cy??r.top+r.height/2,true);
+}
+function initLightbox(){
+  const box=document.getElementById('lightbox'),img=document.getElementById('lightbox-img');
+  document.getElementById('lb-close').addEventListener('click',closeLightbox);
+  document.getElementById('lb-zoom').addEventListener('click',()=>lbToggleZoom());
+  document.getElementById('lb-save').addEventListener('click',()=>{if(lb.attach)downloadAttachment(lb.attach);});
+  // Close on the backdrop only — not the image, the sender card or controls.
+  box.addEventListener('click',e=>{
+    // A pan that started on the image and was released over the backdrop
+    // produces a click there too — that's the end of a drag, not a close.
+    if(lb.dragged){lb.dragged=false;return;}
+    if(e.target.closest('#lb-controls,#lb-sender')||e.target===img)return;
+    closeLightbox();
+  });
+  img.addEventListener('dblclick',e=>lbToggleZoom(e.clientX,e.clientY));
+  box.addEventListener('wheel',e=>{
+    if(!lb.open)return;
+    e.preventDefault();
+    lbZoomAt(lb.scale*Math.exp(-e.deltaY*0.0015),e.clientX,e.clientY,false);
+  },{passive:false});
+  img.addEventListener('mousedown',e=>{
+    if(e.button!==0||lb.scale<=1)return;
+    e.preventDefault();
+    lb.drag={x:e.clientX,y:e.clientY,tx:lb.tx,ty:lb.ty};
+    lb.dragged=false;
+    box.classList.add('dragging');
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!lb.drag)return;
+    if(Math.abs(e.clientX-lb.drag.x)+Math.abs(e.clientY-lb.drag.y)>3)lb.dragged=true;
+    lb.tx=lb.drag.tx+(e.clientX-lb.drag.x);
+    lb.ty=lb.drag.ty+(e.clientY-lb.drag.y);
+    lbClampPan();lbApply(false);
+  });
+  window.addEventListener('mouseup',()=>{if(lb.drag){lb.drag=null;box.classList.remove('dragging');}});
+  window.addEventListener('resize',()=>{if(lb.open){lbClampPan();lbApply(false);}});
+  // Capture phase, so Escape closes just the viewer and doesn't also fall
+  // through to closing search/modals behind it.
+  document.addEventListener('keydown',e=>{
+    if(!lb.open)return;
+    if(e.key==='Escape'){e.stopImmediatePropagation();closeLightbox();}
+    else if(e.key==='+'||e.key==='='){lbZoomAt(lb.scale*1.25,innerWidth/2,innerHeight/2,true);}
+    else if(e.key==='-'){lbZoomAt(lb.scale/1.25,innerWidth/2,innerHeight/2,true);}
+  },true);
+}
 function formatTime(iso){if(!iso)return'';try{return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return'';}}
 // Calendar-day key for comparing whether two messages fall on the same day,
 // in the viewer's local time zone (not UTC) — matches how someone actually
@@ -2335,7 +2571,7 @@ function init(){
   document.addEventListener('click',()=>closeDropdown());
   document.getElementById('status-dot-btn').addEventListener('click',togglePingPopover);
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
-  document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.add('hidden'));
+  initLightbox();
   document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();updateJumpToPresentVisibility();});
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
   document.getElementById('voice-deafen-btn').addEventListener('click',toggleDeafen);
