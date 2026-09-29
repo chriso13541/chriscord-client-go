@@ -192,12 +192,7 @@ func (a *App) ReadImageAsDataURL(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	mime := "image/png"
-	lower := strings.ToLower(path)
-	if strings.HasSuffix(lower, ".jpg") || strings.HasSuffix(lower, ".jpeg") {
-		mime = "image/jpeg"
-	}
-	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+	return pfpDataURL(data), nil
 }
 
 // GetProfilePicture returns the current account's own profile picture as
@@ -220,13 +215,38 @@ func (a *App) GetProfilePicture() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("pfp is set (%s) but couldn't be read: %w", path, err)
 	}
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
+	return pfpDataURL(data), nil
 }
 
-// SaveProfilePicture decodes a PNG data URL — the cropped result from the
+// maxPfpBytes caps a saved/uploaded pfp. The cropper's output is far
+// smaller than this (1024px max); it mainly guards against an oversized
+// file copied in raw at account creation. Matches the server's own cap.
+const maxPfpBytes = 8 << 20
+
+// pfpMime sniffs the real image type from the bytes themselves rather than
+// trusting a file name — pfp.png keeps its name inside account bundles for
+// compatibility with existing exports, but may hold a JPEG now.
+func pfpMime(data []byte) string {
+	switch mime := http.DetectContentType(data); mime {
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
+		return mime
+	default:
+		return ""
+	}
+}
+
+func pfpDataURL(data []byte) string {
+	mime := pfpMime(data)
+	if mime == "" {
+		mime = "image/png"
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
+}
+
+// SaveProfilePicture decodes an image data URL — the cropped result from the
 // frontend's own canvas — and saves it as the current account's pfp.png,
 // overwriting any existing one.
-func (a *App) SaveProfilePicture(pngDataURL string) error {
+func (a *App) SaveProfilePicture(dataURL string) error {
 	a.mu.Lock()
 	slug := ""
 	if a.account != nil {
@@ -236,13 +256,19 @@ func (a *App) SaveProfilePicture(pngDataURL string) error {
 	if slug == "" {
 		return fmt.Errorf("no account unlocked")
 	}
-	const prefix = "data:image/png;base64,"
-	if !strings.HasPrefix(pngDataURL, prefix) {
-		return fmt.Errorf("expected a PNG data URL")
+	comma := strings.Index(dataURL, ",")
+	if !strings.HasPrefix(dataURL, "data:image/") || comma < 0 || !strings.HasSuffix(dataURL[:comma], ";base64") {
+		return fmt.Errorf("expected a base64 image data URL")
 	}
-	data, err := base64.StdEncoding.DecodeString(pngDataURL[len(prefix):])
+	data, err := base64.StdEncoding.DecodeString(dataURL[comma+1:])
 	if err != nil {
 		return fmt.Errorf("invalid image data: %w", err)
+	}
+	if m := pfpMime(data); m != "image/png" && m != "image/jpeg" {
+		return fmt.Errorf("only PNG and JPEG profile pictures are supported for now")
+	}
+	if len(data) > maxPfpBytes {
+		return fmt.Errorf("profile picture is too large (%d MB max)", maxPfpBytes>>20)
 	}
 	dir := filepath.Join(accountsDir(), slug)
 	dest := filepath.Join(dir, "pfp.png")
@@ -297,6 +323,10 @@ func (a *App) handlePfpRequest() {
 		log.Printf("pfp: failed to read own pfp for upload: %v", err)
 		return
 	}
+	if len(data) > maxPfpBytes {
+		log.Printf("pfp: own pfp is %d bytes, over the %d byte limit — re-save it from settings to shrink it", len(data), maxPfpBytes)
+		return
+	}
 	log.Printf("pfp: uploading %d bytes read from %s", len(data), path)
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
@@ -340,7 +370,7 @@ func (a *App) FetchUserPfp(username string) (string, error) {
 		return "", err
 	}
 	log.Printf("pfp: fetched %d bytes for %s", len(data), username)
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
+	return pfpDataURL(data), nil
 }
 
 func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {

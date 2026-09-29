@@ -84,7 +84,7 @@ input,button,textarea { font-family:inherit; }
 .voice-item.joined { color:var(--green); }
 .voice-count { margin-left:auto; font-size:.79rem; color:var(--text-muted); background:var(--bg-mid); border-radius:8px; padding:1px 6px; flex-shrink:0; }
 .voice-occupant-row { display:flex; align-items:center; gap:6px; padding:2px 12px 2px 30px; }
-.voice-occupant-avatar { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#fff; flex-shrink:0; }
+.voice-occupant-avatar { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#fff; flex-shrink:0; background-size:cover; background-position:center; }
 .voice-occupant-name { font-size:.86rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .voice-occupant-avatar.speaking { box-shadow:0 0 0 2px var(--green); }
 .voice-occupant-status { margin-left:auto; font-size:.72rem; flex-shrink:0; color:var(--red); }
@@ -966,7 +966,7 @@ function renderSidebar(){
             const speaking=!!state.voiceSpeaking[key];
             const status=state.voiceMuteStatus[key]||{muted:false,deafened:false};
             const statusIcon=status.deafened?'🎧':(status.muted?'🎤':'');
-            row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" style="background:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span>${statusIcon?`<span class="voice-occupant-status">${statusIcon}</span>`:''}`;
+            row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span>${statusIcon?`<span class="voice-occupant-status">${statusIcon}</span>`:''}`;
             list.appendChild(row);
             applyUserAvatar(row.querySelector('.voice-occupant-avatar'),user);
           });
@@ -1094,23 +1094,18 @@ function switchSettingsTab(name){
 // object-fit:cover), the user can drag to reposition and use a slider to
 // zoom in further, and panning is clamped so the image can never be
 // dragged to reveal empty space at the edges. Saving renders exactly what
-// the viewport shows onto a same-size canvas with a circular clip, so the
-// exported PNG matches the on-screen preview exactly.
+// the viewport shows, but at the SOURCE image's resolution (capped at
+// PFP_MAX_SIZE) rather than the 256px viewport's, and as a plain square —
+// the circle is purely a display-time CSS border-radius, same as Discord.
 const PFP_VIEWPORT=256;
-const pfpCrop={img:null,naturalW:0,naturalH:0,baseScale:1,zoom:1,tx:0,ty:0,dragging:false,startX:0,startY:0,startTx:0,startTy:0};
+const pfpCrop={img:null,srcDataUrl:'',srcMime:'image/png',naturalW:0,naturalH:0,baseScale:1,zoom:1,tx:0,ty:0,dragging:false,startX:0,startY:0,startTx:0,startTy:0};
 
 async function loadCurrentPfp(){
   const circle=document.getElementById('pfp-current-circle');
   let dataUrl='';
   try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){console.error('GetProfilePicture failed:',err);}
-  if(dataUrl){
-    circle.style.backgroundImage=`url("${dataUrl}")`;
-    circle.textContent='';
-  }else{
-    circle.style.backgroundImage='';
-    circle.style.background=avatarColour(state.username||'?');
-    circle.textContent=(state.username||'?')[0].toUpperCase();
-  }
+  if(dataUrl)setAvatarImage(circle,dataUrl);
+  else setAvatarFallback(circle,state.username);
 }
 
 async function pickNewPfp(){
@@ -1126,6 +1121,8 @@ function openPfpCropper(dataUrl){
   const img=document.getElementById('pfp-cropper-img');
   img.onload=()=>{
     pfpCrop.img=img;
+    pfpCrop.srcDataUrl=dataUrl;
+    pfpCrop.srcMime=dataUrl.startsWith('data:image/jpeg')?'image/jpeg':'image/png';
     pfpCrop.naturalW=img.naturalWidth;
     pfpCrop.naturalH=img.naturalHeight;
     pfpCrop.baseScale=Math.max(PFP_VIEWPORT/pfpCrop.naturalW,PFP_VIEWPORT/pfpCrop.naturalH);
@@ -1200,22 +1197,42 @@ function closePfpCropper(){
   pfpCrop.img=null;
 }
 
+// Largest side a saved pfp is stored at. Plenty for any display size here
+// (and HiDPI), while keeping uploads to a few hundred KB-ish.
+const PFP_MAX_SIZE=1024;
+
+// Returns a data URL for exactly the square region the viewport shows.
+// If that region is the whole, untouched source image (already square, no
+// zoom, not larger than PFP_MAX_SIZE), the original file's bytes are kept
+// as-is — zero re-encoding loss, and the same path a future animated pfp
+// would take, since a canvas re-encode would flatten it to one frame.
+// Otherwise the crop is drawn at source resolution (capped) and encoded in
+// the source's own format: JPEG photos stay JPEG (a 1024px photo as PNG
+// would be several MB), PNGs stay PNG to keep transparency.
+function renderPfpCrop(){
+  const scale=pfpCrop.baseScale*pfpCrop.zoom;
+  const srcX=-pfpCrop.tx/scale, srcY=-pfpCrop.ty/scale, srcSide=PFP_VIEWPORT/scale;
+  const untouched=pfpCrop.naturalW===pfpCrop.naturalH && pfpCrop.zoom===1
+    && pfpCrop.naturalW<=PFP_MAX_SIZE && pfpCrop.srcDataUrl;
+  if(untouched)return pfpCrop.srcDataUrl;
+  const outSide=Math.max(1,Math.min(PFP_MAX_SIZE,Math.round(srcSide)));
+  const canvas=document.createElement('canvas');
+  canvas.width=outSide;canvas.height=outSide;
+  const ctx=canvas.getContext('2d');
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  ctx.drawImage(pfpCrop.img,srcX,srcY,srcSide,srcSide,0,0,outSide,outSide);
+  return pfpCrop.srcMime==='image/jpeg'
+    ? canvas.toDataURL('image/jpeg',0.92)
+    : canvas.toDataURL('image/png');
+}
+
 async function savePfpCrop(){
   const btn=document.getElementById('pfp-save-btn');
   btn.disabled=true;
   let dataUrl;
   try{
-    const canvas=document.createElement('canvas');
-    canvas.width=PFP_VIEWPORT;canvas.height=PFP_VIEWPORT;
-    const ctx=canvas.getContext('2d');
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(PFP_VIEWPORT/2,PFP_VIEWPORT/2,PFP_VIEWPORT/2,0,Math.PI*2);
-    ctx.clip();
-    const scale=pfpCrop.baseScale*pfpCrop.zoom;
-    ctx.drawImage(pfpCrop.img,pfpCrop.tx,pfpCrop.ty,pfpCrop.naturalW*scale,pfpCrop.naturalH*scale);
-    ctx.restore();
-    dataUrl=canvas.toDataURL('image/png');
+    dataUrl=renderPfpCrop();
   }catch(err){
     console.error('pfp crop render failed:',err);
     toast('Could not render the cropped image: '+err,true);
@@ -1226,10 +1243,9 @@ async function savePfpCrop(){
   // on a round trip to the backend and back just to redisplay what we
   // already have — also means a save failure below doesn't make what you
   // just cropped look like it silently vanished.
-  document.getElementById('pfp-current-circle').style.backgroundImage=`url("${dataUrl}")`;
-  document.getElementById('pfp-current-circle').textContent='';
+  setAvatarImage(document.getElementById('pfp-current-circle'),dataUrl);
   const av=document.getElementById('user-avatar');
-  if(av){av.style.backgroundImage=`url("${dataUrl}")`;av.textContent='';}
+  if(av)setAvatarImage(av,dataUrl);
   closePfpCropper();
   try{
     await window.go.main.App.SaveProfilePicture(dataUrl);
@@ -1249,14 +1265,28 @@ async function updateSidebarAvatar(){
   if(!av)return;
   let dataUrl='';
   try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){console.error('GetProfilePicture failed:',err);}
-  if(dataUrl){
-    av.style.backgroundImage=`url("${dataUrl}")`;
-    av.textContent='';
-  }else{
-    av.style.backgroundImage='';
-    av.textContent=state.username[0].toUpperCase();
-    av.style.background=avatarColour(state.username);
-  }
+  if(dataUrl)setAvatarImage(av,dataUrl);
+  else setAvatarFallback(av,state.username);
+}
+
+// Every avatar element gets its picture through these two helpers. The
+// earlier code mixed the inline `background:` shorthand (for the colour)
+// with a later `style.backgroundImage` — but the shorthand also resets
+// background-size/position inline, overriding the class's `cover`, so the
+// picture rendered at full size and only its top-left corner (transparent,
+// on the old circle-clipped PNGs) showed through. Setting size/position
+// explicitly here makes that impossible regardless of markup.
+function setAvatarImage(el,url){
+  el.style.backgroundImage=`url("${url}")`;
+  el.style.backgroundSize='cover';
+  el.style.backgroundPosition='center';
+  el.textContent='';
+}
+function setAvatarFallback(el,name){
+  name=name||'?';
+  el.style.backgroundImage='';
+  el.style.backgroundColor=avatarColour(name);
+  el.textContent=name[0].toUpperCase();
 }
 
 // Applies another user's cached pfp to an avatar element if we have one on
@@ -1273,8 +1303,7 @@ function applyUserAvatar(el,user){
   if(!el)return;
   const cached=state.userPfps[user];
   if(cached){
-    el.style.backgroundImage=`url("${cached}")`;
-    el.textContent='';
+    setAvatarImage(el,cached);
     return;
   }
   if(user in state.userPfps || pfpFetchInFlight.has(user))return;
@@ -1284,13 +1313,13 @@ function applyUserAvatar(el,user){
     state.userPfps[user]=dataUrl||'';
     pfpFetchInFlight.delete(user);
     if(dataUrl){
-      // Re-query rather than reuse the `el` passed in above — the
-      // occupant list may well have re-rendered while this fetch was in
-      // flight, making that original element stale.
-      document.querySelectorAll(`.voice-occupant-row[data-user="${CSS.escape(user)}"] .voice-occupant-avatar`).forEach(a=>{
-        a.style.backgroundImage=`url("${dataUrl}")`;
-        a.textContent='';
-      });
+      // Re-query rather than reuse the `el` passed in above — the list
+      // may have re-rendered while this fetch was in flight, making that
+      // element stale. Matches EVERY avatar for this user (voice occupant
+      // list AND the online/offline member list) via data-pfp-user; the
+      // old selector only covered voice rows, so member-list avatars
+      // never got their picture after the first fetch.
+      document.querySelectorAll(`[data-pfp-user="${CSS.escape(user)}"]`).forEach(a=>setAvatarImage(a,dataUrl));
     }
   }).catch(()=>{pfpFetchInFlight.delete(user);});
 }
@@ -1392,7 +1421,7 @@ function renderMembers(payload){
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" style="background:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}</span><div class="member-dot ${isOnline?'online':'offline'}" style="margin-left:auto"></div>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}</span><div class="member-dot ${isOnline?'online':'offline'}" style="margin-left:auto"></div>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
@@ -2103,8 +2132,7 @@ function init(){
   });
   window.runtime.EventsOn('pfp:updated',e=>{
     delete state.userPfps[e.username];
-    document.querySelectorAll(`.voice-occupant-row[data-user="${CSS.escape(e.username)}"] .voice-occupant-avatar`).forEach(el=>applyUserAvatar(el,e.username));
-    document.querySelectorAll(`.member-row[data-user="${CSS.escape(e.username)}"] .user-avatar`).forEach(el=>applyUserAvatar(el,e.username));
+    document.querySelectorAll(`[data-pfp-user="${CSS.escape(e.username)}"]`).forEach(el=>applyUserAvatar(el,e.username));
   });
   window.runtime.EventsOn('voice:connectionState',connState=>{
     if(connState==='failed'||connState==='disconnected'){
