@@ -242,10 +242,6 @@ input,button,textarea { font-family:inherit; }
 .room-type-ic, .board-ic { width:16px; height:16px; }
 #toggle-members-btn .ic, #jump-to-present-btn .ic, .btn-add-server .ic { width:18px; height:18px; }
 #drop-overlay .ic { width:28px; height:28px; margin-right:8px; }
-.attach-chip .chip-status { display:inline-flex; }
-.attach-chip .chip-status .ic { width:14px; height:14px; }
-.attach-chip .chip-status .ok { color:var(--green); }
-.attach-chip .chip-status .err { color:var(--red); }
 .chip-remove .ic { width:14px; height:14px; }
 .msg-file-chip .file-ic { width:20px; height:20px; color:var(--text-muted); }
 .msg-file-chip .dl-ic { width:16px; height:16px; color:var(--text-muted); }
@@ -296,23 +292,25 @@ input,button,textarea { font-family:inherit; }
 
 /* Input area */
 #input-area { padding:0 20px 16px; flex-shrink:0; }
-#attach-queue { display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; padding:8px 14px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px 8px 0 0; border-bottom:none; }
+#attach-queue { display:flex; flex-wrap:wrap; align-items:flex-start; gap:14px; padding:16px 16px 12px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px 8px 0 0; border-bottom:none; }
 #attach-queue.empty { display:none; }
 #attach-queue:not(.empty) + #input-wrap { border-radius:0 0 8px 8px; }
-.attach-chip { display:flex; align-items:center; gap:6px; background:var(--bg-light); border:1px solid var(--border); border-radius:6px; padding:4px 8px; font-size:.8rem; color:var(--text); max-width:200px; }
-/* Image attachments get a Discord-style preview tile instead of a chip */
-.attach-tile { position:relative; display:flex; flex-direction:column; gap:4px; width:150px; padding:6px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; font-size:.75rem; color:var(--text); }
-.attach-tile .tile-img { width:100%; height:120px; border-radius:4px; background:var(--bg-dark) center/contain no-repeat; }
-.attach-tile.pending .tile-img { opacity:.5; }
-.attach-tile.error .tile-img { opacity:.35; outline:2px solid var(--red); }
+/* Every attachment is a Discord-style tile: a picture/video thumbnail, or
+   a large file-type icon for everything else, with the name underneath. */
+.attach-tile { position:relative; display:flex; flex-direction:column; gap:6px; width:160px; padding:8px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; font-size:.75rem; color:var(--text); }
+.attach-tile .tile-thumb { position:relative; width:100%; height:120px; border-radius:4px; background:var(--bg-dark) center/contain no-repeat; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.attach-tile .tile-thumb video { width:100%; height:100%; object-fit:contain; pointer-events:none; }
+.attach-tile .tile-type-ic { width:64px; height:64px; color:var(--accent); }
+.attach-tile .tile-play { position:absolute; width:36px; height:36px; padding:6px; border-radius:50%; background:rgba(0,0,0,.6); color:#fff; box-sizing:border-box; }
+.attach-tile.pending .tile-thumb > :not(.tile-status) { opacity:.5; }
+.attach-tile.error .tile-thumb { outline:2px solid var(--red); }
+.attach-tile.error .tile-thumb > :not(.tile-status) { opacity:.35; }
 .attach-tile .chip-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.attach-tile .tile-status { position:absolute; left:10px; top:10px; font-size:.7rem; background:rgba(0,0,0,.6); color:#fff; border-radius:4px; padding:1px 5px; }
-.attach-tile .chip-remove { position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; background:var(--bg-mid); border:1px solid var(--border); color:var(--text-muted); cursor:pointer; font-size:.8rem; line-height:1; padding:0; }
+.attach-tile .tile-status { position:absolute; left:6px; top:6px; display:flex; align-items:center; gap:4px; font-size:.7rem; background:rgba(0,0,0,.65); color:#fff; border-radius:4px; padding:2px 6px; }
+.attach-tile .tile-status .ic { width:12px; height:12px; }
+.attach-tile.error .tile-status { color:#ff9b9b; }
+.attach-tile .chip-remove { position:absolute; top:-8px; right:-8px; width:24px; height:24px; border-radius:50%; background:var(--bg-mid); border:1px solid var(--border); color:var(--text-muted); cursor:pointer; padding:0; }
 .attach-tile .chip-remove:hover { color:var(--red); }
-.attach-chip .chip-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; }
-.attach-chip .chip-status { font-size:.7rem; color:var(--text-muted); flex-shrink:0; }
-.attach-chip .chip-remove { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; padding:0; line-height:1; flex-shrink:0; }
-.attach-chip .chip-remove:hover { color:var(--red); }
 #input-wrap { display:flex; align-items:center; background:var(--bg-light); border-radius:8px; border:1px solid var(--border); padding:0 12px; gap:8px; transition:border-color .15s; }
 #input-wrap:focus-within { border-color:var(--accent-dim); }
 #attach-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem; padding:4px 2px; transition:color .15s; line-height:1; flex-shrink:0; }
@@ -380,6 +378,13 @@ input,button,textarea { font-family:inherit; }
      your SVG uses a different one); keep it a single-colour shape with no
      fill set so it follows the text colour. -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="ic-audio_file" viewBox="0 -960 960 960"><path d="M430-200q38 0 64-26t26-64v-150h120v-80H480v155q-11-8-23.5-11.5T430-380q-38 0-64 26t-26 64q0 38 26 64t64 26ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ic-code" viewBox="0 -960 960 960"><path d="M320-240 80-480l240-240 57 57-184 184 183 183-56 56Zm320 0-57-57 184-184-183-183 56-56 240 240-240 240Z"/></symbol>
+  <symbol id="ic-draft" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ic-folder_zip" viewBox="0 -960 960 960"><path d="M640-480v-80h80v80h-80Zm0 80h-80v-80h80v80Zm0 80v-80h80v80h-80ZM447-640l-80-80H160v480h400v-80h80v80h160v-400H640v80h-80v-80H447ZM160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Zm0-80v-480 480Z"/></symbol>
+  <symbol id="ic-picture_as_pdf" viewBox="0 -960 960 960"><path d="M360-460h40v-80h40q17 0 28.5-11.5T480-580v-40q0-17-11.5-28.5T440-660h-80v200Zm40-120v-40h40v40h-40Zm120 120h80q17 0 28.5-11.5T640-500v-120q0-17-11.5-28.5T600-660h-80v200Zm40-40v-120h40v120h-40Zm120 40h40v-80h40v-40h-40v-40h40v-40h-80v200ZM320-240q-33 0-56.5-23.5T240-320v-480q0-33 23.5-56.5T320-880h480q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H320Zm0-80h480v-480H320v480ZM160-80q-33 0-56.5-23.5T80-160v-560h80v560h560v80H160Zm160-720v480-480Z"/></symbol>
+  <symbol id="ic-play_arrow" viewBox="0 -960 960 960"><path d="M320-200v-560l440 280-440 280Zm80-280Zm0 134 210-134-210-134v268Z"/></symbol>
+  <symbol id="ic-video_file" viewBox="0 -960 960 960"><path d="M360-240h160q17 0 28.5-11.5T560-280v-40l80 42v-164l-80 42v-40q0-17-11.5-28.5T520-480H360q-17 0-28.5 11.5T320-440v160q0 17 11.5 28.5T360-240ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -1568,28 +1573,67 @@ function renderMembers(payload){
 let attachIdCounter=0;
 function clearAttachQueue(){state.attachQueue=[];renderAttachQueue();}
 const PREVIEWABLE_IMAGE=/\.(png|jpe?g|gif|webp|bmp|avif)$/i;
+const PREVIEWABLE_VIDEO=/\.(mp4|webm|mov|m4v|ogv)$/i;
+
+// Material Symbol that best describes a file, for attachment tiles and
+// file chips in messages. Checked by extension first (it's all there is
+// before upload), then by MIME type.
+function fileTypeIcon(name,mime){
+  const ext=(name||'').split('.').pop().toLowerCase();
+  if(ext==='pdf'||mime==='application/pdf')return 'picture_as_pdf';
+  if(['zip','7z','rar','tar','gz','tgz','xz','bz2','zst'].includes(ext))return 'folder_zip';
+  if(PREVIEWABLE_VIDEO.test(name)||['mkv','avi','wmv','flv'].includes(ext)||mime?.startsWith('video/'))return 'video_file';
+  if(['mp3','wav','flac','ogg','opus','m4a','aac'].includes(ext)||mime?.startsWith('audio/'))return 'audio_file';
+  if(['js','ts','go','rs','c','h','cpp','hpp','py','java','sh','json','html','css','toml','yaml','yml','xml','sql','lua'].includes(ext))return 'code';
+  if(['txt','md','log','csv','doc','docx','odt','rtf'].includes(ext)||mime?.startsWith('text/'))return 'description';
+  return 'draft';
+}
+
 function renderAttachQueue(){
   const el=document.getElementById('attach-queue');el.innerHTML='';
   if(!state.attachQueue.length){el.classList.add('empty');return;}
   el.classList.remove('empty');
   state.attachQueue.forEach(item=>{
-    let chip;
+    const tile=document.createElement('div');tile.className='attach-tile '+item.status;
+    const status=item.status==='pending'?`${icon('progress_activity','spin')}Uploading`
+      :item.status==='error'?`${icon('error')}Failed`:'';
+    tile.innerHTML=`<div class="tile-thumb">${status?`<span class="tile-status">${status}</span>`:''}</div><span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
+    const thumb=tile.querySelector('.tile-thumb');
     if(item.preview){
-      // Image: thumbnail tile, shown from the local file right away —
-      // before (and independent of) the upload finishing.
-      chip=document.createElement('div');chip.className='attach-tile '+item.status;
-      const status=item.status==='pending'?'Uploading…':item.status==='error'?'Failed':'';
-      chip.innerHTML=`<div class="tile-img"></div>${status?`<span class="tile-status">${status}</span>`:''}<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
-      chip.querySelector('.tile-img').style.backgroundImage=`url("${item.preview}")`;
+      // Image: straight from the local file, before the upload finishes.
+      thumb.style.backgroundImage=`url("${item.preview}")`;
+    }else if(item.videoEl){
+      // Video: the same element is re-used on every re-render, so the
+      // frame isn't re-fetched each time an upload's status changes.
+      thumb.insertBefore(item.videoEl,thumb.firstChild);
+      thumb.insertAdjacentHTML('beforeend',icon('play_arrow','tile-play'));
     }else{
-      chip=document.createElement('div');chip.className='attach-chip';
-      const statusIcon=item.status==='pending'?icon('progress_activity','spin'):item.status==='error'?icon('error','err'):icon('check','ok');
-      chip.innerHTML=`<span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><span class="chip-status">${statusIcon}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
+      thumb.insertAdjacentHTML('afterbegin',icon(fileTypeIcon(item.filename,item.mime),'tile-type-ic'));
     }
-    chip.querySelector('.chip-remove').addEventListener('click',e=>{e.stopPropagation();const id=+e.currentTarget.dataset.id;state.attachQueue=state.attachQueue.filter(a=>a.id!==id);renderAttachQueue();});
-    el.appendChild(chip);
+    tile.querySelector('.chip-remove').addEventListener('click',e=>{e.stopPropagation();const id=+e.currentTarget.dataset.id;state.attachQueue=state.attachQueue.filter(a=>a.id!==id);renderAttachQueue();});
+    el.appendChild(tile);
   });
 }
+
+// A video's thumbnail is its first frame, which the webview can only read
+// once the file is on the server (it can't open local paths). A muted,
+// paused <video> with preload=metadata and a #t= start time shows exactly
+// that frame and only fetches the bytes needed for it (range requests).
+// Until it's ready — or if the format can't be played — the tile keeps
+// its video-file icon.
+async function loadVideoThumb(item){
+  try{
+    const src=await getAttachLink(item.url);
+    const v=document.createElement('video');
+    v.muted=true;v.preload='metadata';v.playsInline=true;
+    v.addEventListener('loadeddata',()=>{
+      const cur=state.attachQueue.find(a=>a.id===item.id);
+      if(cur){cur.videoEl=v;renderAttachQueue();}
+    },{once:true});
+    v.src=src+'#t=0.1';
+  }catch(err){console.warn('video thumbnail failed:',err);}
+}
+
 async function queueFiles(filePaths){
   for(const path of filePaths){
     const id=++attachIdCounter;
@@ -1607,7 +1651,10 @@ async function queueFiles(filePaths){
     try{
       const result=await window.go.main.App.UploadFile(path);
       const item=state.attachQueue.find(a=>a.id===id);
-      if(item){item.url=result.url;item.mime=result.mime;item.filename=result.filename;item.status='done';}
+      if(item){
+        item.url=result.url;item.mime=result.mime;item.filename=result.filename;item.status='done';
+        if(PREVIEWABLE_VIDEO.test(item.filename)||item.mime?.startsWith('video/'))loadVideoThumb(item);
+      }
     }catch(err){
       const item=state.attachQueue.find(a=>a.id===id);
       if(item)item.status='error';
@@ -2055,7 +2102,7 @@ function buildMsgEl(msg,grouped){
       attachMediaSource(aud,a.url);body.appendChild(aud);
     }else{
       const chip=document.createElement('div');chip.className='msg-file-chip';
-      chip.innerHTML=`${icon('description','file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
+      chip.innerHTML=`${icon(fileTypeIcon(a.name,a.mime),'file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
       chip.addEventListener('click',()=>downloadAttachment(a));
       body.appendChild(chip);
     }
