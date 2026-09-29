@@ -1246,6 +1246,10 @@ async function savePfpCrop(){
   setAvatarImage(document.getElementById('pfp-current-circle'),dataUrl);
   const av=document.getElementById('user-avatar');
   if(av)setAvatarImage(av,dataUrl);
+  // Your own messages / member row / voice row too, without waiting for the
+  // server's pfp:updated round trip.
+  state.userPfps[state.username]=dataUrl;
+  document.querySelectorAll(`[data-pfp-user="${CSS.escape(state.username)}"]`).forEach(el=>setAvatarImage(el,dataUrl));
   closePfpCropper();
   try{
     await window.go.main.App.SaveProfilePicture(dataUrl);
@@ -1837,9 +1841,10 @@ function buildSearchResultRow(msg){
   const hasAttach=(msg.attachments||[]).length>0;
   const row=document.createElement('div');row.className='search-result-row';
   row.innerHTML=`
-    <div class="sr-head"><div class="sr-avatar" style="background:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
+    <div class="sr-head"><div class="sr-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
     ${msg.content?`<div class="sr-content">${esc(msg.content)}</div>`:''}
     ${hasAttach?'<div class="sr-attach">📎 Attachment</div>':''}`;
+  applyUserAvatar(row.querySelector('.sr-avatar'),msg.username);
   row.addEventListener('click',()=>jumpToSearchResult(msg));
   return row;
 }
@@ -1855,7 +1860,7 @@ function buildMsgEl(msg,grouped){
   div.innerHTML=`
     ${grouped
       ? `<div class="msg-avatar msg-avatar-time"><span class="hover-time" title="${hoverTime}">${time}</span></div>`
-      : `<div class="msg-avatar" style="background:${colour}">${initial}</div>`}
+      : `<div class="msg-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
         ${grouped?'':`<span class="msg-username">${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
@@ -1864,6 +1869,13 @@ function buildMsgEl(msg,grouped){
       ${msg.content?`<div class="msg-content">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
     ${(isOwn||attachments.length)?`<div class="msg-actions"><button class="msg-action-btn" title="More options">⋯</button></div>`:''}`;
+
+  // Grouped follow-up messages show a hover timestamp instead of an
+  // avatar, so there's only something to apply on a group's first message.
+  // Safe on a not-yet-attached element: a cached picture is applied right
+  // here, and an uncached one is fetched and applied by the data-pfp-user
+  // re-query once this element is in the document.
+  if(!grouped)applyUserAvatar(div.querySelector('.msg-avatar'),msg.username);
 
   const body=div.querySelector('.msg-body');
 
