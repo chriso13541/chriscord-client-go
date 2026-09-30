@@ -1211,6 +1211,32 @@ func (a *App) UploadFile(filePath string) (*UploadResult, error) {
 	return &result, nil
 }
 
+// UploadFileData uploads a file the frontend has in memory rather than on
+// disk — e.g. an image pasted into the message box. The bytes arrive
+// base64-encoded; they're written to a temporary file named filename and
+// sent through the same path as UploadFile, then the temp file is removed.
+func (a *App) UploadFileData(filename, dataBase64 string) (*UploadResult, error) {
+	data, err := base64.StdEncoding.DecodeString(dataBase64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file data: %w", err)
+	}
+	// Just a plain file name: no directories, nothing hidden.
+	name := strings.TrimLeft(filepath.Base(strings.ReplaceAll(filename, "\\", "/")), ".")
+	if name == "" || name == "/" {
+		name = "pasted-file"
+	}
+	dir, err := os.MkdirTemp("", "chriscord-paste-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return nil, err
+	}
+	return a.UploadFile(path)
+}
+
 // GetFileLink asks the server for a short-lived link to one attachment
 // (path is its "/api/files/<name>" URL from the message) and returns it as
 // an absolute URL. The server only serves /api/files to a valid, unexpired

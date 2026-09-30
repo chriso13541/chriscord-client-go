@@ -139,3 +139,5 @@ export function UnlockAccount(arg1:string):Promise<main.AccountView>;
 export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<main.SavedServer>>;
 
 export function UploadFile(arg1:string):Promise<main.UploadResult>;
+
+export function UploadFileData(arg1:string,arg2:string):Promise<main.UploadResult>;

@@ -891,6 +891,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
   <div id="lb-controls">
     <div class="lb-group">
       <button class="lb-btn" id="lb-zoom" title="Zoom"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_in"/></svg></button>
+      <button class="lb-btn" id="lb-copy" title="Copy image"><svg class="ic" aria-hidden="true"><use href="#ic-content_copy"/></svg></button>
       <button class="lb-btn" id="lb-save" title="Save image"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button>
     </div>
     <div class="lb-group"><button class="lb-btn" id="lb-close" title="Close"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
@@ -2538,6 +2539,63 @@ async function queueFiles(filePaths){
     }
     renderAttachQueue();
   }
+}
+// Files that exist only in memory — pasted into the message box (an image
+// copied from a browser or a screenshot tool, or files copied in the file
+// explorer). Same tiles, previews and upload as picking files; the bytes
+// go to Go as base64 and are uploaded from a temp file.
+function blobToBase64(blob){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(String(r.result).slice(String(r.result).indexOf(',')+1));
+    r.onerror=()=>reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+function pastedFileName(file){
+  const ext=(file.type.split('/')[1]||'png').replace('jpeg','jpg').replace(/[^a-z0-9]/gi,'');
+  // Screenshots and copied images usually arrive as a generic "image.png".
+  if(!file.name||/^image\.[a-z0-9]+$/i.test(file.name)){
+    const d=new Date(),p=n=>String(n).padStart(2,'0');
+    return `pasted-image-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;
+  }
+  return file.name;
+}
+async function queueBlobs(files){
+  for(const file of files){
+    const id=++attachIdCounter,filename=pastedFileName(file);
+    state.attachQueue.push({id,filename,path:null,url:null,mime:null,status:'pending',preview:null});
+    renderAttachQueue();
+    if(file.type.startsWith('image/')){
+      const r=new FileReader();
+      r.onload=()=>{const item=state.attachQueue.find(a=>a.id===id);if(item){item.preview=r.result;renderAttachQueue();}};
+      r.readAsDataURL(file);
+    }
+    try{
+      const result=await window.go.main.App.UploadFileData(filename,await blobToBase64(file));
+      const item=state.attachQueue.find(a=>a.id===id);
+      if(item){
+        item.url=result.url;item.mime=result.mime;item.filename=result.filename;item.status='done';
+        if(PREVIEWABLE_VIDEO.test(item.filename)||item.mime?.startsWith('video/'))loadVideoThumb(item);
+      }
+    }catch(err){
+      const item=state.attachQueue.find(a=>a.id===id);
+      if(item)item.status='error';
+      toast('Upload failed: '+err,true);
+    }
+    renderAttachQueue();
+  }
+}
+// Ctrl+V / Paste in the message box: files on the clipboard become
+// attachments; plain text pastes as normal.
+function initPasteAttachments(){
+  document.getElementById('msg-input').addEventListener('paste',e=>{
+    const files=[...(e.clipboardData?.items||[])].filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean);
+    if(!files.length)return; // just text — let it paste normally
+    e.preventDefault();
+    if(document.getElementById('attach-btn').disabled){toast('Open a channel to attach files',true);return;}
+    queueBlobs(files);
+  });
 }
 async function pickAndAttach(){
   const paths=await window.go.main.App.PickFiles();
@@ -4327,6 +4385,27 @@ const pointAnchor=(x,y)=>({getBoundingClientRect:()=>new DOMRect(x,y,0,0)});
 async function copyText(t){
   try{await window.runtime.ClipboardSetText(t);}catch{try{await navigator.clipboard.writeText(t);}catch{toast('Could not copy',true);return;}}
 }
+// Copies a picture to the clipboard so it can be pasted into other apps.
+// The clipboard only holds still PNGs, so the image is redrawn as a PNG
+// (an animated GIF copies as its current frame). The PNG is handed to the
+// clipboard as a promise so the copy still counts as part of the click,
+// even though decoding the image takes a moment.
+function copyImage(src){
+  if(!src){toast('Nothing to copy',true);return;}
+  const png=new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
+      c.getContext('2d').drawImage(img,0,0);
+      c.toBlob(b=>b?resolve(b):reject(new Error('could not encode the image')),'image/png');
+    };
+    img.onerror=()=>reject(new Error('could not load the image'));
+    img.src=src;
+  });
+  navigator.clipboard.write([new ClipboardItem({'image/png':png})])
+    .then(()=>toast('Image copied'))
+    .catch(err=>{console.error('copy image failed:',err);toast('Could not copy the image',true);});
+}
 function textFieldMenu(el){
   const hasSel=el.selectionStart!==el.selectionEnd,ro=el.readOnly||el.disabled;
   const sel=()=>el.value.slice(el.selectionStart,el.selectionEnd);
@@ -4338,6 +4417,16 @@ function textFieldMenu(el){
     {label:'Cut',icon:'content_cut',disabled:!hasSel||ro||el.type==='password',action:()=>{copyText(sel());replaceSel('');}},
     {label:'Copy',icon:'content_copy',disabled:!hasSel||el.type==='password',action:()=>copyText(sel())},
     {label:'Paste',icon:'content_paste',disabled:ro,action:async()=>{
+      // In the message box, an image on the clipboard is attached, the
+      // same as Ctrl+V.
+      if(el.id==='msg-input'&&!document.getElementById('attach-btn').disabled){
+        try{
+          for(const item of await navigator.clipboard.read()){
+            const type=item.types.find(t=>t.startsWith('image/'));
+            if(type){const b=await item.getType(type);queueBlobs([new File([b],'image.'+(type.split('/')[1]||'png'),{type})]);return;}
+          }
+        }catch{/* no clipboard image access — fall back to text */}
+      }
       let t='';try{t=await window.runtime.ClipboardGetText();}catch{try{t=await navigator.clipboard.readText();}catch{}}
       if(t)replaceSel(t);
     }},
@@ -4355,12 +4444,13 @@ function messageMenu(msgEl,msg,e){
   return [
     selection?{label:'Copy',icon:'content_copy',action:()=>copyText(selection)}:null,
     link?{label:'Open Link',icon:'open_in_new',action:()=>openExternalURL(link.dataset.url)}:null,
-    link?{label:'Copy Link',icon:'link',action:()=>copyText(link.dataset.url)}:null,
+    link?{label:'Copy Link',icon:'link',action:()=>{copyText(link.dataset.url);toast('Link copied');}}:null,
     imgAttach?{label:'Open Image',icon:'zoom_in',action:()=>getImageBlobURL(imgAttach.url).then(u=>openLightbox(u,imgAttach,msg))}:null,
+    imgAttach?{label:'Copy Image',icon:'content_copy',action:()=>copyImage(img.currentSrc||img.src)}:null,
     imgAttach?{label:'Save Image',icon:'download',action:()=>downloadAttachment(imgAttach)}:null,
     (selection||link||imgAttach)?'-':null,
     {label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))},
-    msg.content?{label:'Copy Text',icon:'content_copy',action:()=>copyText(msg.content)}:null,
+    msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content);toast('Text copied');}}:null,
     {label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
       try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
     }},
@@ -4465,6 +4555,7 @@ function initLightbox(){
   document.getElementById('lb-close').addEventListener('click',closeLightbox);
   document.getElementById('lb-zoom').addEventListener('click',()=>lbToggleZoom());
   document.getElementById('lb-save').addEventListener('click',()=>{if(lb.attach)downloadAttachment(lb.attach);});
+  document.getElementById('lb-copy').addEventListener('click',()=>copyImage(document.getElementById('lightbox-img').src));
   // Close on the backdrop only — not the image, the sender card or controls.
   box.addEventListener('click',e=>{
     // A pan that started on the image and was released over the backdrop
@@ -4686,6 +4777,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initPasteAttachments();
   initContextMenus();
   initEditServer();
   initElasticScroll();

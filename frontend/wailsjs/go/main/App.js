@@ -277,3 +277,7 @@ export function UpdateServer(arg1, arg2, arg3, arg4) {
 export function UploadFile(arg1) {
   return window['go']['main']['App']['UploadFile'](arg1);
 }
+
+export function UploadFileData(arg1, arg2) {
+  return window['go']['main']['App']['UploadFileData'](arg1, arg2);
+}
