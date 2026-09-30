@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
+	"net/url"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -421,6 +424,83 @@ func (a *App) handleVoiceICE(candidate, sdpMid string, sdpMLineIndex *uint16) {
 		init.SDPMLineIndex = sdpMLineIndex
 	}
 	_ = session.pc.AddICECandidate(init)
+
+	// The server is behind the same router as its LAN, so the address it
+	// advertises is usually a private one (192.168.x.x) that nobody outside
+	// that LAN can reach. The address this client already reaches the
+	// server at — the domain/IP it was added with — is the one that works
+	// from here, so offer ICE a copy of the candidate at that address too.
+	// ICE tries both and keeps whichever connects: on the server's own LAN
+	// that's still the LAN address (it's ranked higher); from anywhere else
+	// it's the public one, via the router's UDP port-forward.
+	go func() {
+		copyCand := a.serverAddressCopy(candidate)
+		if copyCand == "" {
+			return
+		}
+		a.voiceMu.Lock()
+		current := a.voice
+		a.voiceMu.Unlock()
+		if current != session {
+			return // call ended or was replaced while resolving
+		}
+		copyInit := init
+		copyInit.Candidate = copyCand
+		if err := session.pc.AddICECandidate(copyInit); err != nil {
+			log.Printf("voice: could not add server-address candidate: %v", err)
+			return
+		}
+		log.Printf("voice: also trying the server at %s", strings.Fields(copyCand)[4])
+	}()
+}
+
+// serverAddressCopy returns a copy of one of the server's ICE candidates
+// with its private host address replaced by the IPv4 address this client
+// connects to the server at (the saved server domain, resolved via DNS) —
+// or "" if that doesn't apply: not a private IPv4 host candidate, the
+// domain doesn't resolve to IPv4, or it resolves to a private/LAN address
+// itself (then the original candidate already covers it).
+func (a *App) serverAddressCopy(candidate string) string {
+	// candidate:<foundation> <component> <transport> <priority> <address> <port> typ <type> ...
+	parts := strings.Fields(candidate)
+	if len(parts) < 8 || parts[6] != "typ" || parts[7] != "host" || !strings.EqualFold(parts[2], "udp") {
+		return ""
+	}
+	lanIP := net.ParseIP(parts[4])
+	if lanIP == nil || lanIP.To4() == nil || !lanIP.IsPrivate() {
+		return ""
+	}
+	a.mu.Lock()
+	domain := a.domain
+	a.mu.Unlock()
+	u, err := url.Parse(normaliseHTTP(domain))
+	if err != nil || u.Hostname() == "" {
+		return ""
+	}
+	var serverIP net.IP
+	if ip := net.ParseIP(u.Hostname()); ip != nil {
+		serverIP = ip.To4()
+	} else if ips, err := net.LookupIP(u.Hostname()); err == nil {
+		for _, ip := range ips {
+			if v4 := ip.To4(); v4 != nil {
+				serverIP = v4
+				break
+			}
+		}
+	}
+	if serverIP == nil || serverIP.IsPrivate() || serverIP.IsLoopback() || serverIP.Equal(lanIP) {
+		return ""
+	}
+	priority, err := strconv.ParseUint(parts[3], 10, 32)
+	if err != nil {
+		return ""
+	}
+	parts[0] += "d"
+	if priority > 2 {
+		parts[3] = strconv.FormatUint(priority-2, 10)
+	}
+	parts[4] = serverIP.String()
+	return strings.Join(parts, " ")
 }
 
 // handleVoiceRenegotiate applies a server-initiated renegotiation to the
