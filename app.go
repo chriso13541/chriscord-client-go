@@ -661,6 +661,9 @@ type serverMsg struct {
 	// Presence on "users" messages: username → "online" | "idle". Its own
 	// key — "statuses" is already the voice status list below.
 	Presence      map[string]string   `json:"presence"`
+	Owner         string              `json:"owner"`  // on "users": the crowned member
+	Banned        bool                `json:"banned"` // on "kicked"
+	Reason        string              `json:"reason"` // on "kicked"
 	Typing        bool                `json:"typing"`
 	All           []string            `json:"all"`
 	ID            string              `json:"id"`
@@ -694,7 +697,8 @@ type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
 }
-type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"` }
+type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"` }
+type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }
 type typingEvent struct { Username string `json:"username"`; Typing bool `json:"typing"` }
 type voiceStateEvent struct { Channels map[string][]string `json:"channels"` }
 type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"` }
@@ -742,7 +746,11 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "history":
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
 		case "users":
-			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All})
+			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner})
+		case "server_updated":
+			runtime.EventsEmit(a.ctx, "server:updated")
+		case "kicked":
+			runtime.EventsEmit(a.ctx, "server:kicked", kickedEvent{Banned: msg.Banned, Reason: msg.Reason})
 		case "typing":
 			runtime.EventsEmit(a.ctx, "chat:typing", typingEvent{Username: msg.Username, Typing: msg.Typing})
 		case "message_edit":
@@ -873,6 +881,22 @@ func (a *App) GetPinnedMessages(boardID string) ([]ChatMessage, error) {
 // SetMessagePinned pins (PUT) or unpins (DELETE) a message. The server
 // broadcasts the change as message_pin, which is what updates every
 // client's view — including this one.
+// FetchServerBanner returns the connected server's banner as a data URL,
+// or "" if it doesn't have one.
+func (a *App) FetchServerBanner() (string, error) {
+	data, err := a.fetchAuthed("/api/server/banner")
+	if err != nil {
+		log.Printf("server banner: fetch failed: %v", err)
+		return "", err
+	}
+	if len(data) == 0 {
+		log.Printf("server banner: none on the server (404)")
+		return "", nil
+	}
+	log.Printf("server banner: fetched %d bytes", len(data))
+	return pfpDataURL(data), nil
+}
+
 // ── Presence ────────────────────────────────────────────────────────────
 
 func (a *App) currentPresence() string {

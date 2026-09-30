@@ -74,6 +74,18 @@ input,button,textarea { font-family:inherit; }
 #sidebar-header.has-banner .server-name { color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.8); }
 #sidebar-header.has-banner #back-btn { color:#fff; background:rgba(0,0,0,.35); }
 #sidebar-header.has-banner #back-btn:hover { background:rgba(0,0,0,.55); }
+#sidebar-header .server-title { display:flex; align-items:center; gap:6px; min-width:0; }
+#server-info-btn { background:none; border:none; padding:2px; border-radius:50%; color:var(--text-muted); cursor:pointer; display:inline-flex; flex-shrink:0; }
+#server-info-btn:hover, #server-info-btn.active { color:var(--text-strong); background:var(--bg-light); }
+#server-info-btn .ic { width:18px; height:18px; }
+#sidebar-header.has-banner #server-info-btn { color:#fff; background:rgba(0,0,0,.35); }
+#sidebar-header.has-banner #server-info-btn:hover, #sidebar-header.has-banner #server-info-btn.active { background:rgba(0,0,0,.6); }
+#server-info-pop { position:fixed; z-index:420; width:300px; max-height:60vh; overflow-y:auto; padding:14px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
+#server-info-pop .sip-name { font-weight:800; font-size:1rem; color:var(--text-strong); margin-bottom:8px; word-break:break-word; }
+#server-info-pop .sip-label { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:4px; }
+#server-info-pop .sip-desc { font-size:.86rem; line-height:1.45; white-space:pre-wrap; word-break:break-word; color:var(--text); }
+#server-info-pop .sip-owner { margin-top:12px; font-size:.8rem; color:var(--text-muted); display:flex; align-items:center; gap:4px; }
+#server-info-pop .sip-owner .ic { width:14px; height:14px; color:var(--yellow); }
 .member-name { display:inline-flex; align-items:center; gap:4px; min-width:0; }
 .owner-crown { display:inline-flex; color:var(--yellow); flex-shrink:0; }
 .owner-crown .ic { width:14px; height:14px; }
@@ -568,6 +580,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <symbol id="st-offline" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5"/></symbol>
   <symbol id="st-invisible" viewBox="0 0 10 10"><path fill-rule="evenodd" d="M5 0a5 5 0 1 1 0 10A5 5 0 0 1 5 0zm0 3a2 2 0 1 0 0 4a2 2 0 0 0 0-4z"/></symbol>
   <symbol id="ic-crown" viewBox="0 -960 960 960"><path d="M200-160v-80h560v80H200Zm0-140-51-321q-2 0-4.5.5t-4.5.5q-25 0-42.5-17.5T80-680q0-25 17.5-42.5T140-740q25 0 42.5 17.5T200-680q0 7-1.5 13t-3.5 11l125 56 125-171q-11-8-18-21t-7-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820q0 15-7 28t-18 21l125 171 125-56q-2-5-3.5-11t-1.5-13q0-25 17.5-42.5T820-740q25 0 42.5 17.5T880-680q0 25-17.5 42.5T820-620q-2 0-4.5-.5t-4.5-.5l-51 321H200Z"/></symbol>
+  <symbol id="ic-info" viewBox="0 -960 960 960"><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -691,7 +704,10 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 <div id="screen-chat" class="hidden">
   <div id="sidebar">
     <div id="sidebar-header">
-      <span class="server-name" id="sidebar-server-name" title="">Server</span>
+      <span class="server-title">
+        <span class="server-name" id="sidebar-server-name">Server</span>
+        <button id="server-info-btn" class="hidden" title="About this server"><svg class="ic" aria-hidden="true"><use href="#ic-info"/></svg></button>
+      </span>
       <button id="back-btn" title="Back"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
     </div>
     <div id="room-list"></div>
@@ -863,6 +879,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   </div>
 </div>
 <div id="profile-popup" class="hidden"></div>
+<div id="server-info-pop" class="hidden" role="dialog" aria-label="About this server"></div>
 <div id="voice-user-menu" class="hidden"></div>
 <div id="toast"></div>
 
@@ -1210,6 +1227,7 @@ async function attemptReconnect(){
     updateStatusDotColor();startPingLoop();
     toast('Reconnected to server.');
     await refreshRoomsAndBoards(); // pick up anything that changed while disconnected
+    refreshServerMeta();
     if(state.selectedBoardId){
       try{await window.go.main.App.SubscribeBoard(state.selectedBoardId);}catch{}
     }
@@ -1245,12 +1263,20 @@ async function doConnect(domain,serverKey){
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.display_name||domain;state.serverOwner='';lastUsersPayload=null;
   serverBannerAt=-1; // a different server: forget the last one's banner
+  state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
   const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.style.removeProperty('--banner');
   showChatScreen();
   refreshServerMeta();
   await loadRooms();
 }
 
+function dataURLToBlob(dataUrl){
+  const [head,b64]=dataUrl.split(',');
+  const mime=(head.match(/^data:([^;]+)/)||[])[1]||'application/octet-stream';
+  const bin=atob(b64),bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new Blob([bytes],{type:mime});
+}
 // Server name, description, banner and crowned owner, as set in the admin
 // panel. Re-run whenever the server says its settings changed.
 let serverBannerAt=-1, serverBannerURL='';
@@ -1262,7 +1288,10 @@ async function refreshServerMeta(){
   if(info?.name){state.serverName=info.name;}
   state.serverOwner=info?.owner||'';
   const nameEl=document.getElementById('sidebar-server-name');
-  nameEl.textContent=state.serverName;nameEl.title=info?.description||'';
+  nameEl.textContent=state.serverName;
+  state.serverDescription=(info?.description||'').trim();
+  document.getElementById('server-info-btn').classList.toggle('hidden',!state.serverDescription);
+  if(!state.serverDescription)closeServerInfo();else if(serverInfoOpen)renderServerInfo();
   document.getElementById('msg-search-input').placeholder='Search '+state.serverName;
   const header=document.getElementById('sidebar-header');
   const at=info?.banner_updated_at||0;
@@ -1274,8 +1303,9 @@ async function refreshServerMeta(){
         // Held as a short blob: URL — a multi-megabyte data: URL is too
         // long to go through a CSS custom property reliably.
         const dataUrl=await window.go.main.App.FetchServerBanner();
-        if(dataUrl)url=URL.createObjectURL(await (await fetch(dataUrl)).blob());
-      }catch{}
+        if(dataUrl)url=URL.createObjectURL(dataURLToBlob(dataUrl));
+        else console.warn('server banner: server reported one, but none came back');
+      }catch(err){console.error('server banner: fetch failed:',err);}
     }
     if(state.domain!==domain){if(url)URL.revokeObjectURL(url);return;}
     if(serverBannerURL)URL.revokeObjectURL(serverBannerURL);
@@ -1284,6 +1314,35 @@ async function refreshServerMeta(){
     header.style.setProperty('--banner',url?`url("${url}")`:'none');
   }
   refreshMemberList();
+}
+// The ⓘ next to the server name: shown only when the server has a
+// description, and pops it out under the header.
+let serverInfoOpen=false;
+function renderServerInfo(){
+  const pop=document.getElementById('server-info-pop');
+  pop.innerHTML=`<div class="sip-name">${esc(state.serverName)}</div>
+    <div class="sip-label">About</div><div class="sip-desc">${renderTextWithLinks(state.serverDescription||'')}</div>
+    ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}`;
+  pop.querySelectorAll('.msg-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
+}
+function openServerInfo(){
+  const pop=document.getElementById('server-info-pop'),btn=document.getElementById('server-info-btn');
+  renderServerInfo();
+  pop.classList.remove('hidden');serverInfoOpen=true;btn.classList.add('active');
+  const z=uiScale(),hdr=document.getElementById('sidebar-header').getBoundingClientRect();
+  const x=Math.max(8,Math.min(innerWidth-pop.getBoundingClientRect().width-8,hdr.left+8));
+  pop.style.left=x/z+'px';pop.style.top=(hdr.bottom+6)/z+'px';
+}
+function closeServerInfo(){
+  serverInfoOpen=false;
+  document.getElementById('server-info-pop')?.classList.add('hidden');
+  document.getElementById('server-info-btn')?.classList.remove('active');
+}
+function initServerInfo(){
+  document.getElementById('server-info-btn').addEventListener('click',e=>{e.stopPropagation();serverInfoOpen?closeServerInfo():openServerInfo();});
+  document.addEventListener('mousedown',e=>{if(serverInfoOpen&&!e.target.closest('#server-info-pop,#server-info-btn'))closeServerInfo();},true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&serverInfoOpen){e.stopImmediatePropagation();closeServerInfo();}},true);
+  window.addEventListener('resize',closeServerInfo);
 }
 // Re-draws the member list from the last payload (e.g. the crown moved).
 let lastUsersPayload=null;
@@ -3861,6 +3920,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initServerInfo();
   initPresence();
   initEmojiPicker();
   initVoiceUserMenu();
