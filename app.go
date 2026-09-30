@@ -913,6 +913,16 @@ func (a *App) FetchServerIcon(domain string) (string, error) {
 	return pfpDataURL(data), nil
 }
 
+// FetchServerThemeBackground returns the connected server's theme
+// background image as a data URL, or "" if it doesn't have one.
+func (a *App) FetchServerThemeBackground() (string, error) {
+	data, err := a.fetchAuthed("/api/server/theme/background")
+	if err != nil || len(data) == 0 {
+		return "", err
+	}
+	return pfpDataURL(data), nil
+}
+
 // FetchServerBanner returns the connected server's banner as a data URL,
 // or "" if it doesn't have one.
 func (a *App) FetchServerBanner() (string, error) {

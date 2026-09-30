@@ -11,12 +11,23 @@ type SavedServer struct {
 	LastUsername string `json:"last_username"`
 }
 
+// ServerTheme is a server's own theme, set in its admin panel (Theme).
+// Base/Accent are "#rrggbb" or "" for the default.
+type ServerTheme struct {
+	Base        string `json:"base"`
+	Accent      string `json:"accent"`
+	Blur        int    `json:"blur"` // 0–100 (%)
+	Dim         int    `json:"dim"`  // 0–90 (%)
+	BgUpdatedAt int64  `json:"bg_updated_at"`
+}
+
 type ServerInfo struct {
 	Name            string `json:"name"`
 	RequiresKey     bool   `json:"requires_key"`
 	Description     string `json:"description"`
 	BannerUpdatedAt int64  `json:"banner_updated_at"` // 0 = no banner
 	IconUpdatedAt   int64  `json:"icon_updated_at"`   // 0 = no icon (coloured letter)
+	Theme           *ServerTheme `json:"theme"`       // nil = the server uses the default look
 	Owner           string `json:"owner"`             // crowned member, "" if none
 }
 

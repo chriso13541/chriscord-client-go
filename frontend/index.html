@@ -428,6 +428,8 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 .pc-status-opt .opt-check .ic { width:16px; height:16px; }
 
 /* ── Appearance editor ─────────────────────────────────────────── */
+.btn:disabled { opacity:.45; cursor:default; }
+.ap-override { margin:-6px 0 18px; padding:12px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg-dark); max-width:940px; }
 #appearance-editor { display:flex; gap:36px; align-items:flex-start; flex-wrap:wrap; }
 #appearance-editor .ap-fields { flex:1; min-width:300px; max-width:440px; }
 .ap-preview-col { position:sticky; top:0; }
@@ -910,6 +912,10 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
     </div>
     <div id="settings-tab-appearance" class="settings-tab-pane">
       <h2>Appearance</h2>
+      <div class="ap-override">
+        <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-override"> Use my own theme instead of the server's</label>
+        <p class="settings-hint" id="ap-override-hint" style="margin-top:0"></p>
+      </div>
       <div id="appearance-editor">
         <div class="ap-fields">
           <label class="settings-label">Theme Color</label>
@@ -1465,6 +1471,7 @@ async function refreshServerMeta(){
   if(info?.name){state.serverName=info.name;}
   state.serverOwner=info?.owner||'';
   refreshServerIcon(domain,info);
+  setServerTheme(info?.theme||null,domain);
   const nameEl=document.getElementById('sidebar-server-name');
   nameEl.textContent=state.serverName;
   state.serverDescription=(info?.description||'').trim();
@@ -1816,7 +1823,7 @@ function stopMicTest(){
   window.go.main.App.StopMicTest().catch(()=>{});
 }
 function switchSettingsTab(name){
-  if(name==='appearance'){apDraft={...appearance};renderAppearanceEditor();}
+  if(name==='appearance'){apDraft={...appearance};renderAppearanceEditor();updateOverrideHint();}
   setLevelMeter(name==='voice'&&!document.getElementById('settings-modal').classList.contains('hidden'));
   document.getElementById('settings-content').classList.toggle('wide',name==='profile'||name==='appearance');
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
@@ -2954,6 +2961,7 @@ async function sendMessage(){
 
 async function goBack(){
   state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
+  setServerTheme(null); // off the server: back to your own theme
   state.voiceChannels={};updateVoiceConnectedBar();
   state.servers=await window.go.main.App.GetServers();renderServers();showScreen('screen-servers');
 }
@@ -3858,13 +3866,51 @@ function paintBackground(layer,a){
   img.style.backgroundImage=`url("${a.image}")`;img.style.filter=px?`blur(${px}px)`:'';
   dim.style.background=`rgba(0,0,0,${(a.dim||0)/100})`;
 }
+// Server themes: a server can set its own theme in its admin panel. While
+// connected it's what you see — unless "Use my own theme" is ticked, which
+// keeps your theme (below) everywhere. Off a server (the server list) or on
+// a server using the default look, your own theme is always used.
+let appearanceOverride=localStorage.getItem('appearanceOverride')==='1';
+let serverThemeBgAt=0, serverThemeBgURL='';
+const onServerScreen=()=>!document.getElementById('screen-chat')?.classList.contains('hidden');
+function serverThemeActive(){return !appearanceOverride&&onServerScreen()&&!!state.serverTheme;}
+function effectiveAppearance(){
+  if(!serverThemeActive())return appearance;
+  const t=state.serverTheme;
+  return {base:t.base||null,accent:t.accent||null,blur:t.blur??30,dim:t.dim??40,image:t.bg_updated_at?serverThemeBgURL:''};
+}
+async function setServerTheme(theme,domain){
+  state.serverTheme=theme||null;
+  const at=theme?.bg_updated_at||0;
+  if(at!==serverThemeBgAt){
+    serverThemeBgAt=at;
+    let url='';
+    if(at){
+      try{const d=await window.go.main.App.FetchServerThemeBackground();if(d)url=URL.createObjectURL(dataURLToBlob(d));}
+      catch(err){console.error('server theme background: fetch failed:',err);}
+    }
+    if(domain!==undefined&&state.domain!==domain){if(url)URL.revokeObjectURL(url);return;}
+    if(serverThemeBgURL)URL.revokeObjectURL(serverThemeBgURL);
+    serverThemeBgURL=url;
+  }
+  applyAppearance();
+  updateOverrideHint();
+}
+function updateOverrideHint(){
+  const hint=document.getElementById('ap-override-hint');if(!hint)return;
+  document.getElementById('ap-override').checked=appearanceOverride;
+  hint.textContent=!onServerScreen()?'You’re not on a server right now, so your own theme below is what you see.'
+    :!state.serverTheme?`${state.serverName} uses the default look, so your own theme below is shown there.`
+    :appearanceOverride?`${state.serverName} has its own theme, but you’re using yours instead.`
+    :`${state.serverName} has its own theme, and you’re seeing it. Tick this to use your theme below instead.`;
+}
 function applyAppearance(){
-  const root=document.documentElement,v=themeVars(appearance);
+  const root=document.documentElement,eff=effectiveAppearance(),v=themeVars(eff);
   for(const [k,val] of Object.entries(v))root.style.setProperty(k,val);
   let layer=document.getElementById('app-bg');
   if(!layer){layer=document.createElement('div');layer.id='app-bg';layer.innerHTML='<div class="bg-img"></div><div class="bg-dim"></div>';document.body.prepend(layer);}
-  document.body.classList.toggle('bg-image',!!appearance.image);
-  paintBackground(layer,appearance);
+  document.body.classList.toggle('bg-image',!!eff.image);
+  paintBackground(layer,eff);
 }
 function renderAppearanceEditor(){
   const d=apDraft,prev=document.getElementById('ap-preview');
@@ -3902,6 +3948,10 @@ function shrinkBackground(dataUrl){
 }
 function initAppearance(){
   applyAppearance();
+  document.getElementById('ap-override').addEventListener('change',e=>{
+    appearanceOverride=e.target.checked;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');
+    applyAppearance();updateOverrideHint();
+  });
   const sw=document.getElementById('ap-swatches');
   sw.innerHTML=THEME_PRESETS.map(([name,c])=>`<button class="ap-swatch" type="button" title="${name}" ${c?`data-color="${c}"`:''} style="background:${c||DEFAULT_THEME['--bg-dark']}">${c?'':'<span>DEF</span>'}</button>`).join('');
   sw.querySelectorAll('.ap-swatch').forEach(b=>b.addEventListener('click',()=>{apDraft.base=b.dataset.color||null;renderAppearanceEditor();}));
