@@ -40,6 +40,10 @@ type App struct {
 	voiceMu          sync.Mutex
 	voiceMuted       atomic.Bool
 	voiceDeafened    atomic.Bool
+	// presence is the status this client shows ("online", "idle" or
+	// "invisible") — sent on connect and whenever the frontend changes it.
+	// Stored in an atomic.Value so it can be read while a.mu is held.
+	presence         atomic.Value
 }
 
 func NewApp() *App { return &App{} }
@@ -638,7 +642,7 @@ func (a *App) Connect(domain, serverKey string) error {
 	})
 	saveServers(a.servers)
 
-	wsURL := httpToWS(base) + "/ws?token=" + a.token
+	wsURL := httpToWS(base) + "/ws?token=" + a.token + "&status=" + url.QueryEscape(a.currentPresence())
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil { return fmt.Errorf("websocket failed: %w", err) }
 	a.ws = conn
@@ -654,6 +658,8 @@ type serverMsg struct {
 	Data          *ChatMessage        `json:"data"`
 	Messages      []ChatMessage       `json:"messages"`
 	Online        []string            `json:"online"`
+	Statuses      map[string]string   `json:"statuses"`
+	Typing        bool                `json:"typing"`
 	All           []string            `json:"all"`
 	ID            string              `json:"id"`
 	Content       string              `json:"content"`
@@ -686,7 +692,8 @@ type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
 }
-type usersEvent  struct { Online []string `json:"online"`; All []string `json:"all"` }
+type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"` }
+type typingEvent struct { Username string `json:"username"`; Typing bool `json:"typing"` }
 type voiceStateEvent struct { Channels map[string][]string `json:"channels"` }
 type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"` }
 type deleteEvent struct { ID string `json:"id"`; BoardID string `json:"board_id"` }
@@ -733,7 +740,9 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "history":
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
 		case "users":
-			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, All: msg.All})
+			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Statuses, All: msg.All})
+		case "typing":
+			runtime.EventsEmit(a.ctx, "chat:typing", typingEvent{Username: msg.Username, Typing: msg.Typing})
 		case "message_edit":
 			runtime.EventsEmit(a.ctx, "chat:edit", editEvent{ID: msg.ID, BoardID: msg.BoardID, Content: msg.Content})
 		case "message_delete":
@@ -862,6 +871,50 @@ func (a *App) GetPinnedMessages(boardID string) ([]ChatMessage, error) {
 // SetMessagePinned pins (PUT) or unpins (DELETE) a message. The server
 // broadcasts the change as message_pin, which is what updates every
 // client's view — including this one.
+// ── Presence ────────────────────────────────────────────────────────────
+
+func (a *App) currentPresence() string {
+	if s, ok := a.presence.Load().(string); ok && s != "" {
+		return s
+	}
+	return "online"
+}
+
+// SetPresence sets the status others see: "online", "idle" (away) or
+// "invisible" (shown as offline). The frontend works out which — your
+// manual choice, or automatic away after 10 minutes idle — and calls this
+// whenever it changes. It's also what the next (re)connect announces.
+func (a *App) SetPresence(status string) error {
+	switch status {
+	case "online", "idle", "invisible":
+	default:
+		return fmt.Errorf("unknown status %q", status)
+	}
+	a.presence.Store(status)
+	a.sendWS(map[string]interface{}{"type": "set_status", "status": status})
+	return nil
+}
+
+// SendTyping tells the server you started (true) or stopped (false)
+// typing. The server doesn't pass it on while you're invisible.
+func (a *App) SendTyping(typing bool) {
+	a.sendWS(map[string]interface{}{"type": "typing", "typing": typing})
+}
+
+// sendWS writes one JSON message to the server if connected.
+func (a *App) sendWS(v interface{}) {
+	msg, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil {
+		return
+	}
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
 // ReactToMessage adds (on=true) or removes (on=false) your emoji reaction.
 // The server broadcasts the change as message_reaction, which is what
 // updates every client's view — including this one.

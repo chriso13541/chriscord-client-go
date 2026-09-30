@@ -371,6 +371,32 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 .reaction.add .ic { width:18px; height:18px; }
 .msg-action-btn .ic { vertical-align:middle; }
 
+/* ── Presence (online / away / invisible / offline / typing) ──── */
+.presence { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; line-height:0; }
+.presence svg { width:10px; height:10px; fill:currentColor; }
+.presence.st-online { color:var(--green); }
+.presence.st-idle { color:var(--yellow); }
+.presence.st-offline, .presence.st-invisible { color:var(--text-muted); }
+.presence.st-typing { gap:2px; height:10px; padding:0 4px; border-radius:5px; background:var(--green); }
+.presence.st-typing i { width:3px; height:3px; border-radius:50%; background:#fff; animation:typing-dot 1.2s infinite ease-in-out; }
+.presence.st-typing i:nth-child(2) { animation-delay:.15s; } .presence.st-typing i:nth-child(3) { animation-delay:.3s; }
+@keyframes typing-dot { 0%,60%,100% { opacity:.35; transform:translateY(0); } 30% { opacity:1; transform:translateY(-1.5px); } }
+/* Badge on an avatar (bottom-left panel, profile cards) */
+.avatar-badge-wrap { position:relative; display:inline-flex; flex-shrink:0; }
+.avatar-badge { position:absolute; right:-3px; bottom:-3px; padding:2px; border-radius:8px; background:var(--bg-mid); line-height:0; }
+.pc-status { background:var(--bg-mid) !important; display:flex; align-items:center; justify-content:center; width:24px !important; height:24px !important; right:1px !important; bottom:1px !important; border:none !important; }
+.pc-status .presence svg { width:14px; height:14px; }
+.pc-status .presence.st-typing { height:12px; }
+/* Status picker in your own profile card */
+.pc-status-menu { margin-top:12px; padding:4px; background:var(--bg-dark); border-radius:8px; }
+.pc-status-opt { display:flex; align-items:center; gap:10px; width:100%; padding:7px 8px; border:none; border-radius:6px; background:none; color:var(--text); font:inherit; font-size:.85rem; text-align:left; cursor:pointer; }
+.pc-status-opt:hover { background:var(--bg-light); }
+.pc-status-opt .presence svg { width:12px; height:12px; }
+.pc-status-opt .opt-text { flex:1; display:flex; flex-direction:column; }
+.pc-status-opt .opt-sub { font-size:.72rem; color:var(--text-muted); }
+.pc-status-opt .opt-check { color:var(--accent); }
+.pc-status-opt .opt-check .ic { width:16px; height:16px; }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -527,6 +553,10 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <symbol id="ic-mood" viewBox="0 -960 960 960"><path d="M620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Zm0 180q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></symbol>
   <symbol id="ic-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
   <symbol id="ic-add_reaction" viewBox="0 -960 960 960"><path d="M480-480Zm0 400q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q43 0 83 8.5t77 24.5v90q-35-20-75.5-31.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q133 0 226.5-93.5T800-480q0-32-6.5-62T776-600h86q9 29 13.5 58.5T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm320-600v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80ZM620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Z"/></symbol>
+  <symbol id="st-online" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5"/></symbol>
+  <symbol id="st-idle" viewBox="0 0 10 10"><path d="M5.303 0.009A5 5 0 1 1 0.009 5.303A3.75 3.75 0 0 0 5.303 0.009Z"/></symbol>
+  <symbol id="st-offline" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5"/></symbol>
+  <symbol id="st-invisible" viewBox="0 0 10 10"><path fill-rule="evenodd" d="M5 0a5 5 0 1 1 0 10A5 5 0 0 1 5 0zm0 3a2 2 0 1 0 0 4a2 2 0 0 0 0-4z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -662,7 +692,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
     </div>
     <div id="sidebar-user">
       <button id="sidebar-user-profile" title="View your profile">
-        <div class="user-avatar" id="user-avatar">?</div>
+        <span class="avatar-badge-wrap"><div class="user-avatar" id="user-avatar">?</div><span class="avatar-badge" data-presence-user-self></span></span>
         <span class="user-name" id="user-name-label">username</span>
       </button>
       <button class="settings-btn" id="settings-btn" title="Settings"><svg class="ic" aria-hidden="true"><use href="#ic-settings"/></svg></button>
@@ -1829,12 +1859,13 @@ function ensureMembersPanelOpen(){
 }
 function renderMembers(payload){
   const online=payload?.online??[],all=payload?.all??[];
-  state.onlineUsers=online;const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
+  state.onlineUsers=online;state.userStatuses=payload?.statuses||{};
+  const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
   const onlineEl=document.getElementById('members-online'),offlineEl=document.getElementById('members-offline');
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}</span><div class="member-dot ${isOnline?'online':'offline'}" style="margin-left:auto"></div>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
@@ -2606,6 +2637,7 @@ async function sendMessage(){
   if(!state.selectedBoardId)return;
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
   input.value='';autoResize(input);
+  stopTyping(); // sent — back to the plain green circle
   const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime}));
   // The picture you just sent is already in memory from its preview — seed
   // the image cache so your own message shows it without downloading it
@@ -2768,13 +2800,13 @@ function buildProfileCard(p){
   const card=document.createElement('div');card.className='profile-card';
   card.innerHTML=`
     <div class="pc-banner"></div>
-    <div class="pc-avatar-wrap"><div class="pc-avatar"></div><div class="pc-status${p.online?' online':''}" title="${p.online?'Online':'Offline'}"></div></div>
+    <div class="pc-avatar-wrap"><div class="pc-avatar"></div><div class="pc-status" ${p.own?'data-presence-user-self':`data-presence-user="${esc(p.username)}"`}>${presenceBadge(p.presence||(p.online?'online':'offline'))}</div></div>
     <div class="pc-body">
       <div class="pc-name">${esc(p.username)}</div>
       ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
       <div class="pc-section"><div class="pc-label">About Me</div>
         <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>
-      ${p.own&&p.editButton!==false?`<button class="pc-edit">${icon('settings')}Edit Profile</button>`:''}
+      ${p.own&&p.editButton!==false?`<div class="pc-status-menu"></div><button class="pc-edit">${icon('settings')}Edit Profile</button>`:''}
     </div>`;
   const avatar=card.querySelector('.pc-avatar');
   if(p.pfp){
@@ -2789,6 +2821,8 @@ function buildProfileCard(p){
   }
   card.querySelectorAll('.msg-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
   card.querySelector('.pc-edit')?.addEventListener('click',()=>{closeProfilePopup();openSettings('profile');});
+  const menu=card.querySelector('.pc-status-menu');
+  if(menu)renderStatusMenu(menu);
   return card;
 }
 
@@ -2804,15 +2838,16 @@ async function openProfilePopup(user,anchor){
   profilePopupFor=user;
   const own=user===state.username;
   const online=own||(state.onlineUsers||[]).includes(user);
+  const presence=userPresence(user);
   let data;
   try{
     if(own){
       const [mine,pfp,prof]=await Promise.all([
         window.go.main.App.GetOwnProfile(),window.go.main.App.GetProfilePicture(),getUserProfile(user).catch(()=>null)]);
-      data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,own:true};
+      data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,presence,own:true};
     }else{
       const [prof,pfp]=await Promise.all([getUserProfile(user),getUserPfp(user)]);
-      data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',pfp,memberSince:prof?.member_since||'',online,own:false};
+      data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',pfp,memberSince:prof?.member_since||'',online,presence,own:false};
     }
   }catch(err){
     if(profilePopupFor===user)profilePopupFor=null;
@@ -2921,7 +2956,7 @@ function renderProfilePreview(){
   slot.innerHTML='';
   slot.appendChild(buildProfileCard({
     username:state.username||'you',bio:profileDraft.bio.trim(),banner:profileDraft.banner,pfp:profileDraft.pfp,
-    memberSince:profileDraft.memberSince,online:true,own:true,editButton:false}));
+    memberSince:profileDraft.memberSince,online:true,presence:'online',own:true,editButton:false}));
 }
 async function saveProfile(){
   const btn=document.getElementById('profile-save-btn');btn.disabled=true;
@@ -3367,6 +3402,105 @@ function initEmojiPicker(){
   },true);
 }
 
+// ── PRESENCE ─────────────────────────────────────────────────────
+// Your status: the choice you make in your profile card (Online, Away or
+// Invisible — kept until you change it) and, while that choice is Online,
+// automatic Away after 10 minutes with no mouse/keyboard activity in the
+// window, back to Online as soon as you're active again. Invisible means
+// connected but shown as offline to everyone else (you see a hollow
+// "invisible" ring on yourself). Closing the app is offline.
+//
+// Typing: while you type, others see an animated "…" in place of your
+// green circle; it goes back after you send, clear the box, or stop
+// typing for 10 seconds. Nothing is sent while you're invisible.
+const AUTO_AWAY_MS=10*60*1000, TYPING_IDLE_MS=10*1000, TYPING_RESEND_MS=3000;
+const STATUS_LABEL={online:'Online',idle:'Away',invisible:'Invisible',offline:'Offline',typing:'Typing…'};
+let presencePref=(()=>{const v=localStorage.getItem('presencePref');return ['online','idle','invisible'].includes(v)?v:'online';})();
+let autoAway=false, lastActivity=Date.now(), sentPresence=null;
+function effectivePresence(){return presencePref==='online'&&autoAway?'idle':presencePref;}
+function pushPresence(){
+  const st=effectivePresence();
+  if(st===sentPresence)return;
+  sentPresence=st;
+  window.go?.main?.App?.SetPresence(st)?.catch?.(()=>{});
+  if(st==='invisible')stopTyping();
+  refreshPresenceBadges();
+}
+function setPresencePref(pref){
+  presencePref=pref;localStorage.setItem('presencePref',pref);
+  if(pref==='online'){autoAway=false;lastActivity=Date.now();} // automatic away can take over again from here
+  pushPresence();
+}
+function presenceBadge(st){
+  if(st==='typing')return `<span class="presence st-typing" title="Typing…"><i></i><i></i><i></i></span>`;
+  return `<span class="presence st-${st}" title="${STATUS_LABEL[st]||''}"><svg aria-hidden="true"><use href="#st-${st}"/></svg></span>`;
+}
+// What to show for anyone, yourself included.
+function userPresence(user){
+  if(user===state.username){
+    const st=effectivePresence();
+    return st!=='invisible'&&myTyping?'typing':st;
+  }
+  if(!(state.onlineUsers||[]).includes(user))return 'offline';
+  if(typingUsers.has(user))return 'typing';
+  return state.userStatuses?.[user]==='idle'?'idle':'online';
+}
+function refreshPresenceBadges(){
+  document.querySelectorAll('[data-presence-user]').forEach(el=>{el.innerHTML=presenceBadge(userPresence(el.dataset.presenceUser));});
+  if(state.username)document.querySelectorAll('[data-presence-user-self]').forEach(el=>{el.innerHTML=presenceBadge(userPresence(state.username));});
+}
+function renderStatusMenu(menu){
+  const opts=[['online','Online',''],['idle','Away','Until you set Online again'],['invisible','Invisible','Shown as offline to everyone']];
+  menu.innerHTML=opts.map(([v,label,sub])=>`<button type="button" class="pc-status-opt" data-status="${v}">${presenceBadge(v)}
+    <span class="opt-text"><span>${label}</span>${sub?`<span class="opt-sub">${sub}</span>`:''}</span>
+    <span class="opt-check">${presencePref===v?icon('check'):''}</span></button>`).join('');
+  menu.querySelectorAll('.pc-status-opt').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();setPresencePref(b.dataset.status);renderStatusMenu(menu);
+  }));
+}
+// Activity tracking for automatic away.
+function noteActivity(){
+  lastActivity=Date.now();
+  if(autoAway){autoAway=false;pushPresence();}
+}
+// Typing — you.
+let myTyping=false, typingSentAt=0, typingStopTimer=null;
+function noteTyping(value){
+  if(!value.trim()){stopTyping();return;}
+  if(effectivePresence()==='invisible'||!state.wsConnected)return;
+  const now=Date.now();
+  if(!myTyping||now-typingSentAt>TYPING_RESEND_MS){ // refresh so others' 10 s expiry doesn't lapse mid-sentence
+    typingSentAt=now;window.go.main.App.SendTyping(true).catch(()=>{});
+  }
+  if(!myTyping){myTyping=true;refreshPresenceBadges();}
+  clearTimeout(typingStopTimer);typingStopTimer=setTimeout(stopTyping,TYPING_IDLE_MS);
+}
+function stopTyping(){
+  clearTimeout(typingStopTimer);typingStopTimer=null;
+  if(!myTyping)return;
+  myTyping=false;typingSentAt=0;
+  window.go?.main?.App?.SendTyping(false)?.catch?.(()=>{});
+  refreshPresenceBadges();
+}
+// Typing — everyone else. Each "typing" expires on its own after 10 s
+// unless refreshed, so a lost "stopped" message can't leave it stuck.
+const typingUsers=new Map(); // username → expiry timer
+function setRemoteTyping(user,typing){
+  clearTimeout(typingUsers.get(user));typingUsers.delete(user);
+  if(typing)typingUsers.set(user,setTimeout(()=>{typingUsers.delete(user);refreshPresenceBadges();},TYPING_IDLE_MS+1000));
+  refreshPresenceBadges();
+}
+function initPresence(){
+  let last=0;
+  const onAct=()=>{const n=Date.now();if(n-last>1000){last=n;noteActivity();}};
+  ['mousemove','mousedown','keydown','wheel','touchstart'].forEach(ev=>window.addEventListener(ev,onAct,{passive:true,capture:true}));
+  window.addEventListener('focus',onAct);
+  setInterval(()=>{
+    if(presencePref==='online'&&!autoAway&&Date.now()-lastActivity>=AUTO_AWAY_MS){autoAway=true;pushPresence();}
+  },15000);
+  pushPresence(); // tell Go before the first connect, so it connects with the right status
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -3574,7 +3708,8 @@ function init(){
     refreshPinsIfOpen(ev.board_id);
     if(ev.pinned&&ev.by&&ev.by!==state.username)toast(`${ev.by} pinned a message`);
   });
-  window.runtime.EventsOn('chat:users',payload=>renderMembers(payload||{}));
+  window.runtime.EventsOn('chat:users',payload=>{renderMembers(payload||{});refreshPresenceBadges();});
+  window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
   window.runtime.EventsOn('voice:state',payload=>{
     state.voiceChannels=payload?.channels||{};
@@ -3645,7 +3780,7 @@ function init(){
   document.getElementById('import-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')submitImportAccount();});
 
   document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
-  document.getElementById('msg-input').addEventListener('input',e=>autoResize(e.target));
+  document.getElementById('msg-input').addEventListener('input',e=>{autoResize(e.target);noteTyping(e.target.value);});
   document.getElementById('modal-add').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAddModal();});
   document.getElementById('modal-confirm-delete').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDeleteConfirm();});
   document.getElementById('export-cancel-btn').addEventListener('click',closeExportModal);
@@ -3658,6 +3793,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initPresence();
   initEmojiPicker();
   initVoiceUserMenu();
   initAudioSettingsUI();
