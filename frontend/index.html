@@ -768,6 +768,17 @@ function applyZoom(level){
   localStorage.setItem('zoomLevel',state.zoomLevel);
 }
 applyZoom(parseFloat(localStorage.getItem('zoomLevel'))||ZOOM_DEFAULT);
+// How many screen pixels one CSS pixel inside the zoomed page takes up.
+// Mouse positions and getBoundingClientRect() are in screen pixels, but
+// style.left/top, translate() and scrollTop inside the zoomed <body> are
+// in CSS pixels (and get multiplied by the zoom when drawn) — so anything
+// mixing the two has to divide by this, or it drifts further off the more
+// you zoom. Measured rather than taken from zoomLevel so it stays right on
+// webview versions that handle CSS zoom differently.
+function uiScale(){
+  const b=document.body;
+  return (b&&b.offsetWidth)?(b.getBoundingClientRect().width/b.offsetWidth)||1:1;
+}
 document.addEventListener('keydown',e=>{
   if(!(e.ctrlKey||e.metaKey))return;
   if(e.key==='='||e.key==='+'||e.code==='NumpadAdd'){e.preventDefault();applyZoom(state.zoomLevel+ZOOM_STEP);}
@@ -1435,8 +1446,9 @@ function onPfpDragStart(e){
 function onPfpDragMove(e){
   if(!pfpCrop.dragging)return;
   const p=e.touches?e.touches[0]:e;
-  pfpCrop.tx=pfpCrop.startTx+(p.clientX-pfpCrop.startX);
-  pfpCrop.ty=pfpCrop.startTy+(p.clientY-pfpCrop.startY);
+  const z=uiScale();
+  pfpCrop.tx=pfpCrop.startTx+(p.clientX-pfpCrop.startX)/z;
+  pfpCrop.ty=pfpCrop.startTy+(p.clientY-pfpCrop.startY)/z;
   clampPfpPan();
   applyPfpTransform();
 }
@@ -2540,7 +2552,7 @@ function sizeLoadedImage(img){
   const before=img.getBoundingClientRect();
   img.classList.remove('loading');
   if(wasNearBottom){c.scrollTop=c.scrollHeight;return;}
-  const delta=img.getBoundingClientRect().height-before.height;
+  const delta=(img.getBoundingClientRect().height-before.height)/uiScale();
   if(delta&&before.bottom<=c.getBoundingClientRect().top)c.scrollTop+=delta;
 }
 
@@ -2637,6 +2649,10 @@ function buildProfileCard(p){
 let profilePopupFor=null;
 async function openProfilePopup(user,anchor){
   if(!user)return;
+  // Where it was clicked, captured now: the row can be re-rendered (and
+  // detached) while the profile is loading.
+  const anchorRect=anchor?.getBoundingClientRect?.()||null;
+  const place=anchor?.id==='sidebar-user-profile'?'above':anchor?.closest?.('#members-panel')?'left':'right';
   if(profilePopupFor===user){closeProfilePopup();return;} // second click toggles it shut
   closeDropdown();
   profilePopupFor=user;
@@ -2660,24 +2676,33 @@ async function openProfilePopup(user,anchor){
   const pop=document.getElementById('profile-popup');
   pop.innerHTML='';pop.appendChild(buildProfileCard(data));
   pop.classList.remove('hidden');
-  positionProfilePopup(pop,anchor);
+  positionProfilePopup(pop,anchorRect,place);
 }
-// Beside whatever was clicked — to its left if it's on the right half of
-// the window (the member list), otherwise to its right — kept on-screen.
-function positionProfilePopup(pop,anchor){
-  const r=(anchor&&anchor.isConnected?anchor:document.body).getBoundingClientRect();
-  const w=pop.offsetWidth,h=pop.offsetHeight,m=8,gap=12;
-  if(anchor?.id==='sidebar-user-profile'){
-    // Your own card opens straight above the bottom-left user panel.
-    pop.style.left=Math.max(m,r.left)+'px';
-    pop.style.top=Math.max(m,r.top-h-gap)+'px';
-    return;
+// Beside whatever was clicked: left of the member list, right of names in
+// the chat/sidebar, above your own panel bottom-left. If the preferred side
+// doesn't fit it flips to the other, and if neither does (a narrow window)
+// it sits below or above the anchor instead — it never lands on top of
+// the name you clicked. Worked out in screen pixels and converted to CSS
+// pixels at the end, so it's right at any Ctrl +/- zoom level.
+function positionProfilePopup(pop,r,place){
+  const z=uiScale(),m=8,gap=12;
+  pop.style.left='0px';pop.style.top='0px';
+  const card=pop.getBoundingClientRect(),w=card.width,h=card.height;
+  const W=innerWidth,H=innerHeight;
+  if(!r){ // nothing to anchor to — centre it
+    pop.style.left=Math.max(m,(W-w)/2)/z+'px';pop.style.top=Math.max(m,(H-h)/2)/z+'px';return;
   }
-  let x=r.left>innerWidth/2?r.left-w-gap:r.right+gap;
-  x=Math.max(m,Math.min(innerWidth-w-m,x));
-  let y=r.top-16;
-  y=Math.max(m,Math.min(innerHeight-h-m,y));
-  pop.style.left=x+'px';pop.style.top=y+'px';
+  const clampX=x=>Math.max(m,Math.min(W-w-m,x)),clampY=y=>Math.max(m,Math.min(H-h-m,y));
+  const fitsLeft=r.left-gap-w>=m,fitsRight=r.right+gap+w<=W-m;
+  let x,y;
+  if(place==='above'&&r.top-gap-h>=m){x=clampX(r.left);y=r.top-gap-h;}
+  else if(place==='left'&&fitsLeft||place!=='left'&&!fitsRight&&fitsLeft){x=r.left-gap-w;y=clampY(r.top-16);}
+  else if(fitsRight){x=r.right+gap;y=clampY(r.top-16);}
+  else{ // no room either side: go under the anchor, or over it
+    x=clampX(r.left);
+    y=r.bottom+gap+h<=H-m?r.bottom+gap:Math.max(m,r.top-gap-h);
+  }
+  pop.style.left=x/z+'px';pop.style.top=y/z+'px';
 }
 function closeProfilePopup(){
   profilePopupFor=null;
@@ -2838,7 +2863,7 @@ function initProfileEditor(){
   document.getElementById('banner-zoom-slider').addEventListener('input',onBannerZoom);
   const vp=document.getElementById('banner-cropper-viewport');
   const start=e=>{if(!bannerCrop.img)return;const p=e.touches?e.touches[0]:e;bannerCrop.drag={x:p.clientX,y:p.clientY,tx:bannerCrop.tx,ty:bannerCrop.ty};vp.classList.add('dragging');e.preventDefault();};
-  const move=e=>{if(!bannerCrop.drag)return;const p=e.touches?e.touches[0]:e;bannerCrop.tx=bannerCrop.drag.tx+(p.clientX-bannerCrop.drag.x);bannerCrop.ty=bannerCrop.drag.ty+(p.clientY-bannerCrop.drag.y);clampBannerPan();applyBannerTransform();};
+  const move=e=>{if(!bannerCrop.drag)return;const p=e.touches?e.touches[0]:e;const z=uiScale();bannerCrop.tx=bannerCrop.drag.tx+(p.clientX-bannerCrop.drag.x)/z;bannerCrop.ty=bannerCrop.drag.ty+(p.clientY-bannerCrop.drag.y)/z;clampBannerPan();applyBannerTransform();};
   const end=()=>{bannerCrop.drag=null;vp.classList.remove('dragging');};
   vp.addEventListener('mousedown',start);vp.addEventListener('touchstart',start,{passive:false});
   window.addEventListener('mousemove',move);window.addEventListener('touchmove',move,{passive:true});
@@ -2906,8 +2931,9 @@ function lbZoomAt(scale,cx,cy,animate){
   scale=Math.min(LB_MAX_ZOOM,Math.max(1,scale));
   const r=document.getElementById('lightbox-img').getBoundingClientRect();
   const k=scale/lb.scale;
-  lb.tx+=(cx-(r.left+r.width/2))*(1-k);
-  lb.ty+=(cy-(r.top+r.height/2))*(1-k);
+  const z=uiScale();
+  lb.tx+=(cx-(r.left+r.width/2))*(1-k)/z;
+  lb.ty+=(cy-(r.top+r.height/2))*(1-k)/z;
   lb.scale=scale;
   if(scale===1){lb.tx=0;lb.ty=0;}
   lbClampPan();lbApply(animate);
@@ -2946,8 +2972,9 @@ function initLightbox(){
   window.addEventListener('mousemove',e=>{
     if(!lb.drag)return;
     if(Math.abs(e.clientX-lb.drag.x)+Math.abs(e.clientY-lb.drag.y)>3)lb.dragged=true;
-    lb.tx=lb.drag.tx+(e.clientX-lb.drag.x);
-    lb.ty=lb.drag.ty+(e.clientY-lb.drag.y);
+    const z=uiScale();
+    lb.tx=lb.drag.tx+(e.clientX-lb.drag.x)/z;
+    lb.ty=lb.drag.ty+(e.clientY-lb.drag.y)/z;
     lbClampPan();lbApply(false);
   });
   window.addEventListener('mouseup',()=>{if(lb.drag){lb.drag=null;box.classList.remove('dragging');}});
