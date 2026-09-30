@@ -669,6 +669,8 @@ type serverMsg struct {
 	Statuses      []VoiceStatusEntry  `json:"statuses"`
 	PfpUpdatedAt  int64               `json:"updated_at"`
 	Pinned        bool                `json:"pinned"`
+	Emoji         string              `json:"emoji"`
+	On            bool                `json:"on"`
 	By            string              `json:"by"`
 }
 
@@ -689,6 +691,13 @@ type voiceStateEvent struct { Channels map[string][]string `json:"channels"` }
 type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"` }
 type deleteEvent struct { ID string `json:"id"`; BoardID string `json:"board_id"` }
 type pinEvent    struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Pinned bool `json:"pinned"`; By string `json:"by"` }
+type reactionEvent struct {
+	ID       string `json:"id"`
+	BoardID  string `json:"board_id"`
+	Emoji    string `json:"emoji"`
+	Username string `json:"username"`
+	On       bool   `json:"on"`
+}
 type voiceSpeakingEvent struct {
 	BoardID  string `json:"board_id"`
 	Username string `json:"username"`
@@ -729,6 +738,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:edit", editEvent{ID: msg.ID, BoardID: msg.BoardID, Content: msg.Content})
 		case "message_delete":
 			runtime.EventsEmit(a.ctx, "chat:delete", deleteEvent{ID: msg.ID, BoardID: msg.BoardID})
+		case "message_reaction":
+			runtime.EventsEmit(a.ctx, "chat:reaction", reactionEvent{ID: msg.ID, BoardID: msg.BoardID, Emoji: msg.Emoji, Username: msg.Username, On: msg.On})
 		case "message_pin":
 			runtime.EventsEmit(a.ctx, "chat:pin", pinEvent{ID: msg.ID, BoardID: msg.BoardID, Pinned: msg.Pinned, By: msg.By})
 		case "rooms_updated":
@@ -851,6 +862,27 @@ func (a *App) GetPinnedMessages(boardID string) ([]ChatMessage, error) {
 // SetMessagePinned pins (PUT) or unpins (DELETE) a message. The server
 // broadcasts the change as message_pin, which is what updates every
 // client's view — including this one.
+// ReactToMessage adds (on=true) or removes (on=false) your emoji reaction.
+// The server broadcasts the change as message_reaction, which is what
+// updates every client's view — including this one.
+func (a *App) ReactToMessage(msgID, emoji string, on bool) error {
+	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
+	data, _ := json.Marshal(map[string]interface{}{"emoji": emoji, "on": on})
+	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/messages/"+msgID+"/reactions", bytes.NewReader(data))
+	if err != nil { return err }
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil { return fmt.Errorf("network error: %w", err) }
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var e map[string]string; json.NewDecoder(resp.Body).Decode(&e)
+		if msg, ok := e["error"]; ok { return fmt.Errorf("%s", msg) }
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (a *App) SetMessagePinned(msgID string, pinned bool) error {
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
 	method := "PUT"

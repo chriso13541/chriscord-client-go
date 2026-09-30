@@ -73,6 +73,15 @@ type ChatMessage struct {
 	Edited      bool         `json:"edited"`
 	CreatedAt   string       `json:"created_at"`
 	Pinned      bool         `json:"pinned"`
+	Reactions   []Reaction   `json:"reactions"`
+}
+
+// Reaction is one emoji's reactions on a message, in the order that emoji
+// was first used there.
+type Reaction struct {
+	Emoji string   `json:"emoji"`
+	Count int      `json:"count"`
+	Users []string `json:"users"`
 }
 
 // SearchResult is a ChatMessage plus which board (and its room) it came

@@ -150,6 +150,10 @@ export function PingServer() {
   return window['go']['main']['App']['PingServer']();
 }
 
+export function ReactToMessage(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ReactToMessage'](arg1, arg2, arg3);
+}
+
 export function ReadImageAsDataURL(arg1) {
   return window['go']['main']['App']['ReadImageAsDataURL'](arg1);
 }

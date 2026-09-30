@@ -64,6 +64,22 @@ export namespace main {
 	        this.name = source["name"];
 	    }
 	}
+	export class Reaction {
+	    emoji: string;
+	    count: number;
+	    users: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Reaction(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.emoji = source["emoji"];
+	        this.count = source["count"];
+	        this.users = source["users"];
+	    }
+	}
 	export class ChatMessage {
 	    id: string;
 	    board_id: string;
@@ -73,6 +89,7 @@ export namespace main {
 	    edited: boolean;
 	    created_at: string;
 	    pinned: boolean;
+	    reactions: Reaction[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatMessage(source);
@@ -88,6 +105,7 @@ export namespace main {
 	        this.edited = source["edited"];
 	        this.created_at = source["created_at"];
 	        this.pinned = source["pinned"];
+	        this.reactions = this.convertValues(source["reactions"], Reaction);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -142,6 +160,7 @@ export namespace main {
 	        this.banner = source["banner"];
 	    }
 	}
+	
 	export class Room {
 	    id: string;
 	    name: string;
@@ -187,6 +206,7 @@ export namespace main {
 	    edited: boolean;
 	    created_at: string;
 	    pinned: boolean;
+	    reactions: Reaction[];
 	    board_name: string;
 	    room_id: string;
 	
@@ -204,6 +224,7 @@ export namespace main {
 	        this.edited = source["edited"];
 	        this.created_at = source["created_at"];
 	        this.pinned = source["pinned"];
+	        this.reactions = this.convertValues(source["reactions"], Reaction);
 	        this.board_name = source["board_name"];
 	        this.room_id = source["room_id"];
 	    }

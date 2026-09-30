@@ -357,6 +357,20 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 .ep-credit { font-size:.68rem; color:var(--text-muted); white-space:nowrap; }
 .ep-credit a { color:var(--text-muted); }
 
+/* ── Reactions ─────────────────────────────────────────────────── */
+.msg-reactions { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; max-width:100%; }
+.msg-reactions:empty { display:none; }
+.reaction { display:inline-flex; align-items:center; gap:4px; height:26px; padding:0 7px; border-radius:8px; border:1px solid transparent; background:var(--bg-light); color:var(--text); font:inherit; font-size:.8rem; font-weight:600; cursor:pointer; font-variant-numeric:tabular-nums; }
+.reaction:hover { border-color:var(--border); }
+.reaction.mine { background:rgba(114,137,218,.18); border-color:var(--accent); color:var(--text-strong); }
+.reaction img.emoji { width:18px; height:18px; margin:0; vertical-align:middle; }
+.reaction .r-text { font-size:1rem; line-height:1; }
+.reaction.more, .reaction.add { color:var(--text-muted); font-weight:700; }
+.reaction.add { opacity:0; transition:opacity .1s; padding:0 6px; }
+.msg-group:hover .reaction.add, .reaction.add:focus-visible { opacity:1; }
+.reaction.add .ic { width:18px; height:18px; }
+.msg-action-btn .ic { vertical-align:middle; }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -512,6 +526,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
   <symbol id="ic-mood" viewBox="0 -960 960 960"><path d="M620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Zm0 180q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></symbol>
   <symbol id="ic-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
+  <symbol id="ic-add_reaction" viewBox="0 -960 960 960"><path d="M480-480Zm0 400q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q43 0 83 8.5t77 24.5v90q-35-20-75.5-31.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q133 0 226.5-93.5T800-480q0-32-6.5-62T776-600h86q9 29 13.5 58.5T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm320-600v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80ZM620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -2008,7 +2023,7 @@ function appendPreviewCard(body,p,url){
   if(p.description)html+=`<div class="link-preview-desc">${esc(p.description)}</div>`;
   html+=`</div>`;
   card.innerHTML=html;
-  body.appendChild(card);
+  body.insertBefore(card,body.querySelector('.msg-reactions')); // reactions stay last
 }
 
 function openExternalURL(url){
@@ -2386,7 +2401,7 @@ function buildMsgEl(msg,grouped){
       </div>
       ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
-    <div class="msg-actions"><button class="msg-action-btn" title="More options">${icon('more_horiz')}</button></div>`;
+    <div class="msg-actions"><button class="msg-action-btn msg-react-btn" title="Add Reaction">${icon('add_reaction')}</button><button class="msg-action-btn" title="More options">${icon('more_horiz')}</button></div>`;
 
   // Grouped follow-up messages show a hover timestamp instead of an
   // avatar, so there's only something to apply on a group's first message.
@@ -2436,11 +2451,17 @@ function buildMsgEl(msg,grouped){
     a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);});
   });
 
+  // Reactions bar, always the last thing in the message body.
+  const reactBar=document.createElement('div');reactBar.className='msg-reactions';
+  body.appendChild(reactBar);
+  renderReactions(div,msg);
+  div.querySelector('.msg-react-btn').addEventListener('click',e=>{e.stopPropagation();openReactionPicker(msg,e.currentTarget);});
+
   // Async link preview (fire and forget)
   if(msg.content)maybeRenderPreviews(div,msg.content);
 
   // 3-dot menu — on every message now, since anyone can Pin
-  div.querySelector('.msg-action-btn').addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
+  div.querySelector('.msg-action-btn[title="More options"]').addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
   return div;
 }
 
@@ -3118,6 +3139,89 @@ function initVoiceUserMenu(){
   window.addEventListener('resize',closeVoiceUserMenu);
 }
 
+// ── REACTIONS ────────────────────────────────────────────────────
+// A bar of emoji + count chips under each message. Click a chip to add or
+// remove your own reaction; the smiley at the end (shown on hover) or the
+// Add Reaction button in the message's hover actions opens the emoji
+// picker to react with anything. Chips wrap onto new lines — never off
+// the side — and past REACTIONS_COLLAPSED the rest fold into a "+N"
+// chip that expands the full set in place.
+const REACTIONS_COLLAPSED=14;
+const expandedReactions=new Set(); // message ids whose bar is expanded
+function reactionEmojiHTML(emoji){
+  const e=EMOJI_BY_CHAR.get(emoji.replace(/\uFE0F/g,''));
+  return e?`<img class="emoji" src="${emojiSrc(e[0])}" alt="${e[1]}" draggable="false">`:`<span class="r-text">${esc(emoji)}</span>`;
+}
+function reactionTitle(r){
+  const e=EMOJI_BY_CHAR.get(r.emoji.replace(/\uFE0F/g,''));
+  const names=(r.users||[]).map(u=>u===state.username?'You':u);
+  const who=names.length<=3?names.join(names.length===2?' and ':', ').replace(/, ([^,]*)$/,' and $1')
+    :`${names.slice(0,3).join(', ')} and ${names.length-3} other${names.length-3===1?'':'s'}`;
+  return `${who} reacted with ${e?`:${e[2]}:`:r.emoji}`;
+}
+function renderReactions(msgEl,msg){
+  const bar=msgEl.querySelector('.msg-reactions');
+  if(!bar)return;
+  const list=(msg.reactions||[]).filter(r=>r.count>0);
+  bar.innerHTML='';
+  if(!list.length)return;
+  const expanded=expandedReactions.has(msg.id);
+  const shown=expanded||list.length<=REACTIONS_COLLAPSED?list:list.slice(0,REACTIONS_COLLAPSED-1);
+  for(const r of shown){
+    const mine=(r.users||[]).includes(state.username);
+    const b=document.createElement('button');
+    b.type='button';b.className='reaction'+(mine?' mine':'');b.title=reactionTitle(r);
+    b.innerHTML=`${reactionEmojiHTML(r.emoji)}<span>${r.count}</span>`;
+    b.addEventListener('click',e=>{e.stopPropagation();toggleReaction(msg,r.emoji);});
+    bar.appendChild(b);
+  }
+  if(list.length>REACTIONS_COLLAPSED){
+    const m=document.createElement('button');m.type='button';m.className='reaction more';
+    m.textContent=expanded?'Show less':`+${list.length-shown.length}`;
+    m.title=expanded?'Collapse reactions':`${list.length-shown.length} more reactions`;
+    m.addEventListener('click',e=>{e.stopPropagation();expanded?expandedReactions.delete(msg.id):expandedReactions.add(msg.id);renderReactions(msgEl,msg);});
+    bar.appendChild(m);
+  }
+  const add=document.createElement('button');add.type='button';add.className='reaction add';add.title='Add Reaction';
+  add.innerHTML=icon('add_reaction');
+  add.addEventListener('click',e=>{e.stopPropagation();openReactionPicker(msg,add);});
+  bar.appendChild(add);
+}
+// Applies one reaction change to a message's data. Idempotent, so the
+// optimistic local update and the server's broadcast of the same change
+// agree however they arrive.
+function applyReaction(msg,emoji,user,on){
+  msg.reactions=msg.reactions||[];
+  let r=msg.reactions.find(x=>x.emoji===emoji);
+  if(on){
+    if(!r){r={emoji,count:0,users:[]};msg.reactions.push(r);}
+    if(!r.users.includes(user)){r.users.push(user);r.count=r.users.length;}
+  }else if(r){
+    r.users=r.users.filter(u=>u!==user);r.count=r.users.length;
+    if(!r.count)msg.reactions=msg.reactions.filter(x=>x!==r);
+  }
+}
+function rerenderReactionsFor(msgId){
+  const msg=state.messages.find(m=>m.id===msgId);
+  const el=document.querySelector(`.msg-group[data-id="${CSS.escape(msgId)}"]`);
+  if(msg&&el)renderReactions(el,msg);
+}
+async function toggleReaction(msg,emoji,forceOn){
+  const mine=(msg.reactions||[]).find(r=>r.emoji===emoji)?.users?.includes(state.username);
+  const on=forceOn??!mine;
+  if(on&&mine)return;
+  applyReaction(msg,emoji,state.username,on);rerenderReactionsFor(msg.id);
+  try{await window.go.main.App.ReactToMessage(msg.id,emoji,on);}
+  catch(err){
+    applyReaction(msg,emoji,state.username,!on);rerenderReactionsFor(msg.id); // undo
+    toast('Reaction failed: '+err,true);
+  }
+}
+function openReactionPicker(msg,anchor){
+  closeDropdown();
+  openEmojiPicker({type:'reaction',msg,anchor});
+}
+
 // ── EMOJI PICKER ─────────────────────────────────────────────────
 // Button left of Send. Sections per category plus Frequently Used, a
 // category rail that jumps to (and follows) the section in view, search
@@ -3194,8 +3298,15 @@ function buildEmojiPicker(){
   p.renderAll=renderAll;p.updateRail=updateRail;
   emojiPickerBuilt=true;
 }
+let emojiPickerTarget={type:'input'};
 function pickEmoji(hex,keepOpen){
   const e=EMOJI_BY_HEX.get(hex);if(!e)return;
+  if(emojiPickerTarget.type==='reaction'){
+    toggleReaction(emojiPickerTarget.msg,e[1],true);
+    noteRecentEmoji(hex);
+    if(!keepOpen)closeEmojiPicker();
+    return;
+  }
   const ta=document.getElementById('msg-input');
   const start=ta.selectionStart??ta.value.length,end=ta.selectionEnd??start;
   ta.value=ta.value.slice(0,start)+e[1]+ta.value.slice(end);
@@ -3205,16 +3316,37 @@ function pickEmoji(hex,keepOpen){
   noteRecentEmoji(hex);
   if(!keepOpen)closeEmojiPicker();
 }
-function openEmojiPicker(){
+// target: {type:'input'} (the message box) or {type:'reaction', msg, anchor}.
+function openEmojiPicker(target={type:'input'}){
   const p=document.getElementById('emoji-picker');
   if(!emojiPickerBuilt)buildEmojiPicker();
+  emojiPickerTarget=target;
+  positionEmojiPicker(p,target);
   const search=p.querySelector('.ep-search');search.value='';
   p.renderAll();                                   // refresh Frequently Used
   p.classList.remove('hidden');
   p.querySelector('.ep-main').scrollTop=0;
   p.updateRail(); // now that it's visible and has real positions
-  document.getElementById('emoji-btn').classList.add('active');
+  document.getElementById('emoji-btn').classList.toggle('active',target.type==='input');
   search.focus();
+}
+// Message box: its usual spot above the input, right-aligned. Reactions:
+// beside the button that opened it, kept fully on-screen (in screen px,
+// converted for Ctrl +/- zoom like the other popups).
+function positionEmojiPicker(p,target){
+  if(target.type!=='reaction'||!target.anchor){
+    p.style.position='';p.style.left='';p.style.top='';p.style.right='';p.style.bottom='';p.style.marginBottom='';
+    return;
+  }
+  p.style.position='fixed';p.style.right='auto';p.style.bottom='auto';p.style.marginBottom='0';
+  p.style.left='0px';p.style.top='0px';
+  p.classList.remove('hidden');
+  const z=uiScale(),r=target.anchor.getBoundingClientRect(),pr=p.getBoundingClientRect(),m=8,gap=8;
+  let x=r.left-pr.width-gap;
+  if(x<m)x=r.right+gap;
+  x=Math.max(m,Math.min(innerWidth-pr.width-m,x));
+  const y=Math.max(m,Math.min(innerHeight-pr.height-m,r.top));
+  p.style.left=x/z+'px';p.style.top=y/z+'px';
 }
 function closeEmojiPicker(){
   document.getElementById('emoji-picker')?.classList.add('hidden');
@@ -3224,13 +3356,14 @@ function initEmojiPicker(){
   const btn=document.getElementById('emoji-btn');
   btn.addEventListener('click',e=>{
     e.stopPropagation();
-    if(document.getElementById('emoji-picker').classList.contains('hidden'))openEmojiPicker();else closeEmojiPicker();
+    const hidden=document.getElementById('emoji-picker').classList.contains('hidden');
+    if(hidden||emojiPickerTarget.type!=='input')openEmojiPicker({type:'input'});else closeEmojiPicker();
   });
   document.addEventListener('mousedown',e=>{
-    if(!e.target.closest('#emoji-picker,#emoji-btn'))closeEmojiPicker();
+    if(!e.target.closest('#emoji-picker,#emoji-btn,.msg-react-btn,.reaction.add'))closeEmojiPicker();
   },true);
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'&&!document.getElementById('emoji-picker').classList.contains('hidden')){e.stopImmediatePropagation();closeEmojiPicker();document.getElementById('msg-input').focus();}
+    if(e.key==='Escape'&&!document.getElementById('emoji-picker').classList.contains('hidden')){e.stopImmediatePropagation();const wasInput=emojiPickerTarget.type==='input';closeEmojiPicker();if(wasInput)document.getElementById('msg-input').focus();}
   },true);
 }
 
@@ -3421,6 +3554,13 @@ function init(){
     if(!ev||ev.board_id!==state.selectedBoardId)return;
     removeMessageFromDOM(ev.id);
     refreshPinsIfOpen(ev.board_id);
+  });
+  window.runtime.EventsOn('chat:reaction',ev=>{
+    if(!ev||ev.board_id!==state.selectedBoardId)return;
+    const m=state.messages.find(m=>m.id===ev.id);
+    if(!m)return;
+    applyReaction(m,ev.emoji,ev.username,ev.on);
+    rerenderReactionsFor(ev.id);
   });
   window.runtime.EventsOn('chat:pin',ev=>{
     if(!ev||ev.board_id!==state.selectedBoardId)return;
