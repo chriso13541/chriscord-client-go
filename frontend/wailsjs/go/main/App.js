@@ -178,6 +178,10 @@ export function SendMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3);
 }
 
+export function SendTyping(arg1) {
+  return window['go']['main']['App']['SendTyping'](arg1);
+}
+
 export function SetAudioSettings(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SetAudioSettings'](arg1, arg2, arg3, arg4);
 }
@@ -188,6 +192,10 @@ export function SetLevelMeter(arg1) {
 
 export function SetMessagePinned(arg1, arg2) {
   return window['go']['main']['App']['SetMessagePinned'](arg1, arg2);
+}
+
+export function SetPresence(arg1) {
+  return window['go']['main']['App']['SetPresence'](arg1);
 }
 
 export function SetUserAudio(arg1, arg2, arg3) {

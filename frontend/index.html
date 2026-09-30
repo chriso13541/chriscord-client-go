@@ -67,6 +67,16 @@ input,button,textarea { font-family:inherit; }
 #sidebar-header .server-name { font-weight:800; font-size:1.05rem; color:var(--text-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #back-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; padding:2px 4px; border-radius:4px; flex-shrink:0; }
 #back-btn:hover { background:var(--bg-light); color:var(--text); }
+/* Server banner: the header grows into a Discord-style banner with the
+   name over the top of the image. */
+#sidebar-header.has-banner { height:140px; align-items:flex-start; padding:12px 12px 0 16px; border-bottom:none;
+  background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,0) 55%),var(--banner) center/cover no-repeat; }
+#sidebar-header.has-banner .server-name { color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.8); }
+#sidebar-header.has-banner #back-btn { color:#fff; background:rgba(0,0,0,.35); }
+#sidebar-header.has-banner #back-btn:hover { background:rgba(0,0,0,.55); }
+.member-name { display:inline-flex; align-items:center; gap:4px; min-width:0; }
+.owner-crown { display:inline-flex; color:var(--yellow); flex-shrink:0; }
+.owner-crown .ic { width:14px; height:14px; }
 #room-list { flex:1; overflow-y:auto; padding:8px 0; }
 .room-header { padding:6px 8px 4px 12px; font-size:.79rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; border-radius:4px; margin:0 4px; }
 .room-header:hover { color:var(--text); background:var(--bg-light); }
@@ -557,6 +567,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <symbol id="st-idle" viewBox="0 0 10 10"><path d="M5.303 0.009A5 5 0 1 1 0.009 5.303A3.75 3.75 0 0 0 5.303 0.009Z"/></symbol>
   <symbol id="st-offline" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5"/></symbol>
   <symbol id="st-invisible" viewBox="0 0 10 10"><path fill-rule="evenodd" d="M5 0a5 5 0 1 1 0 10A5 5 0 0 1 5 0zm0 3a2 2 0 1 0 0 4a2 2 0 0 0 0-4z"/></symbol>
+  <symbol id="ic-crown" viewBox="0 -960 960 960"><path d="M200-160v-80h560v80H200Zm0-140-51-321q-2 0-4.5.5t-4.5.5q-25 0-42.5-17.5T80-680q0-25 17.5-42.5T140-740q25 0 42.5 17.5T200-680q0 7-1.5 13t-3.5 11l125 56 125-171q-11-8-18-21t-7-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820q0 15-7 28t-18 21l125 171 125-56q-2-5-3.5-11t-1.5-13q0-25 17.5-42.5T820-740q25 0 42.5 17.5T880-680q0 25-17.5 42.5T820-620q-2 0-4.5-.5t-4.5-.5l-51 321H200Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -680,7 +691,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 <div id="screen-chat" class="hidden">
   <div id="sidebar">
     <div id="sidebar-header">
-      <span class="server-name" id="sidebar-server-name">Server</span>
+      <span class="server-name" id="sidebar-server-name" title="">Server</span>
       <button id="back-btn" title="Back"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
     </div>
     <div id="room-list"></div>
@@ -1232,8 +1243,62 @@ async function doConnect(domain,serverKey){
   updateStatusDotColor();startPingLoop();updateVoiceConnectedBar();
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
-  state.serverName=saved?.display_name||domain;
-  showChatScreen();await loadRooms();
+  state.serverName=saved?.display_name||domain;state.serverOwner='';lastUsersPayload=null;
+  serverBannerAt=-1; // a different server: forget the last one's banner
+  const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.style.removeProperty('--banner');
+  showChatScreen();
+  refreshServerMeta();
+  await loadRooms();
+}
+
+// Server name, description, banner and crowned owner, as set in the admin
+// panel. Re-run whenever the server says its settings changed.
+let serverBannerAt=-1, serverBannerURL='';
+async function refreshServerMeta(){
+  const domain=state.domain;if(!domain)return;
+  let info;
+  try{info=await window.go.main.App.GetServerInfo(domain);}catch{return;}
+  if(state.domain!==domain)return;
+  if(info?.name){state.serverName=info.name;}
+  state.serverOwner=info?.owner||'';
+  const nameEl=document.getElementById('sidebar-server-name');
+  nameEl.textContent=state.serverName;nameEl.title=info?.description||'';
+  document.getElementById('msg-search-input').placeholder='Search '+state.serverName;
+  const header=document.getElementById('sidebar-header');
+  const at=info?.banner_updated_at||0;
+  if(at!==serverBannerAt){
+    serverBannerAt=at;
+    let url='';
+    if(at){
+      try{
+        // Held as a short blob: URL — a multi-megabyte data: URL is too
+        // long to go through a CSS custom property reliably.
+        const dataUrl=await window.go.main.App.FetchServerBanner();
+        if(dataUrl)url=URL.createObjectURL(await (await fetch(dataUrl)).blob());
+      }catch{}
+    }
+    if(state.domain!==domain){if(url)URL.revokeObjectURL(url);return;}
+    if(serverBannerURL)URL.revokeObjectURL(serverBannerURL);
+    serverBannerURL=url;
+    header.classList.toggle('has-banner',!!url);
+    header.style.setProperty('--banner',url?`url("${url}")`:'none');
+  }
+  refreshMemberList();
+}
+// Re-draws the member list from the last payload (e.g. the crown moved).
+let lastUsersPayload=null;
+function refreshMemberList(){if(lastUsersPayload)renderMembers({...lastUsersPayload,owner:state.serverOwner});}
+
+// Kicked or banned from the admin panel: leave, and don't auto-reconnect
+// (reconnecting would just rejoin — for a kick that's allowed, but only
+// deliberately, from the server list).
+function handleKicked(e){
+  const name=state.serverName||state.domain;
+  state.wsConnected=false; // stops the disconnect handler from scheduling a reconnect
+  cancelReconnect();
+  goBack().catch(()=>{});
+  const why=e?.reason?` Reason: ${e.reason}`:'';
+  toast(e?.banned?`You were banned from ${name}.${why}`:`You were kicked from ${name}.${why}`,true);
 }
 
 // ── CHAT SCREEN ──────────────────────────────────────────────────
@@ -1860,12 +1925,13 @@ function ensureMembersPanelOpen(){
 function renderMembers(payload){
   const online=payload?.online??[],all=payload?.all??[];
   state.onlineUsers=online;state.userStatuses=payload?.statuses||{};
+  if(payload&&'owner' in payload)state.serverOwner=payload.owner||'';
   const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
   const onlineEl=document.getElementById('members-online'),offlineEl=document.getElementById('members-offline');
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
@@ -3708,7 +3774,9 @@ function init(){
     refreshPinsIfOpen(ev.board_id);
     if(ev.pinned&&ev.by&&ev.by!==state.username)toast(`${ev.by} pinned a message`);
   });
-  window.runtime.EventsOn('chat:users',payload=>{renderMembers(payload||{});refreshPresenceBadges();});
+  window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshPresenceBadges();});
+  window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
+  window.runtime.EventsOn('server:kicked',e=>handleKicked(e));
   window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
   window.runtime.EventsOn('voice:state',payload=>{

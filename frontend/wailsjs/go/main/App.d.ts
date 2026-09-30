@@ -90,11 +90,15 @@ export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;
 
 export function SendMessage(arg1:string,arg2:string,arg3:Array<main.Attachment>):Promise<void>;
 
+export function SendTyping(arg1:boolean):Promise<void>;
+
 export function SetAudioSettings(arg1:number,arg2:number,arg3:boolean,arg4:number):Promise<void>;
 
 export function SetLevelMeter(arg1:boolean):Promise<void>;
 
 export function SetMessagePinned(arg1:string,arg2:boolean):Promise<void>;
+
+export function SetPresence(arg1:string):Promise<void>;
 
 export function SetUserAudio(arg1:string,arg2:number,arg3:boolean):Promise<void>;
 

@@ -250,6 +250,9 @@ export namespace main {
 	export class ServerInfo {
 	    name: string;
 	    requires_key: boolean;
+	    description: string;
+	    banner_updated_at: number;
+	    owner: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServerInfo(source);
@@ -259,6 +262,9 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.requires_key = source["requires_key"];
+	        this.description = source["description"];
+	        this.banner_updated_at = source["banner_updated_at"];
+	        this.owner = source["owner"];
 	    }
 	}
 	export class UploadResult {

@@ -16,6 +16,7 @@ Material Symbols (UI icons)
   at the top of `frontend/index.html`; the shapes themselves are unchanged.
 
 Icons used: add, add_reaction, arrow_downward, attach_file, audio_file, call_end, check,
+crown (filled),
 chevron_right, close, code, description, download, draft, error,
 folder_open, folder_zip, group, headphones, headset_off, keep, mic,
 mic_off, more_horiz, picture_as_pdf, play_arrow, progress_activity,

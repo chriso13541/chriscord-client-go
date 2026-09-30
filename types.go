@@ -12,8 +12,11 @@ type SavedServer struct {
 }
 
 type ServerInfo struct {
-	Name        string `json:"name"`
-	RequiresKey bool   `json:"requires_key"`
+	Name            string `json:"name"`
+	RequiresKey     bool   `json:"requires_key"`
+	Description     string `json:"description"`
+	BannerUpdatedAt int64  `json:"banner_updated_at"` // 0 = no banner
+	Owner           string `json:"owner"`             // crowned member, "" if none
 }
 
 type ChallengeResponse struct {
