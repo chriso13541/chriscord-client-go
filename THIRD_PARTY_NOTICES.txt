@@ -19,4 +19,22 @@ Icons used: add, arrow_downward, attach_file, audio_file, call_end, check,
 chevron_right, close, code, description, download, draft, error,
 folder_open, folder_zip, group, headphones, headset_off, keep, mic,
 mic_off, more_horiz, picture_as_pdf, play_arrow, progress_activity,
-search, send, settings, stop, video_file, volume_off, volume_up, zoom_in.
+mood, schedule, search, send, settings, stop, video_file, volume_off,
+volume_up, zoom_in.
+
+OpenMoji (emoji graphics)
+-------------------------
+
+- Source: https://github.com/hfg-gmuend/openmoji (release 17.0.0),
+  color SVGs from openmoji-svg-color.zip and data/openmoji.json
+- Credit: All emojis designed by OpenMoji – the open-source emoji and icon
+  project (https://openmoji.org). This credit is also shown in the
+  emoji picker's footer.
+- License: Creative Commons Attribution-ShareAlike 4.0 International
+  (CC BY-SA 4.0) — full text in frontend/licenses/openmoji-LICENSE.txt
+- Included: the 1,914 standard emoji (frontend/emoji/svg/<hexcode>.svg),
+  copied unmodified — no skin-tone variants and no OpenMoji "extras".
+  frontend/emoji/emoji-data.js is generated from openmoji.json (hexcode,
+  character, name, category, search tags).
+- ShareAlike applies to the emoji graphics themselves (and any modified
+  versions of them), not to the rest of chriscord.

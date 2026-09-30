@@ -327,6 +327,36 @@ input,button,textarea { font-family:inherit; }
 #voice-user-menu .vum-reset:hover { color:var(--text); text-decoration:underline; }
 .voice-occupant-status .ic.local { color:var(--red); }
 
+/* ── Emoji (OpenMoji) ─────────────────────────────────────────── */
+img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em; object-fit:contain; }
+.msg-content.emoji-only img.emoji { width:3rem; height:3rem; margin:.1rem .05rem; vertical-align:middle; }
+#emoji-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px 2px; display:inline-flex; align-items:center; flex-shrink:0; transition:color .15s; }
+#emoji-btn .ic { width:24px; height:24px; }
+#emoji-btn:hover:not(:disabled), #emoji-btn.active { color:var(--yellow); }
+#emoji-btn:disabled { opacity:.3; cursor:default; }
+#emoji-picker { position:absolute; right:20px; bottom:100%; margin-bottom:8px; width:424px; height:440px; max-height:calc(100vh - 140px); display:flex; flex-direction:column; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); z-index:60; overflow:hidden; }
+.ep-top { padding:10px; border-bottom:1px solid var(--border); }
+.ep-search { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text); font:inherit; font-size:.88rem; outline:none; }
+.ep-search:focus { border-color:var(--accent); }
+.ep-body { flex:1; display:flex; min-height:0; }
+.ep-rail { width:44px; flex-shrink:0; background:var(--bg-dark); display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 0; overflow-y:auto; }
+.ep-rail button { width:32px; height:32px; border:none; border-radius:6px; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; color:var(--text-muted); filter:grayscale(1); opacity:.6; }
+.ep-rail button:hover, .ep-rail button.active { background:var(--bg-light); filter:none; opacity:1; color:var(--text); }
+.ep-rail img { width:24px; height:24px; }
+.ep-rail .ic { width:20px; height:20px; }
+.ep-main { flex:1; overflow-y:auto; padding:0 8px 8px; }
+.ep-section-title { position:sticky; top:0; z-index:1; background:var(--bg-mid); padding:8px 4px 6px; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); }
+.ep-grid { display:grid; grid-template-columns:repeat(auto-fill,40px); gap:2px; }
+.ep-grid button { width:40px; height:40px; border:none; border-radius:6px; background:none; cursor:pointer; padding:4px; }
+.ep-grid button:hover, .ep-grid button:focus-visible { background:var(--bg-light); outline:none; }
+.ep-grid img { width:32px; height:32px; display:block; }
+.ep-empty { padding:40px 10px; text-align:center; color:var(--text-muted); font-size:.85rem; }
+.ep-foot { display:flex; align-items:center; gap:10px; padding:8px 12px; border-top:1px solid var(--border); background:var(--bg-dark); min-height:44px; box-sizing:border-box; }
+.ep-foot img { width:28px; height:28px; }
+.ep-foot .ep-name { flex:1; font-weight:700; font-size:.85rem; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ep-credit { font-size:.68rem; color:var(--text-muted); white-space:nowrap; }
+.ep-credit a { color:var(--text-muted); }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -371,7 +401,7 @@ input,button,textarea { font-family:inherit; }
 #settings-close-btn:hover { background:var(--bg-light); color:var(--text); }
 
 /* Input area */
-#input-area { padding:0 20px 16px; flex-shrink:0; }
+#input-area { padding:0 20px 16px; flex-shrink:0; position:relative; }
 #attach-queue { display:flex; flex-wrap:wrap; align-items:flex-start; gap:14px; padding:16px 16px 12px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px 8px 0 0; border-bottom:none; }
 #attach-queue.empty { display:none; }
 #attach-queue:not(.empty) + #input-wrap { border-radius:0 0 8px 8px; }
@@ -480,6 +510,8 @@ input,button,textarea { font-family:inherit; }
   <symbol id="ic-video_file" viewBox="0 -960 960 960"><path d="M360-240h160q17 0 28.5-11.5T560-280v-40l80 42v-164l-80 42v-40q0-17-11.5-28.5T520-480H360q-17 0-28.5 11.5T320-440v160q0 17 11.5 28.5T360-240ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-keep" viewBox="0 -960 960 960"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></symbol>
   <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
+  <symbol id="ic-mood" viewBox="0 -960 960 960"><path d="M620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Zm0 180q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></symbol>
+  <symbol id="ic-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -647,10 +679,12 @@ input,button,textarea { font-family:inherit; }
           <button id="jump-to-present-btn" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-arrow_downward"/></svg> Jump to Present</button>
         </div>
         <div id="input-area">
+          <div id="emoji-picker" class="hidden" role="dialog" aria-label="Emoji"></div>
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
             <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
             <textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea>
+            <button id="emoji-btn" title="Emoji" disabled><svg class="ic" aria-hidden="true"><use href="#ic-mood"/></svg></button>
             <button id="send-btn" disabled title="Send"><svg class="ic" aria-hidden="true"><use href="#ic-send"/></svg></button>
           </div>
         </div>
@@ -776,6 +810,7 @@ input,button,textarea { font-family:inherit; }
 <div id="voice-user-menu" class="hidden"></div>
 <div id="toast"></div>
 
+<script src="emoji/emoji-data.js"></script>
 <script>
 const state = {
   servers:[],rooms:[],boardsByRoom:{},expandedRooms:new Set(),
@@ -962,11 +997,51 @@ async function confirmExport(){
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 
 function renderTextWithLinks(text) {
-  return esc(text).replace(/https?:\/\/[^\s&]+/g, match => {
+  return emojify(esc(text).replace(/https?:\/\/[^\s&]+/g, match => {
     // match is already escaped, unescape for the href
     const raw = match.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
     return `<a class="msg-link" href="#" data-url="${esc(raw)}">${match}</a>`;
-  });
+  }));
+}
+
+// ── EMOJI (OpenMoji) ──────────────────────────────────────────────
+// Emoji stay plain Unicode in messages (so they copy, search and store
+// like any text); they're just *drawn* with the bundled OpenMoji images
+// instead of the OS emoji font, so they look the same on every machine.
+// Lookups ignore U+FE0F (the "draw as emoji" selector), which is often
+// present or absent for the same emoji depending on where it was typed.
+const EMOJI_BY_CHAR=new Map(), EMOJI_BY_HEX=new Map();
+(window.EMOJI_DATA||[]).forEach(e=>{
+  const [hex,ch,name]=e;
+  EMOJI_BY_CHAR.set(ch.replace(/\uFE0F/g,''),e);EMOJI_BY_HEX.set(hex,e);
+});
+const graphemes=typeof Intl!=='undefined'&&Intl.Segmenter?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;
+const emojiSrc=hex=>`emoji/svg/${hex}.svg`;
+function emojiImg(e){return `<img class="emoji" src="${emojiSrc(e[0])}" alt="${e[1]}" title=":${e[2]}:" draggable="false">`;}
+// Replaces known emoji in an HTML string's text (never inside tags).
+function emojify(html){
+  if(!graphemes||!EMOJI_BY_CHAR.size)return html;
+  return html.split(/(<[^>]*>)/).map(part=>{
+    if(part.startsWith('<')||!/[\u00A9\u00AE\u203C-\u3299\uD83C-\uDBFF]/.test(part))return part;
+    let out='';
+    for(const {segment} of graphemes.segment(part)){
+      const e=EMOJI_BY_CHAR.get(segment.replace(/\uFE0F/g,''));
+      // Characters that are text by default (©, ®, ™, ↔, digits in keycaps…)
+      // only become an image when written as emoji: with U+FE0F, as part
+      // of a sequence, or if their default presentation is already emoji.
+      const asEmoji=e&&([...segment].length>1||/\p{Emoji_Presentation}/u.test(segment));
+      out+=asEmoji?emojiImg(e):segment;
+    }
+    return out;
+  }).join('');
+}
+// True when a message is nothing but a few emoji — shown large, like Discord.
+function isEmojiOnly(text){
+  const t=(text||'').replace(/\s+/g,'');
+  if(!t||!graphemes)return false;
+  let n=0;
+  for(const {segment} of graphemes.segment(t)){if(!EMOJI_BY_CHAR.has(segment.replace(/\uFE0F/g,''))||++n>27)return false;}
+  return n>0;
 }
 
 // Extract raw URLs from text
@@ -1128,7 +1203,7 @@ function showChatScreen(){
   document.getElementById('msg-input').placeholder='Select a board to chat';
   document.getElementById('msg-input').disabled=true;
   document.getElementById('send-btn').disabled=true;
-  document.getElementById('attach-btn').disabled=true;
+  document.getElementById('attach-btn').disabled=true;document.getElementById('emoji-btn').disabled=true;closeEmojiPicker();
   document.getElementById('msg-search-input').placeholder='Search '+state.serverName;
   exitSearch();
   if(state.resultsMode)closeResultsPanel();
@@ -1212,7 +1287,7 @@ async function refreshRoomsAndBoards(){
       document.getElementById('msg-input').placeholder='Select a board to chat';
       document.getElementById('msg-input').disabled=true;
       document.getElementById('send-btn').disabled=true;
-      document.getElementById('attach-btn').disabled=true;
+      document.getElementById('attach-btn').disabled=true;document.getElementById('emoji-btn').disabled=true;closeEmojiPicker();
       toast('This channel was deleted.',true);
     }
   }
@@ -1712,7 +1787,7 @@ async function selectBoard(boardId,boardName,roomId){
   document.getElementById('toggle-pins-btn').disabled=false;
   const hdr=document.getElementById('board-title-placeholder');hdr.className='board-title';hdr.textContent=boardName;
   document.getElementById('msg-input').placeholder=`Message  #${boardName}`;
-  document.getElementById('msg-input').disabled=false;document.getElementById('send-btn').disabled=false;document.getElementById('attach-btn').disabled=false;
+  document.getElementById('msg-input').disabled=false;document.getElementById('send-btn').disabled=false;document.getElementById('attach-btn').disabled=false;document.getElementById('emoji-btn').disabled=false;
   document.getElementById('msg-input').focus();
   document.getElementById('messages').innerHTML='<div class="msg-placeholder">Loading history…</div>';
   renderSidebar();
@@ -2272,7 +2347,7 @@ function buildSearchResultRow(msg){
   const row=document.createElement('div');row.className='search-result-row';
   row.innerHTML=`
     <div class="sr-head"><div class="sr-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
-    ${msg.content?`<div class="sr-content">${esc(msg.content)}</div>`:''}
+    ${msg.content?`<div class="sr-content">${emojify(esc(msg.content))}</div>`:''}
     ${images.length?`<div class="sr-images${images.length>1?' multi':''}"></div>`:''}
     ${files.map(a=>`<div class="sr-attach" title="${esc(a.name||'File')}">${icon(fileTypeIcon(a.name,a.mime))}<span>${esc(a.name||'File')}</span></div>`).join('')}`;
   // Image previews use the same session image cache as the chat, so a
@@ -2309,7 +2384,7 @@ function buildMsgEl(msg,grouped){
         ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username">${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}
       </div>
-      ${msg.content?`<div class="msg-content">${renderTextWithLinks(msg.content)}</div>`:''}
+      ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
     <div class="msg-actions"><button class="msg-action-btn" title="More options">${icon('more_horiz')}</button></div>`;
 
@@ -2457,6 +2532,7 @@ function setMessageContent(msgEl,content){
     msgEl.querySelector('.msg-meta').insertAdjacentElement('afterend',c);
   }
   c.innerHTML=renderTextWithLinks(content);
+  c.classList.toggle('emoji-only',isEmojiOnly(content));
   c.querySelectorAll('.msg-link').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);});});
 }
 function markMessageEdited(msgEl){
@@ -3042,6 +3118,122 @@ function initVoiceUserMenu(){
   window.addEventListener('resize',closeVoiceUserMenu);
 }
 
+// ── EMOJI PICKER ─────────────────────────────────────────────────
+// Button left of Send. Sections per category plus Frequently Used, a
+// category rail that jumps to (and follows) the section in view, search
+// by name/tags, and a preview footer. Click inserts at the cursor and
+// closes; Shift+click inserts and keeps it open. Built on first open;
+// images load lazily as they scroll into view.
+const EMOJI_RECENT_MAX=27;
+let emojiPickerBuilt=false;
+function getRecentEmoji(){try{return JSON.parse(localStorage.getItem('emojiRecent')||'[]').filter(h=>EMOJI_BY_HEX.has(h));}catch{return [];}}
+function noteRecentEmoji(hex){
+  const r=[hex,...getRecentEmoji().filter(h=>h!==hex)].slice(0,EMOJI_RECENT_MAX);
+  localStorage.setItem('emojiRecent',JSON.stringify(r));
+}
+function emojiButton(e){
+  return `<button type="button" data-hex="${e[0]}" title=":${e[2]}:"><img src="${emojiSrc(e[0])}" alt="${e[1]}" loading="lazy" draggable="false"></button>`;
+}
+function buildEmojiPicker(){
+  const p=document.getElementById('emoji-picker');
+  const groups=window.EMOJI_GROUPS||[];
+  p.innerHTML=`
+    <div class="ep-top"><input class="ep-search" type="text" placeholder="Find the perfect emoji" autocomplete="off" spellcheck="false"></div>
+    <div class="ep-body">
+      <div class="ep-rail">
+        <button type="button" data-target="recent" title="Frequently Used">${icon('schedule')}</button>
+        ${groups.map((g,i)=>`<button type="button" data-target="g${i}" title="${esc(g.label)}"><img src="${emojiSrc(g.icon)}" alt=""></button>`).join('')}
+      </div>
+      <div class="ep-main"></div>
+    </div>
+    <div class="ep-foot"><img class="ep-prev" alt="" style="visibility:hidden"><span class="ep-name">Pick an emoji…</span>
+      <span class="ep-credit">Emoji by <a href="#" data-url="https://openmoji.org">OpenMoji</a> · <a href="#" data-url="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a></span></div>`;
+  const main=p.querySelector('.ep-main'),search=p.querySelector('.ep-search');
+  const byGroup=groups.map(()=>[]);
+  for(const e of window.EMOJI_DATA||[])byGroup[e[3]]?.push(e);
+  const renderAll=()=>{
+    const recent=getRecentEmoji().map(h=>EMOJI_BY_HEX.get(h));
+    main.innerHTML=(recent.length?`<div class="ep-section" data-sec="recent"><div class="ep-section-title">Frequently Used</div><div class="ep-grid">${recent.map(emojiButton).join('')}</div></div>`:'')+
+      groups.map((g,i)=>`<div class="ep-section" data-sec="g${i}"><div class="ep-section-title">${esc(g.label)}</div><div class="ep-grid">${byGroup[i].map(emojiButton).join('')}</div></div>`).join('');
+    p.querySelector('.ep-rail [data-target="recent"]').style.display=recent.length?'':'none';
+    updateRail();
+  };
+  const renderSearch=q=>{
+    const words=q.toLowerCase().split(/\s+/).filter(Boolean);
+    const hits=(window.EMOJI_DATA||[]).filter(e=>{const hay=(e[2].replace(/_/g,' ')+' '+e[4]).toLowerCase();return words.every(w=>hay.includes(w));});
+    main.innerHTML=hits.length?`<div class="ep-section"><div class="ep-section-title">Results</div><div class="ep-grid">${hits.slice(0,300).map(emojiButton).join('')}</div></div>`
+      :'<div class="ep-empty">No emoji match that.</div>';
+  };
+  // Rail follows whichever section is at the top of the scroll area.
+  const updateRail=()=>{
+    if(search.value.trim())return;
+    const top=main.getBoundingClientRect().top+4;let cur=null;
+    for(const sec of main.querySelectorAll('.ep-section'))if(sec.getBoundingClientRect().top<=top)cur=sec.dataset.sec;
+    cur=cur||main.querySelector('.ep-section')?.dataset.sec;
+    p.querySelectorAll('.ep-rail button').forEach(b=>b.classList.toggle('active',b.dataset.target===cur));
+  };
+  main.addEventListener('scroll',updateRail,{passive:true});
+  p.querySelector('.ep-rail').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-target]');if(!b)return;
+    if(search.value){search.value='';renderAll();}
+    const sec=main.querySelector(`[data-sec="${b.dataset.target}"]`);
+    if(sec)main.scrollTop=sec.offsetTop;
+  });
+  search.addEventListener('input',()=>{const q=search.value.trim();if(q)renderSearch(q);else{renderAll();main.scrollTop=0;}});
+  search.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();const first=main.querySelector('.ep-grid button');if(first)pickEmoji(first.dataset.hex,e.shiftKey);}
+  });
+  const prevImg=p.querySelector('.ep-prev'),prevName=p.querySelector('.ep-name');
+  main.addEventListener('mouseover',e=>{
+    const b=e.target.closest('.ep-grid button');if(!b)return;
+    const em=EMOJI_BY_HEX.get(b.dataset.hex);
+    prevImg.src=emojiSrc(em[0]);prevImg.style.visibility='visible';prevName.textContent=`:${em[2]}:`;
+  });
+  main.addEventListener('click',e=>{const b=e.target.closest('.ep-grid button');if(b)pickEmoji(b.dataset.hex,e.shiftKey);});
+  p.querySelectorAll('.ep-credit a').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
+  p.renderAll=renderAll;p.updateRail=updateRail;
+  emojiPickerBuilt=true;
+}
+function pickEmoji(hex,keepOpen){
+  const e=EMOJI_BY_HEX.get(hex);if(!e)return;
+  const ta=document.getElementById('msg-input');
+  const start=ta.selectionStart??ta.value.length,end=ta.selectionEnd??start;
+  ta.value=ta.value.slice(0,start)+e[1]+ta.value.slice(end);
+  const pos=start+e[1].length;
+  ta.focus();ta.setSelectionRange(pos,pos);autoResize(ta);
+  ta.dispatchEvent(new Event('input',{bubbles:true}));
+  noteRecentEmoji(hex);
+  if(!keepOpen)closeEmojiPicker();
+}
+function openEmojiPicker(){
+  const p=document.getElementById('emoji-picker');
+  if(!emojiPickerBuilt)buildEmojiPicker();
+  const search=p.querySelector('.ep-search');search.value='';
+  p.renderAll();                                   // refresh Frequently Used
+  p.classList.remove('hidden');
+  p.querySelector('.ep-main').scrollTop=0;
+  p.updateRail(); // now that it's visible and has real positions
+  document.getElementById('emoji-btn').classList.add('active');
+  search.focus();
+}
+function closeEmojiPicker(){
+  document.getElementById('emoji-picker')?.classList.add('hidden');
+  document.getElementById('emoji-btn')?.classList.remove('active');
+}
+function initEmojiPicker(){
+  const btn=document.getElementById('emoji-btn');
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(document.getElementById('emoji-picker').classList.contains('hidden'))openEmojiPicker();else closeEmojiPicker();
+  });
+  document.addEventListener('mousedown',e=>{
+    if(!e.target.closest('#emoji-picker,#emoji-btn'))closeEmojiPicker();
+  },true);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&!document.getElementById('emoji-picker').classList.contains('hidden')){e.stopImmediatePropagation();closeEmojiPicker();document.getElementById('msg-input').focus();}
+  },true);
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -3326,6 +3518,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initEmojiPicker();
   initVoiceUserMenu();
   initAudioSettingsUI();
   pushAllAudioSettings();
