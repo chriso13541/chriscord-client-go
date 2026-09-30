@@ -263,13 +263,6 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .msg-actions { position:absolute; top:2px; right:8px; opacity:0; transition:opacity .1s; display:flex; gap:2px; }
 .msg-action-btn { background:var(--bg-light); border:1px solid var(--border); border-radius:4px; color:var(--text-muted); cursor:pointer; font-size:.9rem; padding:2px 7px; line-height:1.4; transition:background .1s,color .1s; }
 .msg-action-btn:hover { background:var(--bg-mid); color:var(--text); }
-.msg-dropdown { position:absolute; top:26px; right:0; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px; padding:4px; min-width:150px; z-index:60; box-shadow:0 4px 20px rgba(0,0,0,.4); }
-.msg-dropdown.dropdown-up { top:auto; bottom:26px; }
-.msg-dropdown-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:4px; font-size:.85rem; cursor:pointer; color:var(--text); white-space:nowrap; }
-.msg-dropdown-item:hover { background:var(--bg-light); }
-.msg-dropdown-item.danger { color:var(--red); }
-.msg-dropdown-item.danger:hover { background:rgba(240,71,71,.12); }
-.msg-dropdown-item .dd-label { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* Icons (Material Symbols sprite). Sized in em so they follow the
    surrounding font size; filled with the current text colour. */
@@ -370,7 +363,7 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .voice-occupant-status .ic.local { color:var(--red); }
 
 /* ── Emoji (OpenMoji) ─────────────────────────────────────────── */
-img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em; object-fit:contain; }
+img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; object-fit:contain; }
 /* A message that's only 1–3 emoji shows them at 4× the normal size. */
 .msg-content.emoji-only img.emoji { width:5.5em; height:5.5em; margin:.1em .05em; vertical-align:middle; }
 #emoji-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px 2px; display:inline-flex; align-items:center; flex-shrink:0; transition:color .15s; }
@@ -489,6 +482,18 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 .ap-av { width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:.6rem; flex-shrink:0; }
 .ap-preview-btn { margin-top:10px; }
 .ap-preview-btn .btn { background:var(--ap-accent, var(--accent)); pointer-events:none; }
+
+/* ── Custom right-click menu (replaces the browser's white one) ─── */
+#ctx-menu { position:fixed; z-index:460; min-width:188px; max-width:280px; padding:6px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 28px rgba(0,0,0,.45); font-size:.86rem; animation:ctx-in .09s ease-out; }
+@keyframes ctx-in { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:none; } }
+.ctx-item { display:flex; align-items:center; gap:10px; width:100%; padding:7px 8px; border:none; border-radius:4px; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+.ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background:var(--accent); color:#fff; outline:none; }
+.ctx-item.danger { color:var(--red); }
+.ctx-item.danger:hover:not(:disabled) { background:var(--red); color:#fff; }
+.ctx-item:disabled { opacity:.4; cursor:default; }
+.ctx-item .ctx-label { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ctx-item .ic { width:17px; height:17px; flex-shrink:0; }
+.ctx-sep { height:1px; margin:4px 6px; background:var(--border); }
 
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
@@ -654,6 +659,14 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <symbol id="ic-info" viewBox="0 -960 960 960"><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
   <symbol id="ic-edit" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></symbol>
   <symbol id="ic-drag_indicator" viewBox="0 -960 960 960"><path d="M360-160q-33 0-56.5-23.5T280-240q0-33 23.5-56.5T360-320q33 0 56.5 23.5T440-240q0 33-23.5 56.5T360-160Zm240 0q-33 0-56.5-23.5T520-240q0-33 23.5-56.5T600-320q33 0 56.5 23.5T680-240q0 33-23.5 56.5T600-160ZM360-400q-33 0-56.5-23.5T280-480q0-33 23.5-56.5T360-560q33 0 56.5 23.5T440-480q0 33-23.5 56.5T360-400Zm240 0q-33 0-56.5-23.5T520-480q0-33 23.5-56.5T600-560q33 0 56.5 23.5T680-480q0 33-23.5 56.5T600-400ZM360-640q-33 0-56.5-23.5T280-720q0-33 23.5-56.5T360-800q33 0 56.5 23.5T440-720q0 33-23.5 56.5T360-640Zm240 0q-33 0-56.5-23.5T520-720q0-33 23.5-56.5T600-800q33 0 56.5 23.5T680-720q0 33-23.5 56.5T600-640Z"/></symbol>
+  <symbol id="ic-content_copy" viewBox="0 -960 960 960"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></symbol>
+  <symbol id="ic-content_cut" viewBox="0 -960 960 960"><path d="M760-120 480-400l-94 94q8 15 11 32t3 34q0 66-47 113T240-80q-66 0-113-47T80-240q0-66 47-113t113-47q17 0 34 3t32 11l94-94-94-94q-15 8-32 11t-34 3q-66 0-113-47T80-720q0-66 47-113t113-47q66 0 113 47t47 113q0 17-3 34t-11 32l494 494v40H760ZM600-520l-80-80 240-240h120v40L600-520ZM240-640q33 0 56.5-23.5T320-720q0-33-23.5-56.5T240-800q-33 0-56.5 23.5T160-720q0 33 23.5 56.5T240-640Zm240 180q8 0 14-6t6-14q0-8-6-14t-14-6q-8 0-14 6t-6 14q0 8 6 14t14 6ZM240-160q33 0 56.5-23.5T320-240q0-33-23.5-56.5T240-320q-33 0-56.5 23.5T160-240q0 33 23.5 56.5T240-160Z"/></symbol>
+  <symbol id="ic-content_paste" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h167q11-35 43-57.5t70-22.5q40 0 71.5 22.5T594-840h166q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560h-80v120H280v-120h-80v560Zm280-560q17 0 28.5-11.5T520-800q0-17-11.5-28.5T480-840q-17 0-28.5 11.5T440-800q0 17 11.5 28.5T480-760Z"/></symbol>
+  <symbol id="ic-select_all" viewBox="0 -960 960 960"><path d="M280-280v-400h400v400H280Zm80-80h240v-240H360v240ZM200-200v80q-33 0-56.5-23.5T120-200h80Zm-80-80v-80h80v80h-80Zm0-160v-80h80v80h-80Zm0-160v-80h80v80h-80Zm80-160h-80q0-33 23.5-56.5T200-840v80Zm80 640v-80h80v80h-80Zm0-640v-80h80v80h-80Zm160 640v-80h80v80h-80Zm0-640v-80h80v80h-80Zm160 640v-80h80v80h-80Zm0-640v-80h80v80h-80Zm160 640v-80h80q0 33-23.5 56.5T760-120Zm0-160v-80h80v80h-80Zm0-160v-80h80v80h-80Zm0-160v-80h80v80h-80Zm0-160v-80q33 0 56.5 23.5T840-760h-80Z"/></symbol>
+  <symbol id="ic-open_in_new" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></symbol>
+  <symbol id="ic-link" viewBox="0 -960 960 960"><path d="M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z"/></symbol>
+  <symbol id="ic-keep_off" viewBox="0 -960 960 960"><path d="M680-840v80h-40v327l-80-80v-247H400v87l-87-87-33-33v-47h400ZM480-40l-40-40v-240H240v-80l80-80v-46L56-792l56-56 736 736-58 56-264-264h-6v240l-40 40ZM354-400h92l-44-44-2-2-46 46Zm126-193Zm-78 149Z"/></symbol>
+  <symbol id="ic-delete" viewBox="0 -960 960 960"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -1064,6 +1077,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   </div>
 </div>
 <div id="profile-popup" class="hidden"></div>
+<div id="ctx-menu" class="hidden" role="menu"></div>
 <div id="server-info-pop" class="hidden" role="dialog" aria-label="About this server"></div>
 <div id="voice-user-menu" class="hidden"></div>
 <div id="toast"></div>
@@ -3053,41 +3067,15 @@ function buildMsgEl(msg,grouped){
 }
 
 // ── 3-DOT DROPDOWN ───────────────────────────────────────────────
+// The ⋯ button opens the same menu as right-clicking the message (same
+// items and icons), lined up under the button's right edge.
+let dotsMenuFor=null;
 function toggleDropdown(msgEl,msg){
-  closeDropdown();
-  const existing=msgEl.querySelector('.msg-dropdown');
-  if(existing){existing.remove();state.activeDropdown=null;return;}
-  const dd=document.createElement('div');dd.className='msg-dropdown';
-  const isOwn=msg.username===state.username;
-  (msg.attachments||[]).forEach(a=>{
-    const item=document.createElement('div');item.className='msg-dropdown-item';
-    item.innerHTML=`<span class="dd-label" title="${esc(a.name||'file')}">Download ${esc(a.name||'file')}</span>`;
-    item.addEventListener('click',()=>{closeDropdown();downloadAttachment(a);});
-    dd.appendChild(item);
-  });
-  const pinItem=document.createElement('div');pinItem.className='msg-dropdown-item';pinItem.textContent=msg.pinned?'Unpin':'Pin';
-  pinItem.addEventListener('click',async()=>{
-    closeDropdown();
-    try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}
-    catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
-  });
-  dd.appendChild(pinItem);
-  if(isOwn){
-    const editItem=document.createElement('div');editItem.className='msg-dropdown-item';editItem.textContent='Edit';
-    editItem.addEventListener('click',()=>{closeDropdown();startEdit(msgEl,msg);});
-    const delItem=document.createElement('div');delItem.className='msg-dropdown-item danger';delItem.textContent='Delete';
-    delItem.addEventListener('click',()=>{closeDropdown();showDeleteConfirm(msg.id);});
-    dd.appendChild(editItem);dd.appendChild(delItem);
-  }
-  msgEl.querySelector('.msg-actions').appendChild(dd);
-  state.activeDropdown=dd;
-
-  // If the menu would extend past the visible message list (e.g. the last
-  // message in the channel, right above the input box), open it upward
-  // instead of downward so it's never rendered under the input area.
-  const messagesEl=document.getElementById('messages');
-  const ddRect=dd.getBoundingClientRect(),containerRect=messagesEl.getBoundingClientRect();
-  if(ddRect.bottom>containerRect.bottom)dd.classList.add('dropdown-up');
+  if(ctxOpen&&dotsMenuFor===msg.id){closeContextMenu();return;}
+  const btn=msgEl.querySelector('.msg-action-btn[title="More options"]'),r=btn.getBoundingClientRect();
+  const fake={target:msgEl.querySelector('.msg-body')||msgEl,clientX:r.right,clientY:r.bottom};
+  showContextMenu(messageMenu(msgEl,msg,fake),r.right,r.bottom+4,{alignRight:true});
+  dotsMenuFor=msg.id;
 }
 // Downloads go through the user's own browser, Discord-style: the server
 // is the CDN, and ?download=1 makes it answer with Content-Disposition:
@@ -3105,7 +3093,7 @@ async function downloadAttachment(a){
     window.runtime.BrowserOpenURL(`${base}${sep}download=1&name=${encodeURIComponent(a.name||'file')}`);
   }catch(err){toast('Download failed: '+err,true);}
 }
-function closeDropdown(){document.querySelectorAll('.msg-dropdown').forEach(d=>d.remove());state.activeDropdown=null;}
+function closeDropdown(){if(dotsMenuFor)closeContextMenu();state.activeDropdown=null;}
 
 // ── DELETE CONFIRM ────────────────────────────────────────────────
 function showDeleteConfirm(msgId){
@@ -4296,6 +4284,113 @@ function initElasticScroll(){
   box.addEventListener('change',()=>{elasticOn=box.checked;localStorage.setItem('elasticScroll',elasticOn?'1':'0');persistClientSettings();});
 }
 
+// ── RIGHT-CLICK MENUS ────────────────────────────────────────────
+// The browser's own (white) context menu never shows. Like Discord,
+// right-click does something only where it's useful:
+//   a message      → Add Reaction, Copy Text, Pin/Unpin, Edit, Delete, Download…
+//   a link         → Open Link, Copy Link (plus the message items)
+//   selected text  → Copy
+//   a text box     → Cut, Copy, Paste, Select All
+//   someone in a voice channel → their volume/mute menu (see above)
+// Anywhere else, right-click simply does nothing.
+let ctxOpen=false;
+function showContextMenu(items,x,y,opts={}){
+  const menu=document.getElementById('ctx-menu');
+  // Drop leading/trailing/doubled separators left by conditional items.
+  const clean=items.filter(Boolean).filter((it,i,a)=>it!=='-'||(i>0&&i<a.length-1&&a[i-1]!=='-'));
+  if(!clean.some(it=>it!=='-'))return;
+  menu.innerHTML='';
+  for(const it of clean){
+    if(it==='-'){const d=document.createElement('div');d.className='ctx-sep';menu.appendChild(d);continue;}
+    const b=document.createElement('button');b.type='button';b.className='ctx-item'+(it.danger?' danger':'');b.disabled=!!it.disabled;b.setAttribute('role','menuitem');
+    b.innerHTML=`<span class="ctx-label">${esc(it.label)}</span>${it.icon?icon(it.icon):''}`;
+    b.addEventListener('click',e=>{e.stopPropagation();closeContextMenu();it.action?.();});
+    menu.appendChild(b);
+  }
+  closeDropdown();closeProfilePopup();
+  menu.classList.remove('hidden');ctxOpen=true;
+  // At the pointer, flipped to stay on-screen; screen px → CSS px for zoom.
+  // offsetWidth/Height: unaffected by the opening animation's scale.
+  const z=uiScale(),r={width:menu.offsetWidth*z,height:menu.offsetHeight*z},m=6;
+  let px=opts.alignRight?x-r.width:x,py=y;
+  if(px<m)px=m;
+  if(px+r.width>innerWidth-m)px=Math.max(m,x-r.width);
+  if(py+r.height>innerHeight-m)py=Math.max(m,y-r.height);
+  menu.style.left=px/z+'px';menu.style.top=py/z+'px';
+}
+function closeContextMenu(){
+  dotsMenuFor=null;
+  if(!ctxOpen)return;
+  ctxOpen=false;document.getElementById('ctx-menu').classList.add('hidden');
+}
+const pointAnchor=(x,y)=>({getBoundingClientRect:()=>new DOMRect(x,y,0,0)});
+async function copyText(t){
+  try{await window.runtime.ClipboardSetText(t);}catch{try{await navigator.clipboard.writeText(t);}catch{toast('Could not copy',true);return;}}
+}
+function textFieldMenu(el){
+  const hasSel=el.selectionStart!==el.selectionEnd,ro=el.readOnly||el.disabled;
+  const sel=()=>el.value.slice(el.selectionStart,el.selectionEnd);
+  const replaceSel=text=>{
+    const a=el.selectionStart,b=el.selectionEnd;el.value=el.value.slice(0,a)+text+el.value.slice(b);
+    el.setSelectionRange(a+text.length,a+text.length);el.dispatchEvent(new Event('input',{bubbles:true}));el.focus();
+  };
+  return [
+    {label:'Cut',icon:'content_cut',disabled:!hasSel||ro||el.type==='password',action:()=>{copyText(sel());replaceSel('');}},
+    {label:'Copy',icon:'content_copy',disabled:!hasSel||el.type==='password',action:()=>copyText(sel())},
+    {label:'Paste',icon:'content_paste',disabled:ro,action:async()=>{
+      let t='';try{t=await window.runtime.ClipboardGetText();}catch{try{t=await navigator.clipboard.readText();}catch{}}
+      if(t)replaceSel(t);
+    }},
+    '-',
+    {label:'Select All',icon:'select_all',disabled:!el.value,action:()=>{el.focus();el.select();}},
+  ];
+}
+function messageMenu(msgEl,msg,e){
+  const isOwn=msg.username===state.username;
+  const link=e.target.closest('a.msg-link');
+  const img=e.target.closest('.grid-img');
+  const selection=String(window.getSelection()||'').trim();
+  const attachments=msg.attachments||[];
+  const imgAttach=img?attachments.filter(a=>a.mime?.startsWith('image/'))[[...msgEl.querySelectorAll('.grid-img')].indexOf(img)]:null;
+  return [
+    selection?{label:'Copy',icon:'content_copy',action:()=>copyText(selection)}:null,
+    link?{label:'Open Link',icon:'open_in_new',action:()=>openExternalURL(link.dataset.url)}:null,
+    link?{label:'Copy Link',icon:'link',action:()=>copyText(link.dataset.url)}:null,
+    imgAttach?{label:'Open Image',icon:'zoom_in',action:()=>getImageBlobURL(imgAttach.url).then(u=>openLightbox(u,imgAttach,msg))}:null,
+    imgAttach?{label:'Save Image',icon:'download',action:()=>downloadAttachment(imgAttach)}:null,
+    (selection||link||imgAttach)?'-':null,
+    {label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))},
+    msg.content?{label:'Copy Text',icon:'content_copy',action:()=>copyText(msg.content)}:null,
+    {label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
+      try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
+    }},
+    isOwn?{label:'Edit Message',icon:'edit',action:()=>startEdit(msgEl,msg)}:null,
+    ...(!imgAttach?attachments.map(a=>({label:`Download ${a.name||'file'}`,icon:'download',action:()=>downloadAttachment(a)})):[]),
+    isOwn?'-':null,
+    isOwn?{label:'Delete Message',icon:'delete',danger:true,action:()=>showDeleteConfirm(msg.id)}:null,
+  ];
+}
+function initContextMenus(){
+  document.addEventListener('contextmenu',e=>{
+    e.preventDefault(); // never the browser's own menu
+    closeContextMenu();
+    if(e.target.closest('.voice-occupant-row[data-user]'))return; // its own menu (initVoiceUserMenu)
+    const field=e.target.closest('input[type=text],input[type=password],input[type=search],input:not([type]),textarea');
+    if(field){showContextMenu(textFieldMenu(field),e.clientX,e.clientY);return;}
+    const msgEl=e.target.closest('.msg-group[data-id]');
+    if(msgEl&&!e.target.closest('.msg-edit-wrap')){
+      const msg=state.messages.find(m=>m.id===msgEl.dataset.id);
+      if(msg){showContextMenu(messageMenu(msgEl,msg,e),e.clientX,e.clientY);return;}
+    }
+    const selection=String(window.getSelection()||'').trim();
+    if(selection)showContextMenu([{label:'Copy',icon:'content_copy',action:()=>copyText(selection)}],e.clientX,e.clientY);
+  });
+  document.addEventListener('mousedown',e=>{if(ctxOpen&&!e.target.closest('#ctx-menu,.msg-action-btn[title="More options"]'))closeContextMenu();},true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ctxOpen){e.stopImmediatePropagation();closeContextMenu();}},true);
+  window.addEventListener('resize',closeContextMenu);window.addEventListener('blur',closeContextMenu);
+  document.addEventListener('scroll',closeContextMenu,true);
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -4591,6 +4686,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initContextMenus();
   initEditServer();
   initElasticScroll();
   initAppearance();
