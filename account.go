@@ -597,6 +597,9 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	if _, err := os.Stat(filepath.Join(srcDir, "banner.png")); err == nil {
 		_ = copyFile(filepath.Join(srcDir, "banner.png"), bannerPath(destDir), 0600) // optional, like pfp.png
 	}
+	if _, err := os.Stat(filepath.Join(srcDir, clientSettingsFile)); err == nil {
+		_ = copyFile(filepath.Join(srcDir, clientSettingsFile), filepath.Join(destDir, clientSettingsFile), 0600) // theme etc.
+	}
 	mergeServersIfPresent(filepath.Join(srcDir, "servers.json"))
 
 	account, err := unlockSlug(slug, passphrase)
@@ -624,14 +627,22 @@ func mergeServersIfPresent(path string) {
 		return
 	}
 	current := loadServers()
+	// Compare addresses without http(s):// or a trailing slash, so a
+	// server saved as "myserver" on one machine and "https://myserver" on
+	// another isn't added twice.
+	key := func(d string) string {
+		d = strings.ToLower(strings.TrimRight(strings.TrimSpace(d), "/"))
+		return strings.TrimPrefix(strings.TrimPrefix(d, "https://"), "http://")
+	}
 	existing := make(map[string]bool, len(current))
 	for _, s := range current {
-		existing[s.Domain] = true
+		existing[key(s.Domain)] = true
 	}
 	changed := false
 	for _, s := range bundled {
-		if !existing[s.Domain] {
-			current = upsertServer(current, s)
+		if !existing[key(s.Domain)] {
+			current = append(current, s)
+			existing[key(s.Domain)] = true
 			changed = true
 		}
 	}
@@ -661,7 +672,7 @@ func buildAccountExport(slug, passphrase string) ([]byte, string, error) {
 
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	for _, name := range []string{"identity.json", "account.json", "pfp.png", "banner.png"} {
+	for _, name := range []string{"identity.json", "account.json", "pfp.png", "banner.png", clientSettingsFile} {
 		srcPath := filepath.Join(dir, name)
 		if _, err := os.Stat(srcPath); err != nil {
 			continue // pfp.png especially is commonly absent — skip quietly

@@ -44,6 +44,10 @@ type App struct {
 	// "invisible") — sent on connect and whenever the frontend changes it.
 	// Stored in an atomic.Value so it can be read while a.mu is held.
 	presence         atomic.Value
+	// pendingExport holds a built, encrypted account key between
+	// PrepareAccountExport and SaveAccountExport (see those).
+	pendingExport    []byte
+	pendingExportAs  string
 }
 
 func NewApp() *App { return &App{} }
@@ -126,7 +130,14 @@ func (a *App) CreateAccount(username, passphrase, pfpPath string) (*AccountView,
 func (a *App) ImportAccount(sourcePath, passphrase string) (*AccountView, error) {
 	acct, err := ImportAccount(sourcePath, passphrase)
 	if err != nil { return nil, err }
-	a.mu.Lock(); a.account = acct; a.mu.Unlock()
+	a.mu.Lock()
+	a.account = acct
+	// The import merged the bundle's servers into servers.json on disk.
+	// Reload them — the in-memory list was read at startup, and the next
+	// Connect() saves that list back, which used to write the imported
+	// servers straight back out of the file.
+	a.servers = loadServers()
+	a.mu.Unlock()
 	return acct.View(), nil
 }
 
@@ -161,6 +172,76 @@ func (a *App) ExportAccount(passphrase string) (string, error) {
 		return "", err
 	}
 	return destPath, nil
+}
+
+// PrepareAccountExport checks the passphrase and builds the encrypted
+// account key (the slow part — key derivation), keeping it in memory, and
+// returns the file name it will be saved as. SaveAccountExport then asks
+// where to save it. Split in two so the save dialog is opened by a mouse
+// click on its own button, not straight from pressing Enter in the
+// passphrase box: on Windows, typing hides the pointer, and a dialog that
+// opens while it's hidden could come up with no visible cursor.
+func (a *App) PrepareAccountExport(passphrase string) (string, error) {
+	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
+	if slug == "" { return "", fmt.Errorf("no account unlocked") }
+	encrypted, finalName, err := buildAccountExport(slug, passphrase)
+	if err != nil {
+		return "", err
+	}
+	a.mu.Lock(); a.pendingExport, a.pendingExportAs = encrypted, finalName; a.mu.Unlock()
+	return finalName, nil
+}
+
+// SaveAccountExport shows the save dialog for the key built by
+// PrepareAccountExport and writes it. Returns "" if the dialog was
+// cancelled (the prepared key is kept, so Save can be tried again).
+func (a *App) SaveAccountExport() (string, error) {
+	a.mu.Lock(); data, name := a.pendingExport, a.pendingExportAs; a.mu.Unlock()
+	if data == nil {
+		return "", fmt.Errorf("nothing to save — enter your passphrase first")
+	}
+	destPath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title: "Export account key", DefaultFilename: name,
+		Filters: []runtime.FileFilter{{DisplayName: "Account key", Pattern: "*.zip"}},
+	})
+	if err != nil || destPath == "" {
+		return "", err
+	}
+	if err := os.WriteFile(destPath, data, 0600); err != nil {
+		return "", err
+	}
+	a.mu.Lock(); a.pendingExport, a.pendingExportAs = nil, ""; a.mu.Unlock()
+	return destPath, nil
+}
+
+// CancelAccountExport drops a prepared, unsaved account key.
+func (a *App) CancelAccountExport() {
+	a.mu.Lock(); a.pendingExport, a.pendingExportAs = nil, ""; a.mu.Unlock()
+}
+
+// ── Client settings (theme etc.), stored with the account ──────────────
+
+// clientSettingsFile holds the app's look-and-feel settings (theme,
+// background, elastic scroll…) inside the account folder, so they travel
+// in the exported account key and come back on import.
+const clientSettingsFile = "client-settings.json"
+
+// SaveClientSettings stores the frontend's settings JSON for this account.
+func (a *App) SaveClientSettings(settingsJSON string) error {
+	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
+	if slug == "" { return fmt.Errorf("no account unlocked") }
+	if !json.Valid([]byte(settingsJSON)) { return fmt.Errorf("settings aren't valid JSON") }
+	if len(settingsJSON) > 16<<20 { return fmt.Errorf("settings are too large") }
+	return os.WriteFile(filepath.Join(accountsDir(), slug, clientSettingsFile), []byte(settingsJSON), 0600)
+}
+
+// GetClientSettings returns this account's stored settings JSON, or "".
+func (a *App) GetClientSettings() string {
+	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
+	if slug == "" { return "" }
+	data, err := os.ReadFile(filepath.Join(accountsDir(), slug, clientSettingsFile))
+	if err != nil { return "" }
+	return string(data)
 }
 
 func (a *App) GetAccountInfo() *AccountView {

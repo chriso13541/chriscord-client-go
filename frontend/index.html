@@ -781,10 +781,18 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <div class="modal">
     <h2>Export Account Key</h2>
     <div class="error-msg hidden" id="export-error"></div>
-    <div class="form-group"><label>Passphrase</label><input id="export-passphrase" type="password" placeholder="Confirm your passphrase" autocomplete="off"><div class="hint">Protects the exported file — nobody can open it without this, including anything it carries with it like your saved servers' join keys.</div></div>
+    <div id="export-step-pass">
+      <div class="form-group"><label>Passphrase</label><input id="export-passphrase" type="password" placeholder="Confirm your passphrase" autocomplete="off"><div class="hint">Protects the exported file — nobody can open it without this, including anything it carries with it like your saved servers' join keys.</div></div>
+      <div class="hint" style="margin:-4px 0 12px">Includes your profile, saved servers, and your theme and appearance settings.</div>
+    </div>
+    <div id="export-step-save" class="hidden">
+      <p style="margin:0 0 6px">Your account key is ready to save as</p>
+      <p style="margin:0 0 14px;font-family:Consolas,monospace;color:var(--text-strong)" id="export-filename"></p>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="export-cancel-btn">Cancel</button>
-      <button class="btn btn-primary" id="export-confirm-btn">Export</button>
+      <button class="btn btn-primary" id="export-confirm-btn">Continue</button>
+      <button class="btn btn-primary hidden" id="export-save-btn">Save…</button>
     </div>
   </div>
 </div>
@@ -1153,6 +1161,7 @@ function setGateTab(tab){
 // regardless of which of the three got us here.
 async function enterApp(accountView){
   state.account=accountView||null;
+  await loadClientSettings();
   const el=document.getElementById('signed-in-as');
   if(el){
     el.innerHTML=state.account?`Signed in as <strong>${esc(state.account.username)}</strong> · <a id="export-account-link">Export Account Key</a>`:'';
@@ -1223,24 +1232,46 @@ async function submitImportAccount(){
 
 function openExportModal(){
   document.getElementById('export-passphrase').value='';
+  document.getElementById('export-step-pass').classList.remove('hidden');document.getElementById('export-step-save').classList.add('hidden');
+  document.getElementById('export-confirm-btn').classList.remove('hidden');document.getElementById('export-save-btn').classList.add('hidden');
   document.getElementById('export-error').classList.add('hidden');
   document.getElementById('modal-export').classList.remove('hidden');
   document.getElementById('export-passphrase').focus();
 }
-function closeExportModal(){document.getElementById('modal-export').classList.add('hidden');}
+function closeExportModal(){
+  document.getElementById('modal-export').classList.add('hidden');
+  window.go.main.App.CancelAccountExport().catch(()=>{});
+}
+// Two steps: Continue checks the passphrase and builds the key (the slow
+// part); then "Save…" opens the save dialog. The dialog is only ever opened
+// by a click on its own button — opening it straight from Enter in the
+// passphrase box is what left the Windows pointer hidden (Windows hides it
+// while you type) inside the file dialog.
 async function confirmExport(){
   const pass=document.getElementById('export-passphrase').value;
   const errEl=document.getElementById('export-error'),btn=document.getElementById('export-confirm-btn');
   if(!pass){errEl.textContent='Enter your passphrase.';errEl.classList.remove('hidden');return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
   try{
-    const finalPath=await window.go.main.App.ExportAccount(pass);
-    if(!finalPath){return;} // user canceled the save dialog
-    closeExportModal();
-    const finalName=finalPath.split(/[\\/]/).pop();
-    toast(`Account key exported as ${finalName}.`);
+    await persistClientSettings(); // make sure the key carries the current theme
+    const name=await window.go.main.App.PrepareAccountExport(pass);
+    document.getElementById('export-passphrase').value='';document.activeElement?.blur();
+    document.getElementById('export-filename').textContent=name;
+    document.getElementById('export-step-pass').classList.add('hidden');document.getElementById('export-step-save').classList.remove('hidden');
+    btn.classList.add('hidden');document.getElementById('export-save-btn').classList.remove('hidden');
   }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
-  finally{btn.disabled=false;btn.textContent='Export';}
+  finally{btn.disabled=false;btn.textContent='Continue';}
+}
+async function saveExport(){
+  const errEl=document.getElementById('export-error'),btn=document.getElementById('export-save-btn');
+  btn.disabled=true;errEl.classList.add('hidden');
+  try{
+    const finalPath=await window.go.main.App.SaveAccountExport();
+    if(!finalPath)return; // cancelled the dialog — still ready to try again
+    document.getElementById('modal-export').classList.add('hidden');
+    toast(`Account key exported as ${finalPath.split(/[\\/]/).pop()}.`);
+  }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
+  finally{btn.disabled=false;}
 }
 
 // ── URL detection ────────────────────────────────────────────────
@@ -4034,6 +4065,30 @@ function initPresence(){
   pushPresence(); // tell Go before the first connect, so it connects with the right status
 }
 
+// ── CLIENT SETTINGS, STORED WITH THE ACCOUNT ─────────────────────
+// Theme, background, the "use my own theme" choice and elastic scrolling
+// are saved into the account folder (client-settings.json) as well as
+// locally, so they travel in the exported account key. On sign-in the
+// account's copy wins — that's how an imported account brings its look.
+function collectClientSettings(){
+  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn};
+}
+async function persistClientSettings(){
+  try{await window.go.main.App.SaveClientSettings(JSON.stringify(collectClientSettings()));}
+  catch(err){console.warn('client settings: could not save to account:',err);}
+}
+async function loadClientSettings(){
+  let raw='';
+  try{raw=await window.go.main.App.GetClientSettings();}catch{}
+  if(!raw){await persistClientSettings();return;} // first time: seed from this install's settings
+  let s;try{s=JSON.parse(raw);}catch{return;}
+  if(s.appearance){appearance={...APPEARANCE_DEFAULTS,...s.appearance};try{localStorage.setItem('appearance',JSON.stringify(appearance));}catch{}}
+  if(typeof s.appearanceOverride==='boolean'){appearanceOverride=s.appearanceOverride;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');}
+  if(typeof s.elasticScroll==='boolean'){elasticOn=s.elasticScroll;localStorage.setItem('elasticScroll',elasticOn?'1':'0');const b=document.getElementById('ap-elastic');if(b)b.checked=elasticOn;}
+  apDraft={...appearance};
+  applyAppearance();
+}
+
 // ── APPEARANCE ───────────────────────────────────────────────────
 // Theme color (every panel/background/border shade is derived from one
 // color), accent color, and an optional background image with blur and
@@ -4170,7 +4225,7 @@ function shrinkBackground(dataUrl){
 function initAppearance(){
   applyAppearance();
   document.getElementById('ap-override').addEventListener('change',e=>{
-    appearanceOverride=e.target.checked;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');
+    appearanceOverride=e.target.checked;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');persistClientSettings();
     applyAppearance();updateOverrideHint();
   });
   const sw=document.getElementById('ap-swatches');
@@ -4194,7 +4249,7 @@ function initAppearance(){
   document.getElementById('ap-save').addEventListener('click',()=>{
     try{localStorage.setItem('appearance',JSON.stringify(apDraft));}
     catch{toast('That background image is too large to save — try a smaller one.',true);return;}
-    appearance={...apDraft};applyAppearance();renderAppearanceEditor();toast('Appearance saved');
+    appearance={...apDraft};applyAppearance();renderAppearanceEditor();persistClientSettings();toast('Appearance saved');
   });
   document.getElementById('ap-revert').addEventListener('click',()=>{apDraft={...appearance};renderAppearanceEditor();});
   document.getElementById('ap-default').addEventListener('click',()=>{apDraft={...APPEARANCE_DEFAULTS};renderAppearanceEditor();});
@@ -4238,7 +4293,7 @@ function initElasticScroll(){
   attachElastic(document.getElementById('messages'));
   const box=document.getElementById('ap-elastic');
   box.checked=elasticOn;
-  box.addEventListener('change',()=>{elasticOn=box.checked;localStorage.setItem('elasticScroll',elasticOn?'1':'0');});
+  box.addEventListener('change',()=>{elasticOn=box.checked;localStorage.setItem('elasticScroll',elasticOn?'1':'0');persistClientSettings();});
 }
 
 // ── LIGHTBOX ──────────────────────────────────────────────────────
@@ -4527,6 +4582,7 @@ function init(){
   document.getElementById('modal-confirm-delete').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDeleteConfirm();});
   document.getElementById('export-cancel-btn').addEventListener('click',closeExportModal);
   document.getElementById('export-confirm-btn').addEventListener('click',confirmExport);
+  document.getElementById('export-save-btn').addEventListener('click',saveExport);
   document.getElementById('export-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')confirmExport();});
   document.getElementById('modal-export').addEventListener('click',e=>{if(e.target===e.currentTarget)closeExportModal();});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeExportModal();closeDropdown();if(state.searchActive)exitSearch();else if(state.resultsMode==='pins')closeResultsPanel();}});
