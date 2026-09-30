@@ -33,7 +33,8 @@ const (
 // incoming audio track — a small buffer of decoded PCM the mixer drains
 // from, filled by that track's own read/decode goroutine.
 type voiceRemoteSource struct {
-	decoder *opus.Decoder
+	username string // whose audio this is — for per-user volume/mute
+	decoder  *opus.Decoder
 	mu      sync.Mutex
 	buf     []int16
 }
@@ -56,9 +57,8 @@ type VoiceSession struct {
 	encoder     *opus.Encoder
 
 	captureStream   *portaudio.Stream
-	captureBuf      []int16
-	wasSpeaking     bool // only touched from within the capture goroutine — no mutex needed
-	quietFrameCount int
+	captureBuf    []int16
+	vad           *voiceActivity // only touched from within the capture goroutine — no mutex needed
 	// Points at the App's own voiceMuted flag, not an owned value — a
 	// roster-change refresh tears down and rebuilds this whole session,
 	// and muting shouldn't silently reset just because someone else
@@ -570,6 +570,7 @@ func (s *VoiceSession) startCapture(micName string) error {
 		defer runtime.UnlockOSThread()
 
 		s.captureBuf = make([]int16, voiceFrameSize)
+		s.vad = newVoiceActivity()
 		params := portaudio.StreamParameters{
 			Input: portaudio.StreamDeviceParameters{
 				Device:   device,
@@ -598,7 +599,7 @@ func (s *VoiceSession) startCapture(micName string) error {
 			case <-s.stopped:
 				stream.Stop()
 				stream.Close()
-				if s.wasSpeaking {
+				if s.vad.reset() {
 					wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
 					s.app.sendSpeaking(s.boardID, false)
 				}
@@ -615,15 +616,26 @@ func (s *VoiceSession) startCapture(micName string) error {
 				// over the wire. Also clear the local speaking indicator
 				// if it was on, since it would be misleading to show
 				// "speaking" while muted.
-				if s.wasSpeaking {
-					s.wasSpeaking = false
-					s.quietFrameCount = 0
+				if s.vad.reset() {
 					wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
 					s.app.sendSpeaking(s.boardID, false)
 				}
 				continue
 			}
-			s.updateSpeakingState()
+			// Input gain + input sensitivity: the speaking ring and what's
+			// actually transmitted follow the same decision, so the ring
+			// lighting up means others really are hearing you. Below the
+			// threshold, silence is sent instead (keeps the stream's timing
+			// steady rather than stopping and starting it).
+			open, changed, level, threshold := s.vad.process(s.captureBuf)
+			s.vad.emitLevel(s.app, level, threshold)
+			if changed {
+				wailsruntime.EventsEmit(s.ctx, "voice:speaking", open)
+				s.app.sendSpeaking(s.boardID, open)
+			}
+			if !open {
+				clear(s.captureBuf)
+			}
 			n, err := s.encoder.Encode(s.captureBuf, encoded)
 			if err != nil {
 				continue
@@ -635,18 +647,8 @@ func (s *VoiceSession) startCapture(micName string) error {
 	return <-started
 }
 
-// Rough threshold for "this frame contains speech" against int16 PCM
-// (range -32768..32767) — a reasonable starting point, not precisely
-// tuned against real hardware; may need adjusting once tested against an
-// actual microphone and room. speakingHangoverFrames keeps the indicator
-// on through brief pauses between words rather than flickering on every
-// syllable break — quick to detect the start of speech, slower to detect
-// the end, which is how real voice-activity detectors behave.
-const (
-	speakingRMSThreshold   = 600
-	speakingHangoverFrames = 15 // ~300ms at the 20ms frame size used here
-)
-
+// rmsLevel is a frame's root-mean-square amplitude (int16 scale); see
+// levelDB in audio.go for the dBFS version the sensitivity setting uses.
 func rmsLevel(samples []int16) float64 {
 	if len(samples) == 0 {
 		return 0
@@ -657,27 +659,6 @@ func rmsLevel(samples []int16) float64 {
 		sum += f * f
 	}
 	return math.Sqrt(sum / float64(len(samples)))
-}
-
-// updateSpeakingState runs once per captured frame and emits voice:speaking
-// only when the speaking/not-speaking state actually changes, not on every
-// frame.
-func (s *VoiceSession) updateSpeakingState() {
-	if rmsLevel(s.captureBuf) > speakingRMSThreshold {
-		s.quietFrameCount = 0
-		if !s.wasSpeaking {
-			s.wasSpeaking = true
-			wailsruntime.EventsEmit(s.ctx, "voice:speaking", true)
-			s.app.sendSpeaking(s.boardID, true)
-		}
-		return
-	}
-	s.quietFrameCount++
-	if s.wasSpeaking && s.quietFrameCount > speakingHangoverFrames {
-		s.wasSpeaking = false
-		wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
-		s.app.sendSpeaking(s.boardID, false)
-	}
 }
 
 func (s *VoiceSession) startPlayback(speakerName string) error {
@@ -735,9 +716,11 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				if n > voiceFrameSize {
 					n = voiceFrameSize
 				}
-				if !deafened {
+				// Per-user volume/mute (set from the right-click menu)
+				// times overall output volume; 0 means skip them.
+				if g := audioCfg.playbackGain(r.username); !deafened && g > 0 {
 					for i := 0; i < n; i++ {
-						sum := int32(s.playBuf[i]) + int32(r.buf[i])
+						sum := int32(s.playBuf[i]) + int32(clampF(float64(r.buf[i])*g, -32768, 32767))
 						if sum > 32767 {
 							sum = 32767
 						} else if sum < -32768 {
@@ -766,7 +749,8 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 	if err != nil {
 		return
 	}
-	source := &voiceRemoteSource{decoder: decoder}
+	// The server labels each forwarded track "audio-<username>".
+	source := &voiceRemoteSource{username: strings.TrimPrefix(track.ID(), "audio-"), decoder: decoder}
 	s.remotesMu.Lock()
 	s.remotes[track.ID()] = source
 	s.remotesMu.Unlock()
@@ -896,6 +880,7 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 
 		captureBuf := make([]int16, voiceFrameSize)
 		playBuf := make([]int16, voiceFrameSize)
+		vad := newVoiceActivity()
 
 		inParams := portaudio.StreamParameters{
 			Input:           portaudio.StreamDeviceParameters{Device: inDevice, Channels: voiceChannels, Latency: inDevice.DefaultLowInputLatency},
@@ -957,6 +942,13 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 			}
 			if err := inStream.Read(); err != nil {
 				return
+			}
+			// Same gain and sensitivity as a real call, so the test sounds
+			// like what others would hear (silence while you're below it).
+			open, _, level, threshold := vad.process(captureBuf)
+			vad.emitLevel(a, level, threshold)
+			if !open {
+				clear(captureBuf)
 			}
 			copy(playBuf, captureBuf)
 			if err := outStream.Write(); err != nil {

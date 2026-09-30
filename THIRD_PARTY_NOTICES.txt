@@ -19,4 +19,4 @@ Icons used: add, arrow_downward, attach_file, audio_file, call_end, check,
 chevron_right, close, code, description, download, draft, error,
 folder_open, folder_zip, group, headphones, headset_off, keep, mic,
 mic_off, more_horiz, picture_as_pdf, play_arrow, progress_activity,
-search, send, settings, stop, video_file, volume_up, zoom_in.
+search, send, settings, stop, video_file, volume_off, volume_up, zoom_in.

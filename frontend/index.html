@@ -298,6 +298,35 @@ input,button,textarea { font-family:inherit; }
 #profile-save-bar .hint { font-size:.8rem; color:var(--text-muted); }
 .profile-divider { border:none; border-top:1px solid var(--border); margin:24px 0 4px; }
 
+/* ── Voice settings: sliders + sensitivity meter ─────────────── */
+.slider-row { display:flex; align-items:center; gap:12px; max-width:460px; }
+.slider-row input[type=range] { flex:1; accent-color:var(--accent); }
+.slider-val { width:48px; text-align:right; font-size:.82rem; color:var(--text); font-variant-numeric:tabular-nums; }
+.check-row { display:flex; align-items:center; gap:10px; font-size:.88rem; color:var(--text); cursor:pointer; margin-bottom:10px; user-select:none; }
+.check-row input { width:16px; height:16px; accent-color:var(--accent); margin:0; }
+#sens-wrap { position:relative; max-width:460px; height:34px; }
+#sens-meter { position:absolute; left:0; right:0; top:11px; height:12px; border-radius:6px; background:var(--bg-dark); overflow:hidden; }
+#sens-level { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--yellow); transition:width .06s linear; }
+#sens-level.open { background:var(--green); }
+#sens-thresh { position:absolute; top:5px; width:3px; height:24px; margin-left:-1px; border-radius:2px; background:var(--text-strong); pointer-events:none; }
+#sens-slider { position:absolute; left:0; right:0; top:0; width:100%; height:34px; margin:0; opacity:0; cursor:ew-resize; }
+#sens-slider:disabled { cursor:default; }
+#sens-wrap.auto #sens-thresh { background:var(--text-muted); }
+#sens-readout { font-size:.78rem; color:var(--text-muted); margin-top:4px; }
+
+/* ── Right-click voice menu ────────────────────────────────────── */
+#voice-user-menu { position:fixed; z-index:450; width:240px; padding:8px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 28px rgba(0,0,0,.45); font-size:.86rem; }
+#voice-user-menu .vum-head { display:flex; align-items:center; gap:8px; padding:4px 6px 8px; border-bottom:1px solid var(--border); margin-bottom:6px; font-weight:700; color:var(--text-strong); }
+#voice-user-menu .vum-head .user-avatar { width:24px; height:24px; font-size:.7rem; }
+#voice-user-menu .vum-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 6px; border-radius:4px; cursor:pointer; color:var(--text); }
+#voice-user-menu .vum-item:hover { background:var(--bg-light); }
+#voice-user-menu .vum-item input { width:16px; height:16px; accent-color:var(--red); margin:0; pointer-events:none; }
+#voice-user-menu .vum-label { padding:8px 6px 2px; font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); }
+#voice-user-menu .slider-row { padding:2px 6px 4px; }
+#voice-user-menu .vum-reset { font-size:.75rem; color:var(--text-muted); padding:2px 6px 4px; cursor:pointer; }
+#voice-user-menu .vum-reset:hover { color:var(--text); text-decoration:underline; }
+.voice-occupant-status .ic.local { color:var(--red); }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -450,6 +479,7 @@ input,button,textarea { font-family:inherit; }
   <symbol id="ic-play_arrow" viewBox="0 -960 960 960"><path d="M320-200v-560l440 280-440 280Zm80-280Zm0 134 210-134-210-134v268Z"/></symbol>
   <symbol id="ic-video_file" viewBox="0 -960 960 960"><path d="M360-240h160q17 0 28.5-11.5T560-280v-40l80 42v-164l-80 42v-40q0-17-11.5-28.5T520-480H360q-17 0-28.5 11.5T320-440v160q0 17 11.5 28.5T360-240ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-keep" viewBox="0 -960 960 960"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></symbol>
+  <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -722,12 +752,28 @@ input,button,textarea { font-family:inherit; }
       <select id="settings-mic-select"><option>Loading devices…</option></select>
       <label class="settings-label">Speaker</label>
       <select id="settings-speaker-select"><option>Loading devices…</option></select>
+
+      <label class="settings-label" for="input-gain">Input Volume</label>
+      <div class="slider-row"><input type="range" id="input-gain" min="0" max="200" step="1"><span class="slider-val" id="input-gain-val">100%</span></div>
+      <label class="settings-label" for="output-volume">Output Volume</label>
+      <div class="slider-row"><input type="range" id="output-volume" min="0" max="200" step="1"><span class="slider-val" id="output-volume-val">100%</span></div>
+
+      <label class="settings-label">Input Sensitivity</label>
+      <label class="check-row"><input type="checkbox" id="sens-auto"> Automatically determine input sensitivity</label>
+      <div id="sens-wrap" title="Drag to set how loud you need to be before you're transmitted">
+        <div id="sens-meter"><div id="sens-level"></div></div>
+        <div id="sens-thresh"></div>
+        <input type="range" id="sens-slider" min="-100" max="0" step="1" aria-label="Input sensitivity threshold">
+      </div>
+      <div id="sens-readout"></div>
+
       <button id="settings-mic-test-btn" class="settings-secondary-btn"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg> Test Voice</button>
-      <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker — a quick way to check your device selection works before joining an actual call.</p>
+      <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker, with your volume and sensitivity applied — exactly what others hear. The meter above moves while you're testing or in a call: the bar turns green when you're loud enough to be transmitted (and your speaking ring lights up).</p>
     </div>
   </div>
 </div>
 <div id="profile-popup" class="hidden"></div>
+<div id="voice-user-menu" class="hidden"></div>
 <div id="toast"></div>
 
 <script>
@@ -1207,6 +1253,7 @@ function renderSidebar(){
             // Mic + headphones always shown beside each name: grey while
             // on, the struck-through version in red while muted/deafened.
             const statusIcons=
+              (user!==state.username&&getUserAudio(user).muted?`<span title="Muted by you" style="display:inline-flex">${icon('volume_off','local')}</span>`:'')+
               (status.muted?icon('mic_off','off'):icon('mic'))+
               (status.deafened?icon('headset_off','off'):icon('headphones'));
             row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
@@ -1321,6 +1368,7 @@ function openSettings(tab='profile'){
 }
 function closeSettings(){
   document.getElementById('settings-modal').classList.add('hidden');
+  setLevelMeter(false);
   if(bannerCrop.img)closeBannerCropper();
   if(micTestRunning)stopMicTest();
   if(pfpCrop.img)closePfpCropper();
@@ -1346,6 +1394,7 @@ function stopMicTest(){
   window.go.main.App.StopMicTest().catch(()=>{});
 }
 function switchSettingsTab(name){
+  setLevelMeter(name==='voice'&&!document.getElementById('settings-modal').classList.contains('hidden'));
   document.getElementById('settings-content').classList.toggle('wide',name==='profile');
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
@@ -2874,6 +2923,125 @@ function initProfileEditor(){
   document.getElementById('profile-reset-btn').addEventListener('click',resetProfileDraft);
 }
 
+// ── AUDIO SETTINGS ───────────────────────────────────────────────
+// Input/output volume, input sensitivity (auto or a manual threshold in
+// dBFS) and per-user volume/mute. Saved in localStorage and pushed to the
+// Go side, which applies them to every audio frame (audio.go).
+const AUDIO_DEFAULTS={inputGain:1,outputVolume:1,autoSensitivity:true,thresholdDB:-50};
+function loadAudioSettings(){
+  try{return {...AUDIO_DEFAULTS,...JSON.parse(localStorage.getItem('audioSettings')||'{}')};}catch{return {...AUDIO_DEFAULTS};}
+}
+let audioSettings=loadAudioSettings();
+let userAudio=(()=>{try{return JSON.parse(localStorage.getItem('userAudio')||'{}');}catch{return {};}})();
+function getUserAudio(user){return {volume:1,muted:false,...(userAudio[user]||{})};}
+function pushAudioSettings(){
+  localStorage.setItem('audioSettings',JSON.stringify(audioSettings));
+  const a=audioSettings;
+  window.go?.main?.App?.SetAudioSettings(a.inputGain,a.outputVolume,a.autoSensitivity,a.thresholdDB)?.catch?.(()=>{});
+}
+function setUserAudio(user,patch){
+  const next={...getUserAudio(user),...patch};
+  if(next.volume===1&&!next.muted)delete userAudio[user];else userAudio[user]=next;
+  localStorage.setItem('userAudio',JSON.stringify(userAudio));
+  window.go.main.App.SetUserAudio(user,next.volume,next.muted).catch(()=>{});
+}
+function pushAllAudioSettings(){
+  pushAudioSettings();
+  for(const [u,v] of Object.entries(userAudio))window.go.main.App.SetUserAudio(u,v.volume??1,!!v.muted).catch(()=>{});
+}
+let levelMeterOn=false;
+function setLevelMeter(on){
+  if(on===levelMeterOn)return;
+  levelMeterOn=on;
+  window.go?.main?.App?.SetLevelMeter(on)?.catch?.(()=>{});
+  if(!on){const l=document.getElementById('sens-level');if(l){l.style.width='0';l.classList.remove('open');}}
+}
+const dbToPct=db=>Math.max(0,Math.min(100,(db+100)));  // -100..0 dBFS → 0..100%
+let lastAutoThreshold=null; // latest threshold auto mode picked, from voice:level
+function renderSensitivity(autoThreshold=lastAutoThreshold){
+  const a=audioSettings;
+  document.getElementById('sens-auto').checked=a.autoSensitivity;
+  const wrap=document.getElementById('sens-wrap'),slider=document.getElementById('sens-slider');
+  wrap.classList.toggle('auto',a.autoSensitivity);slider.disabled=a.autoSensitivity;
+  slider.value=String(Math.round(a.thresholdDB));
+  const thr=a.autoSensitivity?(autoThreshold??null):a.thresholdDB;
+  const mark=document.getElementById('sens-thresh');
+  mark.style.display=thr==null?'none':'';
+  if(thr!=null)mark.style.left=dbToPct(thr)+'%';
+  document.getElementById('sens-readout').textContent=a.autoSensitivity
+    ?(thr==null?'Automatic — adjusts to your background noise.':`Automatic — currently ${Math.round(thr)} dB, following your background noise.`)
+    :`Transmit when louder than ${Math.round(a.thresholdDB)} dB.`;
+}
+function initAudioSettingsUI(){
+  const gain=document.getElementById('input-gain'),vol=document.getElementById('output-volume');
+  const sync=()=>{
+    gain.value=String(Math.round(audioSettings.inputGain*100));
+    vol.value=String(Math.round(audioSettings.outputVolume*100));
+    document.getElementById('input-gain-val').textContent=gain.value+'%';
+    document.getElementById('output-volume-val').textContent=vol.value+'%';
+    renderSensitivity();
+  };
+  gain.addEventListener('input',()=>{audioSettings.inputGain=+gain.value/100;sync();pushAudioSettings();});
+  vol.addEventListener('input',()=>{audioSettings.outputVolume=+vol.value/100;sync();pushAudioSettings();});
+  document.getElementById('sens-auto').addEventListener('change',e=>{audioSettings.autoSensitivity=e.target.checked;sync();pushAudioSettings();});
+  document.getElementById('sens-slider').addEventListener('input',e=>{audioSettings.thresholdDB=+e.target.value;renderSensitivity();pushAudioSettings();});
+  window.runtime.EventsOn('voice:level',e=>{
+    if(!levelMeterOn||!e)return;
+    const l=document.getElementById('sens-level');
+    l.style.width=dbToPct(e.level)+'%';l.classList.toggle('open',!!e.open);
+    if(audioSettings.autoSensitivity){lastAutoThreshold=e.threshold;renderSensitivity();}
+  });
+  sync();
+}
+
+// ── RIGHT-CLICK VOICE MENU ───────────────────────────────────────
+// Right-click someone in a voice channel: mute them for yourself and set
+// how loud they are (0–200%). Left-click still opens their profile card.
+let voiceMenuFor=null;
+function openVoiceUserMenu(user,x,y){
+  closeProfilePopup();
+  voiceMenuFor=user;
+  const menu=document.getElementById('voice-user-menu');
+  const ua=getUserAudio(user);
+  menu.innerHTML=`
+    <div class="vum-head"><div class="user-avatar" data-pfp-user="${esc(user)}"></div><span>${esc(user)}</span></div>
+    <div class="vum-item" id="vum-mute"><span>Mute</span><input type="checkbox" ${ua.muted?'checked':''} tabindex="-1"></div>
+    <div class="vum-label">User Volume</div>
+    <div class="slider-row"><input type="range" id="vum-volume" min="0" max="200" step="1" value="${Math.round(ua.volume*100)}"><span class="slider-val" id="vum-volume-val">${Math.round(ua.volume*100)}%</span></div>
+    <div class="vum-reset" id="vum-reset">Reset to 100%</div>`;
+  const av=menu.querySelector('.user-avatar');setAvatarFallback(av,user);applyUserAvatar(av,user);
+  menu.querySelector('#vum-mute').addEventListener('click',()=>{
+    const muted=!getUserAudio(user).muted;
+    setUserAudio(user,{muted});menu.querySelector('#vum-mute input').checked=muted;renderSidebar();
+  });
+  const slider=menu.querySelector('#vum-volume'),val=menu.querySelector('#vum-volume-val');
+  slider.addEventListener('input',()=>{val.textContent=slider.value+'%';setUserAudio(user,{volume:+slider.value/100});});
+  menu.querySelector('#vum-reset').addEventListener('click',()=>{slider.value='100';val.textContent='100%';setUserAudio(user,{volume:1});});
+  menu.classList.remove('hidden');
+  // At the cursor, kept on-screen; converted for Ctrl +/- zoom like the profile popup.
+  const z=uiScale(),r=menu.getBoundingClientRect(),m=8;
+  const px=Math.max(m,Math.min(innerWidth-r.width-m,x)),py=Math.max(m,Math.min(innerHeight-r.height-m,y));
+  menu.style.left=px/z+'px';menu.style.top=py/z+'px';
+}
+function closeVoiceUserMenu(){
+  voiceMenuFor=null;
+  const menu=document.getElementById('voice-user-menu');
+  if(menu){menu.classList.add('hidden');menu.innerHTML='';}
+}
+function initVoiceUserMenu(){
+  document.addEventListener('contextmenu',e=>{
+    const row=e.target.closest('.voice-occupant-row[data-user]');
+    if(!row)return;
+    e.preventDefault();
+    const user=row.dataset.user;
+    if(user===state.username){toast('Your own volume is under Settings → Voice → Input Volume.');return;}
+    openVoiceUserMenu(user,e.clientX,e.clientY);
+  });
+  document.addEventListener('mousedown',e=>{if(voiceMenuFor&&!e.target.closest('#voice-user-menu'))closeVoiceUserMenu();},true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&voiceMenuFor){e.stopImmediatePropagation();closeVoiceUserMenu();}},true);
+  window.addEventListener('resize',closeVoiceUserMenu);
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -3158,6 +3326,9 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initVoiceUserMenu();
+  initAudioSettingsUI();
+  pushAllAudioSettings();
   initProfileEditor();
   document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();updateJumpToPresentVisibility();});
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
