@@ -42,6 +42,10 @@ export function FetchServerIcon(arg1) {
   return window['go']['main']['App']['FetchServerIcon'](arg1);
 }
 
+export function FetchServerThemeBackground() {
+  return window['go']['main']['App']['FetchServerThemeBackground']();
+}
+
 export function FetchUserPfp(arg1) {
   return window['go']['main']['App']['FetchUserPfp'](arg1);
 }

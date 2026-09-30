@@ -152,7 +152,7 @@ input,button,textarea { font-family:inherit; }
 /* Main chat */
 #main-column { flex:1; display:flex; flex-direction:column; min-width:0; }
 #content-row { flex:1; display:flex; min-height:0; }
-#chat-main { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-darkest); position:relative; }
+#chat-main { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-darkest); position:relative; overflow:hidden; }
 #chat-header { height:48px; padding:0 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; flex-shrink:0; }
 #chat-header .board-title { font-weight:700; font-size:1rem; color:var(--text-strong); }
 #chat-header .board-title::before { content:'# '; color:var(--text-muted); font-weight:400; }
@@ -359,13 +359,14 @@ input,button,textarea { font-family:inherit; }
 
 /* ── Emoji (OpenMoji) ─────────────────────────────────────────── */
 img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em; object-fit:contain; }
-.msg-content.emoji-only img.emoji { width:3rem; height:3rem; margin:.1rem .05rem; vertical-align:middle; }
+/* A message that's only 1–3 emoji shows them at 4× the normal size. */
+.msg-content.emoji-only img.emoji { width:5.5em; height:5.5em; margin:.1em .05em; vertical-align:middle; }
 #emoji-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px 2px; display:inline-flex; align-items:center; flex-shrink:0; transition:color .15s; }
 #emoji-btn .ic { width:24px; height:24px; }
 #emoji-btn:hover:not(:disabled), #emoji-btn.active { color:var(--yellow); }
 #emoji-btn:disabled { opacity:.3; cursor:default; }
 #emoji-picker { position:absolute; right:20px; bottom:100%; margin-bottom:8px; width:424px; height:440px; max-height:calc(100vh - 140px); display:flex; flex-direction:column; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); z-index:60; overflow:hidden; }
-.ep-top { padding:10px; border-bottom:1px solid var(--border); }
+.ep-top { padding:10px; border-bottom:1px solid var(--border); position:relative; z-index:2; background:var(--bg-mid); }
 .ep-search { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text); font:inherit; font-size:.88rem; outline:none; }
 .ep-search:focus { border-color:var(--accent); }
 .ep-body { flex:1; display:flex; min-height:0; }
@@ -381,7 +382,8 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 .ep-grid button:hover, .ep-grid button:focus-visible { background:var(--bg-light); outline:none; }
 .ep-grid img { width:32px; height:32px; display:block; }
 .ep-empty { padding:40px 10px; text-align:center; color:var(--text-muted); font-size:.85rem; }
-.ep-foot { display:flex; align-items:center; gap:10px; padding:8px 12px; border-top:1px solid var(--border); background:var(--bg-dark); min-height:44px; box-sizing:border-box; }
+.ep-foot { display:flex; align-items:center; gap:10px; padding:8px 12px; border-top:1px solid var(--border); background:var(--bg-dark); min-height:44px; box-sizing:border-box; position:relative; z-index:2; }
+.ep-body { overflow:hidden; }
 .ep-foot img { width:28px; height:28px; }
 .ep-foot .ep-name { flex:1; font-weight:700; font-size:.85rem; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ep-credit { font-size:.68rem; color:var(--text-muted); white-space:nowrap; }
@@ -520,7 +522,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 #settings-close-btn:hover { background:var(--bg-light); color:var(--text); }
 
 /* Input area */
-#input-area { padding:0 20px 16px; flex-shrink:0; position:relative; }
+#input-area { padding:0 20px 16px; flex-shrink:0; position:relative; z-index:2; } /* above #messages while it bounces */
 #attach-queue { display:flex; flex-wrap:wrap; align-items:flex-start; gap:14px; padding:16px 16px 12px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px 8px 0 0; border-bottom:none; }
 #attach-queue.empty { display:none; }
 #attach-queue:not(.empty) + #input-wrap { border-radius:0 0 8px 8px; }
@@ -916,6 +918,10 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-override"> Use my own theme instead of the server's</label>
         <p class="settings-hint" id="ap-override-hint" style="margin-top:0"></p>
       </div>
+      <div class="ap-override">
+        <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-elastic"> Elastic scrolling</label>
+        <p class="settings-hint" style="margin-top:0">A small bounce when you scroll past the top or bottom of the chat and the emoji picker.</p>
+      </div>
       <div id="appearance-editor">
         <div class="ap-fields">
           <label class="settings-label">Theme Color</label>
@@ -1249,12 +1255,14 @@ function emojify(html){
     return out;
   }).join('');
 }
-// True when a message is nothing but a few emoji — shown large, like Discord.
+// True when a message is nothing but 1–3 emoji (spaces allowed) — those
+// are shown at 4× size. Any text, or a 4th emoji, keeps the normal size.
+const JUMBO_EMOJI_MAX=3;
 function isEmojiOnly(text){
   const t=(text||'').replace(/\s+/g,'');
   if(!t||!graphemes)return false;
   let n=0;
-  for(const {segment} of graphemes.segment(t)){if(!EMOJI_BY_CHAR.has(segment.replace(/\uFE0F/g,''))||++n>27)return false;}
+  for(const {segment} of graphemes.segment(t)){if(!EMOJI_BY_CHAR.has(segment.replace(/\uFE0F/g,''))||++n>JUMBO_EMOJI_MAX)return false;}
   return n>0;
 }
 
@@ -3643,6 +3651,7 @@ function buildEmojiPicker(){
   main.addEventListener('click',e=>{const b=e.target.closest('.ep-grid button');if(b)pickEmoji(b.dataset.hex,e.shiftKey);});
   p.querySelectorAll('.ep-credit a').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
   p.renderAll=renderAll;p.updateRail=updateRail;
+  attachElastic(main);
   emojiPickerBuilt=true;
 }
 let emojiPickerTarget={type:'input'};
@@ -3979,6 +3988,47 @@ function initAppearance(){
   document.getElementById('ap-default').addEventListener('click',()=>{apDraft={...APPEARANCE_DEFAULTS};renderAppearanceEditor();});
 }
 
+// ── ELASTIC SCROLL ───────────────────────────────────────────────
+// A gentle rubber-band at the ends of a scroll area: scrolling past the
+// top or bottom nudges the content a little (with resistance, capped at
+// ELASTIC_MAX px), and it springs back as soon as you stop. Wheel and
+// touchpad only; the scroll position itself never changes. Toggle in
+// Settings → Appearance (on by default).
+const ELASTIC_MAX=36;
+let elasticOn=localStorage.getItem('elasticScroll')!=='0';
+function attachElastic(el){
+  let off=0,timer=null,settleTimer=null;
+  const release=()=>{
+    if(!off)return;
+    off=0;
+    el.style.transition='transform .38s cubic-bezier(.22,1,.36,1)';
+    el.style.transform='translateY(0)';
+    clearTimeout(settleTimer);
+    // Drop the transform entirely once settled, so nothing is left
+    // transformed at rest.
+    settleTimer=setTimeout(()=>{if(!off){el.style.transform='';el.style.transition='';}},400);
+  };
+  el.addEventListener('wheel',e=>{
+    if(!elasticOn||e.ctrlKey||!e.deltaY)return;
+    const atTop=el.scrollTop<=0&&e.deltaY<0;
+    const atBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-1&&e.deltaY>0;
+    if(!atTop&&!atBottom){release();return;}
+    // Resistance grows the further it's already stretched.
+    const push=-e.deltaY*0.18*(1-Math.min(1,Math.abs(off)/ELASTIC_MAX));
+    off=Math.max(-ELASTIC_MAX,Math.min(ELASTIC_MAX,off+push));
+    clearTimeout(settleTimer);
+    el.style.transition='transform .08s linear';
+    el.style.transform=`translateY(${off}px)`;
+    clearTimeout(timer);timer=setTimeout(release,110);
+  },{passive:true});
+}
+function initElasticScroll(){
+  attachElastic(document.getElementById('messages'));
+  const box=document.getElementById('ap-elastic');
+  box.checked=elasticOn;
+  box.addEventListener('change',()=>{elasticOn=box.checked;localStorage.setItem('elasticScroll',elasticOn?'1':'0');});
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -4273,6 +4323,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initElasticScroll();
   initAppearance();
   initServerInfo();
   initPresence();

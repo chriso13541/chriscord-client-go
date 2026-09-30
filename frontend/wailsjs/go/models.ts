@@ -247,12 +247,33 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ServerTheme {
+	    base: string;
+	    accent: string;
+	    blur: number;
+	    dim: number;
+	    bg_updated_at: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerTheme(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.base = source["base"];
+	        this.accent = source["accent"];
+	        this.blur = source["blur"];
+	        this.dim = source["dim"];
+	        this.bg_updated_at = source["bg_updated_at"];
+	    }
+	}
 	export class ServerInfo {
 	    name: string;
 	    requires_key: boolean;
 	    description: string;
 	    banner_updated_at: number;
 	    icon_updated_at: number;
+	    theme?: ServerTheme;
 	    owner: string;
 	
 	    static createFrom(source: any = {}) {
@@ -266,9 +287,29 @@ export namespace main {
 	        this.description = source["description"];
 	        this.banner_updated_at = source["banner_updated_at"];
 	        this.icon_updated_at = source["icon_updated_at"];
+	        this.theme = this.convertValues(source["theme"], ServerTheme);
 	        this.owner = source["owner"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
+	
 	export class UploadResult {
 	    url: string;
 	    filename: string;

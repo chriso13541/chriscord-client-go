@@ -22,6 +22,8 @@ export function FetchServerBanner():Promise<string>;
 
 export function FetchServerIcon(arg1:string):Promise<string>;
 
+export function FetchServerThemeBackground():Promise<string>;
+
 export function FetchUserPfp(arg1:string):Promise<string>;
 
 export function FetchUserProfile(arg1:string):Promise<main.UserProfile>;
