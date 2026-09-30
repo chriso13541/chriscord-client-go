@@ -528,6 +528,15 @@ func (a *App) PickBanner() (string, error) {
 	})
 }
 
+// PickBackgroundImage opens a file dialog for the app background image
+// (Settings → Appearance).
+func (a *App) PickBackgroundImage() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Select background image",
+		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg;*.webp"}},
+	})
+}
+
 // FetchUserPfp fetches another user's cached profile picture from the
 // server and returns it as a data URL, or "" if they have none cached —
 // nil error either way, since "no pfp" is a normal state, not a failure.

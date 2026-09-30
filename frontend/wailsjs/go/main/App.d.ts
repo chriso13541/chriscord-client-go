@@ -72,6 +72,8 @@ export function PickAccountFile():Promise<string>;
 
 export function PickAccountFolder():Promise<string>;
 
+export function PickBackgroundImage():Promise<string>;
+
 export function PickBanner():Promise<string>;
 
 export function PickFiles():Promise<Array<string>>;

@@ -142,6 +142,10 @@ export function PickAccountFolder() {
   return window['go']['main']['App']['PickAccountFolder']();
 }
 
+export function PickBackgroundImage() {
+  return window['go']['main']['App']['PickBackgroundImage']();
+}
+
 export function PickBanner() {
   return window['go']['main']['App']['PickBanner']();
 }

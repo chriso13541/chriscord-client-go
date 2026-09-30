@@ -13,9 +13,17 @@
   --text:#dcddde; --text-muted:#72767d; --text-strong:#ffffff;
   --sidebar-w:330px; --members-w:200px;
 }
-html { height:100%; }
+html { height:100%; background:var(--bg-darkest); }
 body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg-darkest); color:var(--text); height:100%; overflow:hidden; user-select:none; }
 .hidden { display:none !important; }
+/* ── Appearance: optional background image behind the whole app ── */
+#app-bg { position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none; }
+#app-bg .bg-img, .ap-preview .bg-img { position:absolute; background-size:cover; background-position:center; }
+#app-bg .bg-dim, .ap-preview .bg-dim { position:absolute; inset:0; }
+body.bg-image { background:transparent; }
+body.bg-image #chat-main { background:var(--chat-bg); }
+body.bg-image #sidebar, body.bg-image #members-panel { background:var(--pane-bg); }
+body.bg-image #settings-modal { background:var(--bg-darkest-solid, var(--bg-darkest)); }
 input,button,textarea { font-family:inherit; }
 ::-webkit-scrollbar { width:6px; }
 ::-webkit-scrollbar-track { background:transparent; }
@@ -419,6 +427,53 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
 .pc-status-opt .opt-check { color:var(--accent); }
 .pc-status-opt .opt-check .ic { width:16px; height:16px; }
 
+/* ── Appearance editor ─────────────────────────────────────────── */
+#appearance-editor { display:flex; gap:36px; align-items:flex-start; flex-wrap:wrap; }
+#appearance-editor .ap-fields { flex:1; min-width:300px; max-width:440px; }
+.ap-preview-col { position:sticky; top:0; }
+.ap-swatches { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.ap-swatch { width:34px; height:34px; border-radius:50%; border:2px solid var(--border); cursor:pointer; padding:0; position:relative; }
+.ap-swatch.on { border-color:var(--text-strong); box-shadow:0 0 0 2px var(--accent); }
+.ap-swatch span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.6rem; color:#fff; font-weight:700; }
+.ap-color-row { display:flex; align-items:center; gap:10px; }
+.ap-color-row input[type=color] { width:44px; height:32px; padding:0; border:1px solid var(--border); border-radius:6px; background:none; cursor:pointer; }
+.ap-color-val { font-family:Consolas,monospace; font-size:.85rem; color:var(--text); min-width:70px; }
+.settings-secondary-btn.ap-mini { margin-top:0; padding:5px 10px; font-size:.78rem; }
+#ap-image-controls { margin-top:6px; }
+#ap-image-controls.disabled { opacity:.45; pointer-events:none; }
+.ap-save-bar { flex-wrap:wrap; }
+.ap-defaults { margin-top:22px; padding:12px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg-dark); }
+.ap-default-list { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:.8rem; align-items:center; }
+.ap-default-list i { width:14px; height:14px; border-radius:3px; display:inline-block; border:1px solid rgba(255,255,255,.2); vertical-align:middle; margin-right:6px; }
+.ap-default-list code { font-family:Consolas,monospace; color:var(--text); user-select:text; }
+/* The preview is a small mock of the app, styled by the same variables
+   (set on .ap-preview itself), so it shows exactly what Save would do. */
+.ap-preview { position:relative; width:480px; max-width:100%; height:300px; border-radius:10px; overflow:hidden; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text); font-size:.72rem; isolation:isolate; }
+.ap-preview .bg-img, .ap-preview .bg-dim { z-index:0; }
+.ap-app { position:relative; z-index:1; display:flex; height:100%; }
+.ap-side, .ap-members { background:var(--bg-dark); display:flex; flex-direction:column; gap:2px; padding:8px 6px; }
+.ap-side { width:120px; border-right:1px solid var(--border); }
+.ap-members { width:96px; border-left:1px solid var(--border); }
+.ap-preview.img .ap-side, .ap-preview.img .ap-members { background:var(--pane-bg); }
+.ap-chat { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-darkest); }
+.ap-preview.img .ap-chat { background:var(--chat-bg); }
+.ap-server { font-weight:800; color:var(--text-strong); padding:2px 4px 8px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+.ap-cat { font-size:.6rem; font-weight:800; color:var(--text-muted); padding:6px 4px 2px; }
+.ap-chan { padding:3px 6px; border-radius:4px; color:var(--text-muted); }
+.ap-chan.active { background:var(--bg-light); color:var(--text-strong); }
+.ap-me { margin-top:auto; display:flex; align-items:center; gap:6px; padding:6px 4px 0; border-top:1px solid var(--border); color:var(--text-strong); font-weight:700; }
+.ap-head { padding:8px 10px; border-bottom:1px solid var(--border); font-weight:800; color:var(--text-strong); }
+.ap-msgs { flex:1; padding:8px 10px; display:flex; flex-direction:column; gap:10px; }
+.ap-msg { display:flex; gap:8px; }
+.ap-msg b { color:var(--text-strong); } .ap-msg i { color:var(--text-muted); font-style:normal; font-size:.6rem; }
+.ap-link { color:var(--accent); text-decoration:underline; }
+.ap-react { display:inline-block; margin-top:4px; padding:1px 6px; border-radius:6px; border:1px solid var(--accent); background:var(--bg-light); color:var(--text-strong); }
+.ap-input { margin:0 10px 10px; padding:8px 10px; border-radius:6px; background:var(--bg-mid); color:var(--text-muted); }
+.ap-mem { display:flex; align-items:center; gap:6px; padding:3px 4px; }
+.ap-av { width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:.6rem; flex-shrink:0; }
+.ap-preview-btn { margin-top:10px; }
+.ap-preview-btn .btn { background:var(--ap-accent, var(--accent)); pointer-events:none; }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -792,6 +847,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <button id="settings-close-btn" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
   <div id="settings-tabs">
     <div class="settings-tab active" data-tab="profile">Profile</div>
+    <div class="settings-tab" data-tab="appearance">Appearance</div>
     <div class="settings-tab" data-tab="voice">Voice</div>
   </div>
   <div id="settings-content">
@@ -852,6 +908,85 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
         </div>
       </div>
     </div>
+    <div id="settings-tab-appearance" class="settings-tab-pane">
+      <h2>Appearance</h2>
+      <div id="appearance-editor">
+        <div class="ap-fields">
+          <label class="settings-label">Theme Color</label>
+          <div class="ap-swatches" id="ap-swatches"></div>
+          <div class="ap-color-row">
+            <input type="color" id="ap-base" aria-label="Custom theme color">
+            <span class="ap-color-val" id="ap-base-val">Default</span>
+            <button class="settings-secondary-btn ap-mini" id="ap-base-reset">Reset</button>
+          </div>
+          <p class="settings-hint">The panels, backgrounds and borders are all worked out from this one color. Pick a light one for a light theme.</p>
+
+          <label class="settings-label">Accent Color</label>
+          <div class="ap-color-row">
+            <input type="color" id="ap-accent" aria-label="Accent color">
+            <span class="ap-color-val" id="ap-accent-val">Default</span>
+            <button class="settings-secondary-btn ap-mini" id="ap-accent-reset">Reset</button>
+          </div>
+          <p class="settings-hint">Buttons, links, highlights and your reactions.</p>
+
+          <label class="settings-label">Background Image</label>
+          <div class="profile-btn-row">
+            <button class="settings-secondary-btn" id="ap-image-choose">Choose Image</button>
+            <button class="settings-secondary-btn" id="ap-image-remove">Remove Image</button>
+          </div>
+          <div id="ap-image-controls">
+            <label class="settings-label" for="ap-blur">Blur</label>
+            <div class="slider-row"><input type="range" id="ap-blur" min="0" max="100" step="1"><span class="slider-val" id="ap-blur-val">0%</span></div>
+            <label class="settings-label" for="ap-dim">Darken</label>
+            <div class="slider-row"><input type="range" id="ap-dim" min="0" max="90" step="1"><span class="slider-val" id="ap-dim-val">0%</span></div>
+          </div>
+          <p class="settings-hint">Shows behind the channel list, chat and member list, which turn see-through to let it through. Darken it to keep text easy to read.</p>
+
+          <div id="profile-save-bar" class="ap-save-bar">
+            <button class="btn btn-primary" id="ap-save" disabled>Save Changes</button>
+            <button class="btn btn-ghost" id="ap-revert" disabled>Revert</button>
+            <button class="btn btn-ghost" id="ap-default">Reset to Default</button>
+          </div>
+          <div class="ap-defaults">
+            <div class="settings-label" style="margin-top:0">Default colors, for reference</div>
+            <div class="ap-default-list" id="ap-default-list"></div>
+          </div>
+        </div>
+        <div class="ap-preview-col">
+          <label class="settings-label" style="margin-top:0">Preview</label>
+          <div class="ap-preview" id="ap-preview">
+            <div class="bg-img"></div><div class="bg-dim"></div>
+            <div class="ap-app">
+              <div class="ap-side">
+                <div class="ap-server">My Server</div>
+                <div class="ap-cat">TEXT</div>
+                <div class="ap-chan active"># general</div>
+                <div class="ap-chan"># memes</div>
+                <div class="ap-cat">VOICE</div>
+                <div class="ap-chan">🔊 Hangout</div>
+                <div class="ap-me"><span class="ap-av" style="background:#5865f2">Y</span>you</div>
+              </div>
+              <div class="ap-chat">
+                <div class="ap-head"># general</div>
+                <div class="ap-msgs">
+                  <div class="ap-msg"><span class="ap-av" style="background:#e67e22">A</span><div><b>alex</b> <i>Today</i><div>anyone on tonight?</div></div></div>
+                  <div class="ap-msg"><span class="ap-av" style="background:#1abc9c">S</span><div><b>sam</b> <i>Today</i><div>yeah, hop in <span class="ap-link">voice</span> 🎮</div>
+                    <span class="ap-react">👍 2</span></div></div>
+                </div>
+                <div class="ap-input">Message #general</div>
+              </div>
+              <div class="ap-members">
+                <div class="ap-cat">ONLINE — 2</div>
+                <div class="ap-mem"><span class="ap-av" style="background:#e67e22">A</span>alex</div>
+                <div class="ap-mem"><span class="ap-av" style="background:#1abc9c">S</span>sam</div>
+              </div>
+            </div>
+          </div>
+          <div class="ap-preview-btn"><button class="btn btn-primary">Sample button</button></div>
+        </div>
+      </div>
+    </div>
+
     <div id="settings-tab-voice" class="settings-tab-pane">
       <h2>Voice Settings</h2>
       <label class="settings-label">Microphone</label>
@@ -1681,8 +1816,9 @@ function stopMicTest(){
   window.go.main.App.StopMicTest().catch(()=>{});
 }
 function switchSettingsTab(name){
+  if(name==='appearance'){apDraft={...appearance};renderAppearanceEditor();}
   setLevelMeter(name==='voice'&&!document.getElementById('settings-modal').classList.contains('hidden'));
-  document.getElementById('settings-content').classList.toggle('wide',name==='profile');
+  document.getElementById('settings-content').classList.toggle('wide',name==='profile'||name==='appearance');
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
 }
@@ -3669,6 +3805,130 @@ function initPresence(){
   pushPresence(); // tell Go before the first connect, so it connects with the right status
 }
 
+// ── APPEARANCE ───────────────────────────────────────────────────
+// Theme color (every panel/background/border shade is derived from one
+// color), accent color, and an optional background image with blur and
+// darken. Stored on this machine (localStorage); "Reset to Default" puts
+// back the original look exactly, with the original hex values listed for
+// reference. Edits are a draft shown in the preview until Save.
+const APPEARANCE_DEFAULTS={base:null,accent:null,image:'',blur:30,dim:40};
+const DEFAULT_THEME={'--bg-darkest':'#0e1117','--bg-dark':'#1a1d27','--bg-mid':'#20232f','--bg-light':'#2a2d3e','--border':'#2e3248',
+  '--accent':'#7289da','--accent-dim':'#4e5d94','--text':'#dcddde','--text-muted':'#72767d','--text-strong':'#ffffff'};
+const DEFAULT_LABELS=[['--bg-darkest','Chat background'],['--bg-dark','Panels (channels, members)'],['--bg-mid','Inputs, popups'],
+  ['--bg-light','Hover, selected'],['--border','Borders'],['--accent','Accent'],['--text','Text']];
+const THEME_PRESETS=[['Default',null],['Midnight','#152238'],['Forest','#16261d'],['Plum','#2a1a2e'],['Ember','#2b1a17'],['Charcoal','#1e1e1e'],['Light','#f2f3f5']];
+function loadAppearance(){try{return {...APPEARANCE_DEFAULTS,...JSON.parse(localStorage.getItem('appearance')||'{}')};}catch{return {...APPEARANCE_DEFAULTS};}}
+let appearance=loadAppearance(), apDraft={...appearance};
+
+function hexToHsl(hex){
+  const n=parseInt(hex.slice(1),16),r=(n>>16&255)/255,g=(n>>8&255)/255,b=(n&255)/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;let h=0,s=0;
+  if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;}
+  return [h,s,l];
+}
+function hsl(h,s,l){l=Math.max(0,Math.min(1,l));const a=s*Math.min(l,1-l),f=k=>{const x=(k+h/30)%12;return Math.round(255*(l-a*Math.max(-1,Math.min(x-3,9-x,1)))).toString(16).padStart(2,'0');};return '#'+f(0)+f(8)+f(4);}
+function hexA(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
+// All theme variables for a draft. The theme color plays the role of the
+// panel shade (--bg-dark); the rest keep the default theme's spacing in
+// lightness around it — inverted for light colors, with dark text.
+function themeVars(a){
+  const v={...DEFAULT_THEME};
+  if(a.base){
+    const [h,s,l]=hexToHsl(a.base),light=l>0.55;
+    v['--bg-dark']=a.base;
+    if(!light){
+      Object.assign(v,{'--bg-darkest':hsl(h,s,Math.max(.02,l-.055)),'--bg-mid':hsl(h,s,l+.022),'--bg-light':hsl(h,s,l+.07),'--border':hsl(h,s,l+.09)});
+    }else{
+      Object.assign(v,{'--bg-darkest':hsl(h,s,Math.min(.99,l+.035)),'--bg-mid':hsl(h,s,l-.03),'--bg-light':hsl(h,s,l-.075),'--border':hsl(h,s,l-.12),
+        '--text':'#2e3338','--text-muted':'#5c6370','--text-strong':'#060607'});
+    }
+  }
+  if(a.accent){const [h,s,l]=hexToHsl(a.accent);v['--accent']=a.accent;v['--accent-dim']=hsl(h,s,l*.68);}
+  // See-through panels over a background image.
+  v['--pane-bg']=hexA(v['--bg-dark'],.72);v['--chat-bg']=hexA(v['--bg-darkest'],.45);
+  v['--bg-darkest-solid']=v['--bg-darkest'];
+  return v;
+}
+const blurPx=a=>Math.round((a.blur||0)*0.3); // 0–100% → 0–30px
+function paintBackground(layer,a){
+  const img=layer.querySelector('.bg-img'),dim=layer.querySelector('.bg-dim');
+  if(!a.image){img.style.backgroundImage='';dim.style.background='transparent';return;}
+  const px=blurPx(a),pad=-px*2;
+  img.style.inset=`${pad}px`; // grow past the edges so blurring never shows a soft border
+  img.style.backgroundImage=`url("${a.image}")`;img.style.filter=px?`blur(${px}px)`:'';
+  dim.style.background=`rgba(0,0,0,${(a.dim||0)/100})`;
+}
+function applyAppearance(){
+  const root=document.documentElement,v=themeVars(appearance);
+  for(const [k,val] of Object.entries(v))root.style.setProperty(k,val);
+  let layer=document.getElementById('app-bg');
+  if(!layer){layer=document.createElement('div');layer.id='app-bg';layer.innerHTML='<div class="bg-img"></div><div class="bg-dim"></div>';document.body.prepend(layer);}
+  document.body.classList.toggle('bg-image',!!appearance.image);
+  paintBackground(layer,appearance);
+}
+function renderAppearanceEditor(){
+  const d=apDraft,prev=document.getElementById('ap-preview');
+  const v=themeVars(d);
+  for(const [k,val] of Object.entries(v))prev.style.setProperty(k,val);
+  prev.style.setProperty('--ap-accent',v['--accent']);
+  document.querySelector('.ap-preview-btn .btn').style.setProperty('--ap-accent',v['--accent']);
+  prev.classList.toggle('img',!!d.image);paintBackground(prev,{...d,blur:d.blur*0.35}); // scaled to the preview's size
+  document.getElementById('ap-base').value=d.base||DEFAULT_THEME['--bg-dark'];
+  document.getElementById('ap-base-val').textContent=d.base?d.base.toUpperCase():'Default';
+  document.getElementById('ap-accent').value=d.accent||DEFAULT_THEME['--accent'];
+  document.getElementById('ap-accent-val').textContent=d.accent?d.accent.toUpperCase():'Default';
+  document.querySelectorAll('.ap-swatch').forEach(b=>b.classList.toggle('on',(b.dataset.color||null)===(d.base||null)));
+  document.getElementById('ap-image-controls').classList.toggle('disabled',!d.image);
+  document.getElementById('ap-image-remove').disabled=!d.image;
+  document.getElementById('ap-blur').value=d.blur;document.getElementById('ap-blur-val').textContent=d.blur+'%';
+  document.getElementById('ap-dim').value=d.dim;document.getElementById('ap-dim-val').textContent=d.dim+'%';
+  const dirty=JSON.stringify(d)!==JSON.stringify(appearance);
+  document.getElementById('ap-save').disabled=!dirty;document.getElementById('ap-revert').disabled=!dirty;
+}
+// Background images are scaled to at most 1920×1080 and re-encoded as
+// JPEG, so even a big photo fits comfortably in local storage.
+function shrinkBackground(dataUrl){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const k=Math.min(1,1920/img.naturalWidth,1080/img.naturalHeight);
+      const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);
+      const ctx=c.getContext('2d');ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,c.width,c.height);
+      resolve(c.toDataURL('image/jpeg',0.85));
+    };
+    img.onerror=()=>reject(new Error('That file isn\u2019t a readable image'));
+    img.src=dataUrl;
+  });
+}
+function initAppearance(){
+  applyAppearance();
+  const sw=document.getElementById('ap-swatches');
+  sw.innerHTML=THEME_PRESETS.map(([name,c])=>`<button class="ap-swatch" type="button" title="${name}" ${c?`data-color="${c}"`:''} style="background:${c||DEFAULT_THEME['--bg-dark']}">${c?'':'<span>DEF</span>'}</button>`).join('');
+  sw.querySelectorAll('.ap-swatch').forEach(b=>b.addEventListener('click',()=>{apDraft.base=b.dataset.color||null;renderAppearanceEditor();}));
+  document.getElementById('ap-default-list').innerHTML=DEFAULT_LABELS.map(([k,label])=>`<span><i style="background:${DEFAULT_THEME[k]}"></i>${label}</span><code>${DEFAULT_THEME[k]}</code>`).join('');
+  document.getElementById('ap-base').addEventListener('input',e=>{apDraft.base=e.target.value;renderAppearanceEditor();});
+  document.getElementById('ap-accent').addEventListener('input',e=>{apDraft.accent=e.target.value;renderAppearanceEditor();});
+  document.getElementById('ap-base-reset').addEventListener('click',()=>{apDraft.base=null;renderAppearanceEditor();});
+  document.getElementById('ap-accent-reset').addEventListener('click',()=>{apDraft.accent=null;renderAppearanceEditor();});
+  document.getElementById('ap-blur').addEventListener('input',e=>{apDraft.blur=+e.target.value;renderAppearanceEditor();});
+  document.getElementById('ap-dim').addEventListener('input',e=>{apDraft.dim=+e.target.value;renderAppearanceEditor();});
+  document.getElementById('ap-image-choose').addEventListener('click',async()=>{
+    try{
+      const path=await window.go.main.App.PickBackgroundImage();if(!path)return;
+      apDraft.image=await shrinkBackground(await window.go.main.App.ReadImageAsDataURL(path));
+      renderAppearanceEditor();
+    }catch(err){toast('Could not load image: '+err,true);}
+  });
+  document.getElementById('ap-image-remove').addEventListener('click',()=>{apDraft.image='';renderAppearanceEditor();});
+  document.getElementById('ap-save').addEventListener('click',()=>{
+    try{localStorage.setItem('appearance',JSON.stringify(apDraft));}
+    catch{toast('That background image is too large to save — try a smaller one.',true);return;}
+    appearance={...apDraft};applyAppearance();renderAppearanceEditor();toast('Appearance saved');
+  });
+  document.getElementById('ap-revert').addEventListener('click',()=>{apDraft={...appearance};renderAppearanceEditor();});
+  document.getElementById('ap-default').addEventListener('click',()=>{apDraft={...APPEARANCE_DEFAULTS};renderAppearanceEditor();});
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -3963,6 +4223,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initAppearance();
   initServerInfo();
   initPresence();
   initEmojiPicker();
