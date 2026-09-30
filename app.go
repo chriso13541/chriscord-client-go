@@ -881,6 +881,29 @@ func (a *App) GetPinnedMessages(boardID string) ([]ChatMessage, error) {
 // SetMessagePinned pins (PUT) or unpins (DELETE) a message. The server
 // broadcasts the change as message_pin, which is what updates every
 // client's view — including this one.
+// FetchServerIcon returns a server's icon (shown on the server list) as a
+// data URL, or "" if it doesn't have one. Public — it works for any saved
+// server, connected or not, so the list can show icons before joining.
+func (a *App) FetchServerIcon(domain string) (string, error) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(normaliseHTTP(domain) + "/api/server/icon")
+	if err != nil {
+		return "", fmt.Errorf("cannot reach server: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
+	if err != nil || len(data) == 0 {
+		return "", err
+	}
+	return pfpDataURL(data), nil
+}
+
 // FetchServerBanner returns the connected server's banner as a data URL,
 // or "" if it doesn't have one.
 func (a *App) FetchServerBanner() (string, error) {

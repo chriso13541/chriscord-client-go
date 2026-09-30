@@ -34,6 +34,14 @@ export function FetchLinkPreview(arg1) {
   return window['go']['main']['App']['FetchLinkPreview'](arg1);
 }
 
+export function FetchServerBanner() {
+  return window['go']['main']['App']['FetchServerBanner']();
+}
+
+export function FetchServerIcon(arg1) {
+  return window['go']['main']['App']['FetchServerIcon'](arg1);
+}
+
 export function FetchUserPfp(arg1) {
   return window['go']['main']['App']['FetchUserPfp'](arg1);
 }

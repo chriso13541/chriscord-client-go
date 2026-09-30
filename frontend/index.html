@@ -29,7 +29,7 @@ input,button,textarea { font-family:inherit; }
 .server-list { width:100%; max-width:480px; display:flex; flex-direction:column; gap:10px; }
 .server-card { background:var(--bg-dark); border:1px solid var(--border); border-radius:10px; padding:16px 18px; display:flex; align-items:center; gap:14px; transition:border-color .15s; }
 .server-card:hover { border-color:var(--accent-dim); }
-.server-icon { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.3rem; font-weight:700; color:#fff; flex-shrink:0; }
+.server-icon { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.3rem; font-weight:700; color:#fff; flex-shrink:0; background-size:cover; background-position:center; }
 .server-info { flex:1; min-width:0; }
 .server-info .name { font-weight:700; font-size:1rem; color:var(--text-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .server-info .domain { font-size:.78rem; color:var(--text-muted); margin-top:2px; }
@@ -1132,7 +1132,7 @@ function renderServers(){
   state.servers.forEach(s=>{
     const card=document.createElement('div');card.className='server-card';
     const initial=(s.display_name||s.domain)[0].toUpperCase(),colour=avatarColour(s.domain);
-    card.innerHTML=`<div class="server-icon" style="background:${colour}">${initial}</div>
+    card.innerHTML=`<div class="server-icon" data-icon-domain="${esc(s.domain)}" style="background-color:${colour}">${initial}</div>
       <div class="server-info"><div class="name">${esc(s.display_name||s.domain)}</div><div class="domain">${esc(s.domain)}</div>${s.last_username?`<div class="lastuser">@${esc(s.last_username)}</div>`:''}</div>
       <div class="server-actions">
         <button class="btn btn-ghost btn-sm remove-btn" data-domain="${esc(s.domain)}" title="Remove">${icon('close')}</button>
@@ -1146,7 +1146,49 @@ function renderServers(){
     });
     card.querySelector('.remove-btn').addEventListener('click',async e=>{e.stopPropagation();state.servers=await window.go.main.App.RemoveServer(e.currentTarget.dataset.domain);renderServers();});
     list.appendChild(card);
+    applyServerIcon(card.querySelector('.server-icon'),s.domain);
   });
+  state.servers.forEach(s=>refreshServerIcon(s.domain)); // check each for a new/changed/removed icon
+}
+
+// ── SERVER ICONS ─────────────────────────────────────────────────
+// A server's picture (set in its admin panel) replaces the coloured
+// letter on the server list. Icons are cached locally with the server's
+// icon_updated_at, so the list draws instantly — even for a server that's
+// offline — and only re-downloads when the server says the icon changed.
+const serverIconCache=(()=>{try{return JSON.parse(localStorage.getItem('serverIcons')||'{}');}catch{return {};}})();
+function saveServerIconCache(){
+  try{localStorage.setItem('serverIcons',JSON.stringify(serverIconCache));}
+  catch{console.warn('server icons: local cache full; icons will re-download');}
+}
+function applyServerIcon(el,domain){
+  const c=serverIconCache[domain];
+  if(c?.url){el.style.backgroundImage=`url("${c.url}")`;el.textContent='';}
+}
+function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);}
+const iconChecks=new Map(); // domain → in-flight check, so re-renders don't pile up requests
+function refreshServerIcon(domain,info){
+  if(iconChecks.has(domain))return iconChecks.get(domain);
+  const job=(async()=>{
+    try{
+      info=info||await withTimeout(window.go.main.App.GetServerInfo(domain),5000);
+      const at=info?.icon_updated_at||0,cached=serverIconCache[domain];
+      if((cached?.at||0)===at)return;
+      if(!at){delete serverIconCache[domain];}
+      else{
+        const url=await window.go.main.App.FetchServerIcon(domain);
+        if(url)serverIconCache[domain]={at,url};else delete serverIconCache[domain];
+      }
+      saveServerIconCache();
+      document.querySelectorAll(`.server-icon[data-icon-domain="${CSS.escape(domain)}"]`).forEach(el=>{
+        if(serverIconCache[domain])applyServerIcon(el,domain);
+        else{el.style.backgroundImage='';el.textContent=(el.closest('.server-card')?.querySelector('.name')?.textContent||domain)[0].toUpperCase();}
+      });
+    }catch{/* server offline: keep whatever's cached */}
+    finally{iconChecks.delete(domain);}
+  })();
+  iconChecks.set(domain,job);
+  return job;
 }
 
 // ── ADD SERVER MODAL ─────────────────────────────────────────────
@@ -1287,6 +1329,7 @@ async function refreshServerMeta(){
   if(state.domain!==domain)return;
   if(info?.name){state.serverName=info.name;}
   state.serverOwner=info?.owner||'';
+  refreshServerIcon(domain,info);
   const nameEl=document.getElementById('sidebar-server-name');
   nameEl.textContent=state.serverName;
   state.serverDescription=(info?.description||'').trim();

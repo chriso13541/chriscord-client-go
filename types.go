@@ -16,6 +16,7 @@ type ServerInfo struct {
 	RequiresKey     bool   `json:"requires_key"`
 	Description     string `json:"description"`
 	BannerUpdatedAt int64  `json:"banner_updated_at"` // 0 = no banner
+	IconUpdatedAt   int64  `json:"icon_updated_at"`   // 0 = no icon (coloured letter)
 	Owner           string `json:"owner"`             // crowned member, "" if none
 }
 

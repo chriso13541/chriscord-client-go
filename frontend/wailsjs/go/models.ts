@@ -252,6 +252,7 @@ export namespace main {
 	    requires_key: boolean;
 	    description: string;
 	    banner_updated_at: number;
+	    icon_updated_at: number;
 	    owner: string;
 	
 	    static createFrom(source: any = {}) {
@@ -264,6 +265,7 @@ export namespace main {
 	        this.requires_key = source["requires_key"];
 	        this.description = source["description"];
 	        this.banner_updated_at = source["banner_updated_at"];
+	        this.icon_updated_at = source["icon_updated_at"];
 	        this.owner = source["owner"];
 	    }
 	}

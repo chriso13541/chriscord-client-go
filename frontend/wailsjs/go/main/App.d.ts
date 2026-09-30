@@ -18,6 +18,10 @@ export function ExportAccount(arg1:string):Promise<string>;
 
 export function FetchLinkPreview(arg1:string):Promise<main.LinkPreview>;
 
+export function FetchServerBanner():Promise<string>;
+
+export function FetchServerIcon(arg1:string):Promise<string>;
+
 export function FetchUserPfp(arg1:string):Promise<string>;
 
 export function FetchUserProfile(arg1:string):Promise<main.UserProfile>;
