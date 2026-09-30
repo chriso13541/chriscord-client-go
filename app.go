@@ -658,7 +658,9 @@ type serverMsg struct {
 	Data          *ChatMessage        `json:"data"`
 	Messages      []ChatMessage       `json:"messages"`
 	Online        []string            `json:"online"`
-	Statuses      map[string]string   `json:"statuses"`
+	// Presence on "users" messages: username → "online" | "idle". Its own
+	// key — "statuses" is already the voice status list below.
+	Presence      map[string]string   `json:"presence"`
 	Typing        bool                `json:"typing"`
 	All           []string            `json:"all"`
 	ID            string              `json:"id"`
@@ -740,7 +742,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "history":
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
 		case "users":
-			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Statuses, All: msg.All})
+			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All})
 		case "typing":
 			runtime.EventsEmit(a.ctx, "chat:typing", typingEvent{Username: msg.Username, Typing: msg.Typing})
 		case "message_edit":
