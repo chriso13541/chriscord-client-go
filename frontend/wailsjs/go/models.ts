@@ -184,6 +184,7 @@ export namespace main {
 	    server_key: string;
 	    display_name: string;
 	    last_username: string;
+	    custom_name?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SavedServer(source);
@@ -195,6 +196,7 @@ export namespace main {
 	        this.server_key = source["server_key"];
 	        this.display_name = source["display_name"];
 	        this.last_username = source["last_username"];
+	        this.custom_name = source["custom_name"];
 	    }
 	}
 	export class SearchResult {

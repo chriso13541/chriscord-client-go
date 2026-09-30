@@ -9,6 +9,10 @@ type SavedServer struct {
 	ServerKey    string `json:"server_key"`
 	DisplayName  string `json:"display_name"`
 	LastUsername string `json:"last_username"`
+	// CustomName is a name you gave the server yourself (Edit on the server
+	// list). It's shown instead of the server's own name and survives
+	// reconnects, which refresh DisplayName from the server.
+	CustomName   string `json:"custom_name,omitempty"`
 }
 
 // ServerTheme is a server's own theme, set in its admin panel (Theme).

@@ -182,7 +182,7 @@ func (a *App) PickAccountFolder() (string, error) {
 func (a *App) PickPfp() (string, error) {
 	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Select profile picture",
-		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg"}},
+		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: profileImagePattern}},
 	})
 }
 
@@ -231,13 +231,31 @@ const maxPfpBytes = 8 << 20
 // trusting a file name — pfp.png keeps its name inside account bundles for
 // compatibility with existing exports, but may hold a JPEG now.
 func pfpMime(data []byte) string {
-	switch mime := http.DetectContentType(data); mime {
-	case "image/png", "image/jpeg", "image/gif", "image/webp":
-		return mime
-	default:
-		return ""
+	switch {
+	case bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")):
+		return "image/png"
+	case bytes.HasPrefix(data, []byte{0xFF, 0xD8, 0xFF}):
+		return "image/jpeg"
+	case bytes.HasPrefix(data, []byte("GIF87a")), bytes.HasPrefix(data, []byte("GIF89a")):
+		return "image/gif"
+	case len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP":
+		return "image/webp"
+	case len(data) > 26 && bytes.HasPrefix(data, []byte("BM")):
+		return "image/bmp"
+	case len(data) >= 12 && string(data[4:8]) == "ftyp" && (string(data[8:12]) == "avif" || string(data[8:12]) == "avis"):
+		return "image/avif"
 	}
+	return ""
 }
+
+// isProfileImage reports whether data is a type allowed for profile
+// pictures and banners — the common still formats plus animated GIF,
+// WebP and APNG (animated files are kept byte-for-byte so they keep
+// moving). Matches the server's is_profile_image.
+func isProfileImage(data []byte) bool { return pfpMime(data) != "" }
+
+// profileImagePattern is the file-dialog filter for pfps and banners.
+const profileImagePattern = "*.png;*.apng;*.jpg;*.jpeg;*.gif;*.webp;*.bmp;*.avif"
 
 func pfpDataURL(data []byte) string {
 	mime := pfpMime(data)
@@ -268,8 +286,8 @@ func (a *App) SaveProfilePicture(dataURL string) error {
 	if err != nil {
 		return fmt.Errorf("invalid image data: %w", err)
 	}
-	if m := pfpMime(data); m != "image/png" && m != "image/jpeg" {
-		return fmt.Errorf("only PNG and JPEG profile pictures are supported for now")
+	if !isProfileImage(data) {
+		return fmt.Errorf("profile pictures can be PNG, JPEG, GIF, WebP, BMP or AVIF")
 	}
 	if len(data) > maxPfpBytes {
 		return fmt.Errorf("profile picture is too large (%d MB max)", maxPfpBytes>>20)
@@ -401,8 +419,8 @@ func (a *App) SaveProfile(bio, banner string) error {
 		if err != nil {
 			return fmt.Errorf("invalid banner data: %w", err)
 		}
-		if m := pfpMime(data); m != "image/png" && m != "image/jpeg" {
-			return fmt.Errorf("banners must be PNG or JPEG")
+		if !isProfileImage(data) {
+			return fmt.Errorf("banners can be PNG, JPEG, GIF, WebP, BMP or AVIF")
 		}
 		if len(data) > maxPfpBytes {
 			return fmt.Errorf("banner is too large (%d MB max)", maxPfpBytes>>20)
@@ -524,7 +542,7 @@ func (a *App) fetchAuthed(path string) ([]byte, error) {
 func (a *App) PickBanner() (string, error) {
 	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Select profile banner",
-		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg"}},
+		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: profileImagePattern}},
 	})
 }
 
@@ -533,7 +551,7 @@ func (a *App) PickBanner() (string, error) {
 func (a *App) PickBackgroundImage() (string, error) {
 	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Select background image",
-		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg;*.webp"}},
+		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.avif;*.gif"}},
 	})
 }
 
@@ -646,8 +664,12 @@ func (a *App) Connect(domain, serverKey string) error {
 
 	displayName := domain
 	if info, err := a.GetServerInfo(domain); err == nil { displayName = info.Name }
+	customName := ""
+	for _, s := range a.servers {
+		if s.Domain == domain { customName = s.CustomName } // keep a name you set yourself
+	}
 	a.servers = upsertServer(a.servers, SavedServer{
-		Domain: domain, ServerKey: serverKey, DisplayName: displayName, LastUsername: a.username,
+		Domain: domain, ServerKey: serverKey, DisplayName: displayName, LastUsername: a.username, CustomName: customName,
 	})
 	saveServers(a.servers)
 
@@ -1164,6 +1186,94 @@ func (a *App) Disconnect() {
 	a.mu.Lock(); defer a.mu.Unlock()
 	if a.ws != nil { a.ws.Close(); a.ws = nil }
 	a.token = ""; a.domain = ""; a.username = ""; a.fingerprint = ""
+}
+
+// ResolveServerAddress turns what someone typed into a full server address.
+// With http:// or https:// already there it's used as-is (tidied up).
+// Without one, https:// is tried first and http:// second, by asking each
+// for /api/info; whichever answers is used. So "myserver.com" finds an
+// HTTPS server behind a proxy, and "192.168.1.10:7070" still finds a plain
+// HTTP one on the LAN.
+func (a *App) ResolveServerAddress(input string) (string, error) {
+	addr := strings.TrimSpace(input)
+	addr = strings.TrimRight(addr, "/")
+	if addr == "" {
+		return "", fmt.Errorf("enter the server's address")
+	}
+	lower := strings.ToLower(addr)
+	if strings.HasPrefix(lower, "https://") {
+		return "https://" + addr[len("https://"):], nil
+	}
+	if strings.HasPrefix(lower, "http://") {
+		return "http://" + addr[len("http://"):], nil
+	}
+	client := &http.Client{Timeout: 4 * time.Second}
+	var lastErr error
+	for _, scheme := range []string{"https://", "http://"} {
+		resp, err := client.Get(scheme + addr + "/api/info")
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			return scheme + addr, nil
+		}
+		lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return "", fmt.Errorf("couldn't reach a chriscord server at %s over https or http (%v)", addr, lastErr)
+}
+
+// UpdateServer edits a saved server in place (same spot in the list):
+// its address, join key and your own name for it. oldDomain identifies
+// which entry; the new address may differ. An empty custom name goes back
+// to showing the server's own name.
+func (a *App) UpdateServer(oldDomain, newDomain, serverKey, customName string) ([]SavedServer, error) {
+	newDomain = strings.TrimRight(strings.TrimSpace(newDomain), "/")
+	if newDomain == "" {
+		return a.servers, fmt.Errorf("the address can't be empty")
+	}
+	idx := -1
+	for i, s := range a.servers {
+		if s.Domain == oldDomain {
+			idx = i
+		} else if s.Domain == newDomain {
+			return a.servers, fmt.Errorf("%s is already in your server list", newDomain)
+		}
+	}
+	if idx < 0 {
+		return a.servers, fmt.Errorf("that server isn't in your list any more")
+	}
+	s := a.servers[idx]
+	s.Domain, s.ServerKey, s.CustomName = newDomain, strings.TrimSpace(serverKey), strings.TrimSpace(customName)
+	a.servers[idx] = s
+	saveServers(a.servers)
+	return a.servers, nil
+}
+
+// ReorderServers saves a new order for the server list (from dragging).
+// Any saved server missing from domains keeps its place at the end, so a
+// stale list from the frontend can never drop one.
+func (a *App) ReorderServers(domains []string) []SavedServer {
+	byDomain := make(map[string]SavedServer, len(a.servers))
+	for _, s := range a.servers {
+		byDomain[s.Domain] = s
+	}
+	out := make([]SavedServer, 0, len(a.servers))
+	for _, d := range domains {
+		if s, ok := byDomain[d]; ok {
+			out = append(out, s)
+			delete(byDomain, d)
+		}
+	}
+	for _, s := range a.servers {
+		if _, left := byDomain[s.Domain]; left {
+			out = append(out, s)
+		}
+	}
+	a.servers = out
+	saveServers(a.servers)
+	return a.servers
 }
 
 func (a *App) RemoveServer(domain string) []SavedServer {

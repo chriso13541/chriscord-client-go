@@ -17,7 +17,7 @@ Material Symbols (UI icons)
 
 Icons used: add, add_reaction, arrow_downward, attach_file, audio_file, call_end, check,
 crown (filled),
-chevron_right, close, code, description, download, draft, error,
+chevron_right, close, code, description, download, drag_indicator, draft, edit, error,
 folder_open, folder_zip, group, headphones, headset_off, info, keep, mic,
 mic_off, more_horiz, picture_as_pdf, play_arrow, progress_activity,
 mood, schedule, search, send, settings, stop, video_file, volume_off,

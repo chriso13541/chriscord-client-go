@@ -90,6 +90,10 @@ export function ReadImageAsDataURL(arg1:string):Promise<string>;
 
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
+export function ReorderServers(arg1:Array<string>):Promise<Array<main.SavedServer>>;
+
+export function ResolveServerAddress(arg1:string):Promise<string>;
+
 export function SaveProfile(arg1:string,arg2:string):Promise<void>;
 
 export function SaveProfilePicture(arg1:string):Promise<void>;
@@ -121,5 +125,7 @@ export function ToggleDeafen():Promise<boolean>;
 export function ToggleMute():Promise<boolean>;
 
 export function UnlockAccount(arg1:string):Promise<main.AccountView>;
+
+export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<main.SavedServer>>;
 
 export function UploadFile(arg1:string):Promise<main.UploadResult>;

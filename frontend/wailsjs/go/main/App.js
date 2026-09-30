@@ -178,6 +178,14 @@ export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
 }
 
+export function ReorderServers(arg1) {
+  return window['go']['main']['App']['ReorderServers'](arg1);
+}
+
+export function ResolveServerAddress(arg1) {
+  return window['go']['main']['App']['ResolveServerAddress'](arg1);
+}
+
 export function SaveProfile(arg1, arg2) {
   return window['go']['main']['App']['SaveProfile'](arg1, arg2);
 }
@@ -240,6 +248,10 @@ export function ToggleMute() {
 
 export function UnlockAccount(arg1) {
   return window['go']['main']['App']['UnlockAccount'](arg1);
+}
+
+export function UpdateServer(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateServer'](arg1, arg2, arg3, arg4);
 }
 
 export function UploadFile(arg1) {

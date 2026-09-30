@@ -35,7 +35,15 @@ input,button,textarea { font-family:inherit; }
 .servers-header h1 { font-size:2rem; color:var(--accent); letter-spacing:4px; font-weight:800; }
 .servers-header p { color:var(--text-muted); margin-top:6px; font-size:.9rem; }
 .server-list { width:100%; max-width:480px; display:flex; flex-direction:column; gap:10px; }
-.server-card { background:var(--bg-dark); border:1px solid var(--border); border-radius:10px; padding:16px 18px; display:flex; align-items:center; gap:14px; transition:border-color .15s; }
+.server-card { background:var(--bg-dark); border:1px solid var(--border); border-radius:10px; padding:16px 18px 16px 8px; display:flex; align-items:center; gap:12px; transition:border-color .15s; touch-action:none; }
+/* Drag to reorder: grab the card anywhere but its buttons */
+.server-card .drag-handle { color:var(--text-muted); opacity:.35; cursor:grab; display:inline-flex; flex-shrink:0; transition:opacity .15s; }
+.server-card:hover .drag-handle { opacity:.8; }
+.server-card .drag-handle .ic { width:20px; height:20px; }
+.server-card.dragging { position:fixed; z-index:50; pointer-events:none; box-shadow:0 12px 32px rgba(0,0,0,.45); border-color:var(--accent); transform:scale(1.02); transition:none; cursor:grabbing; }
+.server-card.dropping { transition:top .18s cubic-bezier(.22,1,.36,1),left .18s cubic-bezier(.22,1,.36,1),transform .18s,box-shadow .18s; transform:scale(1); box-shadow:none; }
+.server-slot { border:2px dashed var(--border); border-radius:10px; box-sizing:border-box; }
+body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-select:none; }
 .server-card:hover { border-color:var(--accent-dim); }
 .server-icon { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.3rem; font-weight:700; color:#fff; flex-shrink:0; background-size:cover; background-position:center; }
 .server-info { flex:1; min-width:0; }
@@ -88,7 +96,11 @@ input,button,textarea { font-family:inherit; }
 #server-info-btn .ic { width:18px; height:18px; }
 #sidebar-header.has-banner #server-info-btn { color:#fff; background:rgba(0,0,0,.35); }
 #sidebar-header.has-banner #server-info-btn:hover, #sidebar-header.has-banner #server-info-btn.active { background:rgba(0,0,0,.6); }
-#server-info-pop { position:fixed; z-index:420; width:300px; max-height:60vh; overflow-y:auto; padding:14px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
+#server-info-pop { position:fixed; z-index:420; width:300px; max-height:70vh; overflow-y:auto; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
+#server-info-pop .sip-banner { height:96px; background-size:cover; background-position:center; }
+#server-info-pop .sip-icon-wrap { width:84px; height:84px; margin:-42px 0 0 14px; padding:5px; border-radius:50%; background:var(--bg-mid); box-sizing:border-box; position:relative; }
+#server-info-pop .sip-icon { width:74px; height:74px; border-radius:50%; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:700; color:#fff; }
+#server-info-pop .sip-body { padding:6px 16px 14px; }
 #server-info-pop .sip-name { font-weight:800; font-size:1rem; color:var(--text-strong); margin-bottom:8px; word-break:break-word; }
 #server-info-pop .sip-label { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:4px; }
 #server-info-pop .sip-desc { font-size:.86rem; line-height:1.45; white-space:pre-wrap; word-break:break-word; color:var(--text); }
@@ -640,6 +652,8 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <symbol id="st-invisible" viewBox="0 0 10 10"><path fill-rule="evenodd" d="M5 0a5 5 0 1 1 0 10A5 5 0 0 1 5 0zm0 3a2 2 0 1 0 0 4a2 2 0 0 0 0-4z"/></symbol>
   <symbol id="ic-crown" viewBox="0 -960 960 960"><path d="M200-160v-80h560v80H200Zm0-140-51-321q-2 0-4.5.5t-4.5.5q-25 0-42.5-17.5T80-680q0-25 17.5-42.5T140-740q25 0 42.5 17.5T200-680q0 7-1.5 13t-3.5 11l125 56 125-171q-11-8-18-21t-7-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820q0 15-7 28t-18 21l125 171 125-56q-2-5-3.5-11t-1.5-13q0-25 17.5-42.5T820-740q25 0 42.5 17.5T880-680q0 25-17.5 42.5T820-620q-2 0-4.5-.5t-4.5-.5l-51 321H200Z"/></symbol>
   <symbol id="ic-info" viewBox="0 -960 960 960"><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ic-edit" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></symbol>
+  <symbol id="ic-drag_indicator" viewBox="0 -960 960 960"><path d="M360-160q-33 0-56.5-23.5T280-240q0-33 23.5-56.5T360-320q33 0 56.5 23.5T440-240q0 33-23.5 56.5T360-160Zm240 0q-33 0-56.5-23.5T520-240q0-33 23.5-56.5T600-320q33 0 56.5 23.5T680-240q0 33-23.5 56.5T600-160ZM360-400q-33 0-56.5-23.5T280-480q0-33 23.5-56.5T360-560q33 0 56.5 23.5T440-480q0 33-23.5 56.5T360-400Zm240 0q-33 0-56.5-23.5T520-480q0-33 23.5-56.5T600-560q33 0 56.5 23.5T680-480q0 33-23.5 56.5T600-400ZM360-640q-33 0-56.5-23.5T280-720q0-33 23.5-56.5T360-800q33 0 56.5 23.5T440-720q0 33-23.5 56.5T360-640Zm240 0q-33 0-56.5-23.5T520-720q0-33 23.5-56.5T600-800q33 0 56.5 23.5T680-720q0 33-23.5 56.5T600-640Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -727,11 +741,26 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
   <div class="modal">
     <h2>Add a Server</h2>
     <div class="error-msg hidden" id="add-error"></div>
-    <div class="form-group"><label>Domain / IP</label><input id="f-domain" type="text" placeholder="chris-domain1.com  or  192.168.1.10:7070" autocomplete="off"><div class="hint">The address of the homelab running chriscord-server.</div></div>
+    <div class="form-group"><label>Domain / IP</label><input id="f-domain" type="text" placeholder="chris-domain1.com  or  192.168.1.10:7070" autocomplete="off"><div class="hint">The address of the homelab running chriscord-server. No need to type https:// or http:// — it tries https first, then http.</div></div>
     <div class="form-group"><label>Join Key <span style="font-weight:400;text-transform:none;letter-spacing:0">(leave blank if server is open)</span></label><input id="f-key" type="text" placeholder="e.g. a3f9bc12" autocomplete="off"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancel-add-btn">Cancel</button>
       <button class="btn btn-primary" id="connect-btn">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit server modal -->
+<div class="modal-overlay hidden" id="modal-edit-server">
+  <div class="modal">
+    <h2>Edit Server</h2>
+    <div class="error-msg hidden" id="edit-server-error"></div>
+    <div class="form-group"><label>Name</label><input id="es-name" type="text" autocomplete="off"><div class="hint" id="es-name-hint">Leave blank to use the server's own name.</div></div>
+    <div class="form-group"><label>Address</label><input id="es-domain" type="text" autocomplete="off"><div class="hint">https:// or http:// is worked out for you if you leave it off.</div></div>
+    <div class="form-group"><label>Join Key <span style="font-weight:400;text-transform:none;letter-spacing:0">(leave blank if server is open)</span></label><input id="es-key" type="text" autocomplete="off"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="es-cancel">Cancel</button>
+      <button class="btn btn-primary" id="es-save">Save</button>
     </div>
   </div>
 </div>
@@ -889,6 +918,7 @@ img.emoji { width:1.375em; height:1.375em; vertical-align:-.33em; margin:0 .05em
           <div id="banner-cropper-wrap" class="hidden">
             <div id="banner-cropper-viewport"><img id="banner-cropper-img" draggable="false" alt=""></div>
             <input type="range" id="banner-zoom-slider" min="1" max="3" step="0.01" value="1">
+            <p class="settings-hint" id="banner-crop-hint" style="margin-top:0">Drag the image to reposition it, and use the slider to zoom.</p>
             <div class="modal-actions" style="justify-content:flex-start">
               <button class="btn btn-ghost" id="banner-cancel-btn">Cancel</button>
               <button class="btn btn-primary" id="banner-apply-btn">Apply</button>
@@ -1279,11 +1309,13 @@ function renderServers(){
   if(!state.servers?.length){hint.classList.remove('hidden');return;}
   hint.classList.add('hidden');
   state.servers.forEach(s=>{
-    const card=document.createElement('div');card.className='server-card';
-    const initial=(s.display_name||s.domain)[0].toUpperCase(),colour=avatarColour(s.domain);
-    card.innerHTML=`<div class="server-icon" data-icon-domain="${esc(s.domain)}" style="background-color:${colour}">${initial}</div>
-      <div class="server-info"><div class="name">${esc(s.display_name||s.domain)}</div><div class="domain">${esc(s.domain)}</div>${s.last_username?`<div class="lastuser">@${esc(s.last_username)}</div>`:''}</div>
+    const card=document.createElement('div');card.className='server-card';card.dataset.domain=s.domain;
+    const shown=s.custom_name||s.display_name||s.domain;
+    const initial=shown[0].toUpperCase(),colour=avatarColour(s.domain);
+    card.innerHTML=`<span class="drag-handle" title="Drag to reorder">${icon('drag_indicator')}</span><div class="server-icon" data-icon-domain="${esc(s.domain)}" style="background-color:${colour}">${initial}</div>
+      <div class="server-info"><div class="name">${esc(shown)}</div><div class="domain">${esc(s.domain)}</div>${s.last_username?`<div class="lastuser">@${esc(s.last_username)}</div>`:''}</div>
       <div class="server-actions">
+        <button class="btn btn-ghost btn-sm edit-server-btn" title="Edit">${icon('edit')}</button>
         <button class="btn btn-ghost btn-sm remove-btn" data-domain="${esc(s.domain)}" title="Remove">${icon('close')}</button>
         <button class="btn btn-primary btn-sm connect-server-btn" data-domain="${esc(s.domain)}" data-key="${esc(s.server_key)}">Connect</button>
       </div>`;
@@ -1294,10 +1326,125 @@ function renderServers(){
       finally{btn.disabled=false;}
     });
     card.querySelector('.remove-btn').addEventListener('click',async e=>{e.stopPropagation();state.servers=await window.go.main.App.RemoveServer(e.currentTarget.dataset.domain);renderServers();});
+    card.querySelector('.edit-server-btn').addEventListener('click',e=>{e.stopPropagation();openEditServer(s);});
+    card.addEventListener('pointerdown',e=>startServerDrag(e,card));
     list.appendChild(card);
     applyServerIcon(card.querySelector('.server-icon'),s.domain);
   });
   state.servers.forEach(s=>refreshServerIcon(s.domain)); // check each for a new/changed/removed icon
+}
+
+// ── SERVER LIST: DRAG TO REORDER ─────────────────────────────────
+// Press on a card (anywhere but its buttons) and drag. The card lifts and
+// follows the pointer; a dashed slot shows where it will land, and the
+// other cards glide out of the way as you pass their midpoints. Letting go
+// settles the card into the slot and saves the new order.
+let serverDrag=null;
+const SERVER_DRAG_THRESHOLD=5;
+function startServerDrag(e,card){
+  if(e.button!==0||e.target.closest('button,a,input'))return;
+  const z=uiScale(),r=card.getBoundingClientRect();
+  serverDrag={card,pointerId:e.pointerId,startY:e.clientY,startX:e.clientX,rect:r,z,active:false,slot:null};
+  card.setPointerCapture(e.pointerId);
+  card.addEventListener('pointermove',onServerDragMove);
+  card.addEventListener('pointerup',endServerDrag);
+  card.addEventListener('pointercancel',endServerDrag);
+}
+// Moves element(s) in the DOM and animates everything else from where it
+// was to where it now is (FLIP), so cards glide rather than jump.
+function flipMove(list,mutate){
+  const els=[...list.children].filter(el=>!el.classList.contains('dragging'));
+  const before=new Map(els.map(el=>[el,el.getBoundingClientRect().top]));
+  mutate();
+  const z=uiScale();
+  for(const el of els){
+    const dy=(before.get(el)-el.getBoundingClientRect().top)/z;
+    if(!dy)continue;
+    el.style.transition='none';el.style.transform=`translateY(${dy}px)`;
+    el.getBoundingClientRect(); // commit the start position
+    el.style.transition='transform .18s cubic-bezier(.22,1,.36,1)';el.style.transform='';
+  }
+}
+function onServerDragMove(e){
+  const d=serverDrag;if(!d||e.pointerId!==d.pointerId)return;
+  const dy=e.clientY-d.startY;
+  if(!d.active){
+    if(Math.abs(dy)<SERVER_DRAG_THRESHOLD&&Math.abs(e.clientX-d.startX)<SERVER_DRAG_THRESHOLD)return;
+    // Lift: a slot of the same size takes the card's place in the list.
+    d.active=true;
+    const slot=document.createElement('div');slot.className='server-slot';slot.style.height=d.rect.height/d.z+'px';
+    d.card.parentNode.insertBefore(slot,d.card);d.slot=slot;
+    Object.assign(d.card.style,{width:d.rect.width/d.z+'px',left:d.rect.left/d.z+'px',top:d.rect.top/d.z+'px'});
+    d.card.classList.add('dragging');document.body.classList.add('dragging-server');
+  }
+  d.card.style.top=(d.rect.top+dy)/d.z+'px';
+  // Where should the slot be? Before the first card whose middle is below
+  // the dragged card's middle.
+  const list=d.slot.parentNode,mid=d.rect.top+dy+d.rect.height/2;
+  const others=[...list.children].filter(el=>el!==d.card&&el!==d.slot);
+  const next=others.find(el=>{const r=el.getBoundingClientRect();return mid<r.top+r.height/2;})||null;
+  if(next!==d.slot.nextElementSibling||(next===null&&d.slot!==list.lastElementChild&&list.lastElementChild!==d.card)){
+    flipMove(list,()=>list.insertBefore(d.slot,next));
+  }
+}
+async function endServerDrag(e){
+  const d=serverDrag;if(!d||e.pointerId!==d.pointerId)return;
+  serverDrag=null;
+  d.card.removeEventListener('pointermove',onServerDragMove);
+  d.card.removeEventListener('pointerup',endServerDrag);
+  d.card.removeEventListener('pointercancel',endServerDrag);
+  if(!d.active)return; // just a click
+  // Settle into the slot, then put the card back in the normal flow there.
+  const target=d.slot.getBoundingClientRect();
+  d.card.classList.add('dropping');
+  d.card.style.top=target.top/d.z+'px';d.card.style.left=target.left/d.z+'px';
+  await new Promise(r=>setTimeout(r,190));
+  d.slot.replaceWith(d.card);
+  d.card.classList.remove('dragging','dropping');d.card.style.cssText='';
+  document.body.classList.remove('dragging-server');
+  const order=[...document.querySelectorAll('#server-list .server-card')].map(c=>c.dataset.domain);
+  if(order.join('\n')!==state.servers.map(s=>s.domain).join('\n')){
+    try{state.servers=await window.go.main.App.ReorderServers(order);}
+    catch(err){toast('Could not save the new order: '+err,true);renderServers();}
+  }
+}
+
+// ── SERVER LIST: EDIT ────────────────────────────────────────────
+let editingServer=null;
+function openEditServer(s){
+  editingServer=s;
+  document.getElementById('es-name').value=s.custom_name||'';
+  document.getElementById('es-name').placeholder=s.display_name||s.domain;
+  document.getElementById('es-name-hint').textContent=`Leave blank to use the server's own name${s.display_name?` (\u201c${s.display_name}\u201d)`:''}.`;
+  document.getElementById('es-domain').value=s.domain;
+  document.getElementById('es-key').value=s.server_key||'';
+  document.getElementById('edit-server-error').classList.add('hidden');
+  document.getElementById('modal-edit-server').classList.remove('hidden');
+  document.getElementById('es-name').focus();
+}
+function closeEditServer(){document.getElementById('modal-edit-server').classList.add('hidden');editingServer=null;}
+async function saveEditServer(){
+  const s=editingServer;if(!s)return;
+  const errEl=document.getElementById('edit-server-error'),btn=document.getElementById('es-save');
+  let domain=document.getElementById('es-domain').value.trim().replace(/\/+$/,'');
+  btn.disabled=true;errEl.classList.add('hidden');
+  try{
+    // A changed address without http(s):// gets the same https-then-http check as Add.
+    if(domain!==s.domain&&!/^https?:\/\//i.test(domain))domain=await window.go.main.App.ResolveServerAddress(domain);
+    state.servers=await window.go.main.App.UpdateServer(s.domain,domain,document.getElementById('es-key').value,document.getElementById('es-name').value);
+    if(domain!==s.domain)moveServerIconCache(s.domain,domain);
+    closeEditServer();renderServers();
+  }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
+  finally{btn.disabled=false;}
+}
+function moveServerIconCache(from,to){
+  if(serverIconCache[from]){serverIconCache[to]=serverIconCache[from];delete serverIconCache[from];saveServerIconCache();}
+  if(serverIconMem[from]){serverIconMem[to]=serverIconMem[from];delete serverIconMem[from];}
+}
+function initEditServer(){
+  document.getElementById('es-cancel').addEventListener('click',closeEditServer);
+  document.getElementById('es-save').addEventListener('click',saveEditServer);
+  ['es-name','es-domain','es-key'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')saveEditServer();if(e.key==='Escape')closeEditServer();}));
 }
 
 // ── SERVER ICONS ─────────────────────────────────────────────────
@@ -1305,13 +1452,14 @@ function renderServers(){
 // letter on the server list. Icons are cached locally with the server's
 // icon_updated_at, so the list draws instantly — even for a server that's
 // offline — and only re-downloads when the server says the icon changed.
+const serverIconMem={}; // large icons, this session only
 const serverIconCache=(()=>{try{return JSON.parse(localStorage.getItem('serverIcons')||'{}');}catch{return {};}})();
 function saveServerIconCache(){
   try{localStorage.setItem('serverIcons',JSON.stringify(serverIconCache));}
   catch{console.warn('server icons: local cache full; icons will re-download');}
 }
 function applyServerIcon(el,domain){
-  const c=serverIconCache[domain];
+  const c=serverIconCache[domain]||serverIconMem[domain];
   if(c?.url){el.style.backgroundImage=`url("${c.url}")`;el.textContent='';}
 }
 function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);}
@@ -1322,15 +1470,18 @@ function refreshServerIcon(domain,info){
     try{
       info=info||await withTimeout(window.go.main.App.GetServerInfo(domain),5000);
       const at=info?.icon_updated_at||0,cached=serverIconCache[domain];
-      if((cached?.at||0)===at)return;
+      if((cached?.at||serverIconMem[domain]?.at||0)===at&&(cached||serverIconMem[domain]||!at))return;
       if(!at){delete serverIconCache[domain];}
       else{
         const url=await window.go.main.App.FetchServerIcon(domain);
         if(url)serverIconCache[domain]={at,url};else delete serverIconCache[domain];
+        // Big (usually animated) icons are kept for this session only, so
+        // they can't crowd out the local cache.
+        if(url&&url.length>1.5e6){serverIconMem[domain]=serverIconCache[domain];delete serverIconCache[domain];}
       }
       saveServerIconCache();
       document.querySelectorAll(`.server-icon[data-icon-domain="${CSS.escape(domain)}"]`).forEach(el=>{
-        if(serverIconCache[domain])applyServerIcon(el,domain);
+        if(serverIconCache[domain]||serverIconMem[domain])applyServerIcon(el,domain);
         else{el.style.backgroundImage='';el.textContent=(el.closest('.server-card')?.querySelector('.name')?.textContent||domain)[0].toUpperCase();}
       });
     }catch{/* server offline: keep whatever's cached */}
@@ -1441,7 +1592,20 @@ async function togglePingPopover(e){
 }
 
 async function doConnect(domain,serverKey){
-  try{await window.go.main.App.Connect(domain,serverKey);}
+  try{
+    // "myserver.com" → https://myserver.com (or http:// if that's what
+    // answers). A saved entry without a scheme is updated to the working one.
+    if(!/^https?:\/\//i.test(domain)){
+      const resolved=await window.go.main.App.ResolveServerAddress(domain);
+      const saved=(state.servers||[]).find(s=>s.domain===domain);
+      if(saved&&resolved!==domain){
+        state.servers=await window.go.main.App.UpdateServer(domain,resolved,saved.server_key||serverKey||'',saved.custom_name||'');
+        moveServerIconCache(domain,resolved);
+      }
+      domain=resolved;
+    }
+    await window.go.main.App.Connect(domain,serverKey);
+  }
   catch(err){toast(String(err),true);throw err;}
   state.username=await window.go.main.App.GetUsername();
   state.domain=domain;
@@ -1452,7 +1616,7 @@ async function doConnect(domain,serverKey){
   updateStatusDotColor();startPingLoop();updateVoiceConnectedBar();
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
-  state.serverName=saved?.display_name||domain;state.serverOwner='';lastUsersPayload=null;
+  state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';lastUsersPayload=null;
   serverBannerAt=-1; // a different server: forget the last one's banner
   state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
   const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.style.removeProperty('--banner');
@@ -1461,6 +1625,27 @@ async function doConnect(domain,serverKey){
   await loadRooms();
 }
 
+// GIF, animated WebP and APNG are kept byte-for-byte for pfps and banners:
+// cropping works by drawing to a canvas, which would keep only one frame.
+function isAnimatedImage(b){
+  if(!b||b.length<16)return false;
+  const s=(a,z)=>String.fromCharCode(...b.subarray(a,z));
+  if(s(0,4)==='GIF8'){let n=0;for(let i=0;i<b.length-1;i++)if(b[i]===0x21&&b[i+1]===0xF9&&++n>1)return true;return false;}
+  if(s(0,4)==='RIFF'&&s(8,12)==='WEBP')return s(12,16)==='VP8X'&&(b[20]&0x02)!==0;
+  if(b[0]===0x89&&s(1,4)==='PNG'){
+    for(let i=8;i+8<=b.length;){
+      const len=((b[i]<<24)|(b[i+1]<<16)|(b[i+2]<<8)|b[i+3])>>>0,t=s(i+4,i+8);
+      if(t==='acTL')return true;if(t==='IDAT')return false;i+=12+len;
+    }
+  }
+  return false;
+}
+function dataURLBytes(dataUrl){
+  const bin=atob(dataUrl.slice(dataUrl.indexOf(',')+1)),u=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+  return u;
+}
+const ANIMATED_CROP_HINT='Animated image \u2014 it\u2019s kept exactly as it is so it keeps moving, filled and centred like this. (Cropping would freeze it on one frame.)';
 function dataURLToBlob(dataUrl){
   const [head,b64]=dataUrl.split(',');
   const mime=(head.match(/^data:([^;]+)/)||[])[1]||'application/octet-stream';
@@ -1476,7 +1661,9 @@ async function refreshServerMeta(){
   let info;
   try{info=await window.go.main.App.GetServerInfo(domain);}catch{return;}
   if(state.domain!==domain)return;
-  if(info?.name){state.serverName=info.name;}
+  const customName=(state.servers||[]).find(x=>x.domain===domain)?.custom_name;
+  if(customName)state.serverName=customName; // your own name for it wins
+  else if(info?.name){state.serverName=info.name;}
   state.serverOwner=info?.owner||'';
   refreshServerIcon(domain,info);
   setServerTheme(info?.theme||null,domain);
@@ -1511,11 +1698,22 @@ async function refreshServerMeta(){
 // The ⓘ next to the server name: shown only when the server has a
 // description, and pops it out under the header.
 let serverInfoOpen=false;
+// Laid out like a user's profile card: the server banner (or a colour
+// picked from its icon), the icon large, then name, About and owner.
 function renderServerInfo(){
   const pop=document.getElementById('server-info-pop');
-  pop.innerHTML=`<div class="sip-name">${esc(state.serverName)}</div>
+  const iconUrl=(serverIconCache[state.domain]||serverIconMem[state.domain])?.url||'';
+  pop.innerHTML=`<div class="sip-banner"></div>
+    <div class="sip-icon-wrap"><div class="sip-icon"></div></div>
+    <div class="sip-body"><div class="sip-name">${esc(state.serverName)}</div>
     <div class="sip-label">About</div><div class="sip-desc">${renderTextWithLinks(state.serverDescription||'')}</div>
-    ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}`;
+    ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}</div>`;
+  const banner=pop.querySelector('.sip-banner'),ic=pop.querySelector('.sip-icon');
+  const fallback=avatarColour(state.domain||state.serverName||'?');
+  if(serverBannerURL)banner.style.backgroundImage=`url("${serverBannerURL}")`;
+  else{banner.style.backgroundColor=fallback;if(iconUrl)bannerColourFromImage(iconUrl).then(c=>{if(c)banner.style.backgroundColor=c;});}
+  if(iconUrl){ic.style.backgroundImage=`url("${iconUrl}")`;ic.style.cursor='zoom-in';ic.addEventListener('click',()=>{closeServerInfo();openLightbox(iconUrl,null,null);});}
+  else{ic.style.backgroundColor=fallback;ic.textContent=(state.serverName||'?')[0].toUpperCase();}
   pop.querySelectorAll('.msg-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
 }
 function openServerInfo(){
@@ -1871,10 +2069,15 @@ async function pickNewPfp(){
 
 function openPfpCropper(dataUrl){
   const img=document.getElementById('pfp-cropper-img');
+  const animated=isAnimatedImage(dataURLBytes(dataUrl));
   img.onload=()=>{
     pfpCrop.img=img;
+    pfpCrop.animated=animated;
     pfpCrop.srcDataUrl=dataUrl;
-    pfpCrop.srcMime=dataUrl.startsWith('data:image/jpeg')?'image/jpeg':'image/png';
+    // Photos stay JPEG; anything that can be transparent comes out as PNG.
+    pfpCrop.srcMime=/^data:image\/(jpeg|bmp)/.test(dataUrl)?'image/jpeg':'image/png';
+    document.getElementById('pfp-zoom-slider').disabled=animated;
+    document.getElementById('pfp-hint').textContent=animated?ANIMATED_CROP_HINT:'Drag the image to reposition it, and use the slider to zoom.';
     pfpCrop.naturalW=img.naturalWidth;
     pfpCrop.naturalH=img.naturalHeight;
     pfpCrop.baseScale=Math.max(PFP_VIEWPORT/pfpCrop.naturalW,PFP_VIEWPORT/pfpCrop.naturalH);
@@ -1922,7 +2125,7 @@ function onPfpZoomChange(){
 }
 
 function onPfpDragStart(e){
-  if(!pfpCrop.img)return;
+  if(!pfpCrop.img||pfpCrop.animated)return;
   pfpCrop.dragging=true;
   const p=e.touches?e.touches[0]:e;
   pfpCrop.startX=p.clientX;pfpCrop.startY=p.clientY;
@@ -1947,7 +2150,9 @@ function onPfpDragEnd(){
 function closePfpCropper(){
   document.getElementById('pfp-cropper-wrap').classList.add('hidden');
   document.getElementById('pfp-current-display').classList.remove('hidden');
-  pfpCrop.img=null;
+  pfpCrop.img=null;pfpCrop.animated=false;
+  document.getElementById('pfp-zoom-slider').disabled=false;
+  document.getElementById('pfp-hint').textContent='Drag the image to reposition it, and use the slider to zoom.';
 }
 
 // Largest side a saved pfp is stored at. Plenty for any display size here
@@ -1963,6 +2168,7 @@ const PFP_MAX_SIZE=1024;
 // the source's own format: JPEG photos stay JPEG (a 1024px photo as PNG
 // would be several MB), PNGs stay PNG to keep transparency.
 function renderPfpCrop(){
+  if(pfpCrop.animated)return pfpCrop.srcDataUrl; // kept as-is so it stays animated
   const scale=pfpCrop.baseScale*pfpCrop.zoom;
   const srcX=-pfpCrop.tx/scale, srcY=-pfpCrop.ty/scale, srcSide=PFP_VIEWPORT/scale;
   const untouched=pfpCrop.naturalW===pfpCrop.naturalH && pfpCrop.zoom===1
@@ -3309,8 +3515,12 @@ async function pickBanner(){
     if(!path)return;
     const dataUrl=await window.go.main.App.ReadImageAsDataURL(path);
     const img=document.getElementById('banner-cropper-img');
+    const animated=isAnimatedImage(dataURLBytes(dataUrl));
     img.onload=()=>{
-      bannerCrop.img=img;bannerCrop.mime=dataUrl.startsWith('data:image/jpeg')?'image/jpeg':'image/png';
+      bannerCrop.img=img;bannerCrop.mime=/^data:image\/(jpeg|bmp)/.test(dataUrl)?'image/jpeg':'image/png';
+      bannerCrop.animated=animated;bannerCrop.src=dataUrl;
+      document.getElementById('banner-zoom-slider').disabled=animated;
+      document.getElementById('banner-crop-hint').textContent=animated?ANIMATED_CROP_HINT:'Drag the image to reposition it, and use the slider to zoom.';
       bannerCrop.nw=img.naturalWidth;bannerCrop.nh=img.naturalHeight;
       bannerCrop.base=Math.max(BANNER_VW/bannerCrop.nw,BANNER_VH/bannerCrop.nh);
       bannerCrop.zoom=1;
@@ -3342,11 +3552,13 @@ function onBannerZoom(){
   clampBannerPan();applyBannerTransform();
 }
 function closeBannerCropper(){
-  bannerCrop.img=null;bannerCrop.drag=null;
+  bannerCrop.img=null;bannerCrop.drag=null;bannerCrop.animated=false;
+  document.getElementById('banner-zoom-slider').disabled=false;
   document.getElementById('banner-cropper-wrap').classList.add('hidden');
   document.getElementById('banner-current-wrap').classList.remove('hidden');
 }
 function applyBannerCrop(){
+  if(bannerCrop.animated){profileDraft.banner=bannerCrop.src;closeBannerCropper();updateProfileEditorState();return;}
   const sc=bannerCrop.base*bannerCrop.zoom;
   const sx=-bannerCrop.tx/sc,sy=-bannerCrop.ty/sc,sw=BANNER_VW/sc,sh=BANNER_VH/sc;
   const outW=Math.max(1,Math.min(BANNER_MAX_W,Math.round(sw))),outH=Math.round(outW*BANNER_VH/BANNER_VW);
@@ -3363,7 +3575,7 @@ function initProfileEditor(){
   document.getElementById('banner-apply-btn').addEventListener('click',applyBannerCrop);
   document.getElementById('banner-zoom-slider').addEventListener('input',onBannerZoom);
   const vp=document.getElementById('banner-cropper-viewport');
-  const start=e=>{if(!bannerCrop.img)return;const p=e.touches?e.touches[0]:e;bannerCrop.drag={x:p.clientX,y:p.clientY,tx:bannerCrop.tx,ty:bannerCrop.ty};vp.classList.add('dragging');e.preventDefault();};
+  const start=e=>{if(!bannerCrop.img||bannerCrop.animated)return;const p=e.touches?e.touches[0]:e;bannerCrop.drag={x:p.clientX,y:p.clientY,tx:bannerCrop.tx,ty:bannerCrop.ty};vp.classList.add('dragging');e.preventDefault();};
   const move=e=>{if(!bannerCrop.drag)return;const p=e.touches?e.touches[0]:e;const z=uiScale();bannerCrop.tx=bannerCrop.drag.tx+(p.clientX-bannerCrop.drag.x)/z;bannerCrop.ty=bannerCrop.drag.ty+(p.clientY-bannerCrop.drag.y)/z;clampBannerPan();applyBannerTransform();};
   const end=()=>{bannerCrop.drag=null;vp.classList.remove('dragging');};
   vp.addEventListener('mousedown',start);vp.addEventListener('touchstart',start,{passive:false});
@@ -4323,6 +4535,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initEditServer();
   initElasticScroll();
   initAppearance();
   initServerInfo();
