@@ -31,6 +31,7 @@ import (
 //                                            under a passphrase
 //   accounts/<fingerprint>/account.json   — username (plaintext, not secret)
 //   accounts/<fingerprint>/pfp.png        — optional, may not exist
+//   accounts/<fingerprint>/banner.png     — optional profile banner
 //
 // identity.json and account.json are copied byte-for-byte into and out of
 // the exported archive — no re-encoding of those files themselves. The
@@ -66,6 +67,10 @@ type accountMeta struct {
 	Username      string    `json:"username"`
 	CreatedAt     time.Time `json:"created_at"`
 	PfpUpdatedAt  int64     `json:"pfp_updated_at,omitempty"`
+	// Profile card: bio text, plus when the bio or banner last changed
+	// (the banner itself lives next to pfp.png as banner.png).
+	Bio              string `json:"bio,omitempty"`
+	ProfileUpdatedAt int64  `json:"profile_updated_at,omitempty"`
 }
 
 // Account is the unlocked, in-memory identity. Never marshaled to JSON and
@@ -82,6 +87,10 @@ type Account struct {
 	// connect so it can tell whether its own cached copy, if any, is still
 	// current, without needing to re-upload every single time.
 	PfpUpdatedAt int64
+	// Profile card data — see accountMeta. Synced to servers the same way
+	// as the pfp (profile_info / profile_request / profile_upload).
+	Bio              string
+	ProfileUpdatedAt int64
 }
 
 func (a *Account) View() *AccountView {
@@ -211,6 +220,25 @@ func updatePfpTimestamp(dir string, updatedAt int64) error {
 	}
 	return os.WriteFile(filepath.Join(dir, "account.json"), data, 0600)
 }
+
+// updateProfileMeta records a new bio and profile timestamp in
+// account.json, preserving everything else there (see updatePfpTimestamp).
+func updateProfileMeta(dir, bio string, updatedAt int64) error {
+	m, err := readAccountMeta(dir)
+	if err != nil {
+		m = &accountMeta{CreatedAt: time.Now().UTC()}
+	}
+	m.Bio = bio
+	m.ProfileUpdatedAt = updatedAt
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "account.json"), data, 0600)
+}
+
+// bannerPath is where an account's profile banner lives, if it has one.
+func bannerPath(dir string) string { return filepath.Join(dir, "banner.png") }
 
 // ── pfp.png — optional at every layer, on purpose ──────────────────────────
 //
@@ -457,10 +485,13 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	}
 	meta, err := readAccountMeta(dir)
 	username := "unnamed"
-	var pfpUpdatedAt int64
+	var pfpUpdatedAt, profileUpdatedAt int64
+	bio := ""
 	if err == nil {
 		username = meta.Username
 		pfpUpdatedAt = meta.PfpUpdatedAt
+		bio = meta.Bio
+		profileUpdatedAt = meta.ProfileUpdatedAt
 	}
 	avatarPath, hasAvatar := pfpIfExists(dir)
 	if hasAvatar && pfpUpdatedAt == 0 {
@@ -476,6 +507,7 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	return &Account{
 		Slug: slug, Username: username, PublicKey: pub, PrivateKey: priv,
 		HasAvatar: hasAvatar, AvatarPath: avatarPath, PfpUpdatedAt: pfpUpdatedAt,
+		Bio: bio, ProfileUpdatedAt: profileUpdatedAt,
 	}, nil
 }
 
@@ -555,10 +587,16 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	}
 	if meta, err := readAccountMeta(srcDir); err == nil {
 		writeAccountMeta(destDir, meta.Username)
+		if meta.ProfileUpdatedAt > 0 {
+			_ = updateProfileMeta(destDir, meta.Bio, meta.ProfileUpdatedAt) // bio travels with the account too
+		}
 	} else {
 		writeAccountMeta(destDir, "unnamed") // account.json is optional too — don't fail the import over it
 	}
 	copyOptionalPfp(filepath.Join(srcDir, "pfp.png"), destDir)
+	if _, err := os.Stat(filepath.Join(srcDir, "banner.png")); err == nil {
+		_ = copyFile(filepath.Join(srcDir, "banner.png"), bannerPath(destDir), 0600) // optional, like pfp.png
+	}
 	mergeServersIfPresent(filepath.Join(srcDir, "servers.json"))
 
 	account, err := unlockSlug(slug, passphrase)
@@ -623,7 +661,7 @@ func buildAccountExport(slug, passphrase string) ([]byte, string, error) {
 
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	for _, name := range []string{"identity.json", "account.json", "pfp.png"} {
+	for _, name := range []string{"identity.json", "account.json", "pfp.png", "banner.png"} {
 		srcPath := filepath.Join(dir, name)
 		if _, err := os.Stat(srcPath); err != nil {
 			continue // pfp.png especially is commonly absent — skip quietly

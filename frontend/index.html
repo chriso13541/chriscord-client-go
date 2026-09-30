@@ -253,6 +253,51 @@ input,button,textarea { font-family:inherit; }
 .sr-attach .ic { width:14px; height:14px; }
 .settings-secondary-btn .ic { width:16px; height:16px; margin-right:4px; }
 
+/* ── Profile card (popup + settings preview) ───────────────────── */
+.profile-card { width:300px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 8px 28px rgba(0,0,0,.45); color:var(--text); }
+.pc-banner { height:106px; background-size:cover; background-position:center; }
+.pc-avatar-wrap { position:relative; width:92px; height:92px; margin:-46px 0 0 14px; border-radius:50%; background:var(--bg-mid); padding:6px; box-sizing:border-box; }
+.pc-avatar { width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.9rem; font-weight:700; color:#fff; background-size:cover; background-position:center; cursor:zoom-in; }
+.pc-status { position:absolute; right:4px; bottom:4px; width:18px; height:18px; border-radius:50%; border:4px solid var(--bg-mid); box-sizing:border-box; background:var(--text-muted); }
+.pc-status.online { background:var(--green); }
+.pc-body { padding:8px 16px 16px; }
+.pc-name { font-size:1.25rem; font-weight:800; color:var(--text-strong); word-break:break-word; }
+.pc-since { font-size:.75rem; color:var(--text-muted); margin-top:2px; }
+.pc-section { margin-top:12px; padding:10px 12px; background:var(--bg-dark); border-radius:8px; }
+.pc-label { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:4px; }
+.pc-bio { font-size:.85rem; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
+.pc-bio.empty { color:var(--text-muted); font-style:italic; }
+.pc-edit { margin-top:12px; width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--bg-light); color:var(--text); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+.pc-edit:hover { background:var(--bg-dark); color:var(--text-strong); }
+.pc-edit .ic { width:16px; height:16px; }
+#profile-popup { position:fixed; z-index:400; }
+#profile-popup .profile-card { max-height:calc(100vh - 16px); overflow-y:auto; }
+/* Things that open a profile card */
+.member-row, .voice-occupant-row, .msg-avatar:not(.msg-avatar-time), .msg-username { cursor:pointer; }
+.msg-username:hover { text-decoration:underline; }
+#sidebar-user-profile { display:flex; align-items:center; gap:8px; min-width:0; padding:3px 6px 3px 3px; margin:-3px 0 -3px -3px; border-radius:6px; cursor:pointer; border:none; background:none; color:inherit; font:inherit; text-align:left; }
+#sidebar-user-profile:hover { background:var(--bg-light); }
+#sidebar-user-profile .user-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ── Profile settings editor ─────────────────────────────────── */
+#profile-editor { display:flex; gap:40px; align-items:flex-start; flex-wrap:wrap; }
+#profile-editor-fields { flex:1; min-width:320px; max-width:520px; }
+#profile-editor-preview { position:sticky; top:0; }
+#profile-editor-preview .settings-label { margin-top:0; }
+#banner-current { width:100%; max-width:340px; aspect-ratio:17/6; border-radius:8px; background-size:cover; background-position:center; border:1px solid var(--border); }
+.profile-btn-row { display:flex; gap:8px; flex-wrap:wrap; }
+.profile-btn-row .settings-secondary-btn { margin-top:10px; }
+#banner-cropper-viewport { width:340px; height:120px; border-radius:8px; overflow:hidden; position:relative; background:var(--bg-darkest); cursor:grab; -webkit-user-select:none; user-select:none; touch-action:none; }
+#banner-cropper-viewport.dragging { cursor:grabbing; }
+#banner-cropper-img { position:absolute; top:0; left:0; transform-origin:top left; pointer-events:none; max-width:none; }
+#banner-zoom-slider { width:340px; display:block; margin:12px 0; }
+#profile-bio { width:100%; min-height:110px; resize:vertical; padding:10px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font:inherit; font-size:.88rem; line-height:1.45; box-sizing:border-box; }
+#profile-bio-count { font-size:.75rem; color:var(--text-muted); text-align:right; margin-top:4px; }
+#profile-bio-count.over { color:var(--red); }
+#profile-save-bar { display:flex; align-items:center; gap:10px; margin-top:20px; }
+#profile-save-bar .hint { font-size:.8rem; color:var(--text-muted); }
+.profile-divider { border:none; border-top:1px solid var(--border); margin:24px 0 4px; }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -276,6 +321,7 @@ input,button,textarea { font-family:inherit; }
 .settings-tab:hover { background:var(--bg-light); color:var(--text); }
 .settings-tab.active { background:var(--bg-light); color:var(--text-strong); }
 #settings-content { flex:1; padding:56px 40px; overflow-y:auto; max-width:640px; }
+#settings-content.wide { max-width:1040px; }
 .settings-tab-pane { display:none; }
 .settings-tab-pane.active { display:block; }
 .settings-tab-pane h2 { font-size:1.3rem; margin-bottom:20px; }
@@ -538,8 +584,10 @@ input,button,textarea { font-family:inherit; }
       <button id="voice-leave-btn" class="voice-bar-btn" title="Disconnect from voice"><svg class="ic" aria-hidden="true"><use href="#ic-call_end"/></svg></button>
     </div>
     <div id="sidebar-user">
-      <div class="user-avatar" id="user-avatar">?</div>
-      <span class="user-name" id="user-name-label">username</span>
+      <button id="sidebar-user-profile" title="View your profile">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <span class="user-name" id="user-name-label">username</span>
+      </button>
       <button class="settings-btn" id="settings-btn" title="Settings"><svg class="ic" aria-hidden="true"><use href="#ic-settings"/></svg></button>
       <button class="status-dot-btn" id="status-dot-btn" title="Connected">
         <span class="status-dot" id="status-dot"></span>
@@ -607,29 +655,68 @@ input,button,textarea { font-family:inherit; }
 <div id="settings-modal" class="hidden">
   <button id="settings-close-btn" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
   <div id="settings-tabs">
-    <div class="settings-tab" data-tab="profile">Profile</div>
-    <div class="settings-tab active" data-tab="voice">Voice</div>
+    <div class="settings-tab active" data-tab="profile">Profile</div>
+    <div class="settings-tab" data-tab="voice">Voice</div>
   </div>
   <div id="settings-content">
-    <div id="settings-tab-profile" class="settings-tab-pane">
+    <div id="settings-tab-profile" class="settings-tab-pane active">
       <h2>Profile</h2>
-      <div id="pfp-current-display">
-        <div id="pfp-current-circle"></div>
-        <button class="settings-secondary-btn" id="pfp-choose-btn">Choose Image</button>
-      </div>
-      <div id="pfp-cropper-wrap" class="hidden">
-        <div id="pfp-cropper-viewport">
-          <img id="pfp-cropper-img" draggable="false" alt="">
+      <div id="profile-editor">
+        <div id="profile-editor-fields">
+          <label class="settings-label">Profile Picture</label>
+          <div id="pfp-current-display">
+            <div id="pfp-current-circle"></div>
+            <button class="settings-secondary-btn" id="pfp-choose-btn">Choose Image</button>
+          </div>
+          <div id="pfp-cropper-wrap" class="hidden">
+            <div id="pfp-cropper-viewport">
+              <img id="pfp-cropper-img" draggable="false" alt="">
+            </div>
+            <input type="range" id="pfp-zoom-slider" min="1" max="3" step="0.01" value="1">
+            <div class="modal-actions">
+              <button class="btn btn-ghost" id="pfp-cancel-btn">Cancel</button>
+              <button class="btn btn-primary" id="pfp-save-btn">Save</button>
+            </div>
+          </div>
+          <p class="settings-hint" id="pfp-hint">Drag the image to reposition it, and use the slider to zoom.</p>
+
+          <hr class="profile-divider">
+          <label class="settings-label">Profile Banner</label>
+          <div id="banner-current-wrap">
+            <div id="banner-current"></div>
+            <div class="profile-btn-row">
+              <button class="settings-secondary-btn" id="banner-choose-btn">Choose Image</button>
+              <button class="settings-secondary-btn" id="banner-remove-btn">Remove Banner</button>
+            </div>
+            <p class="settings-hint" style="margin-top:10px">Without a banner image, your card uses a colour picked from your profile picture.</p>
+          </div>
+          <div id="banner-cropper-wrap" class="hidden">
+            <div id="banner-cropper-viewport"><img id="banner-cropper-img" draggable="false" alt=""></div>
+            <input type="range" id="banner-zoom-slider" min="1" max="3" step="0.01" value="1">
+            <div class="modal-actions" style="justify-content:flex-start">
+              <button class="btn btn-ghost" id="banner-cancel-btn">Cancel</button>
+              <button class="btn btn-primary" id="banner-apply-btn">Apply</button>
+            </div>
+          </div>
+
+          <hr class="profile-divider">
+          <label class="settings-label" for="profile-bio">Bio</label>
+          <textarea id="profile-bio" maxlength="500" placeholder="Tell people a little about yourself"></textarea>
+          <div id="profile-bio-count">0 / 500</div>
+
+          <div id="profile-save-bar">
+            <button class="btn btn-primary" id="profile-save-btn" disabled>Save Changes</button>
+            <button class="btn btn-ghost" id="profile-reset-btn" disabled>Reset</button>
+            <span class="hint" id="profile-save-hint"></span>
+          </div>
         </div>
-        <input type="range" id="pfp-zoom-slider" min="1" max="3" step="0.01" value="1">
-        <div class="modal-actions">
-          <button class="btn btn-ghost" id="pfp-cancel-btn">Cancel</button>
-          <button class="btn btn-primary" id="pfp-save-btn">Save</button>
+        <div id="profile-editor-preview">
+          <label class="settings-label">Preview</label>
+          <div id="profile-preview-slot"></div>
         </div>
       </div>
-      <p class="settings-hint" id="pfp-hint">Drag the image to reposition it, and use the slider to zoom.</p>
     </div>
-    <div id="settings-tab-voice" class="settings-tab-pane active">
+    <div id="settings-tab-voice" class="settings-tab-pane">
       <h2>Voice Settings</h2>
       <label class="settings-label">Microphone</label>
       <select id="settings-mic-select"><option>Loading devices…</option></select>
@@ -640,6 +727,7 @@ input,button,textarea { font-family:inherit; }
     </div>
   </div>
 </div>
+<div id="profile-popup" class="hidden"></div>
 <div id="toast"></div>
 
 <script>
@@ -1209,13 +1297,20 @@ async function toggleMute(){
 // Generic tab list + content pane, matching Discord's own settings shape —
 // adding a future tab is just one more .settings-tab + .settings-tab-pane
 // pair, not a structural change to this switching logic.
-function openSettings(){
+// Always opens on the first tab (Profile) unless told otherwise — the
+// gear shouldn't drop you back wherever you last were.
+function openSettings(tab='profile'){
+  if(typeof tab!=='string')tab='profile'; // called directly as a click handler
+  closeProfilePopup();
   document.getElementById('settings-modal').classList.remove('hidden');
+  switchSettingsTab(tab);
   populateAudioDeviceDropdowns();
   loadCurrentPfp();
+  loadProfileEditor();
 }
 function closeSettings(){
   document.getElementById('settings-modal').classList.add('hidden');
+  if(bannerCrop.img)closeBannerCropper();
   if(micTestRunning)stopMicTest();
   if(pfpCrop.img)closePfpCropper();
 }
@@ -1240,6 +1335,7 @@ function stopMicTest(){
   window.go.main.App.StopMicTest().catch(()=>{});
 }
 function switchSettingsTab(name){
+  document.getElementById('settings-content').classList.toggle('wide',name==='profile');
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
 }
@@ -1260,6 +1356,8 @@ async function loadCurrentPfp(){
   const circle=document.getElementById('pfp-current-circle');
   let dataUrl='';
   try{dataUrl=await window.go.main.App.GetProfilePicture();}catch(err){console.error('GetProfilePicture failed:',err);}
+  profileDraft.pfp=dataUrl||'';
+  renderProfilePreview();
   if(dataUrl)setAvatarImage(circle,dataUrl);
   else setAvatarFallback(circle,state.username);
 }
@@ -1405,6 +1503,7 @@ async function savePfpCrop(){
   // Your own messages / member row / voice row too, without waiting for the
   // server's pfp:updated round trip.
   state.userPfps[state.username]=dataUrl;
+  profileDraft.pfp=dataUrl;updateProfileEditorState(); // preview + default banner colour follow the new picture
   document.querySelectorAll(`[data-pfp-user="${CSS.escape(state.username)}"]`).forEach(el=>setAvatarImage(el,dataUrl));
   closePfpCropper();
   try{
@@ -2448,6 +2547,308 @@ function sizeLoadedImage(img){
 // Markup for a UI icon from the sprite at the top of <body>.
 function icon(name,cls=''){return `<svg class="ic${cls?' '+cls:''}" aria-hidden="true"><use href="#ic-${name}"/></svg>`;}
 
+// ── PROFILES ─────────────────────────────────────────────────────
+// Profile cards: a banner (image, or a colour picked from the pfp), the
+// avatar large with an online dot, name, join date and bio. The same
+// builder draws the popup (click a member, a voice occupant, a message's
+// name/avatar, or yourself bottom-left) and the live preview in settings.
+const profileCache={}; // username → Promise<{bio,banner,member_since}>
+const bannerColourCache=new Map(); // pfp data URL → colour
+
+function getUserPfp(user){
+  if(typeof state.userPfps[user]==='string')return Promise.resolve(state.userPfps[user]);
+  return window.go.main.App.FetchUserPfp(user).then(d=>{state.userPfps[user]=d||'';return d||'';}).catch(()=>'');
+}
+function getUserProfile(user){
+  if(!profileCache[user]){
+    profileCache[user]=window.go.main.App.FetchUserProfile(user).catch(err=>{delete profileCache[user];throw err;});
+  }
+  return profileCache[user];
+}
+
+// The "best fit" banner colour for a picture, the way Discord picks one:
+// shrink it, bucket the pixels by colour, take the most common bucket
+// (ignoring near-black, near-white and transparent pixels, which are
+// usually background rather than the picture's character) and average it.
+function bannerColourFromImage(dataUrl){
+  if(!dataUrl)return Promise.resolve(null);
+  if(bannerColourCache.has(dataUrl))return Promise.resolve(bannerColourCache.get(dataUrl));
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const N=32,c=document.createElement('canvas');c.width=N;c.height=N;
+        const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,N,N);
+        const px=ctx.getImageData(0,0,N,N).data,buckets=new Map();
+        let fallback=[0,0,0,0];
+        for(let i=0;i<px.length;i+=4){
+          const r=px[i],g=px[i+1],b=px[i+2],a=px[i+3];
+          if(a<128)continue;
+          fallback[0]+=r;fallback[1]+=g;fallback[2]+=b;fallback[3]++;
+          const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+          if(mx<28||mn>232)continue;
+          const key=(r>>5)<<6|(g>>5)<<3|(b>>5);
+          const e=buckets.get(key)||[0,0,0,0];e[0]+=r;e[1]+=g;e[2]+=b;e[3]++;buckets.set(key,e);
+        }
+        let best=null;for(const e of buckets.values())if(!best||e[3]>best[3])best=e;
+        const src=best||(fallback[3]?fallback:null);
+        const colour=src?`rgb(${Math.round(src[0]/src[3])},${Math.round(src[1]/src[3])},${Math.round(src[2]/src[3])})`:null;
+        bannerColourCache.set(dataUrl,colour);resolve(colour);
+      }catch{resolve(null);}
+    };
+    img.onerror=()=>resolve(null);
+    img.src=dataUrl;
+  });
+}
+
+function formatMemberSince(iso){
+  try{return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}catch{return'';}
+}
+
+// p: {username, bio, banner, pfp, memberSince, online, own}
+function buildProfileCard(p){
+  const card=document.createElement('div');card.className='profile-card';
+  card.innerHTML=`
+    <div class="pc-banner"></div>
+    <div class="pc-avatar-wrap"><div class="pc-avatar"></div><div class="pc-status${p.online?' online':''}" title="${p.online?'Online':'Offline'}"></div></div>
+    <div class="pc-body">
+      <div class="pc-name">${esc(p.username)}</div>
+      ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
+      <div class="pc-section"><div class="pc-label">About Me</div>
+        <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>
+      ${p.own&&p.editButton!==false?`<button class="pc-edit">${icon('settings')}Edit Profile</button>`:''}
+    </div>`;
+  const avatar=card.querySelector('.pc-avatar');
+  if(p.pfp){
+    setAvatarImage(avatar,p.pfp);
+    avatar.addEventListener('click',()=>openLightbox(p.pfp,null,null));
+  }else{setAvatarFallback(avatar,p.username);avatar.style.cursor='default';}
+  const banner=card.querySelector('.pc-banner');
+  if(p.banner)banner.style.backgroundImage=`url("${p.banner}")`;
+  else{
+    banner.style.backgroundColor=avatarColour(p.username);
+    bannerColourFromImage(p.pfp).then(c=>{if(c)banner.style.backgroundColor=c;});
+  }
+  card.querySelectorAll('.msg-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
+  card.querySelector('.pc-edit')?.addEventListener('click',()=>{closeProfilePopup();openSettings('profile');});
+  return card;
+}
+
+let profilePopupFor=null;
+async function openProfilePopup(user,anchor){
+  if(!user)return;
+  if(profilePopupFor===user){closeProfilePopup();return;} // second click toggles it shut
+  closeDropdown();
+  profilePopupFor=user;
+  const own=user===state.username;
+  const online=own||(state.onlineUsers||[]).includes(user);
+  let data;
+  try{
+    if(own){
+      const [mine,pfp,prof]=await Promise.all([
+        window.go.main.App.GetOwnProfile(),window.go.main.App.GetProfilePicture(),getUserProfile(user).catch(()=>null)]);
+      data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,own:true};
+    }else{
+      const [prof,pfp]=await Promise.all([getUserProfile(user),getUserPfp(user)]);
+      data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',pfp,memberSince:prof?.member_since||'',online,own:false};
+    }
+  }catch(err){
+    if(profilePopupFor===user)profilePopupFor=null;
+    toast('Could not load profile: '+err,true);return;
+  }
+  if(profilePopupFor!==user)return; // closed or switched while loading
+  const pop=document.getElementById('profile-popup');
+  pop.innerHTML='';pop.appendChild(buildProfileCard(data));
+  pop.classList.remove('hidden');
+  positionProfilePopup(pop,anchor);
+}
+// Beside whatever was clicked — to its left if it's on the right half of
+// the window (the member list), otherwise to its right — kept on-screen.
+function positionProfilePopup(pop,anchor){
+  const r=(anchor&&anchor.isConnected?anchor:document.body).getBoundingClientRect();
+  const w=pop.offsetWidth,h=pop.offsetHeight,m=8,gap=12;
+  if(anchor?.id==='sidebar-user-profile'){
+    // Your own card opens straight above the bottom-left user panel.
+    pop.style.left=Math.max(m,r.left)+'px';
+    pop.style.top=Math.max(m,r.top-h-gap)+'px';
+    return;
+  }
+  let x=r.left>innerWidth/2?r.left-w-gap:r.right+gap;
+  x=Math.max(m,Math.min(innerWidth-w-m,x));
+  let y=r.top-16;
+  y=Math.max(m,Math.min(innerHeight-h-m,y));
+  pop.style.left=x+'px';pop.style.top=y+'px';
+}
+function closeProfilePopup(){
+  profilePopupFor=null;
+  const pop=document.getElementById('profile-popup');
+  if(pop){pop.classList.add('hidden');pop.innerHTML='';}
+}
+function initProfilePopups(){
+  // One delegated listener covers every place a profile can be opened
+  // from, including rows rendered later.
+  document.addEventListener('click',e=>{
+    const pop=document.getElementById('profile-popup');
+    if(e.target.closest('#profile-popup'))return;
+    const own=e.target.closest('#sidebar-user-profile');
+    const member=e.target.closest('.member-row[data-user]');
+    const occupant=e.target.closest('.voice-occupant-row[data-user]');
+    const msgHit=e.target.closest('.msg-avatar:not(.msg-avatar-time), .msg-username');
+    let user=null,anchor=null;
+    if(own){user=state.username;anchor=own;}
+    else if(member){user=member.dataset.user;anchor=member;}
+    else if(occupant){user=occupant.dataset.user;anchor=occupant;}
+    else if(msgHit){user=msgHit.closest('.msg-group')?.dataset.username;anchor=msgHit;}
+    if(user){e.stopPropagation();openProfilePopup(user,anchor);return;}
+    if(!pop.classList.contains('hidden'))closeProfilePopup();
+  },true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&profilePopupFor){e.stopImmediatePropagation();closeProfilePopup();}},true);
+  window.addEventListener('resize',closeProfilePopup);
+  document.getElementById('messages')?.addEventListener('scroll',closeProfilePopup,{passive:true});
+}
+
+// ── PROFILE SETTINGS (banner + bio + live preview) ───────────────
+// Edits are a draft until Save Changes; the preview shows the card as
+// others will see it once saved. The profile picture keeps its own
+// immediate Save (above), and the preview follows it too.
+const BIO_MAX=500;
+const profileDraft={pfp:'',bio:'',banner:'',savedBio:'',savedBanner:'',memberSince:''};
+async function loadProfileEditor(){
+  try{
+    const mine=await window.go.main.App.GetOwnProfile();
+    profileDraft.bio=profileDraft.savedBio=mine?.bio||'';
+    profileDraft.banner=profileDraft.savedBanner=mine?.banner||'';
+  }catch(err){console.error('GetOwnProfile failed:',err);}
+  document.getElementById('profile-bio').value=profileDraft.bio;
+  document.getElementById('profile-save-hint').textContent='';
+  updateProfileEditorState();
+  // Join date for the preview, from the server you're connected to (none
+  // on the server-list screen, which is fine — the line is just omitted).
+  if(state.domain&&state.username)getUserProfile(state.username)
+    .then(p=>{profileDraft.memberSince=p?.member_since||'';renderProfilePreview();}).catch(()=>{});
+}
+function profileDirty(){return profileDraft.bio.trim()!==profileDraft.savedBio.trim()||profileDraft.banner!==profileDraft.savedBanner;}
+function updateProfileEditorState(){
+  const n=[...profileDraft.bio].length;
+  const count=document.getElementById('profile-bio-count');
+  count.textContent=`${n} / ${BIO_MAX}`;count.classList.toggle('over',n>BIO_MAX);
+  const dirty=profileDirty();
+  document.getElementById('profile-save-btn').disabled=!dirty||n>BIO_MAX;
+  document.getElementById('profile-reset-btn').disabled=!dirty;
+  const cur=document.getElementById('banner-current');
+  if(profileDraft.banner){cur.style.backgroundImage=`url("${profileDraft.banner}")`;cur.style.backgroundColor='';}
+  else{
+    cur.style.backgroundImage='';cur.style.backgroundColor=avatarColour(state.username||'?');
+    bannerColourFromImage(profileDraft.pfp).then(c=>{if(c&&!profileDraft.banner)cur.style.backgroundColor=c;});
+  }
+  document.getElementById('banner-remove-btn').disabled=!profileDraft.banner;
+  renderProfilePreview();
+}
+function renderProfilePreview(){
+  const slot=document.getElementById('profile-preview-slot');
+  if(!slot)return;
+  slot.innerHTML='';
+  slot.appendChild(buildProfileCard({
+    username:state.username||'you',bio:profileDraft.bio.trim(),banner:profileDraft.banner,pfp:profileDraft.pfp,
+    memberSince:profileDraft.memberSince,online:true,own:true,editButton:false}));
+}
+async function saveProfile(){
+  const btn=document.getElementById('profile-save-btn');btn.disabled=true;
+  try{
+    await window.go.main.App.SaveProfile(profileDraft.bio,profileDraft.banner);
+    profileDraft.bio=profileDraft.bio.trim();
+    profileDraft.savedBio=profileDraft.bio;profileDraft.savedBanner=profileDraft.banner;
+    document.getElementById('profile-bio').value=profileDraft.bio;
+    delete profileCache[state.username];
+    document.getElementById('profile-save-hint').textContent='Saved.';
+    toast('Profile saved');
+  }catch(err){toast('Could not save profile: '+err,true);}
+  updateProfileEditorState();
+}
+function resetProfileDraft(){
+  profileDraft.bio=profileDraft.savedBio;profileDraft.banner=profileDraft.savedBanner;
+  document.getElementById('profile-bio').value=profileDraft.bio;
+  document.getElementById('profile-save-hint').textContent='';
+  updateProfileEditorState();
+}
+
+// Banner cropper — same drag + zoom behaviour as the pfp cropper, on a
+// 17:6 viewport (Discord's banner shape). Output is the visible region at
+// source resolution, capped at 1020×360.
+const BANNER_VW=340,BANNER_VH=120,BANNER_MAX_W=1020;
+const bannerCrop={img:null,mime:'image/png',nw:0,nh:0,base:1,zoom:1,tx:0,ty:0,drag:null};
+async function pickBanner(){
+  try{
+    const path=await window.go.main.App.PickBanner();
+    if(!path)return;
+    const dataUrl=await window.go.main.App.ReadImageAsDataURL(path);
+    const img=document.getElementById('banner-cropper-img');
+    img.onload=()=>{
+      bannerCrop.img=img;bannerCrop.mime=dataUrl.startsWith('data:image/jpeg')?'image/jpeg':'image/png';
+      bannerCrop.nw=img.naturalWidth;bannerCrop.nh=img.naturalHeight;
+      bannerCrop.base=Math.max(BANNER_VW/bannerCrop.nw,BANNER_VH/bannerCrop.nh);
+      bannerCrop.zoom=1;
+      const sc=bannerCrop.base;
+      bannerCrop.tx=(BANNER_VW-bannerCrop.nw*sc)/2;bannerCrop.ty=(BANNER_VH-bannerCrop.nh*sc)/2;
+      document.getElementById('banner-zoom-slider').value='1';
+      applyBannerTransform();
+      document.getElementById('banner-cropper-wrap').classList.remove('hidden');
+      document.getElementById('banner-current-wrap').classList.add('hidden');
+    };
+    img.src=dataUrl;
+  }catch(err){toast('Could not load image: '+err,true);}
+}
+function clampBannerPan(){
+  const sc=bannerCrop.base*bannerCrop.zoom;
+  bannerCrop.tx=Math.min(0,Math.max(BANNER_VW-bannerCrop.nw*sc,bannerCrop.tx));
+  bannerCrop.ty=Math.min(0,Math.max(BANNER_VH-bannerCrop.nh*sc,bannerCrop.ty));
+}
+function applyBannerTransform(){
+  const sc=bannerCrop.base*bannerCrop.zoom;
+  bannerCrop.img.style.transform=`translate(${bannerCrop.tx}px,${bannerCrop.ty}px) scale(${sc})`;
+}
+function onBannerZoom(){
+  const old=bannerCrop.base*bannerCrop.zoom;
+  const cx=(BANNER_VW/2-bannerCrop.tx)/old,cy=(BANNER_VH/2-bannerCrop.ty)/old;
+  bannerCrop.zoom=parseFloat(document.getElementById('banner-zoom-slider').value);
+  const sc=bannerCrop.base*bannerCrop.zoom;
+  bannerCrop.tx=BANNER_VW/2-cx*sc;bannerCrop.ty=BANNER_VH/2-cy*sc;
+  clampBannerPan();applyBannerTransform();
+}
+function closeBannerCropper(){
+  bannerCrop.img=null;bannerCrop.drag=null;
+  document.getElementById('banner-cropper-wrap').classList.add('hidden');
+  document.getElementById('banner-current-wrap').classList.remove('hidden');
+}
+function applyBannerCrop(){
+  const sc=bannerCrop.base*bannerCrop.zoom;
+  const sx=-bannerCrop.tx/sc,sy=-bannerCrop.ty/sc,sw=BANNER_VW/sc,sh=BANNER_VH/sc;
+  const outW=Math.max(1,Math.min(BANNER_MAX_W,Math.round(sw))),outH=Math.round(outW*BANNER_VH/BANNER_VW);
+  const c=document.createElement('canvas');c.width=outW;c.height=outH;
+  const ctx=c.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(bannerCrop.img,sx,sy,sw,sh,0,0,outW,outH);
+  profileDraft.banner=bannerCrop.mime==='image/jpeg'?c.toDataURL('image/jpeg',0.92):c.toDataURL('image/png');
+  closeBannerCropper();updateProfileEditorState();
+}
+function initProfileEditor(){
+  document.getElementById('banner-choose-btn').addEventListener('click',pickBanner);
+  document.getElementById('banner-remove-btn').addEventListener('click',()=>{profileDraft.banner='';updateProfileEditorState();});
+  document.getElementById('banner-cancel-btn').addEventListener('click',closeBannerCropper);
+  document.getElementById('banner-apply-btn').addEventListener('click',applyBannerCrop);
+  document.getElementById('banner-zoom-slider').addEventListener('input',onBannerZoom);
+  const vp=document.getElementById('banner-cropper-viewport');
+  const start=e=>{if(!bannerCrop.img)return;const p=e.touches?e.touches[0]:e;bannerCrop.drag={x:p.clientX,y:p.clientY,tx:bannerCrop.tx,ty:bannerCrop.ty};vp.classList.add('dragging');e.preventDefault();};
+  const move=e=>{if(!bannerCrop.drag)return;const p=e.touches?e.touches[0]:e;bannerCrop.tx=bannerCrop.drag.tx+(p.clientX-bannerCrop.drag.x);bannerCrop.ty=bannerCrop.drag.ty+(p.clientY-bannerCrop.drag.y);clampBannerPan();applyBannerTransform();};
+  const end=()=>{bannerCrop.drag=null;vp.classList.remove('dragging');};
+  vp.addEventListener('mousedown',start);vp.addEventListener('touchstart',start,{passive:false});
+  window.addEventListener('mousemove',move);window.addEventListener('touchmove',move,{passive:true});
+  window.addEventListener('mouseup',end);window.addEventListener('touchend',end);
+  const bio=document.getElementById('profile-bio');
+  bio.addEventListener('input',()=>{profileDraft.bio=bio.value;document.getElementById('profile-save-hint').textContent='';updateProfileEditorState();});
+  document.getElementById('profile-save-btn').addEventListener('click',saveProfile);
+  document.getElementById('profile-reset-btn').addEventListener('click',resetProfileDraft);
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -2678,6 +3079,9 @@ function init(){
     }
     renderSidebar();
   });
+  window.runtime.EventsOn('profile:updated',e=>{
+    delete profileCache[e.username];
+  });
   window.runtime.EventsOn('pfp:updated',e=>{
     delete state.userPfps[e.username];
     document.querySelectorAll(`[data-pfp-user="${CSS.escape(e.username)}"]`).forEach(el=>applyUserAvatar(el,e.username));
@@ -2726,6 +3130,8 @@ function init(){
   document.getElementById('status-dot-btn').addEventListener('click',togglePingPopover);
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
+  initProfilePopups();
+  initProfileEditor();
   document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();updateJumpToPresentVisibility();});
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
   document.getElementById('voice-deafen-btn').addEventListener('click',toggleDeafen);

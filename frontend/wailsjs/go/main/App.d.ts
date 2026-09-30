@@ -20,6 +20,8 @@ export function FetchLinkPreview(arg1:string):Promise<main.LinkPreview>;
 
 export function FetchUserPfp(arg1:string):Promise<string>;
 
+export function FetchUserProfile(arg1:string):Promise<main.UserProfile>;
+
 export function GetAccountInfo():Promise<main.AccountView>;
 
 export function GetBoards(arg1:string):Promise<Array<main.Board>>;
@@ -33,6 +35,8 @@ export function GetFingerprint():Promise<string>;
 export function GetMessagesAround(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
 
 export function GetMessagesBefore(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
+
+export function GetOwnProfile():Promise<main.OwnProfile>;
 
 export function GetPinnedMessages(arg1:string):Promise<Array<main.ChatMessage>>;
 
@@ -64,6 +68,8 @@ export function PickAccountFile():Promise<string>;
 
 export function PickAccountFolder():Promise<string>;
 
+export function PickBanner():Promise<string>;
+
 export function PickFiles():Promise<Array<string>>;
 
 export function PickPfp():Promise<string>;
@@ -73,6 +79,8 @@ export function PingServer():Promise<number>;
 export function ReadImageAsDataURL(arg1:string):Promise<string>;
 
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
+
+export function SaveProfile(arg1:string,arg2:string):Promise<void>;
 
 export function SaveProfilePicture(arg1:string):Promise<void>;
 

@@ -128,6 +128,20 @@ export namespace main {
 	        this.site_name = source["site_name"];
 	    }
 	}
+	export class OwnProfile {
+	    bio: string;
+	    banner: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OwnProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bio = source["bio"];
+	        this.banner = source["banner"];
+	    }
+	}
 	export class Room {
 	    id: string;
 	    name: string;
@@ -240,6 +254,24 @@ export namespace main {
 	        this.url = source["url"];
 	        this.filename = source["filename"];
 	        this.mime = source["mime"];
+	    }
+	}
+	export class UserProfile {
+	    username: string;
+	    bio: string;
+	    banner: string;
+	    member_since: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UserProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.username = source["username"];
+	        this.bio = source["bio"];
+	        this.banner = source["banner"];
+	        this.member_since = source["member_since"];
 	    }
 	}
 

@@ -339,6 +339,191 @@ func (a *App) handlePfpRequest() {
 	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
 }
 
+// ── Profile card (bio + banner) ─────────────────────────────────────────
+
+// maxBioChars matches the server's MAX_BIO_CHARS.
+const maxBioChars = 500
+
+// OwnProfile is what the profile settings page edits.
+type OwnProfile struct {
+	Bio    string `json:"bio"`
+	Banner string `json:"banner"` // data URL, "" = no banner (colour from the pfp instead)
+}
+
+// GetOwnProfile returns this account's own bio and banner.
+func (a *App) GetOwnProfile() (*OwnProfile, error) {
+	a.mu.Lock()
+	if a.account == nil {
+		a.mu.Unlock()
+		return nil, fmt.Errorf("no account unlocked")
+	}
+	dir := filepath.Join(accountsDir(), a.account.Slug)
+	p := &OwnProfile{Bio: a.account.Bio}
+	a.mu.Unlock()
+	if data, err := os.ReadFile(bannerPath(dir)); err == nil {
+		p.Banner = pfpDataURL(data)
+	}
+	return p, nil
+}
+
+// SaveProfile stores a new bio and banner for this account and pushes
+// them to the connected server. banner is the complete desired state: a
+// data URL to set, or "" for no banner.
+func (a *App) SaveProfile(bio, banner string) error {
+	bio = strings.TrimSpace(bio)
+	if n := len([]rune(bio)); n > maxBioChars {
+		return fmt.Errorf("bio is %d characters — %d max", n, maxBioChars)
+	}
+	a.mu.Lock()
+	slug := ""
+	if a.account != nil {
+		slug = a.account.Slug
+	}
+	a.mu.Unlock()
+	if slug == "" {
+		return fmt.Errorf("no account unlocked")
+	}
+	dir := filepath.Join(accountsDir(), slug)
+	if banner == "" {
+		if err := os.Remove(bannerPath(dir)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		comma := strings.Index(banner, ",")
+		if !strings.HasPrefix(banner, "data:image/") || comma < 0 || !strings.HasSuffix(banner[:comma], ";base64") {
+			return fmt.Errorf("expected a base64 image data URL for the banner")
+		}
+		data, err := base64.StdEncoding.DecodeString(banner[comma+1:])
+		if err != nil {
+			return fmt.Errorf("invalid banner data: %w", err)
+		}
+		if m := pfpMime(data); m != "image/png" && m != "image/jpeg" {
+			return fmt.Errorf("banners must be PNG or JPEG")
+		}
+		if len(data) > maxPfpBytes {
+			return fmt.Errorf("banner is too large (%d MB max)", maxPfpBytes>>20)
+		}
+		if err := os.WriteFile(bannerPath(dir), data, 0600); err != nil {
+			return err
+		}
+	}
+	updatedAt := time.Now().Unix()
+	if err := updateProfileMeta(dir, bio, updatedAt); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	if a.account != nil {
+		a.account.Bio = bio
+		a.account.ProfileUpdatedAt = updatedAt
+	}
+	a.mu.Unlock()
+	a.sendProfileInfo(updatedAt)
+	return nil
+}
+
+// sendProfileInfo reports this account's profile timestamp so the server
+// can ask for an upload if its cached copy is stale — the profile
+// equivalent of sendPfpInfo.
+func (a *App) sendProfileInfo(updatedAt int64) {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil || updatedAt == 0 {
+		return
+	}
+	msg, _ := json.Marshal(map[string]interface{}{"type": "profile_info", "profile_updated_at": updatedAt})
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
+// handleProfileRequest uploads this account's bio and banner.
+func (a *App) handleProfileRequest() {
+	a.mu.Lock()
+	if a.account == nil || a.account.ProfileUpdatedAt == 0 {
+		a.mu.Unlock()
+		return
+	}
+	dir := filepath.Join(accountsDir(), a.account.Slug)
+	bio, updatedAt := a.account.Bio, a.account.ProfileUpdatedAt
+	a.mu.Unlock()
+	banner := ""
+	if data, err := os.ReadFile(bannerPath(dir)); err == nil && len(data) <= maxPfpBytes {
+		banner = base64.StdEncoding.EncodeToString(data)
+	}
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	if a.ws == nil {
+		return
+	}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"type": "profile_upload", "profile_updated_at": updatedAt, "bio": bio, "banner_data": banner,
+	})
+	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
+// UserProfile is another user's profile card as fetched from the server.
+type UserProfile struct {
+	Username    string `json:"username"`
+	Bio         string `json:"bio"`
+	Banner      string `json:"banner"` // data URL, or "" for none
+	MemberSince string `json:"member_since"`
+}
+
+// FetchUserProfile fetches a user's bio, banner and join date from the
+// connected server.
+func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
+	var raw struct {
+		Username    string `json:"username"`
+		Bio         string `json:"bio"`
+		HasBanner   bool   `json:"has_banner"`
+		MemberSince string `json:"member_since"`
+	}
+	if err := a.doGET("/api/profile/"+url.PathEscape(username), &raw); err != nil {
+		return nil, err
+	}
+	p := &UserProfile{Username: raw.Username, Bio: raw.Bio, MemberSince: raw.MemberSince}
+	if raw.HasBanner {
+		if data, err := a.fetchAuthed("/api/banner/" + url.PathEscape(username)); err == nil && len(data) > 0 {
+			p.Banner = pfpDataURL(data)
+		}
+	}
+	return p, nil
+}
+
+// fetchAuthed GETs a server path with the session token and returns the
+// raw body (nil, nil on 404).
+func (a *App) fetchAuthed(path string) ([]byte, error) {
+	a.mu.Lock()
+	domain, token := a.domain, a.token
+	a.mu.Unlock()
+	if domain == "" || token == "" {
+		return nil, fmt.Errorf("not connected")
+	}
+	req, err := http.NewRequest("GET", normaliseHTTP(domain)+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// PickBanner opens a file dialog for a profile banner image.
+func (a *App) PickBanner() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Select profile banner",
+		Filters: []runtime.FileFilter{{DisplayName: "Images", Pattern: "*.png;*.jpg;*.jpeg"}},
+	})
+}
+
 // FetchUserPfp fetches another user's cached profile picture from the
 // server and returns it as a data URL, or "" if they have none cached —
 // nil error either way, since "no pfp" is a normal state, not a failure.
@@ -459,6 +644,7 @@ func (a *App) Connect(domain, serverKey string) error {
 	a.ws = conn
 	go a.wsReader(conn)
 	a.sendPfpInfo(a.account.PfpUpdatedAt)
+	a.sendProfileInfo(a.account.ProfileUpdatedAt)
 	return nil
 }
 
@@ -565,6 +751,10 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.handlePfpRequest()
 		case "pfp_updated":
 			runtime.EventsEmit(a.ctx, "pfp:updated", pfpUpdatedEvent{Username: msg.Username})
+		case "profile_request":
+			a.handleProfileRequest()
+		case "profile_updated":
+			runtime.EventsEmit(a.ctx, "profile:updated", pfpUpdatedEvent{Username: msg.Username})
 		}
 	}
 }

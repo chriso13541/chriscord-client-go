@@ -38,6 +38,10 @@ export function FetchUserPfp(arg1) {
   return window['go']['main']['App']['FetchUserPfp'](arg1);
 }
 
+export function FetchUserProfile(arg1) {
+  return window['go']['main']['App']['FetchUserProfile'](arg1);
+}
+
 export function GetAccountInfo() {
   return window['go']['main']['App']['GetAccountInfo']();
 }
@@ -64,6 +68,10 @@ export function GetMessagesAround(arg1, arg2) {
 
 export function GetMessagesBefore(arg1, arg2) {
   return window['go']['main']['App']['GetMessagesBefore'](arg1, arg2);
+}
+
+export function GetOwnProfile() {
+  return window['go']['main']['App']['GetOwnProfile']();
 }
 
 export function GetPinnedMessages(arg1) {
@@ -126,6 +134,10 @@ export function PickAccountFolder() {
   return window['go']['main']['App']['PickAccountFolder']();
 }
 
+export function PickBanner() {
+  return window['go']['main']['App']['PickBanner']();
+}
+
 export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }
@@ -144,6 +156,10 @@ export function ReadImageAsDataURL(arg1) {
 
 export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
+}
+
+export function SaveProfile(arg1, arg2) {
+  return window['go']['main']['App']['SaveProfile'](arg1, arg2);
 }
 
 export function SaveProfilePicture(arg1) {
