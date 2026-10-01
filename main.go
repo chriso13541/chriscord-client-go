@@ -28,6 +28,7 @@ func main() {
 			EnableFileDrop: true,
 		},
 		OnStartup: app.startup,
+		OnShutdown: app.shutdown, // leave any call and close cleanly when the window closes
 		Bind: []interface{}{
 			app,
 		},

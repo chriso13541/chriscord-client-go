@@ -813,6 +813,7 @@ func (a *App) Connect(domain, serverKey string) error {
 	wsURL := httpToWS(base) + "/ws?token=" + a.token + "&status=" + url.QueryEscape(a.currentPresence())
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil { return fmt.Errorf("websocket failed: %w", err) }
+	watchConnection(conn)
 	a.ws = conn
 	go a.wsReader(conn)
 	a.sendPfpInfo(a.account.PfpUpdatedAt)
@@ -899,14 +900,100 @@ type pfpUpdatedEvent struct {
 	Username string `json:"username"`
 }
 
+// ── Noticing a dead connection from this side ─────────────────────────
+//
+// When the network goes away (Wi-Fi drops, cable pulled, laptop sleeps),
+// nothing tells the app: TCP just goes quiet, and a read can sit waiting
+// for many minutes. So the app pings the server every wsPingEvery, and
+// any frame from the server — a message, its pong, or its own ping —
+// pushes a deadline wsDeadAfter into the future. If the deadline passes,
+// the read fails, wsReader ends, and the frontend gets ws:disconnected
+// (stopping a call's audio and starting to reconnect) within seconds.
+const (
+	wsPingEvery = 10 * time.Second
+	wsDeadAfter = 25 * time.Second
+)
+
+func watchConnection(conn *websocket.Conn) {
+	alive := func() { _ = conn.SetReadDeadline(time.Now().Add(wsDeadAfter)) }
+	alive()
+	conn.SetPongHandler(func(string) error { alive(); return nil })
+	conn.SetPingHandler(func(data string) error {
+		alive()
+		return conn.WriteControl(websocket.PongMessage, []byte(data), time.Now().Add(5*time.Second))
+	})
+}
+
+func keepAlive(conn *websocket.Conn, done <-chan struct{}) {
+	t := time.NewTicker(wsPingEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-t.C:
+			// WriteControl is safe alongside other writes (gorilla).
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)); err != nil {
+				conn.Close() // can't even send: the read will fail and report the disconnect
+				return
+			}
+		}
+	}
+}
+
+// hangUpAndClose ends this client's side of a connection on purpose: hangs
+// up any call (telling the server, so it removes us straight away instead
+// of showing us as "reconnecting"), then sends a proper WebSocket close
+// frame — which the server also treats as "left on purpose" — and closes.
+func (a *App) hangUpAndClose(conn *websocket.Conn) {
+	if conn == nil {
+		return
+	}
+	a.voiceMu.Lock()
+	inCall := a.voice != nil
+	a.voiceMu.Unlock()
+	if inCall {
+		a.stopVoiceSession()
+	}
+	a.writeMu.Lock()
+	if inCall {
+		msg, _ := json.Marshal(map[string]string{"type": "leave_voice"})
+		_ = conn.SetWriteDeadline(time.Now().Add(time.Second))
+		_ = conn.WriteMessage(websocket.TextMessage, msg)
+	}
+	err := conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"), time.Now().Add(time.Second))
+	a.writeMu.Unlock()
+	if err == nil {
+		// Give the server a moment to read the close frame before the socket
+		// goes away — closing at once can make it see a plain drop instead.
+		time.Sleep(250 * time.Millisecond)
+	}
+	conn.Close()
+}
+
+// shutdown runs when the app window closes: leave any call and close the
+// connection cleanly, so nobody sees a stale "still in the call" after
+// you've quit.
+func (a *App) shutdown(ctx context.Context) {
+	a.mu.Lock()
+	conn := a.ws
+	a.ws = nil
+	a.mu.Unlock()
+	a.hangUpAndClose(conn)
+}
+
 func (a *App) wsReader(conn *websocket.Conn) {
+	done := make(chan struct{})
+	go keepAlive(conn, done)
 	defer func() {
+		close(done)
 		a.mu.Lock(); if a.ws == conn { a.ws = nil }; a.mu.Unlock()
 		runtime.EventsEmit(a.ctx, "ws:disconnected")
 	}()
 	for {
 		_, raw, err := conn.ReadMessage()
 		if err != nil { return }
+		_ = conn.SetReadDeadline(time.Now().Add(wsDeadAfter)) // heard from the server: still alive
 		var msg serverMsg
 		if err := json.Unmarshal(raw, &msg); err != nil { continue }
 		switch msg.Type {
@@ -1363,9 +1450,19 @@ func (a *App) GetUsername() string { return a.username }
 func (a *App) GetFingerprint() string { return a.fingerprint }
 
 func (a *App) Disconnect() {
-	a.mu.Lock(); defer a.mu.Unlock()
-	if a.ws != nil { a.ws.Close(); a.ws = nil }
+	a.mu.Lock()
+	conn := a.ws
+	a.ws = nil
 	a.token = ""; a.domain = ""; a.username = ""; a.fingerprint = ""
+	a.mu.Unlock()
+	a.hangUpAndClose(conn) // leaving the server is leaving its call too
+}
+
+// InVoiceCall reports whether this client currently has a call running.
+func (a *App) InVoiceCall() bool {
+	a.voiceMu.Lock()
+	defer a.voiceMu.Unlock()
+	return a.voice != nil
 }
 
 // ResolveServerAddress turns what someone typed into a full server address.

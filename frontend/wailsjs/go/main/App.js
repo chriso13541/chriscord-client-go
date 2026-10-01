@@ -130,6 +130,10 @@ export function ImportAccount(arg1, arg2) {
   return window['go']['main']['App']['ImportAccount'](arg1, arg2);
 }
 
+export function InVoiceCall() {
+  return window['go']['main']['App']['InVoiceCall']();
+}
+
 export function IsDeafened() {
   return window['go']['main']['App']['IsDeafened']();
 }

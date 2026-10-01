@@ -2138,6 +2138,10 @@ async function doConnect(domain,serverKey){
     // from: suggestions empty and everyone's status dots offline until the
     // next join/leave.
     state.onlineUsers=[];state.userStatuses={};lastUsersPayload=null;
+    // A fresh connection (app just started, or you picked this server)
+    // has no call running here — so if the server still lists us in one,
+    // that's left over from a crashed/closed app: clear it (see voice:state).
+    state.clearStaleVoice=true;
     await window.go.main.App.Connect(domain,serverKey);
   }
   catch(err){toast(String(err),true);throw err;}
@@ -5714,6 +5718,13 @@ function init(){
   window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
   window.runtime.EventsOn('voice:state',payload=>{
+    if(state.clearStaleVoice){
+      state.clearStaleVoice=false;
+      const listed=[payload?.channels,payload?.reconnecting].some(ch=>Object.values(ch||{}).some(u=>(u||[]).includes(state.username)));
+      if(listed&&!voiceRejoin)window.go.main.App.InVoiceCall().then(inCall=>{
+        if(!inCall){console.info('voice: clearing a call left over from a previous session');window.go.main.App.LeaveVoiceChannel().catch(()=>{});}
+      }).catch(()=>{});
+    }
     const next=payload?.channels||{};
     voiceSoundsFor(state.voiceChannels,next,state.voiceReconnecting,payload?.reconnecting||{});
     state.voiceChannels=next;

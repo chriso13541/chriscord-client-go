@@ -66,6 +66,8 @@ export function HasAccount():Promise<boolean>;
 
 export function ImportAccount(arg1:string,arg2:string):Promise<main.AccountView>;
 
+export function InVoiceCall():Promise<boolean>;
+
 export function IsDeafened():Promise<boolean>;
 
 export function IsMuted():Promise<boolean>;
