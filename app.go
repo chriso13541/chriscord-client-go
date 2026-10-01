@@ -138,7 +138,12 @@ func (a *App) ImportAccount(sourcePath, passphrase string) (*AccountView, error)
 	// servers straight back out of the file.
 	a.servers = loadServers()
 	a.mu.Unlock()
-	return acct.View(), nil
+	view := acct.View()
+	if _, err := os.Stat(filepath.Join(accountsDir(), acct.Slug, clientSettingsFile)); err == nil && bundleHasClientSettings(sourcePath, passphrase) {
+		view.ImportedSettings = true
+	}
+	log.Printf("import: account %s imported (appearance settings included: %v)", acct.Slug, view.ImportedSettings)
+	return view, nil
 }
 
 // UnlockAccount decrypts the active account into memory for this session.
@@ -181,9 +186,19 @@ func (a *App) ExportAccount(passphrase string) (string, error) {
 // click on its own button, not straight from pressing Enter in the
 // passphrase box: on Windows, typing hides the pointer, and a dialog that
 // opens while it's hidden could come up with no visible cursor.
-func (a *App) PrepareAccountExport(passphrase string) (string, error) {
+//
+// settingsJSON is the app's current appearance settings; they're written
+// into the account folder right here, so the key always carries exactly
+// what you see now (rather than relying on an earlier save having worked).
+func (a *App) PrepareAccountExport(passphrase, settingsJSON string) (string, error) {
 	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
 	if slug == "" { return "", fmt.Errorf("no account unlocked") }
+	if settingsJSON != "" {
+		if err := a.SaveClientSettings(settingsJSON); err != nil {
+			return "", fmt.Errorf("could not include your appearance settings: %w", err)
+		}
+		log.Printf("export: including appearance settings (%d bytes)", len(settingsJSON))
+	}
 	encrypted, finalName, err := buildAccountExport(slug, passphrase)
 	if err != nil {
 		return "", err

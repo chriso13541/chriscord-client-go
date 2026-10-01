@@ -20,6 +20,7 @@ export namespace main {
 	    username: string;
 	    fingerprint: string;
 	    has_avatar: boolean;
+	    imported_settings?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AccountView(source);
@@ -30,6 +31,7 @@ export namespace main {
 	        this.username = source["username"];
 	        this.fingerprint = source["fingerprint"];
 	        this.has_avatar = source["has_avatar"];
+	        this.imported_settings = source["imported_settings"];
 	    }
 	}
 	export class Attachment {

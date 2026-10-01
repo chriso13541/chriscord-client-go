@@ -174,8 +174,8 @@ export function PingServer() {
   return window['go']['main']['App']['PingServer']();
 }
 
-export function PrepareAccountExport(arg1) {
-  return window['go']['main']['App']['PrepareAccountExport'](arg1);
+export function PrepareAccountExport(arg1, arg2) {
+  return window['go']['main']['App']['PrepareAccountExport'](arg1, arg2);
 }
 
 export function ReactToMessage(arg1, arg2, arg3) {

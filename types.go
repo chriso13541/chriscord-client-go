@@ -51,6 +51,9 @@ type AccountView struct {
 	Username    string `json:"username"`
 	Fingerprint string `json:"fingerprint"`
 	HasAvatar   bool   `json:"has_avatar"`
+	// Set only by ImportAccount: whether the key carried the app's
+	// appearance settings (theme, wallpaper…), so the UI can say so.
+	ImportedSettings bool `json:"imported_settings,omitempty"`
 }
 
 // AccountSummary describes a locally saved account without unlocking it.

@@ -796,7 +796,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
     <div class="error-msg hidden" id="export-error"></div>
     <div id="export-step-pass">
       <div class="form-group"><label>Passphrase</label><input id="export-passphrase" type="password" placeholder="Confirm your passphrase" autocomplete="off"><div class="hint">Protects the exported file — nobody can open it without this, including anything it carries with it like your saved servers' join keys.</div></div>
-      <div class="hint" style="margin:-4px 0 12px">Includes your profile, saved servers, and your theme and appearance settings.</div>
+      <div class="hint" style="margin:-4px 0 12px" id="export-includes">Includes your profile, saved servers, and your theme and appearance settings.</div>
     </div>
     <div id="export-step-save" class="hidden">
       <p style="margin:0 0 6px">Your account key is ready to save as</p>
@@ -1241,12 +1241,26 @@ async function submitImportAccount(){
   try{
     const acct=await window.go.main.App.ImportAccount(pickedImportPath,pass);
     await enterApp(acct);
+    if(acct?.imported_settings)toast(`Restored your appearance from the account key: ${appearanceSummary()}.`);
+    else toast('That account key didn\u2019t include appearance settings (it was probably exported by an older version). Export it again from your other computer to bring your theme over.',true);
   }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
   finally{btn.disabled=false;btn.textContent='Import Account';}
 }
 
+// A one-line summary of the appearance settings that will travel with
+// the key, so you can see exactly what's included.
+function appearanceSummary(){
+  const a=appearance,bits=[];
+  bits.push(a.base?`theme ${a.base.toUpperCase()}`:'default theme');
+  if(a.accent)bits.push(`accent ${a.accent.toUpperCase()}`);
+  bits.push(a.image?`wallpaper (blur ${a.blur}%, darken ${a.dim}%)`:'no wallpaper');
+  if(appearanceOverride)bits.push('own theme over servers\u2019');
+  bits.push(`elastic scrolling ${elasticOn?'on':'off'}`);
+  return bits.join(', ');
+}
 function openExportModal(){
   document.getElementById('export-passphrase').value='';
+  document.getElementById('export-includes').textContent=`Includes your profile, saved servers, and appearance: ${appearanceSummary()}.`;
   document.getElementById('export-step-pass').classList.remove('hidden');document.getElementById('export-step-save').classList.add('hidden');
   document.getElementById('export-confirm-btn').classList.remove('hidden');document.getElementById('export-save-btn').classList.add('hidden');
   document.getElementById('export-error').classList.add('hidden');
@@ -1268,8 +1282,9 @@ async function confirmExport(){
   if(!pass){errEl.textContent='Enter your passphrase.';errEl.classList.remove('hidden');return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
   try{
-    await persistClientSettings(); // make sure the key carries the current theme
-    const name=await window.go.main.App.PrepareAccountExport(pass);
+    // The current appearance goes in with the request itself, so the key
+    // carries exactly what you see now.
+    const name=await window.go.main.App.PrepareAccountExport(pass,JSON.stringify(collectClientSettings()));
     document.getElementById('export-passphrase').value='';document.activeElement?.blur();
     document.getElementById('export-filename').textContent=name;
     document.getElementById('export-step-pass').classList.add('hidden');document.getElementById('export-step-save').classList.remove('hidden');

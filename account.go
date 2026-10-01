@@ -612,6 +612,39 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	return account, nil
 }
 
+// bundleHasClientSettings reports whether an account key (zip/container or
+// folder) contains client-settings.json — used only to tell the user, after
+// an import, whether their appearance came across.
+func bundleHasClientSettings(sourcePath, passphrase string) bool {
+	info, err := os.Stat(sourcePath)
+	if err != nil {
+		return false
+	}
+	if info.IsDir() {
+		_, err := os.Stat(filepath.Join(sourcePath, clientSettingsFile))
+		return err == nil
+	}
+	raw, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return false
+	}
+	if len(raw) >= len(containerMagic) && string(raw[:len(containerMagic)]) == string(containerMagic) {
+		if raw, err = decryptContainer(raw, passphrase); err != nil {
+			return false
+		}
+	}
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		return false
+	}
+	for _, f := range zr.File {
+		if filepath.Base(f.Name) == clientSettingsFile {
+			return true
+		}
+	}
+	return false
+}
+
 // mergeServersIfPresent folds a bundled server-list snapshot into this
 // install's own saved servers, keyed by domain. An existing local entry
 // for a domain is left alone rather than overwritten — the bundle is a
