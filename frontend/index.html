@@ -212,6 +212,8 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .header-icon-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px 6px; border-radius:4px; display:flex; align-items:center; transition:background .15s,color .15s; }
 .header-icon-btn:hover:not(:disabled) { background:var(--bg-light); color:var(--text); }
 .header-icon-btn.active { color:var(--accent); }
+#mute-mentions-btn + #toggle-pins-btn { margin-left:2px; }
+#mute-mentions-btn.muted { color:var(--red); }
 .header-icon-btn:disabled { opacity:.35; cursor:default; }
 .header-icon-btn .ic { width:20px; height:20px; }
 #toggle-members-btn { margin-left:4px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
@@ -662,6 +664,17 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 #attach-btn:hover { color:var(--accent); }
 #attach-btn:disabled { opacity:.3; cursor:default; }
 #msg-input { flex:1; background:none; border:none; outline:none; padding:12px 0; font-size:.93rem; color:var(--text-strong); resize:none; }
+/* @mention boxes in the message box: a copy of the text sits behind the
+   (transparent-background) textarea with its own text invisible, drawing
+   only a box behind each @name. Same font, size, padding, wrapping and
+   scrolling as the textarea, so the boxes sit exactly under the words. */
+#composer-field { position:relative; flex:1; min-width:0; display:flex; }
+#composer-field #msg-input { position:relative; z-index:1; width:100%; display:block; }
+#msg-hl { position:absolute; inset:0; z-index:0; overflow-y:auto; overflow-x:hidden; pointer-events:none; color:transparent;
+  font-family:'OpenMojiInput','Segoe UI',system-ui,-apple-system,sans-serif; line-height:1.5; font-size:.93rem; padding:12px 0;
+  white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; scrollbar-color:transparent transparent; }
+#msg-hl::-webkit-scrollbar { background:transparent; } #msg-hl::-webkit-scrollbar-thumb { background:transparent; }
+#msg-hl .hl-mention { background:rgba(114,137,218,.3); border-radius:3px; box-shadow:0 0 0 2px rgba(114,137,218,.3); }
 #msg-input::placeholder { color:var(--text-muted); }
 #send-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.3rem; padding:4px 2px; transition:color .15s; line-height:1; flex-shrink:0; }
 #send-btn:hover { color:var(--accent); }
@@ -773,6 +786,8 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
   <symbol id="ic-calendar_month" viewBox="0 -960 960 960"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-160 0q-17 0-28.5-11.5T280-440q0-17 11.5-28.5T320-480q17 0 28.5 11.5T360-440q0 17-11.5 28.5T320-400Zm320 0q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-160 0q-17 0-28.5-11.5T280-280q0-17 11.5-28.5T320-320q17 0 28.5 11.5T360-280q0 17-11.5 28.5T320-240Zm320 0q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></symbol>
   <symbol id="ic-verified_user" viewBox="0 -960 960 960"><path d="m438-338 226-226-57-57-169 169-84-84-57 57 141 141Zm42 258q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
   <symbol id="ic-gpp_maybe" viewBox="0 -960 960 960"><path d="M480-320q17 0 28.5-11.5T520-360q0-17-11.5-28.5T480-400q-17 0-28.5 11.5T440-360q0 17 11.5 28.5T480-320Zm-40-160h80v-200h-80v200Zm40 400q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
+  <symbol id="ic-notifications" viewBox="0 -960 960 960"><path d="M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v280h80v80H160Zm320-300Zm0 420q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-280h320v-280q0-66-47-113t-113-47q-66 0-113 47t-47 113v280Z"/></symbol>
+  <symbol id="ic-notifications_off" viewBox="0 -960 960 960"><path d="M160-200v-80h80v-280q0-33 8.5-65t25.5-61l60 60q-7 16-10.5 32.5T320-560v280h248L56-792l56-56 736 736-56 56-146-144H160Zm560-154-80-80v-126q0-66-47-113t-113-47q-26 0-50 8t-44 24l-58-58q20-16 43-28t49-18v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v206Zm-276-50Zm36 324q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm33-481Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -949,6 +964,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
   <div id="main-column">
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
+      <button id="mute-mentions-btn" class="header-icon-btn" title="Mute @mention sounds on this server" disabled><svg class="ic" aria-hidden="true"><use href="#ic-notifications"/></svg></button>
       <button id="toggle-pins-btn" class="header-icon-btn" title="Pinned messages" disabled><svg class="ic" aria-hidden="true"><use href="#ic-keep"/></svg></button>
       <button id="toggle-members-btn" title="Toggle member list"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg> Members</button>
       <div id="search-box">
@@ -971,7 +987,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
             <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
-            <textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea>
+            <div id="composer-field"><div id="msg-hl" aria-hidden="true"></div><textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea></div>
             <button id="emoji-btn" title="Emoji" disabled><svg class="ic" aria-hidden="true"><use href="#ic-mood"/></svg></button>
             <button id="send-btn" disabled title="Send"><svg class="ic" aria-hidden="true"><use href="#ic-send"/></svg></button>
           </div>
@@ -1498,8 +1514,26 @@ function markBoardMentioned(boardId){
 const SOUND_DEFAULTS={voice:true,mention:true,volume:70};
 let soundSettings=(()=>{try{return {...SOUND_DEFAULTS,...JSON.parse(localStorage.getItem('soundSettings')||'{}')};}catch{return {...SOUND_DEFAULTS};}})();
 const soundCache={};
+// The bell next to the pin button: silences @mention sounds for this
+// server only (join/leave sounds and everything else keep playing).
+// Remembered per server on this machine.
+const mentionMuteKey=()=>'mentionsMuted:'+(state.domain||'');
+function mentionsMutedHere(){return localStorage.getItem(mentionMuteKey())==='1';}
+function renderMentionMute(){
+  const b=document.getElementById('mute-mentions-btn');if(!b)return;
+  const muted=mentionsMutedHere();
+  b.classList.toggle('muted',muted);
+  b.innerHTML=icon(muted?'notifications_off':'notifications');
+  b.dataset.tip=b.title=muted?'@mention sounds are muted on this server — click to unmute':'Mute @mention sounds on this server';
+}
+function toggleMentionMute(){
+  const muted=!mentionsMutedHere();
+  if(muted)localStorage.setItem(mentionMuteKey(),'1');else localStorage.removeItem(mentionMuteKey());
+  renderMentionMute();
+  toast(muted?'@mention sounds muted on this server':'@mention sounds back on for this server');
+}
 function playSound(name){
-  if(name==='mention'?!soundSettings.mention:!soundSettings.voice)return;
+  if(name==='mention'?!soundSettings.mention||mentionsMutedHere():!soundSettings.voice)return;
   try{
     const base=soundCache[name]||(soundCache[name]=new Audio(`sounds/${name}.wav`));
     const a=base.cloneNode(); // overlapping plays don't cut each other off
@@ -2203,6 +2237,7 @@ function showChatScreen(){
   exitSearch();
   if(state.resultsMode)closeResultsPanel();
   document.getElementById('toggle-pins-btn').disabled=true; // until a channel is picked
+  document.getElementById('mute-mentions-btn').disabled=false;renderMentionMute();
   clearAttachQueue();
   state.membersVisible=localStorage.getItem('membersVisible')==='true';
   const panel=document.getElementById('members-panel'),btn=document.getElementById('toggle-members-btn');
@@ -3861,7 +3896,7 @@ async function sendMessage(){
   if(!content&&!readyAttachments.length)return;
   if(!state.selectedBoardId)return;
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
-  input.value='';autoResize(input);closeEmojiSuggest();
+  input.value='';autoResize(input);closeEmojiSuggest();renderComposerHighlight();
   stopTyping(); // sent — back to the plain green circle
   const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime}));
   // The picture you just sent is already in memory from its preview — seed
@@ -5506,7 +5541,26 @@ function buildDateSeparator(iso){
   el.innerHTML=`<span>${esc(formatDateSeparator(iso))}</span>`;
   return el;
 }
-function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+function autoResize(el){
+  el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';
+  if(el.id==='msg-input')renderComposerHighlight();
+}
+// Boxes behind @mentions in the message box (see #msg-hl). Matched against
+// the member list like in sent messages, so "@Mary Jane" boxes the whole
+// name and an email address doesn't get one.
+function renderComposerHighlight(){
+  const ta=document.getElementById('msg-input'),hl=document.getElementById('msg-hl');
+  if(!ta||!hl)return;
+  const v=ta.value;
+  let html=esc(v);
+  if(v.includes('@')){
+    const re=mentionRegex();
+    if(re)html=html.replace(re,(all,lead,name)=>`${lead}<span class="hl-mention">@${name}</span>`);
+  }
+  // A trailing newline needs something after it to take up its line.
+  hl.innerHTML=html+(v.endsWith('\n')?' ':'');
+  hl.scrollTop=ta.scrollTop;
+}
 
 // ── WAILS INIT ────────────────────────────────────────────────────
 window.addEventListener('load',()=>{const r=setInterval(()=>{if(window.runtime&&window.go){clearInterval(r);init();}},50);});
@@ -5573,7 +5627,7 @@ function init(){
     refreshPinsIfOpen(ev.board_id);
     if(ev.pinned&&ev.by&&ev.by!==state.username)toast(`${ev.by} pinned a message`);
   });
-  window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshPresenceBadges();});
+  window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshPresenceBadges();renderComposerHighlight();});
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
   window.runtime.EventsOn('server:kicked',e=>handleKicked(e));
   window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});
@@ -5663,6 +5717,10 @@ function init(){
   document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
+  document.getElementById('mute-mentions-btn').addEventListener('click',toggleMentionMute);
+  {const ta=document.getElementById('msg-input');
+   ta.addEventListener('input',renderComposerHighlight);
+   ta.addEventListener('scroll',()=>{document.getElementById('msg-hl').scrollTop=ta.scrollTop;});}
   initSounds();
   initSearchFilters();
   initTooltips();
