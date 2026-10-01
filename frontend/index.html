@@ -160,6 +160,11 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 #voice-connected-bar .voice-bar-btn.muted:hover { color:var(--red-light); }
 #voice-leave-btn:hover { color:var(--red) !important; }
 #voice-connected-name { display:flex; align-items:center; gap:5px; min-width:0; margin-right:auto; }
+/* Dropped mid-call and expected back: faded, name in red (like Discord). */
+.voice-occupant-row.reconnecting { opacity:.5; }
+.voice-occupant-row.reconnecting .voice-occupant-name { color:var(--red); }
+#voice-connected-bar.reconnecting { color:var(--red); }
+#voice-connected-bar.reconnecting .voice-bar-btn:not(#voice-leave-btn) { opacity:.4; pointer-events:none; }
 #voice-connected-name span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #voice-connected-name .ic { width:16px; height:16px; }
 #voice-connected-bar #voice-deafen-btn { margin-left:auto; }
@@ -1572,14 +1577,15 @@ function initSounds(){
 }
 // Voice channel join/leave sounds, worked out from each new voice snapshot:
 // you joining or leaving, or someone joining or leaving the channel you're in.
-function voiceSoundsFor(prev,next){
+function voiceSoundsFor(prev,next,prevDropped={},nextDropped={}){
   const me=state.username;
   const mine=ch=>Object.entries(ch||{}).find(([,u])=>(u||[]).includes(me))?.[0]||null;
   const before=mine(prev),after=mine(next);
   if(!before&&after)return playSound('join');
   if(before&&!after)return playSound('leave');
   if(before&&after&&before===after){
-    const a=new Set(prev[before]||[]),b=new Set(next[after]||[]);
+    // Someone who dropped is still "in the call" until they time out.
+    const a=new Set([...(prev[before]||[]),...(prevDropped[before]||[])]),b=new Set([...(next[after]||[]),...(nextDropped[after]||[])]);
     if([...b].some(u=>!a.has(u)))playSound('join');
     else if([...a].some(u=>!b.has(u)))playSound('leave');
   }else if(before&&after)playSound('join'); // moved channels
@@ -2026,7 +2032,7 @@ function cancelReconnect(){
 // error.wav plays. When the app reconnects to that server it puts you
 // back in the same channel — join.wav plays as you reappear in it — and
 // restores mute/deafen. Leaving the server yourself cancels the rejoin.
-let voiceRejoin=null;
+let voiceRejoin=null,voiceHungUpWhileAway=null,voiceRejoinInFlight=null;
 const voiceSnapshotWaiters=[];
 function myVoiceBoard(channels=state.voiceChannels){
   return Object.entries(channels||{}).find(([,u])=>(u||[]).includes(state.username))?.[0]||null;
@@ -2050,9 +2056,19 @@ function nextVoiceSnapshot(ms){
   return new Promise(res=>{const t=setTimeout(res,ms);voiceSnapshotWaiters.push(()=>{clearTimeout(t);res();});});
 }
 async function rejoinVoiceAfterReconnect(){
+  // Hung up while disconnected: tell the server, so it stops showing us
+  // as "reconnecting" to everyone else, and don't rejoin.
+  if(voiceHungUpWhileAway){
+    const h=voiceHungUpWhileAway;voiceHungUpWhileAway=null;
+    if(h.domain===state.domain)window.go.main.App.LeaveVoiceChannel().catch(()=>{});
+  }
   const r=voiceRejoin;voiceRejoin=null;
-  if(!r||r.domain!==state.domain||!state.wsConnected)return;
+  if(!r||r.domain!==state.domain||!state.wsConnected){updateVoiceConnectedBar();return;}
+  voiceRejoinInFlight=r;updateVoiceConnectedBar();
   await nextVoiceSnapshot(3000); // who's in the call now, so audio connects to everyone
+  voiceRejoinInFlight=null;updateVoiceConnectedBar();
+  // Hung up in the moment between reconnecting and rejoining: respect it.
+  if(r.cancelled){window.go.main.App.LeaveVoiceChannel().catch(()=>{});return;}
   if(!state.wsConnected||myVoiceBoard())return;
   const others=(state.voiceChannels[r.boardId]||[]).filter(u=>u!==state.username);
   try{
@@ -2392,12 +2408,16 @@ function renderSidebar(){
         if(!isJoined)for(const k of Object.keys(state.voiceSpeaking))if(k.startsWith(board.id+':'))delete state.voiceSpeaking[k];
         const item=document.createElement('div');
         item.className='voice-item'+(isJoined?' joined':'');
-        item.innerHTML=`${icon('volume_up','board-ic')}<span class="board-name">${esc(board.name)}</span>${occupants.length?`<span class="voice-count">${occupants.length}</span>`:''}`;
+        const total=occupants.length+(state.voiceReconnecting?.[board.id]||[]).filter(u=>!occupants.includes(u)).length;
+        item.innerHTML=`${icon('volume_up','board-ic')}<span class="board-name">${esc(board.name)}</span>${total?`<span class="voice-count">${total}</span>`:''}`;
         item.addEventListener('click',()=>toggleVoiceChannel(board.id));
         list.appendChild(item);
-        if(occupants.length){
-          occupants.forEach(user=>{
-            const row=document.createElement('div');row.className='voice-occupant-row';
+        const dropped=(state.voiceReconnecting?.[board.id]||[]).filter(u=>!occupants.includes(u));
+        if(occupants.length||dropped.length){
+          [...occupants,...dropped].forEach(user=>{
+            const isDropped=dropped.includes(user);
+            const row=document.createElement('div');row.className='voice-occupant-row'+(isDropped?' reconnecting':'');
+            if(isDropped)row.title=user===state.username?'You lost connection — rejoining when it\u2019s back':`${user} lost connection — waiting for them to come back`;
             row.dataset.board=board.id;row.dataset.user=user;
             const key=`${board.id}:${user}`;
             const speaking=!!state.voiceSpeaking[key];
@@ -2459,6 +2479,13 @@ function setSpeakingIndicator(boardId,user,speaking){
 function updateVoiceConnectedBar(){
   const bar=document.getElementById('voice-connected-bar');
   if(!bar)return;
+  const pending=voiceRejoin||voiceRejoinInFlight;
+  bar.classList.toggle('reconnecting',!!pending);
+  if(pending){ // dropped: keep the bar so you can still hang up
+    const b=findBoardLocal(pending.boardId);
+    document.getElementById('voice-connected-name').innerHTML=`${icon('volume_up')}<span>Reconnecting\u2026 ${esc(b?.name||'')}</span>`;
+    bar.classList.remove('hidden');return;
+  }
   const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
   if(!entry){bar.classList.add('hidden');setMuteButtonState(false);setDeafenButtonState(false);return;}
   const boardId=entry[0];
@@ -3956,7 +3983,7 @@ async function sendMessage(){
 }
 
 async function goBack(){
-  voiceRejoin=null;
+  voiceRejoin=null;voiceHungUpWhileAway=null;state.voiceReconnecting={};
   state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
   setServerTheme(null); // off the server: back to your own theme
   state.voiceChannels={};updateVoiceConnectedBar();
@@ -5682,8 +5709,9 @@ function init(){
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
   window.runtime.EventsOn('voice:state',payload=>{
     const next=payload?.channels||{};
-    voiceSoundsFor(state.voiceChannels,next);
+    voiceSoundsFor(state.voiceChannels,next,state.voiceReconnecting,payload?.reconnecting||{});
     state.voiceChannels=next;
+    state.voiceReconnecting=payload?.reconnecting||{};
     voiceSnapshotWaiters.splice(0).forEach(w=>w());
     renderSidebar();
     updateVoiceConnectedBar();
@@ -5729,7 +5757,9 @@ function init(){
   window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){
     const inCall=rememberVoiceForRejoin(); // before the voice list is cleared
     toast(inCall?'Disconnected from server — you\u2019ll rejoin the call when it\u2019s back.':'Disconnected from server',true);
-    state.wsConnected=false;state.lastPingMs=null;state.voiceChannels={};stopPingLoop();updateStatusDotColor();updateVoiceConnectedBar();renderSidebar();scheduleReconnect();}});
+    state.wsConnected=false;state.lastPingMs=null;state.voiceChannels={};
+    state.voiceReconnecting=voiceRejoin?{[voiceRejoin.boardId]:[state.username]}:{};
+    stopPingLoop();updateStatusDotColor();updateVoiceConnectedBar();renderSidebar();scheduleReconnect();}});
 
   document.getElementById('open-add-btn').addEventListener('click',()=>openAddModal());
   document.getElementById('cancel-add-btn').addEventListener('click',closeAddModal);
@@ -5795,6 +5825,15 @@ function init(){
   document.getElementById('voice-deafen-btn').addEventListener('click',toggleDeafen);
   document.getElementById('voice-mute-btn').addEventListener('click',toggleMute);
   document.getElementById('voice-leave-btn').addEventListener('click',async()=>{
+    if(voiceRejoinInFlight){voiceRejoinInFlight.cancelled=true;voiceRejoinInFlight=null;updateVoiceConnectedBar();playSound('leave');toast('You won\u2019t be put back in the call.');return;}
+    if(voiceRejoin){
+      // Disconnected and waiting to rejoin: hanging up now means "don't".
+      voiceHungUpWhileAway={domain:voiceRejoin.domain};
+      voiceRejoin=null;state.voiceReconnecting={};
+      playSound('leave');updateVoiceConnectedBar();renderSidebar();
+      toast('You won\u2019t be put back in the call.');
+      return;
+    }
     try{await window.go.main.App.LeaveVoiceChannel();}catch(err){toast('Failed to leave voice: '+err,true);}
   });
   document.getElementById('settings-btn').addEventListener('click',openSettings);
