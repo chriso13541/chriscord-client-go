@@ -2138,6 +2138,9 @@ async function doConnect(domain,serverKey){
     // from: suggestions empty and everyone's status dots offline until the
     // next join/leave.
     state.onlineUsers=[];state.userStatuses={};lastUsersPayload=null;
+    // Same for who's in which call: the server sends that the moment you
+    // connect too, so the previous server's list is cleared now, not after.
+    state.voiceChannels={};state.voiceReconnecting={};state.voiceSpeaking={};
     // A fresh connection (app just started, or you picked this server)
     // has no call running here — so if the server still lists us in one,
     // that's left over from a crashed/closed app: clear it (see voice:state).
@@ -2150,7 +2153,6 @@ async function doConnect(domain,serverKey){
   state.rooms=[];state.boardsByRoom={};state.expandedRooms=new Set();state.unreadBoards=new Set();state.mentionCounts={};
   state.selectedRoomId=null;state.selectedBoardId=null;state.messages=[];
   state.attachQueue=[];state.wsConnected=true;state.lastPingMs=null;
-  state.voiceChannels={};
   updateStatusDotColor();startPingLoop();updateVoiceConnectedBar();
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
