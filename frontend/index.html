@@ -1199,7 +1199,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
       <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker, with your volume and sensitivity applied — exactly what others hear. The meter above moves while you're testing or in a call: the bar turns green when you're loud enough to be transmitted (and your speaking ring lights up).</p>
 
       <label class="settings-label">Sounds</label>
-      <label class="check-row"><input type="checkbox" id="snd-voice"> Play a sound when people join or leave your voice channel</label>
+      <label class="check-row"><input type="checkbox" id="snd-voice"> Play a sound when people join or leave your voice channel, or your call drops</label>
       <label class="check-row"><input type="checkbox" id="snd-mention"> Play a sound when someone @mentions you</label>
       <div class="slider-row"><input type="range" id="snd-volume" min="0" max="100" step="1" aria-label="Sound volume"><span class="slider-val" id="snd-volume-val">70%</span>
         <button class="settings-secondary-btn ap-mini" id="snd-test" type="button">Test</button></div>
@@ -1508,7 +1508,8 @@ function markBoardMentioned(boardId){
 
 // ── SOUNDS ───────────────────────────────────────────────────────
 // Short effects from frontend/sounds/: join.wav / leave.wav for your voice
-// channel, mention.wav when someone @mentions you. Each can be turned off
+// channel, error.wav when your call drops (lost connection), mention.wav
+// when someone @mentions you. Each can be turned off
 // (Settings → Voice → Sounds) and they share one volume. A missing or
 // empty file just plays nothing.
 const SOUND_DEFAULTS={voice:true,mention:true,volume:70};
@@ -1559,7 +1560,7 @@ function initSounds(){
   document.getElementById('snd-volume').addEventListener('change',saveSoundSettings);
   let n=0;
   document.getElementById('snd-test').addEventListener('click',()=>{
-    const name=['join','leave','mention'][n++%3];
+    const name=['join','leave','mention','error'][n++%4];
     const was={...soundSettings};soundSettings.voice=soundSettings.mention=true;playSound(name);soundSettings.voice=was.voice;soundSettings.mention=was.mention;
     toast(`Played ${name}.wav`);
   });
@@ -2019,6 +2020,51 @@ function scheduleReconnect(){
 function cancelReconnect(){
   if(reconnectTimerId){clearTimeout(reconnectTimerId);reconnectTimerId=null;}
 }
+// ── VOICE: REJOIN AFTER A DROPPED CONNECTION ─────────────────────
+// If the connection to the server drops while you're in a call, the call
+// you were in (and whether you were muted/deafened) is remembered and
+// error.wav plays. When the app reconnects to that server it puts you
+// back in the same channel — join.wav plays as you reappear in it — and
+// restores mute/deafen. Leaving the server yourself cancels the rejoin.
+let voiceRejoin=null;
+const voiceSnapshotWaiters=[];
+function myVoiceBoard(channels=state.voiceChannels){
+  return Object.entries(channels||{}).find(([,u])=>(u||[]).includes(state.username))?.[0]||null;
+}
+function rememberVoiceForRejoin(){
+  const boardId=myVoiceBoard();
+  if(!boardId)return false;
+  voiceRejoin={
+    domain:state.domain,boardId,
+    muted:!!document.getElementById('voice-mute-btn')?.classList.contains('muted'),
+    deafened:!!document.getElementById('voice-deafen-btn')?.classList.contains('muted'),
+  };
+  // The server has already dropped us from the call; stop our side of it
+  // (microphone, speaker, the dead audio connection) until we rejoin.
+  window.go.main.App.LeaveVoiceChannel().catch(()=>{});
+  playSound('error');
+  return true;
+}
+// Resolves on the next voice snapshot from the server, or after ms.
+function nextVoiceSnapshot(ms){
+  return new Promise(res=>{const t=setTimeout(res,ms);voiceSnapshotWaiters.push(()=>{clearTimeout(t);res();});});
+}
+async function rejoinVoiceAfterReconnect(){
+  const r=voiceRejoin;voiceRejoin=null;
+  if(!r||r.domain!==state.domain||!state.wsConnected)return;
+  await nextVoiceSnapshot(3000); // who's in the call now, so audio connects to everyone
+  if(!state.wsConnected||myVoiceBoard())return;
+  const others=(state.voiceChannels[r.boardId]||[]).filter(u=>u!==state.username);
+  try{
+    await window.go.main.App.JoinVoiceChannel(r.boardId,localStorage.getItem('audioMicLabel')||'',localStorage.getItem('audioSpeakerLabel')||'',others);
+    if(r.deafened){setDeafenButtonState(await window.go.main.App.ToggleDeafen());setMuteButtonState(await window.go.main.App.IsMuted());}
+    else if(r.muted)setMuteButtonState(await window.go.main.App.ToggleMute());
+    toast('Back in the voice channel.');
+  }catch(err){
+    playSound('error');
+    toast('Couldn\u2019t rejoin the voice channel: '+err,true);
+  }
+}
 async function attemptReconnect(){
   reconnectTimerId=null;
   if(state.wsConnected||!state.domain)return; // already back some other way, or nothing to reconnect to
@@ -2033,6 +2079,7 @@ async function attemptReconnect(){
     if(state.selectedBoardId){
       try{await window.go.main.App.SubscribeBoard(state.selectedBoardId);}catch{}
     }
+    rejoinVoiceAfterReconnect();
   }catch(err){
     scheduleReconnect(); // still down — try again shortly, silently (no toast spam per attempt)
   }
@@ -3909,6 +3956,7 @@ async function sendMessage(){
 }
 
 async function goBack(){
+  voiceRejoin=null;
   state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
   setServerTheme(null); // off the server: back to your own theme
   state.voiceChannels={};updateVoiceConnectedBar();
@@ -5636,6 +5684,7 @@ function init(){
     const next=payload?.channels||{};
     voiceSoundsFor(state.voiceChannels,next);
     state.voiceChannels=next;
+    voiceSnapshotWaiters.splice(0).forEach(w=>w());
     renderSidebar();
     updateVoiceConnectedBar();
   });
@@ -5673,10 +5722,14 @@ function init(){
   });
   window.runtime.EventsOn('voice:connectionState',connState=>{
     if(connState==='failed'||connState==='disconnected'){
+      if(state.wsConnected)playSound('error'); // (a full server drop plays it from ws:disconnected)
       toast('Voice connection '+connState+' — you may need to rejoin.',true);
     }
   });
-  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){toast('Disconnected from server',true);state.wsConnected=false;state.lastPingMs=null;state.voiceChannels={};stopPingLoop();updateStatusDotColor();updateVoiceConnectedBar();renderSidebar();scheduleReconnect();}});
+  window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){
+    const inCall=rememberVoiceForRejoin(); // before the voice list is cleared
+    toast(inCall?'Disconnected from server — you\u2019ll rejoin the call when it\u2019s back.':'Disconnected from server',true);
+    state.wsConnected=false;state.lastPingMs=null;state.voiceChannels={};stopPingLoop();updateStatusDotColor();updateVoiceConnectedBar();renderSidebar();scheduleReconnect();}});
 
   document.getElementById('open-add-btn').addEventListener('click',()=>openAddModal());
   document.getElementById('cancel-add-btn').addEventListener('click',closeAddModal);
