@@ -70,6 +70,10 @@ export function GetClientSettings() {
   return window['go']['main']['App']['GetClientSettings']();
 }
 
+export function GetConnectionSecurity() {
+  return window['go']['main']['App']['GetConnectionSecurity']();
+}
+
 export function GetFileLink(arg1) {
   return window['go']['main']['App']['GetFileLink'](arg1);
 }

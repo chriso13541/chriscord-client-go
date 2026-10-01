@@ -97,8 +97,15 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 #back-btn:hover { background:var(--bg-light); color:var(--text); }
 /* Server banner: the header grows into a Discord-style banner with the
    name over the top of the image. */
-#sidebar-header.has-banner { height:140px; align-items:flex-start; padding:12px 12px 0 16px; border-bottom:none;
-  background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,0) 55%),var(--banner) center/cover no-repeat; }
+#sidebar-header { position:relative; }
+#sidebar-header.has-banner { height:140px; align-items:flex-start; padding:12px 12px 0 16px; border-bottom:none; overflow:hidden; }
+/* The banner is a real <img> under the header's contents (not a CSS
+   background), so an animated one can be paused and restarted the same
+   way as images in chat. */
+#sidebar-banner-img { display:none; position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; }
+#sidebar-header.has-banner #sidebar-banner-img { display:block; }
+#sidebar-header.has-banner::before { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,0) 55%); }
+#sidebar-header > .server-title, #sidebar-header > #back-btn { position:relative; z-index:2; }
 #sidebar-header.has-banner .server-name { color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.8); }
 #sidebar-header.has-banner #back-btn { color:#fff; background:rgba(0,0,0,.35); }
 #sidebar-header.has-banner #back-btn:hover { background:rgba(0,0,0,.55); }
@@ -169,9 +176,30 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .status-dot-btn { background:none; border:none; padding:6px; border-radius:4px; cursor:pointer; display:flex; align-items:center; flex-shrink:0; }
 .status-dot-btn:hover { background:var(--bg-light); }
 .status-dot { width:8px; height:8px; border-radius:50%; background:var(--green); flex-shrink:0; }
-#ping-popover { position:absolute; bottom:calc(100% + 8px); right:8px; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px; padding:10px 14px; box-shadow:0 4px 20px rgba(0,0,0,.4); z-index:150; min-width:130px; }
-#ping-popover .ping-value { font-weight:700; font-size:.85rem; color:var(--text-strong); }
-#ping-popover .ping-label { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
+/* ── Connection panel (click the status dot) ──────────────────── */
+.status-dot-btn { gap:5px; }
+.conn-shield { display:inline-flex; line-height:0; }
+.conn-shield .ic { width:15px; height:15px; }
+.conn-shield.secure { color:var(--green); } .conn-shield.insecure { color:var(--yellow); }
+#ping-popover { position:absolute; bottom:calc(100% + 8px); left:8px; right:8px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; padding:12px 14px; box-shadow:0 8px 28px rgba(0,0,0,.45); z-index:150; font-size:.8rem; color:var(--text); }
+.cp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.cp-title { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); }
+.cp-state { display:inline-flex; align-items:center; gap:5px; font-size:.72rem; font-weight:700; padding:2px 8px; border-radius:10px; background:var(--bg-light); }
+.cp-state i { width:7px; height:7px; border-radius:50%; background:currentColor; }
+.cp-latency { display:flex; align-items:baseline; gap:8px; }
+.cp-ms { font-size:1.6rem; font-weight:800; color:var(--text-strong); font-variant-numeric:tabular-nums; line-height:1.1; }
+.cp-ms small { font-size:.8rem; font-weight:700; color:var(--text-muted); margin-left:2px; }
+.cp-quality { font-weight:700; }
+.q-excellent { color:var(--green); } .q-good { color:#9ccc65; } .q-fair { color:var(--yellow); } .q-poor, .q-down { color:var(--red); }
+.cp-graph { display:block; width:100%; height:44px; margin:8px 0 4px; }
+.cp-stats { display:flex; justify-content:space-between; color:var(--text-muted); font-size:.72rem; font-variant-numeric:tabular-nums; }
+.cp-stats b { color:var(--text); font-weight:700; }
+.cp-sec { display:flex; gap:10px; align-items:flex-start; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+.cp-sec .ic { width:22px; height:22px; flex-shrink:0; }
+.cp-sec.secure .ic { color:var(--green); } .cp-sec.insecure .ic { color:var(--yellow); }
+.cp-sec b { display:block; color:var(--text-strong); font-size:.82rem; }
+.cp-sec span { display:block; color:var(--text-muted); font-size:.72rem; line-height:1.4; word-break:break-word; }
+.cp-addr { margin-top:8px; color:var(--text-muted); font-size:.7rem; font-family:Consolas,monospace; word-break:break-all; }
 
 /* Main chat */
 #main-column { flex:1; display:flex; flex-direction:column; min-width:0; }
@@ -734,6 +762,8 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
   <symbol id="ic-movie" viewBox="0 -960 960 960"><path d="m160-800 80 160h120l-80-160h80l80 160h120l-80-160h80l80 160h120l-80-160h120q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Zm0 240v320h640v-320H160Zm0 0v320-320Z"/></symbol>
   <symbol id="ic-music_note" viewBox="0 -960 960 960"><path d="M400-120q-66 0-113-47t-47-113q0-66 47-113t113-47q23 0 42.5 5.5T480-418v-422h240v160H560v400q0 66-47 113t-113 47Z"/></symbol>
   <symbol id="ic-calendar_month" viewBox="0 -960 960 960"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-160 0q-17 0-28.5-11.5T280-440q0-17 11.5-28.5T320-480q17 0 28.5 11.5T360-440q0 17-11.5 28.5T320-400Zm320 0q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-160 0q-17 0-28.5-11.5T280-280q0-17 11.5-28.5T320-320q17 0 28.5 11.5T360-280q0 17-11.5 28.5T320-240Zm320 0q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></symbol>
+  <symbol id="ic-verified_user" viewBox="0 -960 960 960"><path d="m438-338 226-226-57-57-169 169-84-84-57 57 141 141Zm42 258q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
+  <symbol id="ic-gpp_maybe" viewBox="0 -960 960 960"><path d="M480-320q17 0 28.5-11.5T520-360q0-17-11.5-28.5T480-400q-17 0-28.5 11.5T440-360q0 17 11.5 28.5T480-320Zm-40-160h80v-200h-80v200Zm40 400q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -880,6 +910,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 <div id="screen-chat" class="hidden">
   <div id="sidebar">
     <div id="sidebar-header">
+      <img id="sidebar-banner-img" alt="" draggable="false">
       <span class="server-title">
         <span class="server-name" id="sidebar-server-name">Server</span>
         <button id="server-info-btn" class="hidden" title="About this server"><svg class="ic" aria-hidden="true"><use href="#ic-info"/></svg></button>
@@ -900,12 +931,10 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
       </button>
       <button class="settings-btn" id="settings-btn" title="Settings"><svg class="ic" aria-hidden="true"><use href="#ic-settings"/></svg></button>
       <button class="status-dot-btn" id="status-dot-btn" title="Connected">
+        <span class="conn-shield" id="conn-shield"></span>
         <span class="status-dot" id="status-dot"></span>
       </button>
-      <div id="ping-popover" class="hidden">
-        <div class="ping-value" id="ping-value">-- ms</div>
-        <div class="ping-label" id="ping-label"></div>
-      </div>
+      <div id="ping-popover" class="hidden"></div>
     </div>
   </div>
   <div id="main-column">
@@ -1723,29 +1752,102 @@ function updateStatusDotColor(){
     btn.title='Disconnected';
     return;
   }
-  if(state.lastPingMs!=null&&state.lastPingMs>100){
-    dot.style.background='var(--yellow)';
-    btn.title=`Connected · ${state.lastPingMs}ms (slow)`;
-  }else{
-    dot.style.background='var(--green)';
-    btn.title=state.lastPingMs!=null?`Connected · ${state.lastPingMs}ms`:'Connected';
-  }
+  const ms=state.lastPingMs,[q,label]=pingQuality(ms);
+  dot.style.background=ms==null?'var(--green)':q==='excellent'||q==='good'?'var(--green)':q==='fair'?'var(--yellow)':'var(--red)';
+  const sec=(connSecurity?connSecurity.https:isHttpsDomain())?'secure (HTTPS)':'not encrypted (HTTP)';
+  btn.dataset.tip=btn.title=ms!=null?`Connected · ${ms} ms (${label.toLowerCase()}) · ${sec}`:`Connected · ${sec}`;
 }
-const PING_MIN_INTERVAL_MS=5*60*1000; // don't let repeated clicks (or anything else) hit the server with ping requests more than once every 5 minutes
-let pingIntervalId=null,lastPingCheckAt=0;
+// Ping: how quickly the server answers a tiny request. In the background
+// it's checked every 30 s, and not at all while the window is hidden or
+// minimised; while the connection panel is open it updates every 2 s so
+// the number is live. Either way only one request is ever in flight, so a
+// slow server can't pile them up. The last PING_HISTORY results feed the
+// panel's graph and averages.
+const PING_BG_MS=30000, PING_LIVE_MS=2000, PING_HISTORY=30;
+let pingTimer=null,pingInFlight=false,pingSamples=[],lastPingCheckAt=0;
 async function updatePingOnce(){
-  lastPingCheckAt=Date.now(); // recorded even on failure — a broken server shouldn't get hammered either
+  if(pingInFlight||!state.wsConnected)return;
+  pingInFlight=true;lastPingCheckAt=Date.now();
   try{state.lastPingMs=await window.go.main.App.PingServer();}
   catch{state.lastPingMs=null;}
+  finally{pingInFlight=false;}
+  pingSamples.push(state.lastPingMs);if(pingSamples.length>PING_HISTORY)pingSamples.shift();
   updateStatusDotColor();
+  if(pingPanelOpen())renderPingPanel();
+}
+const pingPanelOpen=()=>!document.getElementById('ping-popover')?.classList.contains('hidden');
+function schedulePing(){
+  clearTimeout(pingTimer);pingTimer=null;
+  if(!state.wsConnected)return;
+  if(document.hidden&&!pingPanelOpen())return; // resumes on visibilitychange
+  pingTimer=setTimeout(async()=>{await updatePingOnce();schedulePing();},pingPanelOpen()?PING_LIVE_MS:PING_BG_MS);
 }
 function startPingLoop(){
-  stopPingLoop();
-  updatePingOnce(); // always check once immediately on a fresh connect
-  pingIntervalId=setInterval(updatePingOnce,PING_MIN_INTERVAL_MS);
+  stopPingLoop();pingSamples=[];connSecurity=null;
+  updatePingOnce().then(schedulePing); // check once immediately on a fresh connect
+  loadConnSecurity();
 }
-function stopPingLoop(){
-  if(pingIntervalId){clearInterval(pingIntervalId);pingIntervalId=null;}
+function stopPingLoop(){clearTimeout(pingTimer);pingTimer=null;}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden||!state.wsConnected)return;
+  // Back in view after a while: refresh now rather than waiting out the timer.
+  if(Date.now()-lastPingCheckAt>PING_BG_MS)updatePingOnce().then(schedulePing);else schedulePing();
+});
+
+// HTTPS or not, and the certificate — checked once per connection.
+let connSecurity=null;
+async function loadConnSecurity(){
+  const domain=state.domain;
+  try{const sec=await window.go.main.App.GetConnectionSecurity();if(state.domain===domain)connSecurity=sec;}
+  catch{connSecurity=null;}
+  renderConnShield();if(pingPanelOpen())renderPingPanel();
+}
+function isHttpsDomain(){return /^https:\/\//i.test(state.domain||'');}
+function renderConnShield(){
+  const el=document.getElementById('conn-shield');if(!el)return;
+  const secure=connSecurity?connSecurity.https:isHttpsDomain();
+  el.className='conn-shield '+(secure?'secure':'insecure');
+  el.innerHTML=icon(secure?'verified_user':'gpp_maybe');
+}
+function pingQuality(ms){
+  if(ms==null)return ['down','No response'];
+  if(ms<60)return ['excellent','Excellent'];
+  if(ms<120)return ['good','Good'];
+  if(ms<250)return ['fair','Fair'];
+  return ['poor','Poor'];
+}
+function renderPingPanel(){
+  const pop=document.getElementById('ping-popover');
+  const ok=pingSamples.filter(v=>v!=null),ms=state.lastPingMs;
+  const [q,qLabel]=state.wsConnected?pingQuality(ms):['down','Disconnected'];
+  const avg=ok.length?Math.round(ok.reduce((a,b)=>a+b,0)/ok.length):null;
+  const jitter=ok.length>1?Math.round(ok.slice(1).reduce((a,v,i)=>a+Math.abs(v-ok[i]),0)/(ok.length-1)):null;
+  const lost=pingSamples.length?Math.round(100*(pingSamples.length-ok.length)/pingSamples.length):0;
+  // Bar graph of recent pings, newest on the right; missing ones in red.
+  const W=240,H=44,n=PING_HISTORY,bw=W/n,top=Math.max(150,...ok)*1.15;
+  const bars=pingSamples.map((v,i)=>{
+    const x=(n-pingSamples.length+i)*bw;
+    if(v==null)return `<rect x="${x+1}" y="0" width="${bw-2}" height="${H}" rx="1.5" fill="var(--red)" opacity=".35"/>`;
+    const h=Math.max(2,H*v/top),[qq]=pingQuality(v);
+    return `<rect x="${x+1}" y="${H-h}" width="${bw-2}" height="${h}" rx="1.5" class="bar-${qq}"/>`;
+  }).join('');
+  const sec=connSecurity,secure=sec?sec.https:isHttpsDomain();
+  const expires=sec?.expires_at?new Date(sec.expires_at):null;
+  const days=expires?Math.round((expires-Date.now())/864e5):null;
+  const secText=secure
+    ?`Encrypted${sec?.tls_version?` with ${esc(sec.tls_version)}`:''}${sec?.issuer?`, certificate from ${esc(sec.issuer)}`:''}${days!=null?` (renews in ${days} day${days===1?'':'s'})`:''}.`
+    :'This server uses plain HTTP, so messages and files travel unencrypted. Fine on your own network; put it behind HTTPS before using it over the internet.';
+  pop.innerHTML=`
+    <div class="cp-head"><span class="cp-title">Connection</span>
+      <span class="cp-state q-${state.wsConnected?'excellent':'down'}"><i></i>${state.wsConnected?'Connected':'Disconnected'}</span></div>
+    <div class="cp-latency"><span class="cp-ms">${ms!=null&&state.wsConnected?ms:'—'}<small>${ms!=null&&state.wsConnected?'ms':''}</small></span>
+      <span class="cp-quality q-${q}">${qLabel}</span></div>
+    <svg class="cp-graph" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Recent ping times">
+      <style>.bar-excellent{fill:var(--green)}.bar-good{fill:#9ccc65}.bar-fair{fill:var(--yellow)}.bar-poor{fill:var(--red)}</style>${bars}</svg>
+    <div class="cp-stats"><span>avg <b>${avg??'—'}${avg!=null?' ms':''}</b></span><span>jitter <b>${jitter??'—'}${jitter!=null?' ms':''}</b></span><span>lost <b>${lost}%</b></span></div>
+    <div class="cp-sec ${secure?'secure':'insecure'}">${icon(secure?'verified_user':'gpp_maybe')}
+      <div><b>${secure?'Secure connection (HTTPS)':'Not encrypted (HTTP)'}</b><span>${secText}</span></div></div>
+    <div class="cp-addr">${esc(state.domain||'')}</div>`;
 }
 
 // ── AUTO-RECONNECT ───────────────────────────────────────────────
@@ -1781,18 +1883,19 @@ async function attemptReconnect(){
     scheduleReconnect(); // still down — try again shortly, silently (no toast spam per attempt)
   }
 }
-async function togglePingPopover(e){
+// Opening the panel pings right away and then every 2 s while it's open;
+// closing it drops back to the 30 s background rate.
+function togglePingPopover(e){
   e.stopPropagation();
   const pop=document.getElementById('ping-popover');
-  if(!pop.classList.contains('hidden')){pop.classList.add('hidden');return;}
-  pop.classList.remove('hidden');
-  if(Date.now()-lastPingCheckAt>=PING_MIN_INTERVAL_MS){
-    document.getElementById('ping-value').textContent='Pinging…';
-    document.getElementById('ping-label').textContent='';
-    await updatePingOnce();
-  }
-  document.getElementById('ping-value').textContent=state.lastPingMs!=null?`${state.lastPingMs} ms`:'Unreachable';
-  document.getElementById('ping-label').textContent=state.wsConnected?'Connected':'Disconnected';
+  if(!pop.classList.contains('hidden')){closePingPanel();return;}
+  pop.classList.remove('hidden');renderPingPanel();
+  if(Date.now()-lastPingCheckAt>1000)updatePingOnce().then(schedulePing);else schedulePing();
+}
+function closePingPanel(){
+  const pop=document.getElementById('ping-popover');
+  if(pop.classList.contains('hidden'))return;
+  pop.classList.add('hidden');schedulePing();
 }
 
 async function doConnect(domain,serverKey){
@@ -1823,7 +1926,7 @@ async function doConnect(domain,serverKey){
   state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';lastUsersPayload=null;
   serverBannerAt=-1; // a different server: forget the last one's banner
   state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
-  const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.style.removeProperty('--banner');
+  const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.classList.remove('anim-paused');document.getElementById('sidebar-banner-img').removeAttribute('src');
   showChatScreen();
   refreshServerMeta();
   await loadRooms();
@@ -1895,7 +1998,8 @@ async function refreshServerMeta(){
     if(serverBannerURL)URL.revokeObjectURL(serverBannerURL);
     serverBannerURL=url;
     header.classList.toggle('has-banner',!!url);
-    header.style.setProperty('--banner',url?`url("${url}")`:'none');
+    const bannerImg=document.getElementById('sidebar-banner-img');
+    if(url){bannerImg.src=url;limitBannerAnimation(header,url);}else bannerImg.removeAttribute('src');
   }
   refreshMemberList();
 }
@@ -3419,7 +3523,7 @@ function buildSearchResultRow(msg){
   images.slice(0,4).forEach(a=>{
     const img=document.createElement('img');img.className='sr-img loading';img.alt=a.name||'image';
     img.addEventListener('load',()=>img.classList.remove('loading'),{once:true});
-    getImageBlobURL(a.url).then(url=>{img.src=url;}).catch(err=>console.error('image load failed:',err));
+    getImageBlobURL(a.url).then(url=>{img.src=url;limitAnimation(img,url);}).catch(err=>console.error('image load failed:',err));
     img.addEventListener('click',e=>{e.stopPropagation();getImageBlobURL(a.url).then(url=>openLightbox(url,a,msg)).catch(()=>{});});
     imgWrap.appendChild(img);
   });
@@ -3469,7 +3573,7 @@ function buildMsgEl(msg,grouped){
     images.slice(0,4).forEach(a=>{
       const img=document.createElement('img');img.className='grid-img loading';img.alt=a.name||'image';
       img.addEventListener('load',()=>sizeLoadedImage(img),{once:true});
-      getImageBlobURL(a.url).then(url=>{img.src=url;}).catch(err=>console.error('image load failed:',err));
+      getImageBlobURL(a.url).then(url=>{img.src=url;limitAnimation(img,url);}).catch(err=>console.error('image load failed:',err));
       img.addEventListener('click',()=>getImageBlobURL(a.url).then(url=>openLightbox(url,a,msg)).catch(()=>{}));
       grid.appendChild(img);
     });
@@ -4991,6 +5095,109 @@ function initShortcodes(){
   ta.addEventListener('blur',()=>setTimeout(closeEmojiSuggest,120));
 }
 
+// ── ANIMATION LIMIT ──────────────────────────────────────────────
+// Animated GIF / WebP / PNG images in chat (and the server banner) play
+// ANIMATION_PLAYS times, then rest on their first frame; hovering plays them
+// again (from the start, for another ANIMATION_PLAYS loops). Profile
+// banners and pictures, and the image viewer, keep playing — they're only
+// on screen briefly. A browser can't pause an animated image, so "paused"
+// is a still copy of the first frame swapped in, and "play" swaps in a
+// fresh copy of the animation (a new URL makes it start from frame one).
+const ANIMATION_PLAYS=5;
+// Total length of one loop, in ms, read from the file itself — or 0 if
+// it isn't animated (or can't be read). Frame delays under 20 ms count as
+// 100 ms, which is what browsers actually show.
+function animationLoopMs(b){
+  if(!b||b.length<16)return 0;
+  const s=(a,z)=>String.fromCharCode(...b.subarray(a,z)),u16=i=>b[i]|(b[i+1]<<8),fix=ms=>ms<20?100:ms;
+  const gif=s(0,4)==='GIF8';
+  if(!gif&&!isAnimatedImage(b))return 0;
+  let total=0;
+  try{
+    if(gif){ // walk the blocks: each image frame, with the delay its control block set (if any)
+      let i=13,frames=0,delay=null;if(b[10]&0x80)i+=3*(2<<(b[10]&7)); // global color table
+      while(i<b.length){
+        const t=b[i];
+        if(t===0x3B)break; // end
+        if(t===0x21){ // extension
+          if(b[i+1]===0xF9)delay=u16(i+4)*10;
+          i+=2;while(i<b.length&&b[i])i+=b[i]+1;i++;
+        }else if(t===0x2C){ // image: descriptor, optional local colors, data
+          frames++;total+=fix(delay??0);delay=null;
+          const packed=b[i+9];i+=10;if(packed&0x80)i+=3*(2<<(packed&7));
+          i++;while(i<b.length&&b[i])i+=b[i]+1;i++;
+        }else break;
+      }
+      if(frames<2)return 0;
+    }else if(s(0,4)==='RIFF'){ // animated WebP: ANMF chunks carry each frame's duration
+      for(let i=12;i+8<=b.length;){
+        const len=(b[i+4]|(b[i+5]<<8)|(b[i+6]<<16)|(b[i+7]<<24))>>>0;
+        if(s(i,i+4)==='ANMF')total+=fix(b[i+20]|(b[i+21]<<8)|(b[i+22]<<16));
+        i+=8+len+(len&1);
+      }
+    }else{ // APNG: fcTL chunks carry delay_num/delay_den
+      for(let i=8;i+8<=b.length;){
+        const len=((b[i]<<24)|(b[i+1]<<16)|(b[i+2]<<8)|b[i+3])>>>0;
+        if(s(i+4,i+8)==='fcTL'){const d=i+8,num=(b[d+20]<<8)|b[d+21],den=((b[d+22]<<8)|b[d+23])||100;total+=fix(num*1000/den);}
+        i+=12+len;
+      }
+    }
+  }catch{return 0;}
+  return total;
+}
+async function animatedInfo(url){
+  const blob=await (await fetch(url)).blob();
+  const loopMs=animationLoopMs(new Uint8Array(await blob.arrayBuffer()));
+  return loopMs?{blob,loopMs}:null;
+}
+// First frame as a still image (drawing an animated image to a canvas
+// draws a single frame).
+function stillFrame(blob){
+  return new Promise((resolve,reject)=>{
+    const u=URL.createObjectURL(blob),img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
+      c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(u);
+      c.toBlob(b=>b?resolve(URL.createObjectURL(b)):reject(new Error('no frame')),'image/png');
+    };
+    img.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('unreadable'));};
+    img.src=u;
+  });
+}
+// Generic controller: show(url) puts a URL on screen; hoverEl is what you
+// hover to play it again.
+async function limitAnimationOn(srcUrl,show,hoverEl){
+  let info;try{info=await animatedInfo(srcUrl);}catch{return;}
+  if(!info)return; // not animated
+  let still=null,timer=null,playing=srcUrl,hovered=false;
+  const pause=async()=>{
+    timer=null;
+    if(hovered){arm();return;} // still being looked at — keep going
+    try{still=still||await stillFrame(info.blob);}catch{return;}
+    if(!hoverEl.isConnected)return;
+    show(still);hoverEl.classList.add('anim-paused');
+    if(playing!==srcUrl){URL.revokeObjectURL(playing);playing=srcUrl;}
+  };
+  const arm=()=>{clearTimeout(timer);timer=setTimeout(pause,info.loopMs*ANIMATION_PLAYS);};
+  hoverEl.addEventListener('mouseenter',()=>{
+    hovered=true;
+    if(hoverEl.classList.contains('anim-paused')){
+      // A fresh URL restarts the animation from its first frame.
+      if(playing!==srcUrl)URL.revokeObjectURL(playing);
+      playing=URL.createObjectURL(info.blob);
+      show(playing);hoverEl.classList.remove('anim-paused');
+    }
+    arm();
+  });
+  hoverEl.addEventListener('mouseleave',()=>{hovered=false;});
+  arm();
+}
+function limitAnimation(img,url){limitAnimationOn(url,u=>{img.src=u;},img);}
+function limitBannerAnimation(header,url){
+  const img=document.getElementById('sidebar-banner-img');
+  limitAnimationOn(url,u=>{if(serverBannerURL===url)img.src=u;},header);
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -5284,7 +5491,7 @@ function init(){
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAddModal();closeDeleteConfirm();closeExportModal();closeDropdown();if(state.searchActive)exitSearch();else if(state.resultsMode==='pins')closeResultsPanel();}});
   document.addEventListener('click',()=>closeDropdown());
   document.getElementById('status-dot-btn').addEventListener('click',togglePingPopover);
-  document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
+  document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
   initSearchFilters();

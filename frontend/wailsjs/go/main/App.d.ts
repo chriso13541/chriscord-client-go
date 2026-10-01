@@ -36,6 +36,8 @@ export function GetBoards(arg1:string):Promise<Array<main.Board>>;
 
 export function GetClientSettings():Promise<string>;
 
+export function GetConnectionSecurity():Promise<main.ConnectionSecurity>;
+
 export function GetFileLink(arg1:string):Promise<string>;
 
 export function GetFileURL(arg1:string):Promise<string>;

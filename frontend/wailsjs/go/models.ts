@@ -128,6 +128,26 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ConnectionSecurity {
+	    https: boolean;
+	    tls_version?: string;
+	    issuer?: string;
+	    subject?: string;
+	    expires_at?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConnectionSecurity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.https = source["https"];
+	        this.tls_version = source["tls_version"];
+	        this.issuer = source["issuer"];
+	        this.subject = source["subject"];
+	        this.expires_at = source["expires_at"];
+	    }
+	}
 	export class LinkPreview {
 	    url: string;
 	    title?: string;

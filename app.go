@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
@@ -692,6 +693,46 @@ func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
 	var info ServerInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil { return nil, err }
 	return &info, nil
+}
+
+// ConnectionSecurity describes how the app talks to the connected server:
+// over HTTPS (encrypted, with a certificate the system trusts — a bad one
+// would have stopped the connection entirely) or plain HTTP.
+type ConnectionSecurity struct {
+	HTTPS      bool   `json:"https"`
+	TLSVersion string `json:"tls_version,omitempty"`
+	Issuer     string `json:"issuer,omitempty"`     // who issued the certificate
+	Subject    string `json:"subject,omitempty"`    // the name it was issued for
+	ExpiresAt  string `json:"expires_at,omitempty"` // RFC 3339
+}
+
+// GetConnectionSecurity checks the connected server's address and, for
+// HTTPS, the certificate it presents.
+func (a *App) GetConnectionSecurity() (*ConnectionSecurity, error) {
+	a.mu.Lock(); domain := a.domain; a.mu.Unlock()
+	if domain == "" { return nil, fmt.Errorf("not connected") }
+	base := normaliseHTTP(domain)
+	if !strings.HasPrefix(strings.ToLower(base), "https://") {
+		return &ConnectionSecurity{HTTPS: false}, nil
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(base + "/api/info")
+	if err != nil { return nil, fmt.Errorf("cannot reach server: %w", err) }
+	defer resp.Body.Close()
+	sec := &ConnectionSecurity{HTTPS: resp.TLS != nil}
+	if resp.TLS == nil {
+		return sec, nil
+	}
+	sec.TLSVersion = map[uint16]string{tls.VersionTLS10: "TLS 1.0", tls.VersionTLS11: "TLS 1.1", tls.VersionTLS12: "TLS 1.2", tls.VersionTLS13: "TLS 1.3"}[resp.TLS.Version]
+	if len(resp.TLS.PeerCertificates) > 0 {
+		cert := resp.TLS.PeerCertificates[0]
+		sec.Issuer = cert.Issuer.CommonName
+		if len(cert.Issuer.Organization) > 0 { sec.Issuer = cert.Issuer.Organization[0] }
+		sec.Subject = cert.Subject.CommonName
+		if sec.Subject == "" && len(cert.DNSNames) > 0 { sec.Subject = cert.DNSNames[0] }
+		sec.ExpiresAt = cert.NotAfter.UTC().Format(time.RFC3339)
+	}
+	return sec, nil
 }
 
 // PingServer times a real round trip to the currently connected host, in
