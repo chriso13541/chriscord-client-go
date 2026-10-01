@@ -110,6 +110,8 @@ export function SaveProfilePicture(arg1:string):Promise<void>;
 
 export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;
 
+export function SearchServerFiltered(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<Array<main.SearchResult>>;
+
 export function SendMessage(arg1:string,arg2:string,arg3:Array<main.Attachment>):Promise<void>;
 
 export function SendTyping(arg1:boolean):Promise<void>;

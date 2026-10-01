@@ -936,6 +936,22 @@ func (a *App) SearchServer(query string) ([]SearchResult, error) {
 	return results, a.doGET(path, &results)
 }
 
+// SearchServerFiltered is SearchServer plus the search box's filters:
+// from (username), has (comma-separated: link,image,video,audio,file),
+// inBoard (a channel id), and after/before (RFC 3339 instants — after
+// inclusive, before exclusive). Empty strings mean "not filtered".
+func (a *App) SearchServerFiltered(query, from, has, inBoard, after, before string) ([]SearchResult, error) {
+	v := url.Values{}
+	v.Set("q", query)
+	for k, val := range map[string]string{"from": from, "has": has, "in": inBoard, "after": after, "before": before} {
+		if val != "" {
+			v.Set(k, val)
+		}
+	}
+	var results []SearchResult
+	return results, a.doGET("/api/search?"+v.Encode(), &results)
+}
+
 // GetMessagesBefore fetches one page of messages older than beforeID, for
 // "load older" when scrolling to the top of a board's history. Page size is
 // fixed server-side (messages::HISTORY_PAGE) — see the matching constant in

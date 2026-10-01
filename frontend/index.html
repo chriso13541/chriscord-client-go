@@ -20,6 +20,12 @@ html { height:100%; background:var(--bg-darkest); }
    emoji; every other character falls through to the normal fonts. */
 @font-face { font-family:'OpenMojiColor'; src:url('emoji/OpenMoji-color-glyf_colr_0.woff2') format('woff2'); font-display:swap;
   unicode-range:U+00A9,U+00AE,U+203C,U+2049,U+2122,U+2139,U+2194-2199,U+21A9-21AA,U+231A-231B,U+2328,U+23CF,U+23E9-23F3,U+23F8-23FA,U+24C2,U+25AA-25AB,U+25B6,U+25C0,U+25FB-25FE,U+2600-27BF,U+2934-2935,U+2B05-2B07,U+2B1B-2B1C,U+2B50,U+2B55,U+3030,U+303D,U+3297,U+3299,U+FE0F,U+200D,U+20E3,U+1F000-1FAFF,U+E0020-E007F; }
+/* The same font again, drawn 60% larger, for the boxes you type in —
+   emoji there were noticeably smaller than in sent messages. size-adjust
+   scales only this face's glyphs (the emoji); the text is unaffected. */
+@font-face { font-family:'OpenMojiInput'; src:url('emoji/OpenMoji-color-glyf_colr_0.woff2') format('woff2'); font-display:swap; size-adjust:160%; ascent-override:72%; descent-override:18%;
+  unicode-range:U+00A9,U+00AE,U+203C,U+2049,U+2122,U+2139,U+2194-2199,U+21A9-21AA,U+231A-231B,U+2328,U+23CF,U+23E9-23F3,U+23F8-23FA,U+24C2,U+25AA-25AB,U+25B6,U+25C0,U+25FB-25FE,U+2600-27BF,U+2934-2935,U+2B05-2B07,U+2B1B-2B1C,U+2B50,U+2B55,U+3030,U+303D,U+3297,U+3299,U+FE0F,U+200D,U+20E3,U+1F000-1FAFF,U+E0020-E007F; }
+#msg-input, .msg-edit-input { font-family:'OpenMojiInput','Segoe UI',system-ui,-apple-system,sans-serif; line-height:1.5; }
 body { font-family:'OpenMojiColor','Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg-darkest); color:var(--text); height:100%; overflow:hidden; user-select:none; }
 .hidden { display:none !important; }
 /* ── Appearance: optional background image behind the whole app ── */
@@ -183,9 +189,38 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 #toggle-members-btn { margin-left:4px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
 #toggle-members-btn:hover { background:var(--bg-light); color:var(--text); }
 #toggle-members-btn.active { color:var(--accent); }
-#search-box { display:flex; align-items:center; background:var(--bg-mid); border:1px solid var(--border); border-radius:6px; padding:0 4px 0 10px; width:160px; flex-shrink:0; transition:border-color .15s,width .15s; }
-#search-box:focus-within { border-color:var(--accent-dim); width:190px; }
-#msg-search-input { flex:1; min-width:0; background:none; border:none; outline:none; padding:6px 4px 6px 0; font-size:.83rem; color:var(--text-strong); }
+#search-box { position:relative; display:flex; align-items:center; background:var(--bg-mid); border:1px solid var(--border); border-radius:6px; padding:0 4px 0 10px; width:180px; flex-shrink:0; transition:border-color .15s,width .15s; }
+#search-box:focus-within, #search-box.has-filters { border-color:var(--accent-dim); width:340px; }
+/* The input's own text is invisible; a mirror behind it draws the same
+   text with filters (from:, has:, in:, date:) highlighted. The mirror only
+   adds colour and a background drawn with box-shadow, never width, so
+   the caret and selection still line up exactly with what you see. */
+#search-field { position:relative; flex:1; min-width:0; }
+#search-hl, #msg-search-input { font:inherit; font-size:.83rem; letter-spacing:normal; padding:6px 4px 6px 0; white-space:pre; }
+#search-hl { position:absolute; inset:0; overflow:hidden; color:var(--text-strong); pointer-events:none; }
+#search-hl .sf-key { color:var(--accent); background:rgba(114,137,218,.18); border-radius:3px 0 0 3px; box-shadow:-2px 0 0 0 rgba(114,137,218,.18); }
+#search-hl .sf-key:last-child { border-radius:3px; box-shadow:-2px 0 0 0 rgba(114,137,218,.18),2px 0 0 0 rgba(114,137,218,.18); }
+#search-hl .sf-val { color:var(--text-strong); background:rgba(114,137,218,.18); border-radius:0 3px 3px 0; box-shadow:2px 0 0 0 rgba(114,137,218,.18); }
+#search-hl .sf-bad { text-decoration:underline wavy var(--red); text-underline-offset:3px; }
+#msg-search-input { position:relative; width:100%; background:none; border:none; outline:none; color:transparent; caret-color:var(--text-strong); }
+#msg-search-input::selection { color:transparent; background:rgba(114,137,218,.35); }
+/* Filter suggestions under the search box */
+#search-suggest { position:absolute; top:calc(100% + 6px); right:-1px; width:320px; max-height:420px; overflow-y:auto; z-index:70; padding:6px;
+  background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 28px rgba(0,0,0,.45); font-size:.86rem; }
+.ss-title { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); padding:6px 8px 4px; }
+.ss-row { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:4px; cursor:pointer; color:var(--text); }
+.ss-row.on { background:var(--bg-light); color:var(--text-strong); }
+.ss-row .ic { width:18px; height:18px; color:var(--text-muted); flex-shrink:0; }
+.ss-row .user-avatar { width:22px; height:22px; font-size:.65rem; flex-shrink:0; }
+.ss-row b { color:var(--text-strong); font-weight:700; }
+.ss-row .ss-hint { color:var(--text-muted); margin-left:auto; font-size:.78rem; }
+.ss-dates { display:flex; align-items:center; gap:6px; padding:6px 8px; color:var(--text-muted); font-size:.8rem; }
+.ss-dates input { flex:1; min-width:0; padding:5px 6px; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text); font:inherit; font-size:.8rem; color-scheme:dark; }
+.ss-dates button { padding:5px 10px; border-radius:4px; border:none; background:var(--accent); color:#fff; cursor:pointer; font:inherit; font-size:.8rem; }
+.ss-empty { color:var(--text-muted); padding:8px; }
+.rs-filters { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+.rs-filters span { font-size:.72rem; padding:1px 6px; border-radius:4px; background:rgba(114,137,218,.18); color:var(--text-strong); }
+
 #msg-search-input::placeholder { color:var(--text-muted); }
 #msg-search-btn,#msg-search-clear { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.8rem; padding:4px 5px; line-height:1; flex-shrink:0; }
 #msg-search-btn:hover,#msg-search-clear:hover { color:var(--accent); }
@@ -514,6 +549,12 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 #emoji-suggest .es-row img { width:22px; height:22px; }
 #emoji-suggest .es-row .es-alias { margin-left:auto; color:var(--text-muted); font-size:.75rem; }
 
+/* A link to another message, shown as "#channel › 💬" */
+.msg-link.msg-jump { display:inline-flex; align-items:center; gap:2px; padding:0 5px; border-radius:4px; background:rgba(114,137,218,.15); color:var(--accent); text-decoration:none; font-weight:600; vertical-align:baseline; }
+.msg-link.msg-jump:hover { background:rgba(114,137,218,.3); text-decoration:none; }
+.msg-link.msg-jump .ic { width:14px; height:14px; }
+.msg-link.msg-jump .mj-sep { margin:0 2px; opacity:.7; }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -686,6 +727,13 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
   <symbol id="ic-link" viewBox="0 -960 960 960"><path d="M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z"/></symbol>
   <symbol id="ic-keep_off" viewBox="0 -960 960 960"><path d="M680-840v80h-40v327l-80-80v-247H400v87l-87-87-33-33v-47h400ZM480-40l-40-40v-240H240v-80l80-80v-46L56-792l56-56 736 736-58 56-264-264h-6v240l-40 40ZM354-400h92l-44-44-2-2-46 46Zm126-193Zm-78 149Z"/></symbol>
   <symbol id="ic-delete" viewBox="0 -960 960 960"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></symbol>
+  <symbol id="ic-tag" viewBox="0 -960 960 960"><path d="m240-160 40-160H120l20-80h160l40-160H180l20-80h160l40-160h80l-40 160h160l40-160h80l-40 160h160l-20 80H660l-40 160h160l-20 80H600l-40 160h-80l40-160H360l-40 160h-80Zm140-240h160l40-160H420l-40 160Z"/></symbol>
+  <symbol id="ic-chat_bubble" viewBox="0 -960 960 960"><path d="M80-80v-720q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H240L80-80Zm126-240h594v-480H160v525l46-45Zm-46 0v-480 480Z"/></symbol>
+  <symbol id="ic-person" viewBox="0 -960 960 960"><path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/></symbol>
+  <symbol id="ic-image" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></symbol>
+  <symbol id="ic-movie" viewBox="0 -960 960 960"><path d="m160-800 80 160h120l-80-160h80l80 160h120l-80-160h80l80 160h120l-80-160h120q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Zm0 240v320h640v-320H160Zm0 0v320-320Z"/></symbol>
+  <symbol id="ic-music_note" viewBox="0 -960 960 960"><path d="M400-120q-66 0-113-47t-47-113q0-66 47-113t113-47q23 0 42.5 5.5T480-418v-422h240v160H560v400q0 66-47 113t-113 47Z"/></symbol>
+  <symbol id="ic-calendar_month" viewBox="0 -960 960 960"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-160 0q-17 0-28.5-11.5T280-440q0-17 11.5-28.5T320-480q17 0 28.5 11.5T360-440q0 17-11.5 28.5T320-400Zm320 0q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-160 0q-17 0-28.5-11.5T280-280q0-17 11.5-28.5T320-320q17 0 28.5 11.5T360-280q0 17-11.5 28.5T320-240Zm320 0q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -866,7 +914,8 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
       <button id="toggle-pins-btn" class="header-icon-btn" title="Pinned messages" disabled><svg class="ic" aria-hidden="true"><use href="#ic-keep"/></svg></button>
       <button id="toggle-members-btn" title="Toggle member list"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg> Members</button>
       <div id="search-box">
-        <input id="msg-search-input" type="text" placeholder="Search" autocomplete="off">
+        <div id="search-field"><div id="search-hl" aria-hidden="true"></div><input id="msg-search-input" type="text" placeholder="Search" autocomplete="off" spellcheck="false"></div>
+        <div id="search-suggest" class="hidden" role="listbox"></div>
         <button id="msg-search-clear" class="hidden" title="Clear search"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
         <button id="msg-search-btn" title="Search"><svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg></button>
       </div>
@@ -1163,7 +1212,14 @@ document.addEventListener('keydown',e=>{
 
 const AVATAR_COLOURS=['#7289da','#43b581','#faa61a','#f04747','#1abc9c','#e91e63','#9c27b0','#3f51b5'];
 function avatarColour(n){let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;return AVATAR_COLOURS[h%AVATAR_COLOURS.length];}
-function showScreen(id){document.querySelectorAll('[id^="screen-"]').forEach(el=>el.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');}
+function showScreen(id){
+  document.querySelectorAll('[id^="screen-"]').forEach(el=>el.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');
+  // Which theme shows depends on the screen (a server's own theme applies
+  // only on that server's chat screen), so recompute it on every switch —
+  // otherwise a theme worked out while the chat screen was still hidden
+  // could stay put.
+  try{applyAppearance();}catch{/* not initialised yet during startup */}
+}
 let toastTimer;
 function toast(msg,isError=false){const el=document.getElementById('toast');el.textContent=msg;el.className='show'+(isError?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3500);}
 function esc(str){return String(str??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -1332,8 +1388,74 @@ function renderTextWithLinks(text) {
   return emojify(esc(text).replace(/https?:\/\/[^\s&]+/g, match => {
     // match is already escaped, unescape for the href
     const raw = match.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+    // A link to a message on this server shows as a "#channel › message"
+    // chip instead of the raw address (clicking still goes through
+    // openExternalURL, which jumps to it).
+    const ml=parseMessageLink(raw);
+    if(ml&&ml.sameServer){
+      const b=findBoardLocal(ml.boardId);
+      if(!b)queueBoardNameLookup();
+      return `<a class="msg-link msg-jump" href="#" data-url="${esc(raw)}" data-board="${esc(ml.boardId)}">${icon('tag')}<span class="mj-name">${esc(b?.name||'message')}</span><span class="mj-sep">›</span>${icon('chat_bubble')}</a>`;
+    }
     return `<a class="msg-link" href="#" data-url="${esc(raw)}">${match}</a>`;
   }));
+}
+
+// ── MESSAGE LINKS ────────────────────────────────────────────────
+// "Copy Message Link" gives <server address>/channels/<channel>/<message>
+// (like Discord's). Clicking one in chat jumps straight to that message —
+// loading its channel and the conversation around it — instead of
+// opening a browser.
+function serverBase(domain=state.domain){
+  const d=(domain||'').replace(/\/+$/,'');
+  return /^https?:\/\//i.test(d)?d:'http://'+d;
+}
+function messageLink(msg){return `${serverBase()}/channels/${msg.board_id}/${msg.id}`;}
+const UUIDISH='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+function parseMessageLink(url){
+  const m=String(url).match(new RegExp(`^(https?:\/\/[^/]+)\/channels\/(${UUIDISH})\/(${UUIDISH})\/?$`,'i'));
+  if(!m)return null;
+  const host=u=>u.replace(/^https?:\/\//i,'').toLowerCase();
+  return {base:m[1],boardId:m[2],messageId:m[3],sameServer:!!state.domain&&host(m[1])===host(serverBase())};
+}
+function findBoardLocal(boardId){
+  for(const [roomId,list] of Object.entries(state.boardsByRoom||{})){
+    const b=(list||[]).find(b=>b.id===boardId);
+    if(b)return {...b,room_id:roomId};
+  }
+  return null;
+}
+// A chip whose channel's room isn't loaded yet says "message" at first;
+// this loads the remaining rooms' channel lists once, then fills the
+// channel names in.
+let boardLookupPending=false;
+function queueBoardNameLookup(){
+  if(boardLookupPending)return;
+  boardLookupPending=true;
+  setTimeout(async()=>{
+    for(const r of state.rooms||[]){
+      if(state.boardsByRoom[r.id])continue;
+      try{state.boardsByRoom[r.id]=await window.go.main.App.GetBoards(r.id)||[];}catch{state.boardsByRoom[r.id]=[];}
+    }
+    boardLookupPending=false;
+    document.querySelectorAll('.msg-jump[data-board]').forEach(a=>{const b=findBoardLocal(a.dataset.board);if(b)a.querySelector('.mj-name').textContent=b.name;});
+  },0);
+}
+async function openMessageLink(ml){
+  if(!ml.sameServer){
+    const host=ml.base.replace(/^https?:\/\//i,'');
+    toast(`That message is on ${host}. Connect to that server first, then open the link there.`,true);return;
+  }
+  let b=findBoardLocal(ml.boardId);
+  if(!b){ // channel list for that room not loaded yet — look through every room
+    for(const r of state.rooms||[]){
+      if(state.boardsByRoom[r.id])continue;
+      try{state.boardsByRoom[r.id]=await window.go.main.App.GetBoards(r.id)||[];}catch{state.boardsByRoom[r.id]=[];}
+      if((b=findBoardLocal(ml.boardId)))break;
+    }
+  }
+  if(!b){toast('That message\u2019s channel doesn\u2019t exist any more, or you can\u2019t see it.',true);return;}
+  await jumpToSearchResult({id:ml.messageId,board_id:b.id,board_name:b.name,room_id:b.room_id});
 }
 
 // ── EMOJI (OpenMoji) ──────────────────────────────────────────────
@@ -2722,6 +2844,8 @@ function appendPreviewCard(body,p,url){
 }
 
 function openExternalURL(url){
+  const ml=parseMessageLink(url);
+  if(ml){openMessageLink(ml);return;} // a chriscord message link: jump, don't open a browser
   // In Wails, BrowserOpenURL opens in the OS default browser
   window.runtime.BrowserOpenURL(url);
 }
@@ -2862,16 +2986,231 @@ async function loadOlderMessages(){
 // results appear in the members panel, swapped in for the online/offline
 // list. The live channel underneath is untouched, same as Discord's search
 // results panel.
+// ── SEARCH FILTERS ───────────────────────────────────────────────
+// Discord-style filters typed into the search box, with suggestions as you
+// type and highlighted in place:
+//   from:alex            messages sent by alex
+//   has:link|image|video|audio|file   (repeat for several)
+//   in:general           only that channel
+//   date:2026-09-01..2026-09-30  (or one day, or today / yesterday /
+//                          week / month), plus before: and after:
+// Everything else is the text to find (whole words; "quotes" for a phrase).
+const HAS_VALUES=[['link','link','Links'],['image','image','Images'],['video','movie','Videos'],['audio','music_note','Audio'],['file','attach_file','Files']];
+const FILTER_RE=/(^|\s)(from|has|in|date|before|after):("[^"]*"?|\S*)/gi;
+const unquote=v=>v.replace(/^"|"$/g,'');
+function localDay(str){ // "YYYY-MM-DD" → Date at local midnight, or null
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(str||'');
+  if(!m)return null;
+  const d=new Date(+m[1],+m[2]-1,+m[3]);
+  return isNaN(d)||d.getMonth()!==+m[2]-1?null:d;
+}
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+// A date value → [start, endExclusive] as local Dates, or null if not understood.
+function dateRange(v){
+  v=String(v).toLowerCase();const today=new Date();today.setHours(0,0,0,0);
+  if(v==='today')return [today,addDays(today,1)];
+  if(v==='yesterday')return [addDays(today,-1),today];
+  if(v==='week')return [addDays(today,-6),addDays(today,1)];
+  if(v==='month')return [addDays(today,-29),addDays(today,1)];
+  const [a,b]=v.split('..');
+  const da=localDay(a),db=b===undefined?da:localDay(b);
+  if(!da||!db)return null;
+  return da<=db?[da,addDays(db,1)]:[db,addDays(da,1)];
+}
+function allBoards(){
+  const out=[];
+  for(const r of state.rooms||[])for(const b of state.boardsByRoom[r.id]||[])out.push({...b,room_id:r.id,voice:r.room_type==='voice'});
+  return out;
+}
+let allBoardsLoading=null;
+function loadAllBoards(){
+  if(!allBoardsLoading)allBoardsLoading=(async()=>{
+    for(const r of state.rooms||[]){
+      if(state.boardsByRoom[r.id])continue;
+      try{state.boardsByRoom[r.id]=await window.go.main.App.GetBoards(r.id)||[];}catch{state.boardsByRoom[r.id]=[];}
+    }
+  })().finally(()=>{allBoardsLoading=null;});
+  return allBoardsLoading;
+}
+function parseSearch(text){
+  const f={text:'',from:'',has:[],inName:'',after:null,before:null,errors:[]};
+  f.text=text.replace(FILTER_RE,(all,lead,key,val)=>{
+    key=key.toLowerCase();val=unquote(val);
+    if(!val){f.errors.push(`${key}: needs a value`);return lead;}
+    if(key==='from')f.from=val;
+    else if(key==='has'){const v=val.toLowerCase();if(HAS_VALUES.some(h=>h[0]===v)){if(!f.has.includes(v))f.has.push(v);}else f.errors.push(`has:${val} isn\u2019t a filter (use link, image, video, audio or file)`);}
+    else if(key==='in')f.inName=val.replace(/^#/,'');
+    else{
+      const r=dateRange(val);
+      if(!r)f.errors.push(`${key}:${val} isn\u2019t a date (use YYYY-MM-DD, a range like 2026-09-01..2026-09-30, today, yesterday, week or month)`);
+      else if(key==='date'){f.after=r[0];f.before=r[1];}
+      else if(key==='after')f.after=r[1]; // after a day = from the next day on
+      else f.before=r[0];                  // before a day = up to its start
+    }
+    return lead;
+  }).replace(/\s+/g,' ').trim();
+  return f;
+}
 async function runSearch(){
   const input=document.getElementById('msg-search-input');
-  const q=input.value.trim();
+  const raw=input.value.trim();
+  closeSearchSuggest();
   if(!state.domain){toast('Connect to a server first',true);return;}
-  if(!q){exitSearch();return;}
+  if(!raw){exitSearch();return;}
+  const f=parseSearch(raw);
+  if(f.errors.length){toast(f.errors[0],true);return;}
+  let boardId='';
+  if(f.inName){
+    await loadAllBoards();
+    const b=allBoards().find(b=>b.name.toLowerCase()===f.inName.toLowerCase());
+    if(!b){toast(`There\u2019s no channel called #${f.inName}`,true);return;}
+    boardId=b.id;
+  }
+  if(!f.text&&!f.from&&!f.has.length&&!boardId&&!f.after&&!f.before){exitSearch();return;}
   try{
-    const results=await window.go.main.App.SearchServer(q)||[];
-    showSearchResults(results,q);
+    const results=await window.go.main.App.SearchServerFiltered(f.text,f.from,f.has.join(','),boardId,
+      f.after?f.after.toISOString():'',f.before?f.before.toISOString():'')||[];
+    showSearchResults(results,raw,f);
   }catch(err){toast('Search failed: '+err,true);}
 }
+
+// Draws the search text with filters highlighted, behind the input (whose
+// own text is invisible), and keeps it scrolled the same way.
+function renderSearchHighlight(){
+  const input=document.getElementById('msg-search-input'),hl=document.getElementById('search-hl');
+  const v=input.value;let html='',last=0;
+  FILTER_RE.lastIndex=0;let m;
+  while((m=FILTER_RE.exec(v))){
+    const start=m.index+m[1].length,key=m[2]+':',val=m[3];
+    html+=esc(v.slice(last,start));
+    let bad=false;
+    if(val){
+      const k=m[2].toLowerCase(),u=unquote(val);
+      if(k==='has')bad=!HAS_VALUES.some(h=>h[0]===u.toLowerCase());
+      else if(k==='date'||k==='before'||k==='after')bad=!dateRange(u);
+      else if(k==='in'){const all=allBoards();bad=all.length>0&&!all.some(b=>b.name.toLowerCase()===u.replace(/^#/,'').toLowerCase());}
+    }
+    html+=`<span class="sf-key">${esc(key)}</span>`+(val?`<span class="sf-val${bad?' sf-bad':''}">${esc(val)}</span>`:'');
+    last=start+key.length+val.length;
+    if(m[0].length===0)FILTER_RE.lastIndex++;
+  }
+  html+=esc(v.slice(last));
+  hl.innerHTML=html+' ';
+  hl.scrollLeft=input.scrollLeft;
+  document.getElementById('search-box').classList.toggle('has-filters',/(^|\s)(from|has|in|date|before|after):/i.test(v));
+}
+
+// ── Suggestions dropdown ─────────────────────────────────────────
+const ss={open:false,items:[],index:-1};
+function closeSearchSuggest(){ss.open=false;document.getElementById('search-suggest')?.classList.add('hidden');}
+// The word at the caret: {start, end, key (or null), value}
+function searchTokenAtCaret(){
+  const input=document.getElementById('msg-search-input'),v=input.value,c=input.selectionStart??v.length;
+  let start=c;while(start>0&&!/\s/.test(v[start-1]))start--;
+  let end=c;while(end<v.length&&!/\s/.test(v[end]))end++;
+  const word=v.slice(start,c);
+  const m=/^(from|has|in|date|before|after):(.*)$/i.exec(word);
+  return m?{start,end,key:m[1].toLowerCase(),value:unquote(m[2])}:{start,end,key:null,value:word};
+}
+function replaceSearchToken(tok,text){
+  const input=document.getElementById('msg-search-input'),v=input.value;
+  let rest=v.slice(tok.end);
+  if(text.endsWith(' ')&&rest.startsWith(' '))rest=rest.slice(1);
+  input.value=v.slice(0,tok.start)+text+rest;const pos=tok.start+text.length;
+  input.setSelectionRange(pos,pos);input.focus();
+  renderSearchHighlight();updateSearchSuggest();
+}
+function updateSearchSuggest(){
+  const box=document.getElementById('search-suggest'),tok=searchTokenAtCaret();
+  const rows=[];let title='',dates=false;
+  const val=(tok.value||'').toLowerCase();
+  if(!tok.key){
+    title='Search Options';
+    const opts=[['from','person','from:','user'],['has','attach_file','has:','link, image, video, audio or file'],['in','tag','in:','channel'],['date','calendar_month','date:','a day or a range']];
+    for(const [k,ic,label,hint] of opts){
+      if(val&&!k.startsWith(val))continue;
+      rows.push({html:`${icon(ic)}<b>${label}</b><span class="ss-hint">${hint}</span>`,pick:()=>replaceSearchToken(tok,k+':')});
+    }
+    ss.index=val?0:-1; // with nothing typed at the caret, Enter still searches
+  }else if(tok.key==='from'){
+    title='From User';
+    const users=[...new Set([...(lastUsersPayload?.all||[]),...(state.onlineUsers||[])])].sort((a,b)=>a.localeCompare(b));
+    for(const u of users.filter(u=>u.toLowerCase().includes(val)).slice(0,10)){
+      rows.push({html:`<div class="user-avatar" data-pfp-user="${esc(u)}"></div><b>${esc(u)}</b>`,user:u,pick:()=>replaceSearchToken(tok,'from:'+u+' ')});
+    }
+    ss.index=0;
+  }else if(tok.key==='has'){
+    title='Message Contains';
+    for(const [v,ic,label] of HAS_VALUES){if(v.startsWith(val))rows.push({html:`${icon(ic)}<b>${label}</b><span class="ss-hint">has:${v}</span>`,pick:()=>replaceSearchToken(tok,'has:'+v+' ')});}
+    ss.index=0;
+  }else if(tok.key==='in'){
+    title='In Channel';
+    if(!allBoards().length||(state.rooms||[]).some(r=>!state.boardsByRoom[r.id]))
+      loadAllBoards().then(()=>{if(ss.open&&searchTokenAtCaret().key==='in')updateSearchSuggest();});
+    for(const b of allBoards().filter(b=>b.name.toLowerCase().includes(val.replace(/^#/,''))).slice(0,12)){
+      const name=/\s/.test(b.name)?`"${b.name}"`:b.name;
+      rows.push({html:`${icon(b.voice?'volume_up':'tag')}<b>${esc(b.name)}</b>`,pick:()=>replaceSearchToken(tok,'in:'+name+' ')});
+    }
+    ss.index=0;
+  }else{
+    title=tok.key==='date'?'Date':tok.key==='before'?'Before':'After';
+    const presets=tok.key==='date'?[['today','Today'],['yesterday','Yesterday'],['week','Past 7 days'],['month','Past 30 days']]:[['today','Today'],['yesterday','Yesterday']];
+    for(const [v,label] of presets){if(!val||v.startsWith(val))rows.push({html:`${icon('calendar_month')}<b>${label}</b><span class="ss-hint">${tok.key}:${v}</span>`,pick:()=>replaceSearchToken(tok,`${tok.key}:${v} `)});}
+    dates=true;
+    ss.index=val&&rows.length?0:-1;
+  }
+  ss.items=rows;
+  if(!rows.length&&!dates&&!tok.key){closeSearchSuggest();return;}
+  box.innerHTML=`<div class="ss-title">${title}</div>`+(rows.length||dates?'':'<div class="ss-empty">No matches</div>');
+  rows.forEach((r,i)=>{
+    const d=document.createElement('div');d.className='ss-row'+(i===ss.index?' on':'');d.innerHTML=r.html;
+    d.addEventListener('mousedown',e=>{e.preventDefault();r.pick();});
+    d.addEventListener('mousemove',()=>{if(ss.index!==i){ss.index=i;box.querySelectorAll('.ss-row').forEach((x,j)=>x.classList.toggle('on',j===i));}});
+    box.appendChild(d);
+    if(r.user){const av=d.querySelector('.user-avatar');setAvatarFallback(av,r.user);applyUserAvatar(av,r.user);}
+  });
+  if(dates){
+    // A custom day or range: pick dates, Apply writes the filter in.
+    const today=ymd(new Date()),single=tok.key!=='date';
+    const w=document.createElement('div');w.className='ss-dates';
+    w.innerHTML=`<input type="date" max="${today}" aria-label="${single?'Day':'From'}">${single?'':`<span>to</span><input type="date" max="${today}" aria-label="To">`}<button type="button">Apply</button>`;
+    const [a,b]=w.querySelectorAll('input');
+    const r0=tok.value&&dateRange(tok.value);
+    if(r0){a.value=ymd(r0[0]);if(b)b.value=ymd(addDays(r0[1],-1));}
+    w.addEventListener('mousedown',e=>{if(e.target.tagName!=='INPUT')e.preventDefault();});
+    w.querySelector('button').addEventListener('click',()=>{
+      if(!a.value)return;
+      const v=single?a.value:(b.value&&b.value!==a.value?`${a.value}..${b.value}`:a.value);
+      replaceSearchToken(tok,`${tok.key}:${v} `);
+    });
+    box.appendChild(w);
+  }
+  box.classList.remove('hidden');ss.open=true;
+}
+function initSearchFilters(){
+  const input=document.getElementById('msg-search-input'),box=document.getElementById('search-suggest');
+  input.addEventListener('input',()=>{renderSearchHighlight();updateSearchSuggest();});
+  input.addEventListener('focus',()=>{loadAllBoards();updateSearchSuggest();});
+  input.addEventListener('click',updateSearchSuggest);
+  ['scroll','keyup','select'].forEach(ev=>input.addEventListener(ev,()=>{document.getElementById('search-hl').scrollLeft=input.scrollLeft;}));
+  input.addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='Home'||e.key==='End')updateSearchSuggest();});
+  input.addEventListener('keydown',e=>{
+    if(!ss.open)return;
+    const n=ss.items.length;
+    if((e.key==='ArrowDown'||e.key==='ArrowUp')&&n){
+      e.preventDefault();ss.index=(ss.index+(e.key==='ArrowDown'?1:-1)+n)%n;
+      box.querySelectorAll('.ss-row').forEach((x,i)=>x.classList.toggle('on',i===ss.index));
+    }else if((e.key==='Enter'||e.key==='Tab')&&ss.index>=0&&ss.items[ss.index]){
+      e.preventDefault();e.stopImmediatePropagation();ss.items[ss.index].pick();
+    }else if(e.key==='Escape'){e.stopImmediatePropagation();closeSearchSuggest();}
+  },true);
+  // Close when clicking anywhere outside the search box (the dropdown and
+  // its date fields are inside it, so using them doesn't close it).
+  document.addEventListener('mousedown',e=>{if(ss.open&&!e.target.closest('#search-box'))closeSearchSuggest();},true);
+  renderSearchHighlight();
+}
+
 // The members panel doubles as a results panel for search and for pinned
 // messages — only one at a time. Opening either remembers whether the
 // panel was open before, so closing puts it back the way it was.
@@ -2900,12 +3239,23 @@ function closeResultsPanel(){
   }
   state.membersWasOpenBeforeSearch=null;
 }
-function showSearchResults(results,q){
+function showSearchResults(results,q,f){
   openResultsPanel('search');
   document.getElementById('msg-search-clear').classList.remove('hidden');
 
   const summary=document.getElementById('results-summary');
-  summary.innerHTML=`<span>${results.length} result${results.length===1?'':'s'} for "${esc(q)}"</span>`+
+  const pills=[];
+  if(f){
+    if(f.from)pills.push(`from: ${f.from}`);
+    f.has.forEach(h=>pills.push(`has: ${h}`));
+    if(f.inName)pills.push(`in: #${f.inName}`);
+    const day=d=>d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+    if(f.after&&f.before)pills.push(`${day(f.after)} – ${day(addDays(f.before,-1))}`);
+    else if(f.after)pills.push(`from ${day(f.after)}`);
+    else if(f.before)pills.push(`before ${day(f.before)}`);
+  }
+  const label=f&&f.text?`"${esc(f.text)}"`:(f?'your filters':`"${esc(q)}"`);
+  summary.innerHTML=`<span>${results.length} result${results.length===1?'':'s'} for ${label}${pills.length?`<span class="rs-filters">${pills.map(p=>`<span>${esc(p)}</span>`).join('')}</span>`:''}</span>`+
     `<button class="clear-results" title="Back to members">${icon('close')}</button>`;
   summary.querySelector('.clear-results').addEventListener('click',exitSearch);
 
@@ -2915,6 +3265,7 @@ function showSearchResults(results,q){
 }
 function exitSearch(){
   document.getElementById('msg-search-input').value='';
+  renderSearchHighlight();closeSearchSuggest();
   document.getElementById('msg-search-clear').classList.add('hidden');
   if(state.resultsMode==='search')closeResultsPanel();
 }
@@ -3096,7 +3447,7 @@ function buildMsgEl(msg,grouped){
       </div>
       ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
-    <div class="msg-actions"><button class="msg-action-btn msg-react-btn" title="Add Reaction">${icon('add_reaction')}</button><button class="msg-action-btn" title="More options">${icon('more_horiz')}</button></div>`;
+    <div class="msg-actions"><button class="msg-action-btn msg-react-btn" title="Add Reaction">${icon('add_reaction')}</button><button class="msg-action-btn msg-more-btn" title="More options">${icon('more_horiz')}</button></div>`;
 
   // Grouped follow-up messages show a hover timestamp instead of an
   // avatar, so there's only something to apply on a group's first message.
@@ -3156,7 +3507,7 @@ function buildMsgEl(msg,grouped){
   if(msg.content)maybeRenderPreviews(div,msg.content);
 
   // 3-dot menu — on every message now, since anyone can Pin
-  div.querySelector('.msg-action-btn[title="More options"]').addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
+  div.querySelector('.msg-more-btn').addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
   return div;
 }
 
@@ -3166,7 +3517,7 @@ function buildMsgEl(msg,grouped){
 let dotsMenuFor=null;
 function toggleDropdown(msgEl,msg){
   if(ctxOpen&&dotsMenuFor===msg.id){closeContextMenu();return;}
-  const btn=msgEl.querySelector('.msg-action-btn[title="More options"]'),r=btn.getBoundingClientRect();
+  const btn=msgEl.querySelector('.msg-more-btn'),r=btn.getBoundingClientRect();
   const fake={target:msgEl.querySelector('.msg-body')||msgEl,clientX:r.right,clientY:r.bottom};
   showContextMenu(messageMenu(msgEl,msg,fake),r.right,r.bottom+4,{alignRight:true});
   dotsMenuFor=msg.id;
@@ -4264,6 +4615,7 @@ function updateOverrideHint(){
 }
 function applyAppearance(){
   const root=document.documentElement,eff=effectiveAppearance(),v=themeVars(eff);
+  console.info(`appearance: showing ${serverThemeActive()?'the server\u2019s theme':'your theme'} (base ${eff.base||'default'}, override ${appearanceOverride?'on':'off'}, server theme ${state.serverTheme?'set':'none'})`);
   for(const [k,val] of Object.entries(v))root.style.setProperty(k,val);
   let layer=document.getElementById('app-bg');
   if(!layer){layer=document.createElement('div');layer.id='app-bg';layer.innerHTML='<div class="bg-img"></div><div class="bg-dim"></div>';document.body.prepend(layer);}
@@ -4331,7 +4683,8 @@ function initAppearance(){
   document.getElementById('ap-save').addEventListener('click',()=>{
     try{localStorage.setItem('appearance',JSON.stringify(apDraft));}
     catch{toast('That background image is too large to save — try a smaller one.',true);return;}
-    appearance={...apDraft};applyAppearance();renderAppearanceEditor();persistClientSettings();toast('Appearance saved');
+    appearance={...apDraft};applyAppearance();renderAppearanceEditor();persistClientSettings();
+    toast(serverThemeActive()?`Appearance saved. ${state.serverName} has its own theme, so you\u2019ll see yours on the server list \u2014 or tick \u201cUse my own theme\u201d to use it here too.`:'Appearance saved');
   });
   document.getElementById('ap-revert').addEventListener('click',()=>{apDraft={...appearance};renderAppearanceEditor();});
   document.getElementById('ap-default').addEventListener('click',()=>{apDraft={...APPEARANCE_DEFAULTS};renderAppearanceEditor();});
@@ -4487,6 +4840,7 @@ function messageMenu(msgEl,msg,e){
     (selection||link||imgAttach)?'-':null,
     {label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))},
     msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content);toast('Text copied');}}:null,
+    {label:'Copy Message Link',icon:'link',action:()=>{copyText(messageLink(msg));toast('Message link copied');}},
     {label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
       try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
     }},
@@ -4511,7 +4865,7 @@ function initContextMenus(){
     const selection=String(window.getSelection()||'').trim();
     if(selection)showContextMenu([{label:'Copy',icon:'content_copy',action:()=>copyText(selection)}],e.clientX,e.clientY);
   });
-  document.addEventListener('mousedown',e=>{if(ctxOpen&&!e.target.closest('#ctx-menu,.msg-action-btn[title="More options"]'))closeContextMenu();},true);
+  document.addEventListener('mousedown',e=>{if(ctxOpen&&!e.target.closest('#ctx-menu,.msg-more-btn'))closeContextMenu();},true);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ctxOpen){e.stopImmediatePropagation();closeContextMenu();}},true);
   window.addEventListener('resize',closeContextMenu);window.addEventListener('blur',closeContextMenu);
   document.addEventListener('scroll',closeContextMenu,true);
@@ -4519,7 +4873,8 @@ function initContextMenus(){
 
 // ── TOOLTIPS ─────────────────────────────────────────────────────
 // Every title="…" in the app shows as a themed tooltip instead of the
-// browser's white box. The first time an element is hovered, its title
+// browser's white box. (So nothing should select elements by [title=…] —
+// the attribute is gone after the first hover; use a class instead.) The first time an element is hovered, its title
 // moves to data-tip (so the native one never appears); code that changes
 // .title later just gets picked up again on the next hover.
 let tipEl=null,tipTimer=null;
@@ -4932,6 +5287,7 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initSearchFilters();
   initTooltips();
   initShortcodes();
   initPasteAttachments();

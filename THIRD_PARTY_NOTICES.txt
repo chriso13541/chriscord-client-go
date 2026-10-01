@@ -16,12 +16,13 @@ Material Symbols (UI icons)
   at the top of `frontend/index.html`; the shapes themselves are unchanged.
 
 Icons used: add, add_reaction, arrow_downward, attach_file, audio_file,
-call_end, check, chevron_right, close, code, content_copy, content_cut,
-content_paste, crown (filled), delete, description, download, draft,
-drag_indicator, edit, error, folder_open, folder_zip, group, headphones,
-headset_off, info, keep, keep_off, link, mic, mic_off, mood, more_horiz,
-open_in_new, picture_as_pdf, play_arrow, progress_activity, schedule,
-search, select_all, send, settings, stop, video_file, volume_off,
+calendar_month, call_end, chat_bubble, check, chevron_right, close,
+code, content_copy, content_cut, content_paste, crown (filled), delete,
+description, download, draft, drag_indicator, edit, error, folder_open,
+folder_zip, group, headphones, headset_off, image, info, keep, keep_off,
+link, mic, mic_off, mood, more_horiz, movie, music_note, open_in_new,
+person, picture_as_pdf, play_arrow, progress_activity, schedule, search,
+select_all, send, settings, stop, tag, video_file, volume_off,
 volume_up, zoom_in.
 
 OpenMoji (emoji graphics)

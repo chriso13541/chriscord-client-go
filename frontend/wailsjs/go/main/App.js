@@ -218,6 +218,10 @@ export function SearchServer(arg1) {
   return window['go']['main']['App']['SearchServer'](arg1);
 }
 
+export function SearchServerFiltered(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['SearchServerFiltered'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function SendMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3);
 }
