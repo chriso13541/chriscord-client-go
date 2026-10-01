@@ -14,7 +14,13 @@
   --sidebar-w:330px; --members-w:200px;
 }
 html { height:100%; background:var(--bg-darkest); }
-body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg-darkest); color:var(--text); height:100%; overflow:hidden; user-select:none; }
+/* OpenMoji as a color font, limited to emoji code points, listed first:
+   anything that is an emoji — including what you type in the message box,
+   where pictures can't go — is drawn as OpenMoji instead of the system's
+   emoji; every other character falls through to the normal fonts. */
+@font-face { font-family:'OpenMojiColor'; src:url('emoji/OpenMoji-color-glyf_colr_0.woff2') format('woff2'); font-display:swap;
+  unicode-range:U+00A9,U+00AE,U+203C,U+2049,U+2122,U+2139,U+2194-2199,U+21A9-21AA,U+231A-231B,U+2328,U+23CF,U+23E9-23F3,U+23F8-23FA,U+24C2,U+25AA-25AB,U+25B6,U+25C0,U+25FB-25FE,U+2600-27BF,U+2934-2935,U+2B05-2B07,U+2B1B-2B1C,U+2B50,U+2B55,U+3030,U+303D,U+3297,U+3299,U+FE0F,U+200D,U+20E3,U+1F000-1FAFF,U+E0020-E007F; }
+body { font-family:'OpenMojiColor','Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg-darkest); color:var(--text); height:100%; overflow:hidden; user-select:none; }
 .hidden { display:none !important; }
 /* ── Appearance: optional background image behind the whole app ── */
 #app-bg { position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none; }
@@ -495,6 +501,19 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .ctx-item .ic { width:17px; height:17px; flex-shrink:0; }
 .ctx-sep { height:1px; margin:4px 6px; background:var(--border); }
 
+/* ── Tooltips (replace the browser's white title boxes) ───────── */
+#tooltip { position:fixed; z-index:600; max-width:280px; padding:5px 9px; border-radius:6px; background:var(--bg-darkest); border:1px solid var(--border);
+  color:var(--text-strong); font-size:.78rem; font-weight:600; line-height:1.3; box-shadow:0 4px 14px rgba(0,0,0,.4); pointer-events:none; white-space:pre-line; word-break:break-word; animation:tip-in .1s ease-out; }
+@keyframes tip-in { from { opacity:0; transform:translateY(2px); } to { opacity:1; transform:none; } }
+/* ── :shortcode: suggestions above the message box ───────────── */
+#emoji-suggest { position:absolute; left:20px; right:20px; bottom:100%; margin-bottom:6px; z-index:61; max-height:320px; overflow-y:auto; padding:6px;
+  background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+#emoji-suggest .es-title { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); padding:2px 8px 6px; }
+#emoji-suggest .es-row { display:flex; align-items:center; gap:10px; padding:5px 8px; border-radius:4px; cursor:pointer; color:var(--text); font-size:.88rem; }
+#emoji-suggest .es-row.on { background:var(--bg-light); color:var(--text-strong); }
+#emoji-suggest .es-row img { width:22px; height:22px; }
+#emoji-suggest .es-row .es-alias { margin-left:auto; color:var(--text-muted); font-size:.75rem; }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -861,6 +880,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
         </div>
         <div id="input-area">
           <div id="emoji-picker" class="hidden" role="dialog" aria-label="Emoji"></div>
+          <div id="emoji-suggest" class="hidden" role="listbox"></div>
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
             <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
@@ -1078,6 +1098,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
   </div>
 </div>
 <div id="profile-popup" class="hidden"></div>
+<div id="tooltip" class="hidden" role="tooltip"></div>
 <div id="ctx-menu" class="hidden" role="menu"></div>
 <div id="server-info-pop" class="hidden" role="dialog" aria-label="About this server"></div>
 <div id="voice-user-menu" class="hidden"></div>
@@ -3253,7 +3274,7 @@ async function sendMessage(){
   if(!content&&!readyAttachments.length)return;
   if(!state.selectedBoardId)return;
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
-  input.value='';autoResize(input);
+  input.value='';autoResize(input);closeEmojiSuggest();
   stopTyping(); // sent — back to the plain green circle
   const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime}));
   // The picture you just sent is already in memory from its preview — seed
@@ -4496,6 +4517,125 @@ function initContextMenus(){
   document.addEventListener('scroll',closeContextMenu,true);
 }
 
+// ── TOOLTIPS ─────────────────────────────────────────────────────
+// Every title="…" in the app shows as a themed tooltip instead of the
+// browser's white box. The first time an element is hovered, its title
+// moves to data-tip (so the native one never appears); code that changes
+// .title later just gets picked up again on the next hover.
+let tipEl=null,tipTimer=null;
+function hideTooltip(){clearTimeout(tipTimer);tipTimer=null;tipEl=null;document.getElementById('tooltip')?.classList.add('hidden');}
+function showTooltip(el){
+  const text=el.dataset.tip;if(!text||!el.isConnected)return;
+  const tip=document.getElementById('tooltip');
+  tip.textContent=text;tip.classList.remove('hidden');
+  const z=uiScale(),r=el.getBoundingClientRect(),w=tip.offsetWidth*z,h=tip.offsetHeight*z,m=6;
+  let x=r.left+r.width/2-w/2,y=r.top-h-8;
+  if(y<m)y=r.bottom+8; // no room above: below
+  x=Math.max(m,Math.min(innerWidth-w-m,x));
+  tip.style.left=x/z+'px';tip.style.top=y/z+'px';
+}
+function initTooltips(){
+  document.addEventListener('mouseover',e=>{
+    const el=e.target.closest?.('[title],[data-tip]');
+    if(!el){if(tipEl)hideTooltip();return;}
+    if(el.hasAttribute('title')){
+      const t=el.getAttribute('title');el.removeAttribute('title');
+      if(t){el.dataset.tip=t;if(!el.hasAttribute('aria-label')&&!el.textContent.trim())el.setAttribute('aria-label',t);}
+    }
+    if(el===tipEl)return;
+    hideTooltip();tipEl=el;
+    tipTimer=setTimeout(()=>{if(tipEl===el)showTooltip(el);},350);
+  });
+  document.addEventListener('mouseout',e=>{if(tipEl&&!tipEl.contains(e.relatedTarget))hideTooltip();});
+  ['mousedown','wheel','keydown'].forEach(ev=>document.addEventListener(ev,hideTooltip,true));
+  window.addEventListener('blur',hideTooltip);
+}
+
+// ── :SHORTCODE: EMOJI ────────────────────────────────────────────
+// Typing ":" and two or more letters in the message box suggests emoji
+// (↑/↓ to choose, Tab or Enter to insert, Esc to dismiss). Typing a
+// complete code like :turtle: turns into 🐢 by itself. Names come from
+// OpenMoji (:turtle:, :red_heart:), plus Discord's familiar short ones
+// (:joy:, :heart:, :thumbsup:, :+1:, :fire:, :sob:, :tada:…).
+const EMOJI_ALIASES={"joy": "face_with_tears_of_joy", "heart": "red_heart", "thumbsup": "thumbs_up", "+1": "thumbs_up", "thumbsdown": "thumbs_down", "-1": "thumbs_down", "fire": "fire", "smile": "grinning_face_with_smiling_eyes", "smiley": "grinning_face_with_big_eyes", "grin": "beaming_face_with_smiling_eyes", "laughing": "grinning_squinting_face", "sob": "loudly_crying_face", "cry": "crying_face", "eyes": "eyes", "skull": "skull", "pray": "folded_hands", "clap": "clapping_hands", "wave": "waving_hand", "ok_hand": "ok_hand", "sunglasses": "smiling_face_with_sunglasses", "thinking": "thinking_face", "rofl": "rolling_on_the_floor_laughing", "sweat_smile": "grinning_face_with_sweat", "heart_eyes": "smiling_face_with_heart_eyes", "kissing_heart": "face_blowing_a_kiss", "wink": "winking_face", "angry": "angry_face", "rage": "enraged_face", "tada": "party_popper", "100": "hundred_points", "poop": "pile_of_poo", "star": "star", "sparkles": "sparkles", "rocket": "rocket", "white_check_mark": "check_mark_button", "x": "cross_mark", "warning": "warning", "upside_down": "upside_down_face", "shrug": "person_shrugging", "facepalm": "person_facepalming", "slight_smile": "slightly_smiling_face", "blush": "smiling_face_with_smiling_eyes", "pensive": "pensive_face", "sleeping": "sleeping_face", "scream": "face_screaming_in_fear", "muscle": "flexed_biceps", "point_up": "index_pointing_up", "raised_hands": "raising_hands", "skull_crossbones": "skull_and_crossbones", "broken_heart": "broken_heart", "zany": "zany_face", "nerd": "nerd_face", "cowboy": "cowboy_hat_face", "partying_face": "partying_face", "salute": "saluting_face", "melting": "melting_face"};
+const EMOJI_BY_NAME=new Map();
+(window.EMOJI_DATA||[]).forEach(e=>{if(!EMOJI_BY_NAME.has(e[2]))EMOJI_BY_NAME.set(e[2],e);});
+for(const [alias,name] of Object.entries(EMOJI_ALIASES)){const e=EMOJI_BY_NAME.get(name);if(e)EMOJI_BY_NAME.set(alias,e);}
+const ALIAS_OF=new Map(Object.entries(EMOJI_ALIASES).map(([a,n])=>[n,a]));
+function emojiMatches(q,limit=8){
+  q=q.toLowerCase();
+  const exact=[],prefix=[],word=[],seen=new Set();
+  for(const [name,e] of EMOJI_BY_NAME){
+    if(seen.has(e[0]))continue;
+    if(name===q){exact.push([name,e]);seen.add(e[0]);}
+  }
+  for(const [name,e] of EMOJI_BY_NAME){
+    if(seen.has(e[0]))continue;
+    if(name.startsWith(q)){prefix.push([name,e]);seen.add(e[0]);}
+    else if(name.includes('_'+q)){word.push([name,e]);seen.add(e[0]);}
+  }
+  prefix.sort((a,b)=>a[0].length-b[0].length);
+  return [...exact,...prefix,...word].slice(0,limit);
+}
+const suggest={open:false,items:[],index:0,start:0};
+function closeEmojiSuggest(){suggest.open=false;document.getElementById('emoji-suggest')?.classList.add('hidden');}
+function renderEmojiSuggest(q){
+  const box=document.getElementById('emoji-suggest');
+  box.innerHTML=`<div class="es-title">Emoji matching :${esc(q)}</div>`+suggest.items.map(([name,e],i)=>
+    `<div class="es-row${i===suggest.index?' on':''}" data-i="${i}"><img src="${emojiSrc(e[0])}" alt=""><span>:${esc(name)}:</span>${ALIAS_OF.has(name)?`<span class="es-alias">:${esc(ALIAS_OF.get(name))}:</span>`:''}</div>`).join('');
+  box.querySelectorAll('.es-row').forEach(r=>{
+    r.addEventListener('mousedown',ev=>{ev.preventDefault();suggest.index=+r.dataset.i;acceptEmojiSuggest();});
+    r.addEventListener('mousemove',()=>{if(suggest.index!==+r.dataset.i){suggest.index=+r.dataset.i;box.querySelectorAll('.es-row').forEach((x,i)=>x.classList.toggle('on',i===suggest.index));}});
+  });
+  box.querySelector('.es-row.on')?.scrollIntoView({block:'nearest'});
+  box.classList.remove('hidden');suggest.open=true;
+}
+function replaceBeforeCaret(ta,from,text){
+  const to=ta.selectionStart;
+  ta.value=ta.value.slice(0,from)+text+ta.value.slice(to);
+  const pos=from+text.length;ta.setSelectionRange(pos,pos);
+  ta.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function acceptEmojiSuggest(){
+  const ta=document.getElementById('msg-input'),pick=suggest.items[suggest.index];
+  closeEmojiSuggest();
+  if(!pick)return;
+  replaceBeforeCaret(ta,suggest.start,pick[1][1]+' ');
+  noteRecentEmoji(pick[1][0]);ta.focus();
+}
+function onShortcodeInput(ta){
+  const before=ta.value.slice(0,ta.selectionStart);
+  // A finished :code: — swap it for the emoji.
+  const done=before.match(/(^|[\s(])(:([a-z0-9_+\-]+):)$/i);
+  if(done){
+    const e=EMOJI_BY_NAME.get(done[3].toLowerCase());
+    if(e){closeEmojiSuggest();replaceBeforeCaret(ta,before.length-done[2].length,e[1]);noteRecentEmoji(e[0]);return;}
+  }
+  // An unfinished one — suggest.
+  const m=before.match(/(^|[\s(]):([a-z0-9_+\-]{2,})$/i);
+  if(!m){closeEmojiSuggest();return;}
+  suggest.items=emojiMatches(m[2]);
+  if(!suggest.items.length){closeEmojiSuggest();return;}
+  suggest.start=before.length-m[2].length-1;suggest.index=0;
+  renderEmojiSuggest(m[2]);
+}
+function initShortcodes(){
+  const ta=document.getElementById('msg-input');
+  ta.addEventListener('input',e=>{if(!e.isComposing)onShortcodeInput(ta);});
+  // Capture phase, so Enter picks a suggestion instead of sending.
+  ta.addEventListener('keydown',e=>{
+    if(!suggest.open)return;
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      e.preventDefault();e.stopImmediatePropagation();
+      suggest.index=(suggest.index+(e.key==='ArrowDown'?1:-1)+suggest.items.length)%suggest.items.length;
+      document.querySelectorAll('#emoji-suggest .es-row').forEach((x,i)=>x.classList.toggle('on',i===suggest.index));
+      document.querySelector('#emoji-suggest .es-row.on')?.scrollIntoView({block:'nearest'});
+    }else if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();e.stopImmediatePropagation();acceptEmojiSuggest();}
+    else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeEmojiSuggest();}
+  },true);
+  ta.addEventListener('blur',()=>setTimeout(closeEmojiSuggest,120));
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -4792,6 +4932,8 @@ function init(){
   document.addEventListener('click',()=>document.getElementById('ping-popover')?.classList.add('hidden'));
   initLightbox();
   initProfilePopups();
+  initTooltips();
+  initShortcodes();
   initPasteAttachments();
   initContextMenus();
   initEditServer();

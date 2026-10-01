@@ -38,5 +38,9 @@ OpenMoji (emoji graphics)
   copied unmodified — no skin-tone variants and no OpenMoji "extras".
   frontend/emoji/emoji-data.js is generated from openmoji.json (hexcode,
   character, name, category, search tags).
+- Also included: the OpenMoji color font (frontend/emoji/
+  OpenMoji-color-glyf_colr_0.woff2, from openmoji-font.zip in the same
+  release, unmodified), used so emoji typed in text boxes appear as
+  OpenMoji rather than the operating system's emoji.
 - ShareAlike applies to the emoji graphics themselves (and any modified
   versions of them), not to the rest of chriscord.
