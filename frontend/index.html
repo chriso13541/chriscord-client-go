@@ -1579,8 +1579,9 @@ function initSounds(){
 // you joining or leaving, or someone joining or leaving the channel you're in.
 function voiceSoundsFor(prev,next,prevDropped={},nextDropped={}){
   const me=state.username;
-  const mine=ch=>Object.entries(ch||{}).find(([,u])=>(u||[]).includes(me))?.[0]||null;
-  const before=mine(prev),after=mine(next);
+  const mine=(ch,dr)=>Object.entries(ch||{}).find(([,u])=>(u||[]).includes(me))?.[0]
+    ||Object.entries(dr||{}).find(([,u])=>(u||[]).includes(me))?.[0]||null;
+  const before=mine(prev,prevDropped),after=mine(next,nextDropped);
   if(!before&&after)return playSound('join');
   if(before&&!after)return playSound('leave');
   if(before&&after&&before===after){
@@ -2069,13 +2070,15 @@ async function rejoinVoiceAfterReconnect(){
   voiceRejoinInFlight=null;updateVoiceConnectedBar();
   // Hung up in the moment between reconnecting and rejoining: respect it.
   if(r.cancelled){window.go.main.App.LeaveVoiceChannel().catch(()=>{});return;}
-  if(!state.wsConnected||myVoiceBoard())return;
+  // Already properly in a call (not just shown as reconnecting)? Nothing to do.
+  const inCall=myVoiceBoard();
+  if(!state.wsConnected||(inCall&&!(state.voiceReconnecting?.[inCall]||[]).includes(state.username)))return;
   const others=(state.voiceChannels[r.boardId]||[]).filter(u=>u!==state.username);
   try{
     await window.go.main.App.JoinVoiceChannel(r.boardId,localStorage.getItem('audioMicLabel')||'',localStorage.getItem('audioSpeakerLabel')||'',others);
     if(r.deafened){setDeafenButtonState(await window.go.main.App.ToggleDeafen());setMuteButtonState(await window.go.main.App.IsMuted());}
     else if(r.muted)setMuteButtonState(await window.go.main.App.ToggleMute());
-    toast('Back in the voice channel.');
+    playSound('join'); // you never left the list, so the snapshot itself won't play it
   }catch(err){
     playSound('error');
     toast('Couldn\u2019t rejoin the voice channel: '+err,true);
@@ -2412,10 +2415,13 @@ function renderSidebar(){
         item.innerHTML=`${icon('volume_up','board-ic')}<span class="board-name">${esc(board.name)}</span>${total?`<span class="voice-count">${total}</span>`:''}`;
         item.addEventListener('click',()=>toggleVoiceChannel(board.id));
         list.appendChild(item);
-        const dropped=(state.voiceReconnecting?.[board.id]||[]).filter(u=>!occupants.includes(u));
+        const droppedHere=state.voiceReconnecting?.[board.id]||[];
+        const dropped=droppedHere.filter(u=>!occupants.includes(u));
         if(occupants.length||dropped.length){
-          [...occupants,...dropped].forEach(user=>{
-            const isDropped=dropped.includes(user);
+          // Alphabetical, so rows never jump around — the server's order
+          // isn't stable, and someone reconnecting keeps their place.
+          [...occupants,...dropped].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).forEach(user=>{
+            const isDropped=droppedHere.includes(user);
             const row=document.createElement('div');row.className='voice-occupant-row'+(isDropped?' reconnecting':'');
             if(isDropped)row.title=user===state.username?'You lost connection — rejoining when it\u2019s back':`${user} lost connection — waiting for them to come back`;
             row.dataset.board=board.id;row.dataset.user=user;
@@ -5757,8 +5763,17 @@ function init(){
   window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){
     const inCall=rememberVoiceForRejoin(); // before the voice list is cleared
     toast(inCall?'Disconnected from server — you\u2019ll rejoin the call when it\u2019s back.':'Disconnected from server',true);
-    state.wsConnected=false;state.lastPingMs=null;state.voiceChannels={};
-    state.voiceReconnecting=voiceRejoin?{[voiceRejoin.boardId]:[state.username]}:{};
+    state.wsConnected=false;state.lastPingMs=null;
+    if(voiceRejoin){
+      // Keep the call exactly as it was when the connection dropped —
+      // everyone still in it, you marked as reconnecting — so it reads as
+      // "still in the call", not "kicked out". Only your channel is kept;
+      // the rest can't be trusted until we're back. Speaking rings are
+      // cleared, since nothing live is coming through.
+      state.voiceChannels={[voiceRejoin.boardId]:[...(state.voiceChannels[voiceRejoin.boardId]||[])]};
+      state.voiceReconnecting={[voiceRejoin.boardId]:[state.username]};
+      state.voiceSpeaking={};
+    }else{state.voiceChannels={};state.voiceReconnecting={};}
     stopPingLoop();updateStatusDotColor();updateVoiceConnectedBar();renderSidebar();scheduleReconnect();}});
 
   document.getElementById('open-add-btn').addEventListener('click',()=>openAddModal());
@@ -5829,7 +5844,9 @@ function init(){
     if(voiceRejoin){
       // Disconnected and waiting to rejoin: hanging up now means "don't".
       voiceHungUpWhileAway={domain:voiceRejoin.domain};
+      const bid=voiceRejoin.boardId;
       voiceRejoin=null;state.voiceReconnecting={};
+      if(state.voiceChannels[bid])state.voiceChannels[bid]=state.voiceChannels[bid].filter(u=>u!==state.username);
       playSound('leave');updateVoiceConnectedBar();renderSidebar();
       toast('You won\u2019t be put back in the call.');
       return;
