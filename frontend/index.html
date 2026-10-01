@@ -583,6 +583,15 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .msg-link.msg-jump .ic { width:14px; height:14px; }
 .msg-link.msg-jump .mj-sep { margin:0 2px; opacity:.7; }
 
+/* ── @mentions ─────────────────────────────────────────────────── */
+.mention { display:inline; padding:0 3px; border-radius:4px; background:rgba(114,137,218,.22); color:var(--accent); font-weight:600; cursor:pointer; }
+.mention:hover { background:var(--accent); color:#fff; }
+.msg-group.mentions-me { background:rgba(250,166,26,.08); box-shadow:inset 2px 0 0 var(--yellow); }
+.msg-group.mentions-me:hover { background:rgba(250,166,26,.12); }
+.board-item .mention-badge { margin-left:auto; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--red); color:#fff; font-size:.66rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
+#emoji-suggest .es-row .user-avatar { width:22px; height:22px; font-size:.65rem; flex-shrink:0; }
+#emoji-suggest .es-row .es-status { margin-left:auto; color:var(--text-muted); font-size:.75rem; }
+
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -1172,6 +1181,13 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 
       <button id="settings-mic-test-btn" class="settings-secondary-btn"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg> Test Voice</button>
       <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker, with your volume and sensitivity applied — exactly what others hear. The meter above moves while you're testing or in a call: the bar turns green when you're loud enough to be transmitted (and your speaking ring lights up).</p>
+
+      <label class="settings-label">Sounds</label>
+      <label class="check-row"><input type="checkbox" id="snd-voice"> Play a sound when people join or leave your voice channel</label>
+      <label class="check-row"><input type="checkbox" id="snd-mention"> Play a sound when someone @mentions you</label>
+      <div class="slider-row"><input type="range" id="snd-volume" min="0" max="100" step="1" aria-label="Sound volume"><span class="slider-val" id="snd-volume-val">70%</span>
+        <button class="settings-secondary-btn ap-mini" id="snd-test" type="button">Test</button></div>
+
     </div>
   </div>
 </div>
@@ -1414,7 +1430,7 @@ async function saveExport(){
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 
 function renderTextWithLinks(text) {
-  return emojify(esc(text).replace(/https?:\/\/[^\s&]+/g, match => {
+  return emojify(mentionsOutsideLinks(esc(text).replace(/https?:\/\/[^\s&]+/g, match => {
     // match is already escaped, unescape for the href
     const raw = match.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
     // A link to a message on this server shows as a "#channel › message"
@@ -1427,7 +1443,111 @@ function renderTextWithLinks(text) {
       return `<a class="msg-link msg-jump" href="#" data-url="${esc(raw)}" data-board="${esc(ml.boardId)}">${icon('tag')}<span class="mj-name">${esc(b?.name||'message')}</span><span class="mj-sep">›</span>${icon('chat_bubble')}</a>`;
     }
     return `<a class="msg-link" href="#" data-url="${esc(raw)}">${match}</a>`;
-  }));
+  })));
+}
+
+// ── @MENTIONS ────────────────────────────────────────────────────
+// "@name" where name is a member of this server shows as a highlighted
+// chip (click it for their profile); a message that mentions you is tinted
+// like Discord's; a new one plays the mention sound and badges its channel.
+// Usernames can contain spaces and punctuation, so mentions are matched
+// against the actual member list (longest name first) instead of a pattern.
+function knownUsernames(){
+  return [...new Set([...(lastUsersPayload?.all||[]),...(state.onlineUsers||[]),state.username,...(state.messages||[]).map(m=>m.username)])].filter(Boolean);
+}
+let mentionReCache={key:'',re:null};
+const reEscape=t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function mentionRegex(){
+  const names=knownUsernames().sort((a,b)=>b.length-a.length);
+  const key=names.join('\n');
+  if(mentionReCache.key!==key){
+    // Works on HTML-escaped text, so match the escaped form of each name.
+    mentionReCache={key,re:names.length?new RegExp(`(^|[^\\w@])@(${names.map(n=>reEscape(esc(n))).join('|')})(?![\\w])`,'gi'):null};
+  }
+  return mentionReCache.re;
+}
+// Mentions only in plain text — never inside a link or an HTML tag.
+function mentionsOutsideLinks(html){
+  return html.split(/(<a\b[^>]*>[\s\S]*?<\/a>|<[^>]+>)/).map(part=>part.startsWith('<')?part:highlightMentions(part)).join('');
+}
+function highlightMentions(escapedHtml){
+  const re=mentionRegex();if(!re)return escapedHtml;
+  const byLower=new Map(knownUsernames().map(n=>[esc(n).toLowerCase(),n]));
+  return escapedHtml.replace(re,(all,lead,name)=>{
+    const real=byLower.get(name.toLowerCase())||name;
+    const me=real===state.username;
+    return `${lead}<span class="mention${me?' me':''}" data-user="${esc(real)}">@${esc(real)}</span>`;
+  });
+}
+function mentionsMe(text){
+  if(!text||!state.username||!text.includes('@'))return false;
+  return new RegExp(`(^|[^\\w@])@${reEscape(state.username)}(?![\\w])`,'i').test(text);
+}
+// Mentions in other channels: a red @ count on that channel until you open it.
+function markBoardMentioned(boardId){
+  state.mentionCounts=state.mentionCounts||{};
+  state.mentionCounts[boardId]=(state.mentionCounts[boardId]||0)+1;
+  renderSidebar();
+}
+
+// ── SOUNDS ───────────────────────────────────────────────────────
+// Short effects from frontend/sounds/: join.wav / leave.wav for your voice
+// channel, mention.wav when someone @mentions you. Each can be turned off
+// (Settings → Voice → Sounds) and they share one volume. A missing or
+// empty file just plays nothing.
+const SOUND_DEFAULTS={voice:true,mention:true,volume:70};
+let soundSettings=(()=>{try{return {...SOUND_DEFAULTS,...JSON.parse(localStorage.getItem('soundSettings')||'{}')};}catch{return {...SOUND_DEFAULTS};}})();
+const soundCache={};
+function playSound(name){
+  if(name==='mention'?!soundSettings.mention:!soundSettings.voice)return;
+  try{
+    const base=soundCache[name]||(soundCache[name]=new Audio(`sounds/${name}.wav`));
+    const a=base.cloneNode(); // overlapping plays don't cut each other off
+    a.volume=Math.max(0,Math.min(1,soundSettings.volume/100));
+    a.play().catch(()=>{}); // empty placeholder / autoplay quirks: stay silent
+  }catch{}
+}
+function saveSoundSettings(){
+  localStorage.setItem('soundSettings',JSON.stringify(soundSettings));
+  persistClientSettings();
+}
+function renderSoundSettings(){
+  document.getElementById('snd-voice').checked=soundSettings.voice;
+  document.getElementById('snd-mention').checked=soundSettings.mention;
+  document.getElementById('snd-volume').value=soundSettings.volume;
+  document.getElementById('snd-volume-val').textContent=soundSettings.volume+'%';
+}
+function initSounds(){
+  renderSoundSettings();
+  document.getElementById('snd-voice').addEventListener('change',e=>{soundSettings.voice=e.target.checked;saveSoundSettings();});
+  document.getElementById('snd-mention').addEventListener('change',e=>{soundSettings.mention=e.target.checked;saveSoundSettings();});
+  document.getElementById('snd-volume').addEventListener('input',e=>{soundSettings.volume=+e.target.value;document.getElementById('snd-volume-val').textContent=e.target.value+'%';});
+  document.getElementById('snd-volume').addEventListener('change',saveSoundSettings);
+  let n=0;
+  document.getElementById('snd-test').addEventListener('click',()=>{
+    const name=['join','leave','mention'][n++%3];
+    const was={...soundSettings};soundSettings.voice=soundSettings.mention=true;playSound(name);soundSettings.voice=was.voice;soundSettings.mention=was.mention;
+    toast(`Played ${name}.wav`);
+  });
+  // Clicking an @mention opens that person's profile card.
+  document.addEventListener('click',e=>{
+    const m=e.target.closest('.mention[data-user]');if(!m)return;
+    e.stopPropagation();openProfilePopup(m.dataset.user,m);
+  },true);
+}
+// Voice channel join/leave sounds, worked out from each new voice snapshot:
+// you joining or leaving, or someone joining or leaving the channel you're in.
+function voiceSoundsFor(prev,next){
+  const me=state.username;
+  const mine=ch=>Object.entries(ch||{}).find(([,u])=>(u||[]).includes(me))?.[0]||null;
+  const before=mine(prev),after=mine(next);
+  if(!before&&after)return playSound('join');
+  if(before&&!after)return playSound('leave');
+  if(before&&after&&before===after){
+    const a=new Set(prev[before]||[]),b=new Set(next[after]||[]);
+    if([...b].some(u=>!a.has(u)))playSound('join');
+    else if([...a].some(u=>!b.has(u)))playSound('leave');
+  }else if(before&&after)playSound('join'); // moved channels
 }
 
 // ── MESSAGE LINKS ────────────────────────────────────────────────
@@ -1911,19 +2031,26 @@ async function doConnect(domain,serverKey){
       }
       domain=resolved;
     }
+    // Clear the previous server's member list *before* connecting: the
+    // server sends the member list the moment the connection opens, which
+    // can arrive while Connect() is still returning — clearing it after
+    // (as this used to) wiped the list that had just come in, leaving the
+    // from: suggestions empty and everyone's status dots offline until the
+    // next join/leave.
+    state.onlineUsers=[];state.userStatuses={};lastUsersPayload=null;
     await window.go.main.App.Connect(domain,serverKey);
   }
   catch(err){toast(String(err),true);throw err;}
   state.username=await window.go.main.App.GetUsername();
   state.domain=domain;
-  state.rooms=[];state.boardsByRoom={};state.expandedRooms=new Set();state.unreadBoards=new Set();
+  state.rooms=[];state.boardsByRoom={};state.expandedRooms=new Set();state.unreadBoards=new Set();state.mentionCounts={};
   state.selectedRoomId=null;state.selectedBoardId=null;state.messages=[];
-  state.onlineUsers=[];state.attachQueue=[];state.wsConnected=true;state.lastPingMs=null;
+  state.attachQueue=[];state.wsConnected=true;state.lastPingMs=null;
   state.voiceChannels={};
   updateStatusDotColor();startPingLoop();updateVoiceConnectedBar();
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
-  state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';lastUsersPayload=null;
+  state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';
   serverBannerAt=-1; // a different server: forget the last one's banner
   state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
   const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.classList.remove('anim-paused');document.getElementById('sidebar-banner-img').removeAttribute('src');
@@ -2209,7 +2336,8 @@ function renderSidebar(){
         const isActive=state.selectedBoardId===board.id,isUnread=state.unreadBoards.has(board.id)&&!isActive;
         const item=document.createElement('div');
         item.className='board-item'+(isActive?' active':'')+(isUnread?' unread':'');
-        item.innerHTML=`<span class="unread-dot">${isUnread?'•':''}</span><span class="board-hash">#</span><span class="board-name">${esc(board.name)}</span>`;
+        const mentions=!isActive?(state.mentionCounts?.[board.id]||0):0;
+        item.innerHTML=`<span class="unread-dot">${isUnread?'•':''}</span><span class="board-hash">#</span><span class="board-name">${esc(board.name)}</span>${mentions?`<span class="mention-badge" title="${mentions} mention${mentions===1?'':'s'}">${mentions>99?'99+':mentions}</span>`:''}`;
         item.addEventListener('click',()=>selectBoard(board.id,board.name,room.id));
         list.appendChild(item);
       });
@@ -2659,6 +2787,7 @@ async function selectBoard(boardId,boardName,roomId){
   if(state.selectedBoardId===boardId)return;
   state.selectedBoardId=boardId;state.selectedBoardName=boardName;state.selectedRoomId=roomId??state.selectedRoomId;state.messages=[];clearAttachQueue();
   state.unreadBoards.delete(boardId);
+  if(state.mentionCounts)delete state.mentionCounts[boardId];
   const pinsWereOpen=state.resultsMode==='pins';
   exitSearch();
   document.getElementById('toggle-pins-btn').disabled=false;
@@ -3239,7 +3368,8 @@ function updateSearchSuggest(){
     ss.index=val?0:-1; // with nothing typed at the caret, Enter still searches
   }else if(tok.key==='from'){
     title='From User';
-    const users=[...new Set([...(lastUsersPayload?.all||[]),...(state.onlineUsers||[])])].sort((a,b)=>a.localeCompare(b));
+    const users=[...new Set([...(lastUsersPayload?.all||[]),...(state.onlineUsers||[]),...(state.messages||[]).map(m=>m.username)])]
+      .filter(Boolean).sort((a,b)=>a.localeCompare(b));
     for(const u of users.filter(u=>u.toLowerCase().includes(val)).slice(0,10)){
       rows.push({html:`<div class="user-avatar" data-pfp-user="${esc(u)}"></div><b>${esc(u)}</b>`,user:u,pick:()=>replaceSearchToken(tok,'from:'+u+' ')});
     }
@@ -3538,7 +3668,7 @@ function buildMsgEl(msg,grouped){
   const attachments=msg.attachments||[];
 
   const div=document.createElement('div');
-  div.className='msg-group'+(grouped?' grouped':'');
+  div.className='msg-group'+(grouped?' grouped':'')+(msg.username!==state.username&&mentionsMe(msg.content)?' mentions-me':'');
   div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
   div.innerHTML=`
     ${grouped
@@ -3670,6 +3800,8 @@ async function executeDelete(){
 // so an image-only message never gets a blank line. Shared by your own
 // edits and by chat:edit events for everyone else's.
 function setMessageContent(msgEl,content){
+  const author=state.messages.find(m=>m.id===msgEl.dataset.id)?.username;
+  msgEl.classList.toggle('mentions-me',author!==state.username&&mentionsMe(content));
   let c=msgEl.querySelector('.msg-content');
   if(!content){if(c)c.remove();return;}
   if(!c){
@@ -4608,7 +4740,7 @@ function initPresence(){
 // locally, so they travel in the exported account key. On sign-in the
 // account's copy wins — that's how an imported account brings its look.
 function collectClientSettings(){
-  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn};
+  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings};
 }
 async function persistClientSettings(){
   try{await window.go.main.App.SaveClientSettings(JSON.stringify(collectClientSettings()));}
@@ -4621,6 +4753,7 @@ async function loadClientSettings(){
   let s;try{s=JSON.parse(raw);}catch{return;}
   if(s.appearance){appearance={...APPEARANCE_DEFAULTS,...s.appearance};try{localStorage.setItem('appearance',JSON.stringify(appearance));}catch{}}
   if(typeof s.appearanceOverride==='boolean'){appearanceOverride=s.appearanceOverride;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');}
+  if(s.sounds&&typeof s.sounds==='object'){soundSettings={...SOUND_DEFAULTS,...s.sounds};localStorage.setItem('soundSettings',JSON.stringify(soundSettings));try{renderSoundSettings();}catch{}}
   if(typeof s.elasticScroll==='boolean'){elasticOn=s.elasticScroll;localStorage.setItem('elasticScroll',elasticOn?'1':'0');const b=document.getElementById('ap-elastic');if(b)b.checked=elasticOn;}
   apDraft={...appearance};
   applyAppearance();
@@ -5059,11 +5192,41 @@ function acceptEmojiSuggest(){
   const ta=document.getElementById('msg-input'),pick=suggest.items[suggest.index];
   closeEmojiSuggest();
   if(!pick)return;
+  if(suggest.kind==='user'){replaceBeforeCaret(ta,suggest.start,'@'+pick.user+' ');ta.focus();return;}
   replaceBeforeCaret(ta,suggest.start,pick[1][1]+' ');
   noteRecentEmoji(pick[1][0]);ta.focus();
 }
+// "@" + the start of a name suggests members (online first), the same
+// way ":" suggests emoji. Tab/Enter inserts "@name ".
+function renderUserSuggest(q){
+  const box=document.getElementById('emoji-suggest');
+  box.innerHTML=`<div class="es-title">Members${q?` matching @${esc(q)}`:''}</div>`+suggest.items.map((it,i)=>
+    `<div class="es-row${i===suggest.index?' on':''}" data-i="${i}"><div class="user-avatar" data-pfp-user="${esc(it.user)}"></div><span>${esc(it.user)}</span><span class="es-status">${it.online?'online':''}</span></div>`).join('');
+  box.querySelectorAll('.es-row').forEach(r=>{
+    const av=r.querySelector('.user-avatar'),u=suggest.items[+r.dataset.i].user;setAvatarFallback(av,u);applyUserAvatar(av,u);
+    r.addEventListener('mousedown',ev=>{ev.preventDefault();suggest.index=+r.dataset.i;acceptEmojiSuggest();});
+    r.addEventListener('mousemove',()=>{if(suggest.index!==+r.dataset.i){suggest.index=+r.dataset.i;box.querySelectorAll('.es-row').forEach((x,i)=>x.classList.toggle('on',i===suggest.index));}});
+  });
+  box.querySelector('.es-row.on')?.scrollIntoView({block:'nearest'});
+  box.classList.remove('hidden');suggest.open=true;
+}
+function userMatches(q){
+  q=q.toLowerCase();
+  const online=new Set(state.onlineUsers||[]);
+  return knownUsernames().filter(u=>u!==state.username&&u.toLowerCase().includes(q))
+    .sort((a,b)=>(b.toLowerCase().startsWith(q)-a.toLowerCase().startsWith(q))||(online.has(b)-online.has(a))||a.localeCompare(b))
+    .slice(0,8).map(u=>({user:u,online:online.has(u)}));
+}
 function onShortcodeInput(ta){
   const before=ta.value.slice(0,ta.selectionStart);
+  const at=before.match(/(^|[\s(])@([^\s@]{0,32})$/);
+  if(at){
+    suggest.kind='user';suggest.items=userMatches(at[2]);
+    if(!suggest.items.length){closeEmojiSuggest();return;}
+    suggest.start=before.length-at[2].length-1;suggest.index=0;
+    renderUserSuggest(at[2]);return;
+  }
+  suggest.kind='emoji';
   // A finished :code: — swap it for the emoji.
   const done=before.match(/(^|[\s(])(:([a-z0-9_+\-]+):)$/i);
   if(done){
@@ -5363,6 +5526,10 @@ function init(){
   });
   window.runtime.EventsOn('chat:message',msg=>{
     if(!msg)return;
+    if(msg.username!==state.username&&mentionsMe(msg.content)){
+      playSound('mention');
+      if(msg.board_id!==state.selectedBoardId)markBoardMentioned(msg.board_id);
+    }
     if(msg.board_id===state.selectedBoardId){
       if(state.viewingLive){state.messages.push(msg);appendMessage(msg);}
       // else: viewing a historical jump snapshot with a gap to "now" — this
@@ -5412,7 +5579,9 @@ function init(){
   window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
   window.runtime.EventsOn('voice:state',payload=>{
-    state.voiceChannels=payload?.channels||{};
+    const next=payload?.channels||{};
+    voiceSoundsFor(state.voiceChannels,next);
+    state.voiceChannels=next;
     renderSidebar();
     updateVoiceConnectedBar();
   });
@@ -5494,6 +5663,7 @@ function init(){
   document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
+  initSounds();
   initSearchFilters();
   initTooltips();
   initShortcodes();
