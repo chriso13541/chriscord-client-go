@@ -2434,12 +2434,12 @@ function renderSidebar(){
             const key=`${board.id}:${user}`;
             const speaking=!!state.voiceSpeaking[key];
             const status=state.voiceMuteStatus[key]||{muted:false,deafened:false};
-            // Mic + headphones always shown beside each name: grey while
-            // on, the struck-through version in red while muted/deafened.
+            // Nothing beside a name normally; a red crossed-out mic when
+            // muted, or a red crossed-out headset when deafened (which
+            // includes muted, so only that one shows).
             const statusIcons=
               (user!==state.username&&getUserAudio(user).muted?`<span title="Muted by you" style="display:inline-flex">${icon('volume_off','local')}</span>`:'')+
-              (status.muted?icon('mic_off','off'):icon('mic'))+
-              (status.deafened?icon('headset_off','off'):icon('headphones'));
+              (status.deafened?icon('headset_off','off'):status.muted?icon('mic_off','off'):'');
             row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
             list.appendChild(row);
             applyUserAvatar(row.querySelector('.voice-occupant-avatar'),user);
@@ -5720,6 +5720,15 @@ function init(){
   window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
   window.runtime.EventsOn('voice:state',payload=>{
+    // The server sends everyone's current mute/deafen with each update:
+    // replace what we had, so a status left over from someone's earlier
+    // session (or one we missed) can't stick around.
+    if(payload?.mute_states){
+      const fresh={};
+      for(const [board,users] of Object.entries(payload.channels||{}))
+        for(const u of users||[]){const m=payload.mute_states[u];if(m)fresh[`${board}:${u}`]={muted:!!m.muted,deafened:!!m.deafened};}
+      state.voiceMuteStatus=fresh;
+    }
     if(state.clearStaleVoice){
       state.clearStaleVoice=false;
       const listed=[payload?.channels,payload?.reconnecting].some(ch=>Object.values(ch||{}).some(u=>(u||[]).includes(state.username)));

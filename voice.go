@@ -136,7 +136,10 @@ func (a *App) JoinVoiceChannel(boardID, micName, speakerName string, knownOthers
 	// still reach whoever they explicitly requested via knownOthers, but
 	// nobody who was already in the call before them would ever hear it.
 	a.writeMu.Lock()
-	msg, _ := json.Marshal(map[string]string{"type": "join_voice", "board_id": boardID})
+	// Says whether we're muted/deafened as we join, so the server (and
+	// everyone else) starts from the real state, never a stale one.
+	msg, _ := json.Marshal(map[string]interface{}{"type": "join_voice", "board_id": boardID,
+		"muted": a.voiceMuted.Load(), "deafened": a.voiceDeafened.Load()})
 	err := a.ws.WriteMessage(websocket.TextMessage, msg)
 	a.writeMu.Unlock()
 	if err != nil {
