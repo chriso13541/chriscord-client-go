@@ -320,6 +320,40 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .img-grid-1 .grid-img.loading { width:320px; max-width:100%; height:200px; }
 .img-grid-2 .grid-img.loading, .img-grid-3 .grid-img.loading, .img-grid-4 .grid-img.loading { width:calc(50% - 2px); height:160px; }
 
+/* ── Audio / video players ───────────────────────────────────── */
+.mp { margin-top:6px; position:relative; user-select:none; }
+.mp-audio { width:420px; max-width:100%; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; padding:10px 12px; box-sizing:border-box; }
+.mp-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; min-width:0; }
+.mp-head .mp-file-ic { width:30px; height:30px; color:var(--accent); flex-shrink:0; }
+.mp-name { flex:1; min-width:0; font-weight:600; color:var(--accent); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.9rem; }
+.mp-bar { display:flex; align-items:center; gap:8px; }
+.mp-btn { background:none; border:none; padding:3px; border-radius:4px; color:var(--text); cursor:pointer; display:inline-flex; flex-shrink:0; }
+.mp-btn:hover { color:var(--text-strong); background:rgba(255,255,255,.08); }
+.mp-btn .ic { width:20px; height:20px; }
+.mp-time { font-size:.75rem; color:var(--text-muted); font-variant-numeric:tabular-nums; white-space:nowrap; min-width:78px; text-align:center; }
+.mp-seek { flex:1; position:relative; height:16px; cursor:pointer; display:flex; align-items:center; touch-action:none; }
+.mp-seek .mp-track { position:absolute; left:0; right:0; height:4px; border-radius:2px; background:rgba(255,255,255,.15); overflow:hidden; }
+.mp-seek .mp-buffered { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.18); }
+.mp-seek .mp-fill { position:absolute; left:0; top:0; bottom:0; background:var(--accent); }
+.mp-seek .mp-thumb { position:absolute; width:12px; height:12px; margin-left:-6px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.5); opacity:0; transition:opacity .12s; }
+.mp-seek:hover .mp-thumb, .mp.seeking .mp-thumb { opacity:1; }
+.mp-vol { display:flex; align-items:center; }
+.mp-vol { overflow:hidden; }
+.mp-vol input { width:0; min-width:0; padding:0; opacity:0; pointer-events:none; transition:width .15s,opacity .15s; accent-color:var(--accent); margin:0; }
+.mp-vol:hover input, .mp-vol:focus-within input { width:64px; opacity:1; margin-left:4px; pointer-events:auto; }
+.mp-video { width:480px; max-width:100%; border-radius:8px; overflow:hidden; background:#000; border:1px solid var(--border); }
+.mp-video video { display:block; width:100%; max-height:360px; aspect-ratio:16/9; object-fit:contain; background:#000; cursor:pointer; }
+.mp-video .mp-big { position:absolute; left:50%; top:50%; transform:translate(-50%,-60%); width:56px; height:56px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:opacity .15s, background .15s; }
+.mp-video .mp-big:hover { background:var(--accent); }
+.mp-video .mp-big .ic { width:32px; height:32px; }
+.mp-video.playing .mp-big { opacity:0; pointer-events:none; }
+.mp-video .mp-bar { position:absolute; left:0; right:0; bottom:0; padding:22px 10px 6px; background:linear-gradient(transparent,rgba(0,0,0,.75)); transition:opacity .2s; }
+.mp-video .mp-bar .mp-btn, .mp-video .mp-time { color:#fff; }
+.mp-video .mp-time { color:rgba(255,255,255,.85); }
+.mp-video.playing.idle .mp-bar { opacity:0; }
+.mp-video.playing.idle video { cursor:none; }
+.mp-video:fullscreen { width:100%; border:none; border-radius:0; display:flex; align-items:center; }
+.mp-video:fullscreen video { max-height:none; height:100%; aspect-ratio:auto; }
 .msg-video { width:480px; max-width:100%; height:270px; object-fit:contain; border-radius:8px; margin-top:6px; display:block; border:1px solid var(--border); background:#000; }
 .msg-audio { width:320px; margin-top:6px; display:block; }
 .msg-file-chip { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:8px 12px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--text); font-size:.85rem; transition:border-color .15s; user-select:text; }
@@ -705,6 +739,9 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   font-family:'OpenMojiInput','Segoe UI',system-ui,-apple-system,sans-serif; line-height:1.5; font-size:.93rem; padding:12px 0;
   white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; scrollbar-color:transparent transparent; }
 #msg-hl::-webkit-scrollbar { background:transparent; } #msg-hl::-webkit-scrollbar-thumb { background:transparent; }
+#msg-hl .hl-spell { text-decoration:underline wavy var(--red); text-decoration-skip-ink:none; text-underline-offset:3px; text-decoration-thickness:1.5px; }
+.ctx-item.ctx-suggest .ctx-label { font-weight:700; color:var(--text-strong); }
+.ctx-item.ctx-suggest:hover .ctx-label { color:#fff; }
 #msg-hl .hl-mention { background:rgba(114,137,218,.3); border-radius:3px; box-shadow:0 0 0 2px rgba(114,137,218,.3); }
 #msg-input::placeholder { color:var(--text-muted); }
 #send-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.3rem; padding:4px 2px; transition:color .15s; line-height:1; flex-shrink:0; }
@@ -828,6 +865,9 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-gpp_maybe" viewBox="0 -960 960 960"><path d="M480-320q17 0 28.5-11.5T520-360q0-17-11.5-28.5T480-400q-17 0-28.5 11.5T440-360q0 17 11.5 28.5T480-320Zm-40-160h80v-200h-80v200Zm40 400q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
   <symbol id="ic-notifications" viewBox="0 -960 960 960"><path d="M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v280h80v80H160Zm320-300Zm0 420q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-280h320v-280q0-66-47-113t-113-47q-66 0-113 47t-47 113v280Z"/></symbol>
   <symbol id="ic-notifications_off" viewBox="0 -960 960 960"><path d="M160-200v-80h80v-280q0-33 8.5-65t25.5-61l60 60q-7 16-10.5 32.5T320-560v280h248L56-792l56-56 736 736-56 56-146-144H160Zm560-154-80-80v-126q0-66-47-113t-113-47q-26 0-50 8t-44 24l-58-58q20-16 43-28t49-18v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v206Zm-276-50Zm36 324q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm33-481Z"/></symbol>
+  <symbol id="ic-pause" viewBox="0 -960 960 960"><path d="M520-200v-560h240v560H520Zm-320 0v-560h240v560H200Zm400-80h80v-400h-80v400Zm-320 0h80v-400h-80v400Zm0-400v400-400Zm320 0v400-400Z"/></symbol>
+  <symbol id="ic-fullscreen" viewBox="0 -960 960 960"><path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/></symbol>
+  <symbol id="ic-fullscreen_exit" viewBox="0 -960 960 960"><path d="M240-120v-120H120v-80h200v200h-80Zm400 0v-200h200v80H720v120h-80ZM120-640v-80h120v-120h80v200H120Zm520 0v-200h80v120h120v80H640Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -1027,7 +1067,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
             <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
-            <div id="composer-field"><div id="msg-hl" aria-hidden="true"></div><textarea id="msg-input" rows="1" placeholder="Select a board to chat" disabled></textarea></div>
+            <div id="composer-field"><div id="msg-hl" aria-hidden="true"></div><textarea id="msg-input" rows="1" placeholder="Select a board to chat" spellcheck="false" disabled></textarea></div>
             <button id="emoji-btn" title="Emoji" disabled><svg class="ic" aria-hidden="true"><use href="#ic-mood"/></svg></button>
             <button id="send-btn" disabled title="Send"><svg class="ic" aria-hidden="true"><use href="#ic-send"/></svg></button>
           </div>
@@ -1132,6 +1172,10 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-override"> Use my own theme instead of the server's</label>
         <p class="settings-hint" id="ap-override-hint" style="margin-top:0"></p>
+      </div>
+      <div class="ap-override">
+        <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-spell"> Check spelling while typing</label>
+        <p class="settings-hint" style="margin-top:0">Misspelled words get a red underline in the message box; right-click one for suggestions or to add it to your dictionary.</p>
       </div>
       <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-elastic"> Elastic scrolling</label>
@@ -2833,11 +2877,26 @@ async function updateSidebarAvatar(){
 // picture rendered at full size and only its top-left corner (transparent,
 // on the old circle-clipped PNGs) showed through. Setting size/position
 // explicitly here makes that impossible regardless of markup.
+// Animated profile pictures only move on profile cards (and your own
+// picture in Profile settings). Everywhere else — chat, the member list,
+// calls — they show their first frame, so a channel full of animated
+// avatars isn't distracting.
+const avatarStills=new Map(); // picture → Promise of a still copy (or null if not animated)
+function avatarStill(url){
+  if(!avatarStills.has(url))avatarStills.set(url,(async()=>{
+    try{
+      if(!url.startsWith('data:'))return null;
+      if(!isAnimatedImage(dataURLBytes(url)))return null;
+      return await stillFrame(dataURLToBlob(url));
+    }catch{return null;}
+  })());
+  return avatarStills.get(url);
+}
 function setAvatarImage(el,url){
-  el.style.backgroundImage=`url("${url}")`;
-  el.style.backgroundSize='cover';
-  el.style.backgroundPosition='center';
-  el.textContent='';
+  const paint=u=>{el.style.backgroundImage=`url("${u}")`;el.style.backgroundSize='cover';el.style.backgroundPosition='center';el.textContent='';};
+  if(el.closest?.('.profile-card')||el.id==='pfp-current-circle'){paint(url);return;}
+  el.dataset.pfpSrc=url;
+  avatarStill(url).then(still=>{if(el.dataset.pfpSrc===url)paint(still||url);});
 }
 function setAvatarFallback(el,name){
   name=name||'?';
@@ -3871,11 +3930,9 @@ function buildMsgEl(msg,grouped){
   // Non-image attachments
   others.forEach(a=>{
     if(a.mime?.startsWith('video/')){
-      const vid=document.createElement('video');vid.className='msg-video';vid.controls=true;vid.preload='metadata';
-      attachMediaSource(vid,a.url);body.appendChild(vid);
+      body.appendChild(buildMediaPlayer(a,'video'));
     }else if(a.mime?.startsWith('audio/')){
-      const aud=document.createElement('audio');aud.className='msg-audio';aud.controls=true;
-      attachMediaSource(aud,a.url);body.appendChild(aud);
+      body.appendChild(buildMediaPlayer(a,'audio'));
     }else{
       const chip=document.createElement('div');chip.className='msg-file-chip';
       chip.innerHTML=`${icon(fileTypeIcon(a.name,a.mime),'file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
@@ -4087,6 +4144,91 @@ function getImageBlobURL(rel){
 // gets a 403 → the element fires 'error' → swap in a fresh link and pick
 // up at the same spot. One retry per successful load, so a genuinely
 // missing file can't loop.
+// ── AUDIO / VIDEO PLAYERS ────────────────────────────────────────
+// Themed players instead of the browser's own controls. Audio shows like
+// Discord's: the file's name with a download button, then play, time, a
+// seek bar and volume. Video gets the same bar over the picture (it fades
+// out while playing until you move the mouse), a big play button, and
+// fullscreen. Starting one pauses any other that's playing; volume is
+// shared and remembered.
+const fmtTime=t=>{if(!isFinite(t)||t<0)t=0;t=Math.floor(t);const h=Math.floor(t/3600),m=Math.floor(t/60)%60,s=t%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0');};
+let mediaVolume=(()=>{const v=parseFloat(localStorage.getItem('mediaVolume'));return isFinite(v)?Math.max(0,Math.min(1,v)):1;})();
+function buildMediaPlayer(a,kind){
+  const wrap=document.createElement('div');wrap.className=`mp mp-${kind}`;
+  const media=document.createElement(kind);media.preload='metadata';
+  if(kind==='video')media.playsInline=true;
+  media.volume=mediaVolume;
+  const bar=`<div class="mp-bar">
+      <button class="mp-btn mp-play" title="Play">${icon('play_arrow')}</button>
+      <span class="mp-time">0:00 / 0:00</span>
+      <div class="mp-seek" role="slider" aria-label="Seek"><div class="mp-track"><div class="mp-buffered"></div><div class="mp-fill"></div></div><div class="mp-thumb"></div></div>
+      <div class="mp-vol"><button class="mp-btn mp-mute" title="Mute">${icon('volume_up')}</button><input type="range" min="0" max="1" step="0.01" aria-label="Volume"></div>
+      ${kind==='video'?`<button class="mp-btn mp-dl" title="Download ${esc(a.name||'')}">${icon('download')}</button><button class="mp-btn mp-fs" title="Fullscreen">${icon('fullscreen')}</button>`:''}
+    </div>`;
+  if(kind==='audio'){
+    wrap.innerHTML=`<div class="mp-head">${icon('audio_file','mp-file-ic')}<span class="mp-name" title="${esc(a.name||'Audio')}">${esc(a.name||'Audio')}</span>
+      <button class="mp-btn mp-dl" title="Download">${icon('download')}</button></div>${bar}`;
+    wrap.appendChild(media);
+  }else{
+    wrap.innerHTML=`<button class="mp-big" title="Play">${icon('play_arrow')}</button>${bar}`;
+    wrap.prepend(media);
+  }
+  const $=sel=>wrap.querySelector(sel);
+  const playBtn=$('.mp-play'),big=$('.mp-big'),time=$('.mp-time'),seek=$('.mp-seek'),fill=$('.mp-fill'),buf=$('.mp-buffered'),thumb=$('.mp-thumb'),muteBtn=$('.mp-mute'),vol=$('.mp-vol input');
+  vol.value=mediaVolume;
+  const toggle=()=>{media.paused?media.play().catch(()=>{}):media.pause();};
+  const paint=()=>{
+    const d=media.duration,t=media.currentTime,pct=isFinite(d)&&d>0?100*t/d:0;
+    fill.style.width=pct+'%';thumb.style.left=pct+'%';
+    time.textContent=`${fmtTime(t)} / ${fmtTime(d)}`;
+    if(media.buffered.length&&isFinite(d)&&d>0)buf.style.width=100*media.buffered.end(media.buffered.length-1)/d+'%';
+  };
+  const paintPlay=()=>{
+    const playing=!media.paused&&!media.ended;
+    playBtn.innerHTML=icon(playing?'pause':'play_arrow');playBtn.dataset.tip=playBtn.title=playing?'Pause':'Play';
+    wrap.classList.toggle('playing',playing);
+  };
+  const paintVol=()=>{
+    const silent=media.muted||media.volume===0;
+    muteBtn.innerHTML=icon(silent?'volume_off':'volume_up');muteBtn.dataset.tip=muteBtn.title=silent?'Unmute':'Mute';
+    vol.value=media.muted?0:media.volume;
+  };
+  playBtn.addEventListener('click',e=>{e.stopPropagation();toggle();});
+  big?.addEventListener('click',e=>{e.stopPropagation();toggle();});
+  if(kind==='video')media.addEventListener('click',toggle);
+  media.addEventListener('play',()=>{
+    // Only one thing plays at a time.
+    document.querySelectorAll('.mp video, .mp audio').forEach(m=>{if(m!==media&&!m.paused)m.pause();});
+    paintPlay();
+  });
+  ['pause','ended'].forEach(ev=>media.addEventListener(ev,paintPlay));
+  ['timeupdate','loadedmetadata','durationchange','progress'].forEach(ev=>media.addEventListener(ev,paint));
+  media.addEventListener('volumechange',paintVol);
+  muteBtn.addEventListener('click',e=>{e.stopPropagation();if(media.muted||media.volume===0){media.muted=false;if(media.volume===0)media.volume=mediaVolume||1;}else media.muted=true;});
+  vol.addEventListener('input',e=>{e.stopPropagation();media.muted=false;media.volume=+vol.value;mediaVolume=media.volume;localStorage.setItem('mediaVolume',String(mediaVolume));});
+  // Seeking: click or drag along the bar.
+  const seekTo=clientX=>{const r=seek.getBoundingClientRect(),f=Math.max(0,Math.min(1,(clientX-r.left)/r.width));if(isFinite(media.duration))media.currentTime=f*media.duration;paint();};
+  seek.addEventListener('pointerdown',e=>{
+    e.preventDefault();e.stopPropagation();seek.setPointerCapture(e.pointerId);wrap.classList.add('seeking');seekTo(e.clientX);
+    const move=ev=>seekTo(ev.clientX);
+    const up=()=>{wrap.classList.remove('seeking');seek.removeEventListener('pointermove',move);seek.removeEventListener('pointerup',up);seek.removeEventListener('pointercancel',up);};
+    seek.addEventListener('pointermove',move);seek.addEventListener('pointerup',up);seek.addEventListener('pointercancel',up);
+  });
+  wrap.querySelectorAll('.mp-dl').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();downloadAttachment(a);}));
+  if(kind==='video'){
+    // Controls fade out after a moment of no mouse movement while playing.
+    let idleT=null;
+    const wake=()=>{wrap.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>wrap.classList.add('idle'),2200);};
+    wrap.addEventListener('mousemove',wake);wrap.addEventListener('mouseleave',()=>{clearTimeout(idleT);wrap.classList.add('idle');});
+    const fsBtn=$('.mp-fs');
+    fsBtn.addEventListener('click',e=>{e.stopPropagation();document.fullscreenElement===wrap?document.exitFullscreen():wrap.requestFullscreen?.().catch(()=>{});});
+    document.addEventListener('fullscreenchange',()=>{const on=document.fullscreenElement===wrap;fsBtn.innerHTML=icon(on?'fullscreen_exit':'fullscreen');fsBtn.dataset.tip=fsBtn.title=on?'Exit fullscreen':'Fullscreen';});
+    media.addEventListener('dblclick',e=>{e.preventDefault();fsBtn.click();});
+  }
+  attachMediaSource(media,a.url);
+  paintPlay();paintVol();
+  return wrap;
+}
 function attachMediaSource(el,rel){
   let retrying=false;
   getAttachLink(rel).then(u=>{el.src=u;}).catch(err=>console.error('media link failed:',err));
@@ -4899,7 +5041,7 @@ function initPresence(){
 // locally, so they travel in the exported account key. On sign-in the
 // account's copy wins — that's how an imported account brings its look.
 function collectClientSettings(){
-  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings};
+  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords};
 }
 async function persistClientSettings(){
   try{await window.go.main.App.SaveClientSettings(JSON.stringify(collectClientSettings()));}
@@ -4913,6 +5055,8 @@ async function loadClientSettings(){
   if(s.appearance){appearance={...APPEARANCE_DEFAULTS,...s.appearance};try{localStorage.setItem('appearance',JSON.stringify(appearance));}catch{}}
   if(typeof s.appearanceOverride==='boolean'){appearanceOverride=s.appearanceOverride;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');}
   if(s.sounds&&typeof s.sounds==='object'){soundSettings={...SOUND_DEFAULTS,...s.sounds};localStorage.setItem('soundSettings',JSON.stringify(soundSettings));try{renderSoundSettings();}catch{}}
+  if(typeof s.spellcheck==='boolean'){spellOn=s.spellcheck;localStorage.setItem('spellcheck',spellOn?'1':'0');const b=document.getElementById('ap-spell');if(b)b.checked=spellOn;if(spellOn)startSpellcheck();}
+  if(Array.isArray(s.spellWords)){spellWords=s.spellWords.filter(w=>typeof w==='string');localStorage.setItem('spellWords',JSON.stringify(spellWords));spellWorker?.postMessage({type:'setCustom',words:spellWords});}
   if(typeof s.elasticScroll==='boolean'){elasticOn=s.elasticScroll;localStorage.setItem('elasticScroll',elasticOn?'1':'0');const b=document.getElementById('ap-elastic');if(b)b.checked=elasticOn;}
   apDraft={...appearance};
   applyAppearance();
@@ -5145,7 +5289,7 @@ function showContextMenu(items,x,y,opts={}){
   menu.innerHTML='';
   for(const it of clean){
     if(it==='-'){const d=document.createElement('div');d.className='ctx-sep';menu.appendChild(d);continue;}
-    const b=document.createElement('button');b.type='button';b.className='ctx-item'+(it.danger?' danger':'');b.disabled=!!it.disabled;b.setAttribute('role','menuitem');
+    const b=document.createElement('button');b.type='button';b.className='ctx-item'+(it.danger?' danger':'')+(it.cls?' '+it.cls:'');b.disabled=!!it.disabled;b.setAttribute('role','menuitem');
     b.innerHTML=`<span class="ctx-label">${esc(it.label)}</span>${it.icon?icon(it.icon):''}`;
     b.addEventListener('click',e=>{e.stopPropagation();closeContextMenu();it.action?.();});
     menu.appendChild(b);
@@ -5252,7 +5396,14 @@ function initContextMenus(){
     closeContextMenu();
     if(e.target.closest('.voice-occupant-row[data-user]'))return; // its own menu (initVoiceUserMenu)
     const field=e.target.closest('input[type=text],input[type=password],input[type=search],input:not([type]),textarea');
-    if(field){showContextMenu(textFieldMenu(field),e.clientX,e.clientY);return;}
+    if(field){
+      if(field.id==='msg-input'&&spellOn){
+        const x=e.clientX,y=e.clientY;
+        spellMenuItems(field).then(extra=>showContextMenu([...extra,...textFieldMenu(field)],x,y));
+        return;
+      }
+      showContextMenu(textFieldMenu(field),e.clientX,e.clientY);return;
+    }
     const msgEl=e.target.closest('.msg-group[data-id]');
     if(msgEl&&!e.target.closest('.msg-edit-wrap')){
       const msg=state.messages.find(m=>m.id===msgEl.dataset.id);
@@ -5501,17 +5652,22 @@ async function limitAnimationOn(srcUrl,show,hoverEl){
     if(playing!==srcUrl){URL.revokeObjectURL(playing);playing=srcUrl;}
   };
   const arm=()=>{clearTimeout(timer);timer=setTimeout(pause,info.loopMs*ANIMATION_PLAYS);};
-  hoverEl.addEventListener('mouseenter',()=>{
+  const wake=()=>{
     hovered=true;
     if(hoverEl.classList.contains('anim-paused')){
       // A fresh URL restarts the animation from its first frame.
       if(playing!==srcUrl)URL.revokeObjectURL(playing);
       playing=URL.createObjectURL(info.blob);
       show(playing);hoverEl.classList.remove('anim-paused');
-    }
-    arm();
-  });
-  hoverEl.addEventListener('mouseleave',()=>{hovered=false;});
+      arm();
+    }else if(!timer)arm();
+  };
+  // Any pointer movement over it counts, not just the moment of entering:
+  // after the window is resized or zoomed, the pointer can already be
+  // over it (or "enter" can be missed), and moving should still wake it.
+  hoverEl.addEventListener('pointerenter',wake);
+  hoverEl.addEventListener('pointermove',()=>{if(!hovered||hoverEl.classList.contains('anim-paused'))wake();});
+  hoverEl.addEventListener('pointerleave',()=>{hovered=false;});
   arm();
 }
 function limitAnimation(img,url){limitAnimationOn(url,u=>{img.src=u;},img);}
@@ -5714,14 +5870,123 @@ function renderComposerHighlight(){
   const ta=document.getElementById('msg-input'),hl=document.getElementById('msg-hl');
   if(!ta||!hl)return;
   const v=ta.value;
-  let html=esc(v);
+  // Marked ranges on the raw text: @mentions (boxed) and misspellings
+  // (red wavy underline), then the text is escaped piece by piece.
+  const marks=[];
   if(v.includes('@')){
-    const re=mentionRegex();
-    if(re)html=html.replace(re,(all,lead,name)=>`${lead}<span class="hl-mention">@${name}</span>`);
+    const names=knownUsernames().sort((a,b)=>b.length-a.length);
+    if(names.length){
+      const re=new RegExp(`(^|[^\\w@])@(${names.map(reEscape).join('|')})(?![\\w])`,'gi');
+      let m;while((m=re.exec(v))){const at=m.index+m[1].length;marks.push([at,at+1+m[2].length,'hl-mention']);}
+    }
   }
+  for(const [a,b] of misspelledRanges(v,ta.selectionStart))if(!marks.some(([x,y])=>a<y&&b>x))marks.push([a,b,'hl-spell']);
+  marks.sort((x,y)=>x[0]-y[0]);
+  let html='',pos=0;
+  for(const [a,b,cls] of marks){html+=esc(v.slice(pos,a))+`<span class="${cls}">${esc(v.slice(a,b))}</span>`;pos=b;}
+  html+=esc(v.slice(pos));
   // A trailing newline needs something after it to take up its line.
   hl.innerHTML=html+(v.endsWith('\n')?' ':'');
   hl.scrollTop=ta.scrollTop;
+}
+
+// ── SPELL CHECK ──────────────────────────────────────────────────
+// Typo.js with an English (US) Hunspell dictionary, running in a worker
+// (spell/spell-worker.js) so it never slows typing. Misspelled words in the
+// message box get a red wavy underline (drawn by the same layer as the
+// mention boxes); right-click one for suggestions or "Add to Dictionary".
+// Skipped: the word you're in the middle of typing, @mentions, links,
+// :emoji: codes, words with digits, ALL-CAPS acronyms, and members' and
+// channels' names. Your own dictionary is saved with your account.
+let spellOn=localStorage.getItem('spellcheck')!=='0';
+let spellWords=(()=>{try{return JSON.parse(localStorage.getItem('spellWords')||'[]');}catch{return [];}})();
+let spellWorker=null,spellReady=false,spellReqId=0;
+const spellCache=new Map();   // word → true (ok) / false (misspelled)
+const spellWaiting=new Set(); // words sent to the worker, no answer yet
+const spellSuggestWaiters=new Map();
+function startSpellcheck(){
+  if(spellWorker||!spellOn)return;
+  try{spellWorker=new Worker('spell/spell-worker.js');}catch(err){console.warn('spellcheck unavailable:',err);return;}
+  spellWorker.postMessage({type:'setCustom',words:spellWords});
+  spellWorker.onmessage=e=>{
+    const m=e.data;
+    if(m.type==='ready'){spellReady=true;renderComposerHighlight();}
+    else if(m.type==='checked'){for(const [w,ok] of m.results){spellCache.set(w,ok);spellWaiting.delete(w);}renderComposerHighlight();}
+    else if(m.type==='suggestions'){spellSuggestWaiters.get(m.id)?.(m.suggestions||[]);spellSuggestWaiters.delete(m.id);}
+    else if(m.type==='error')console.warn('spellcheck: dictionary failed to load:',m.error);
+  };
+}
+function spellIgnored(word){
+  if(word.length<2||/\d/.test(word))return true;
+  if(word.length>1&&word===word.toUpperCase())return true; // acronyms
+  const lw=word.toLowerCase();
+  if(spellWords.some(w=>w.toLowerCase()===lw))return true;
+  if(knownUsernames().some(u=>u.toLowerCase()===lw))return true;
+  if(allBoards().some(b=>b.name.toLowerCase()===lw))return true;
+  return false;
+}
+// [start,end] of each misspelled word (asking the worker about new ones).
+function misspelledRanges(text,caret){
+  if(!spellOn||!spellWorker||!text)return [];
+  const skip=[];
+  for(const re of [/https?:\/\/\S+/g,/:[a-z0-9_+\-]+:?/gi,/(^|\s)@\S+/g])for(const m of text.matchAll(re))skip.push([m.index,m.index+m[0].length]);
+  const out=[],ask=[];
+  for(const m of text.matchAll(/[A-Za-z\u00C0-\u024F]+(?:['\u2019][A-Za-z]+)*/g)){
+    const a=m.index,b=a+m[0].length,w=m[0].replace(/\u2019/g,"'");
+    if(skip.some(([x,y])=>a<y&&b>x))continue;
+    if(caret!=null&&b===caret&&(b===text.length||/\s/.test(text[b])===false))continue; // still typing this one
+    if(spellIgnored(w))continue;
+    const ok=spellCache.get(w);
+    if(ok===false)out.push([a,b]);
+    else if(ok===undefined&&!spellWaiting.has(w)){spellWaiting.add(w);ask.push(w);}
+  }
+  if(ask.length)spellWorker.postMessage({type:'check',id:++spellReqId,words:ask});
+  return out;
+}
+function spellSuggest(word){
+  return new Promise(res=>{
+    if(!spellWorker){res([]);return;}
+    const id=++spellReqId;spellSuggestWaiters.set(id,res);
+    spellWorker.postMessage({type:'suggest',id,word});
+    setTimeout(()=>{if(spellSuggestWaiters.has(id)){spellSuggestWaiters.delete(id);res([]);}},1500);
+  });
+}
+// The misspelled word at a text position in the message box, if any.
+function misspelledAt(ta,pos){
+  for(const [a,b] of misspelledRanges(ta.value,null))if(pos>=a&&pos<=b)return {start:a,end:b,word:ta.value.slice(a,b)};
+  return null;
+}
+async function spellMenuItems(ta){
+  const hit=misspelledAt(ta,ta.selectionStart);
+  if(!hit)return [];
+  const sugg=await spellSuggest(hit.word);
+  const replace=w=>{ta.value=ta.value.slice(0,hit.start)+w+ta.value.slice(hit.end);const p=hit.start+w.length;ta.focus();ta.setSelectionRange(p,p);ta.dispatchEvent(new Event('input',{bubbles:true}));};
+  return [
+    ...(sugg.length?sugg.map(w=>({label:w,cls:'ctx-suggest',action:()=>replace(w)})):[{label:'No suggestions',disabled:true}]),
+    {label:'Add to Dictionary',icon:'add',action:()=>addSpellWord(hit.word)},
+    '-',
+  ];
+}
+function addSpellWord(word){
+  if(!spellWords.some(w=>w.toLowerCase()===word.toLowerCase()))spellWords.push(word);
+  localStorage.setItem('spellWords',JSON.stringify(spellWords));
+  spellWorker?.postMessage({type:'add',word});
+  spellCache.set(word,true);
+  persistClientSettings();renderComposerHighlight();
+}
+function initSpellcheck(){
+  const box=document.getElementById('ap-spell');
+  box.checked=spellOn;
+  box.addEventListener('change',()=>{
+    spellOn=box.checked;localStorage.setItem('spellcheck',spellOn?'1':'0');
+    if(spellOn)startSpellcheck();
+    persistClientSettings();renderComposerHighlight();
+  });
+  // Load the dictionary once the app has settled, not during startup.
+  setTimeout(startSpellcheck,1500);
+  // Re-check when the caret leaves a word (so it's checked once finished).
+  const ta=document.getElementById('msg-input');
+  ['keyup','click'].forEach(ev=>ta.addEventListener(ev,()=>renderComposerHighlight()));
 }
 
 // ── WAILS INIT ────────────────────────────────────────────────────
@@ -5912,6 +6177,7 @@ function init(){
   document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
+  initSpellcheck();
   initTitlebar();
   document.getElementById('mute-mentions-btn').addEventListener('click',toggleMentionMute);
   {const ta=document.getElementById('msg-input');
