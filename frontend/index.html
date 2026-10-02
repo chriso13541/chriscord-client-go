@@ -3401,8 +3401,38 @@ function renderMessages(stickToBottom=true){
     if(!prevMsg||dayKey(prevMsg.created_at)!==dayKey(m.created_at))c.appendChild(buildDateSeparator(m.created_at));
     c.appendChild(buildMsgEl(m,isGroupedWith(prevMsg,m)));
   });
+  chatPinned=!!stickToBottom;
   if(stickToBottom)c.scrollTop=c.scrollHeight;
   else c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
+}
+// ── STAYING AT THE NEWEST MESSAGE ──
+// Scrolling to the bottom once, right after the messages are drawn, isn't
+// enough: plenty grows afterwards — pictures and video players load, link
+// previews arrive, the emoji font loads, the member list slides open and
+// re-wraps every line, the window is resized. So while you're at the
+// bottom ("pinned"), any of that keeps you there; scroll up and it stops,
+// until you come back down.
+let chatPinned=true;
+function keepPinned(){
+  const c=document.getElementById('messages');
+  if(chatPinned&&c)c.scrollTop=c.scrollHeight;
+}
+function initChatPinning(){
+  const c=document.getElementById('messages');
+  // Only scrolling UP un-pins. Things that nudge the position down on their
+  // own (a preview card or picture keeping the view steady as it loads)
+  // fire scroll events too, and mustn't be mistaken for you scrolling away.
+  let lastTop=c.scrollTop;
+  c.addEventListener('scroll',()=>{
+    if(c.scrollHeight-c.scrollTop-c.clientHeight<40)chatPinned=true;
+    else if(c.scrollTop<lastTop-2)chatPinned=false;
+    lastTop=c.scrollTop;
+  },{passive:true});
+  new ResizeObserver(keepPinned).observe(c); // window / side panels resized
+  new MutationObserver(()=>requestAnimationFrame(keepPinned)).observe(c,{childList:true,subtree:true}); // previews, reactions…
+  // Loads inside the chat that change heights (these don't bubble, so catch them on the way down).
+  ['load','loadedmetadata','error'].forEach(ev=>c.addEventListener(ev,()=>requestAnimationFrame(keepPinned),true));
+  document.fonts?.addEventListener?.('loadingdone',()=>requestAnimationFrame(keepPinned));
 }
 function appendMessage(msg){
   const c=document.getElementById('messages');
@@ -3879,6 +3909,7 @@ async function jumpToMessageId(messageId){
 function scrollToAndHighlight(messageId){
   const el=document.querySelector(`.msg-group[data-id="${CSS.escape(messageId)}"]`);
   if(!el){toast('That message has since been deleted.');return;}
+  chatPinned=false; // looking at this message now, not the newest
   el.scrollIntoView({block:'center'});
   el.classList.remove('msg-highlight'); void el.offsetWidth; // restart the animation if it's already mid-run
   el.classList.add('msg-highlight');
@@ -6309,6 +6340,7 @@ function init(){
   document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
+  initChatPinning();
   initPanelResize();
   initSpellcheck();
   initTitlebar();
