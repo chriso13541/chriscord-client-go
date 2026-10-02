@@ -74,9 +74,10 @@ type Room struct {
 }
 
 type Board struct {
-	ID     string `json:"id"`
-	RoomID string `json:"room_id"`
-	Name   string `json:"name"`
+	ID        string `json:"id"`
+	RoomID    string `json:"room_id"`
+	Name      string `json:"name"`
+	IsPrivate bool   `json:"is_private"` // limited to certain roles: shown with a lock
 }
 
 // Attachment is a single file attached to a message.

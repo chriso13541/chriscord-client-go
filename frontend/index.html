@@ -144,6 +144,12 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 #room-list { flex:1; overflow-y:auto; padding:8px 0; }
 .room-header { padding:6px 8px 4px 12px; font-size:.79rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; border-radius:4px; margin:0 4px; }
 .room-header:hover { color:var(--text); background:var(--bg-light); }
+/* More room between categories, so each reads as its own group. */
+.room-header:not(:first-child) { margin-top:16px; }
+/* Lock beside private (role-limited) categories and channels */
+.private-ic { width:13px; height:13px; flex-shrink:0; opacity:.7; }
+.room-header .private-ic { width:12px; height:12px; }
+.board-item .private-ic, .voice-item .private-ic { margin-left:2px; }
 .room-arrow { font-size:.72rem; transition:transform .15s; }
 .room-arrow.open { transform:rotate(90deg); }
 .board-item { padding:5px 8px 5px 12px; margin:1px 4px; border-radius:4px; font-size:.99rem; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -897,6 +903,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-devices" viewBox="0 -960 960 960"><path d="M80-160v-120h80v-440q0-33 23.5-56.5T240-800h600v80H240v440h240v120H80Zm520 0q-17 0-28.5-11.5T560-200v-400q0-17 11.5-28.5T600-640h240q17 0 28.5 11.5T880-600v400q0 17-11.5 28.5T840-160H600Zm40-120h160v-280H640v280Zm0 0h160-160Z"/></symbol>
   <symbol id="ic-person_remove" viewBox="0 -960 960 960"><path d="M640-520v-80h240v80H640Zm-280 40q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
   <symbol id="ic-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
+  <symbol id="ic-lock" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -2536,7 +2543,7 @@ function renderSidebar(){
     const isOpen=state.expandedRooms.has(room.id),boards=state.boardsByRoom[room.id]??null;
     const isVoiceRoom=room.room_type==='voice';
     const header=document.createElement('div');header.className='room-header';
-    header.innerHTML=`<span class="room-arrow ${isOpen?'open':''}">${icon('chevron_right')}</span>${isVoiceRoom?icon('volume_up','room-type-ic'):''}<span class="room-name">${esc(room.name)}</span>`;
+    header.innerHTML=`<span class="room-arrow ${isOpen?'open':''}">${icon('chevron_right')}</span>${isVoiceRoom?icon('volume_up','room-type-ic'):''}<span class="room-name">${esc(room.name)}</span>${room.is_private?`<span title="Private — only some roles can see this" style="display:inline-flex">${icon('lock','private-ic')}</span>`:''}`;
     header.addEventListener('click',()=>toggleRoom(room.id));list.appendChild(header);
     if(isOpen){
       if(boards===null){const l=document.createElement('div');l.style.cssText='padding:4px 12px';l.innerHTML='<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>';list.appendChild(l);}
@@ -2551,7 +2558,7 @@ function renderSidebar(){
         const item=document.createElement('div');
         item.className='voice-item'+(isJoined?' joined':'');
         const total=occupants.length+(state.voiceReconnecting?.[board.id]||[]).filter(u=>!occupants.includes(u)).length;
-        item.innerHTML=`${icon('volume_up','board-ic')}<span class="board-name">${esc(board.name)}</span>${total?`<span class="voice-count">${total}</span>`:''}`;
+        item.innerHTML=`${icon('volume_up','board-ic')}<span class="board-name">${esc(board.name)}</span>${board.is_private?`<span title="Private — only some roles can see this" style="display:inline-flex">${icon('lock','private-ic')}</span>`:''}${total?`<span class="voice-count">${total}</span>`:''}`;
         item.addEventListener('click',()=>toggleVoiceChannel(board.id));
         list.appendChild(item);
         const droppedHere=state.voiceReconnecting?.[board.id]||[];
@@ -2586,7 +2593,7 @@ function renderSidebar(){
         const item=document.createElement('div');
         item.className='board-item'+(isActive?' active':'')+(isUnread?' unread':'');
         const mentions=!isActive?(state.mentionCounts?.[board.id]||0):0;
-        item.innerHTML=`<span class="unread-dot">${isUnread?'•':''}</span><span class="board-hash">#</span><span class="board-name">${esc(board.name)}</span>${mentions?`<span class="mention-badge" title="${mentions} mention${mentions===1?'':'s'}">${mentions>99?'99+':mentions}</span>`:''}`;
+        item.innerHTML=`<span class="unread-dot">${isUnread?'•':''}</span><span class="board-hash">#</span><span class="board-name">${esc(board.name)}</span>${board.is_private?`<span title="Private — only some roles can see this" style="display:inline-flex">${icon('lock','private-ic')}</span>`:''}${mentions?`<span class="mention-badge" title="${mentions} mention${mentions===1?'':'s'}">${mentions>99?'99+':mentions}</span>`:''}`;
         item.addEventListener('click',()=>selectBoard(board.id,board.name,room.id));
         list.appendChild(item);
       });

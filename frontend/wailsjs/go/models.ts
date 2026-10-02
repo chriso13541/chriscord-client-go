@@ -54,6 +54,7 @@ export namespace main {
 	    id: string;
 	    room_id: string;
 	    name: string;
+	    is_private: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Board(source);
@@ -64,6 +65,7 @@ export namespace main {
 	        this.id = source["id"];
 	        this.room_id = source["room_id"];
 	        this.name = source["name"];
+	        this.is_private = source["is_private"];
 	    }
 	}
 	export class Reaction {
