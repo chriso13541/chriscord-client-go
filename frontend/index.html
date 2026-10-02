@@ -167,6 +167,13 @@ body.resizing-panels, body.resizing-panels * { cursor:col-resize !important; use
 #voice-connected-bar .voice-bar-btn:hover { background:var(--bg-light); color:var(--text); }
 #voice-connected-bar .voice-bar-btn { display:flex; align-items:center; }
 #voice-connected-bar .voice-bar-btn .ic { width:20px; height:20px; }
+#voice-connected-bar .voice-switch { display:none; font:inherit; font-size:.8rem; font-weight:700; color:#fff; background:var(--accent); padding:4px 10px; }
+#voice-connected-bar .voice-switch:hover { background:var(--accent); filter:brightness(1.1); color:#fff; }
+#voice-connected-bar.elsewhere { color:var(--text-muted); }
+#voice-connected-bar.elsewhere #voice-connected-name { flex:1; min-width:0; }
+#voice-connected-bar.elsewhere #voice-mute-btn, #voice-connected-bar.elsewhere #voice-deafen-btn, #voice-connected-bar.elsewhere #voice-leave-btn { display:none; }
+#voice-connected-bar.elsewhere .voice-switch { display:flex; }
+.voice-occupant-row .other-device { display:inline-flex; color:var(--text-muted); } .voice-occupant-row .other-device .ic { width:14px; height:14px; }
 #voice-connected-bar .voice-bar-btn.muted { color:var(--red); }
 #voice-connected-bar .voice-bar-btn.muted:hover { color:var(--red-light); }
 #voice-leave-btn:hover { color:var(--red) !important; }
@@ -879,6 +886,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-pause" viewBox="0 -960 960 960"><path d="M520-200v-560h240v560H520Zm-320 0v-560h240v560H200Zm400-80h80v-400h-80v400Zm-320 0h80v-400h-80v400Zm0-400v400-400Zm320 0v400-400Z"/></symbol>
   <symbol id="ic-fullscreen" viewBox="0 -960 960 960"><path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/></symbol>
   <symbol id="ic-fullscreen_exit" viewBox="0 -960 960 960"><path d="M240-120v-120H120v-80h200v200h-80Zm400 0v-200h200v80H720v120h-80ZM120-640v-80h120v-120h80v200H120Zm520 0v-200h80v120h120v80H640Z"/></symbol>
+  <symbol id="ic-devices" viewBox="0 -960 960 960"><path d="M80-160v-120h80v-440q0-33 23.5-56.5T240-800h600v80H240v440h240v120H80Zm520 0q-17 0-28.5-11.5T560-200v-400q0-17 11.5-28.5T600-640h240q17 0 28.5 11.5T880-600v400q0 17-11.5 28.5T840-160H600Zm40-120h160v-280H640v280Zm0 0h160-160Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -1039,6 +1047,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
       <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
       <button id="voice-leave-btn" class="voice-bar-btn" title="Disconnect from voice"><svg class="ic" aria-hidden="true"><use href="#ic-call_end"/></svg></button>
+      <button id="voice-switch-btn" class="voice-bar-btn voice-switch" title="Move the call to this device">Join here</button>
     </div>
     <div id="sidebar-user">
       <button id="sidebar-user-profile" title="View your profile">
@@ -1678,18 +1687,17 @@ function initSounds(){
 // Voice channel join/leave sounds, worked out from each new voice snapshot:
 // you joining or leaving, or someone joining or leaving the channel you're in.
 function voiceSoundsFor(prev,next,prevDropped={},nextDropped={}){
-  const me=state.username;
-  const mine=(ch,dr)=>Object.entries(ch||{}).find(([,u])=>(u||[]).includes(me))?.[0]
-    ||Object.entries(dr||{}).find(([,u])=>(u||[]).includes(me))?.[0]||null;
-  const before=mine(prev,prevDropped),after=mine(next,nextDropped);
-  if(!before&&after)return playSound('join');
-  if(before&&!after)return playSound('leave');
-  if(before&&after&&before===after){
-    // Someone who dropped is still "in the call" until they time out.
-    const a=new Set([...(prev[before]||[]),...(prevDropped[before]||[])]),b=new Set([...(next[after]||[]),...(nextDropped[after]||[])]);
-    if([...b].some(u=>!a.has(u)))playSound('join');
-    else if([...a].some(u=>!b.has(u)))playSound('leave');
-  }else if(before&&after)playSound('join'); // moved channels
+  // Only the call this device is in makes sounds, and only for other
+  // people coming and going — your own joining and leaving play from those
+  // actions (toggleVoiceChannel, leaveVoiceHere, rejoin), so a call on
+  // your other device stays silent here.
+  const here=state.voiceHere;
+  if(!here)return;
+  // Someone who dropped is still "in the call" until they time out.
+  const who=(ch,dr)=>new Set([...(ch[here]||[]),...(dr[here]||[])].filter(u=>u!==state.username));
+  const a=who(prev||{},prevDropped||{}),b=who(next||{},nextDropped||{});
+  if([...b].some(u=>!a.has(u)))playSound('join');
+  else if([...a].some(u=>!b.has(u)))playSound('leave');
 }
 
 // ── MESSAGE LINKS ────────────────────────────────────────────────
@@ -2135,8 +2143,17 @@ function cancelReconnect(){
 // restores mute/deafen. Leaving the server yourself cancels the rejoin.
 let voiceRejoin=null,voiceHungUpWhileAway=null,voiceRejoinInFlight=null;
 const voiceSnapshotWaiters=[];
-function myVoiceBoard(channels=state.voiceChannels){
-  return Object.entries(channels||{}).find(([,u])=>(u||[]).includes(state.username))?.[0]||null;
+// ── One device per call ──
+// Your account can be signed in on several devices; only one of them is
+// actually in a call. state.voiceHere is the channel THIS device is in
+// (null if none) — it, not "is my username listed in a channel", decides
+// the call bar, sounds, speaking rings and rejoining. If you're listed in
+// a channel but voiceHere is null, you're in the call on another device.
+state.voiceHere=null;
+function myVoiceBoard(){return state.voiceHere||null;}
+function voiceElsewhereBoard(){
+  if(state.voiceHere)return null;
+  return Object.entries(state.voiceChannels||{}).find(([,u])=>(u||[]).includes(state.username))?.[0]||null;
 }
 function rememberVoiceForRejoin(){
   const boardId=myVoiceBoard();
@@ -2148,6 +2165,7 @@ function rememberVoiceForRejoin(){
   };
   // The server has already dropped us from the call; stop our side of it
   // (microphone, speaker, the dead audio connection) until we rejoin.
+  state.voiceHere=null;
   window.go.main.App.LeaveVoiceChannel().catch(()=>{});
   playSound('error');
   return true;
@@ -2171,11 +2189,11 @@ async function rejoinVoiceAfterReconnect(){
   // Hung up in the moment between reconnecting and rejoining: respect it.
   if(r.cancelled){window.go.main.App.LeaveVoiceChannel().catch(()=>{});return;}
   // Already properly in a call (not just shown as reconnecting)? Nothing to do.
-  const inCall=myVoiceBoard();
-  if(!state.wsConnected||(inCall&&!(state.voiceReconnecting?.[inCall]||[]).includes(state.username)))return;
+  if(!state.wsConnected||state.voiceHere)return; // already back in a call on this device
   const others=(state.voiceChannels[r.boardId]||[]).filter(u=>u!==state.username);
   try{
     await window.go.main.App.JoinVoiceChannel(r.boardId,localStorage.getItem('audioMicLabel')||'',localStorage.getItem('audioSpeakerLabel')||'',others);
+    state.voiceHere=r.boardId;updateVoiceConnectedBar();renderSidebar();
     if(r.deafened){setDeafenButtonState(await window.go.main.App.ToggleDeafen());setMuteButtonState(await window.go.main.App.IsMuted());}
     else if(r.muted)setMuteButtonState(await window.go.main.App.ToggleMute());
     playSound('join'); // you never left the list, so the snapshot itself won't play it
@@ -2510,7 +2528,7 @@ function renderSidebar(){
       else if(!boards.length){const e=document.createElement('div');e.style.cssText='padding:4px 24px;font-size:.88rem;color:var(--text-muted)';e.textContent='No boards';list.appendChild(e);}
       else if(isVoiceRoom)boards.forEach(board=>{
         const occupants=state.voiceChannels[board.id]||[];
-        const isJoined=occupants.includes(state.username);
+        const isJoined=state.voiceHere===board.id&&occupants.includes(state.username);
         // Not in this call: forget any speaking state for it, so nothing
         // stale lights up (or lingers) if you join later — the server only
         // sends live activity to people in the call anyway.
@@ -2537,6 +2555,7 @@ function renderSidebar(){
             // Nothing beside a name normally; red icons only when muted or
             // deafened (see below).
             const statusIcons=
+              (user===state.username&&state.voiceHere!==board.id?`<span class="other-device" title="On your other device">${icon('devices')}</span>`:'')+
               (user!==state.username&&getUserAudio(user).muted?`<span title="Muted by you" style="display:inline-flex">${icon('volume_off','local')}</span>`:'')+
               // Muted: the crossed-out mic. Deafened (which is also muted):
               // the mic and, to its right, the crossed-out headset.
@@ -2562,18 +2581,29 @@ function renderSidebar(){
 // Joins a voice channel if not currently in it, or leaves if it's the one
 // you're already in — no actual audio yet, this is presence-only, the
 // foundation the real media layer will build on.
+// Clicking the channel this device is in leaves it. Clicking any other —
+// including one you're in on another device — joins it here (moving the
+// call over from that device).
 async function toggleVoiceChannel(boardId){
   const occupants=state.voiceChannels[boardId]||[];
-  const alreadyIn=occupants.includes(state.username);
   try{
-    if(alreadyIn)await window.go.main.App.LeaveVoiceChannel();
-    else{
-      const micLabel=localStorage.getItem('audioMicLabel')||'';
-      const speakerLabel=localStorage.getItem('audioSpeakerLabel')||'';
-      const knownOthers=occupants.filter(u=>u!==state.username);
-      await window.go.main.App.JoinVoiceChannel(boardId,micLabel,speakerLabel,knownOthers);
-    }
+    if(state.voiceHere===boardId){await leaveVoiceHere();return;}
+    const micLabel=localStorage.getItem('audioMicLabel')||'';
+    const speakerLabel=localStorage.getItem('audioSpeakerLabel')||'';
+    const knownOthers=occupants.filter(u=>u!==state.username);
+    const moving=!!voiceElsewhereBoard();
+    await window.go.main.App.JoinVoiceChannel(boardId,micLabel,speakerLabel,knownOthers);
+    state.voiceHere=boardId;
+    playSound('join');
+    if(moving)toast('Moved your call to this device.');
+    updateVoiceConnectedBar();renderSidebar();
   }catch(err){toast('Voice action failed: '+err,true);}
+}
+async function leaveVoiceHere(){
+  const was=state.voiceHere;state.voiceHere=null;
+  try{await window.go.main.App.LeaveVoiceChannel();}catch(err){toast('Failed to leave voice: '+err,true);}
+  if(was)playSound('leave');
+  updateVoiceConnectedBar();renderSidebar();
 }
 // Keeps the persistent "connected to voice" bar in sync — always visible
 // (not just while that room happens to be expanded) so leaving is never
@@ -2582,8 +2612,8 @@ async function toggleVoiceChannel(boardId){
 // Records a participant's speaking state (so re-renders of the call list
 // keep it) and toggles the ring on their current row if it's on screen.
 function setSpeakingIndicator(boardId,user,speaking){
-  // Only people in this same call see its activity.
-  if(!(state.voiceChannels[boardId]||[]).includes(state.username))return;
+  // Only people in this same call — on this device — see its activity.
+  if(state.voiceHere!==boardId)return;
   state.voiceSpeaking[`${boardId}:${user}`]=!!speaking;
   const row=document.querySelector(`.voice-occupant-row[data-board="${CSS.escape(String(boardId))}"][data-user="${CSS.escape(user)}"]`);
   const avatar=row&&row.querySelector('.voice-occupant-avatar');
@@ -2599,9 +2629,16 @@ function updateVoiceConnectedBar(){
     document.getElementById('voice-connected-name').innerHTML=`${icon('volume_up')}<span>Reconnecting\u2026 ${esc(b?.name||'')}</span>`;
     bar.classList.remove('hidden');return;
   }
-  const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
-  if(!entry){bar.classList.add('hidden');setMuteButtonState(false);setDeafenButtonState(false);return;}
-  const boardId=entry[0];
+  const elsewhere=voiceElsewhereBoard();
+  bar.classList.toggle('elsewhere',!!elsewhere);
+  if(elsewhere){ // in a call, but on your other device
+    const b=findBoardLocal(elsewhere);
+    document.getElementById('voice-connected-name').innerHTML=`${icon('devices')}<span>In ${esc(b?.name||'a call')} on another device</span>`;
+    const sw=document.getElementById('voice-switch-btn');sw.onclick=()=>toggleVoiceChannel(elsewhere);
+    bar.classList.remove('hidden');setMuteButtonState(false);setDeafenButtonState(false);return;
+  }
+  const boardId=state.voiceHere&&(state.voiceChannels[state.voiceHere]||[]).includes(state.username)?state.voiceHere:null;
+  if(!boardId){bar.classList.add('hidden');setMuteButtonState(false);setDeafenButtonState(false);return;}
   let boardName=boardId;
   for(const list of Object.values(state.boardsByRoom)){
     const b=(list||[]).find(b=>b.id===boardId);
@@ -4115,7 +4152,7 @@ async function sendMessage(){
 }
 
 async function goBack(){
-  voiceRejoin=null;voiceHungUpWhileAway=null;state.voiceReconnecting={};
+  voiceRejoin=null;state.voiceHere=null;voiceHungUpWhileAway=null;state.voiceReconnecting={};
   state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
   setServerTheme(null); // off the server: back to your own theme
   state.voiceChannels={};updateVoiceConnectedBar();
@@ -6166,8 +6203,14 @@ function init(){
   // (The bottom-left sidebar ring from testing is gone; the call list is
   // the one place speaking shows now.)
   window.runtime.EventsOn('voice:speaking',speaking=>{
-    const entry=Object.entries(state.voiceChannels).find(([,users])=>users.includes(state.username));
-    if(entry)setSpeakingIndicator(entry[0],state.username,speaking);
+    if(state.voiceHere)setSpeakingIndicator(state.voiceHere,state.username,speaking);
+  });
+  // You joined the call from another device: this one has hung up.
+  window.runtime.EventsOn('voice:moved',()=>{
+    state.voiceHere=null;voiceRejoin=null;
+    for(const k of Object.keys(state.voiceSpeaking||{}))delete state.voiceSpeaking[k];
+    toast('Your call moved to another device.');
+    updateVoiceConnectedBar();renderSidebar();
   });
   // Everyone else's rings come via the server's rebroadcast. Your own
   // echo arrives here too, which is harmless — same key, same value.
@@ -6291,7 +6334,7 @@ function init(){
       toast('You won\u2019t be put back in the call.');
       return;
     }
-    try{await window.go.main.App.LeaveVoiceChannel();}catch(err){toast('Failed to leave voice: '+err,true);}
+    await leaveVoiceHere();
   });
   document.getElementById('settings-btn').addEventListener('click',openSettings);
   document.getElementById('settings-btn-servers').addEventListener('click',openSettings);
