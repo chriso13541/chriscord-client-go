@@ -2496,6 +2496,9 @@ async function refreshRoomsAndBoards(){
   try{rooms=await window.go.main.App.GetRooms()||[];}
   catch(err){toast('Failed to refresh rooms: '+err,true);return;}
   state.rooms=rooms;
+  // Channel lists of collapsed categories were cached (for search, links…):
+  // drop them, since which channels you can see may have changed.
+  for(const id of Object.keys(state.boardsByRoom))if(!state.expandedRooms.has(id))delete state.boardsByRoom[id];
 
   const validRoomIds=new Set(rooms.map(r=>r.id));
   let anyRemoved=false;
@@ -6294,7 +6297,13 @@ function init(){
   });
   window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshPresenceBadges();renderComposerHighlight();});
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
-  window.runtime.EventsOn('server:roles',()=>loadRoles());
+  // Roles changed: colours/permissions, and which channels you can see.
+  window.runtime.EventsOn('server:roles',()=>{loadRoles();refreshRoomsAndBoards();});
+  window.runtime.EventsOn('voice:removed',m=>{
+    state.voiceHere=null;voiceRejoin=null;playSound('leave');
+    toast(m||'You no longer have access to that voice channel',true);
+    updateVoiceConnectedBar();renderSidebar();
+  });
   window.runtime.EventsOn('server:denied',m=>toast(m||'You don\u2019t have permission to do that',true));
   window.runtime.EventsOn('server:kicked',e=>handleKicked(e));
   window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});

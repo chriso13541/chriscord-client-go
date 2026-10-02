@@ -1011,6 +1011,13 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
 		case "users":
 			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner})
+		case "voice_removed":
+			// No longer allowed in the voice channel we were in (a role or
+			// channel change): the server has taken us out; hang up here.
+			a.stopVoiceSession()
+			a.voiceMuted.Store(false)
+			a.voiceDeafened.Store(false)
+			runtime.EventsEmit(a.ctx, "voice:removed", msg.DeniedMsg)
 		case "voice_moved":
 			// This account joined the call from another device: this one
 			// hangs up (the server has already moved the call there).
