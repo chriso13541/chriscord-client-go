@@ -90,7 +90,18 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 #screen-chat { display:flex; height:100%; }
 
 /* Sidebar */
-#sidebar { width:var(--sidebar-w); background:var(--bg-dark); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+#sidebar { width:var(--sidebar-w); background:var(--bg-dark); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; position:relative; }
+/* Drag handles for resizing the channel list and the member list. A thin
+   invisible strip on the panel's edge; it shows an accent line on hover
+   and while dragging. Double-click resets the width. */
+.resize-handle { position:absolute; top:0; bottom:0; width:7px; z-index:30; cursor:col-resize; touch-action:none; }
+.resize-handle::after { content:''; position:absolute; top:0; bottom:0; left:3px; width:1px; background:transparent; transition:background .12s; }
+.resize-handle:hover::after, .resize-handle.dragging::after { background:var(--accent); width:2px; left:2px; }
+#sidebar > .resize-handle { right:-4px; }
+#members-panel > .resize-handle { left:0; }
+#members-panel.collapsed > .resize-handle { display:none; }
+#members-panel.resizing, body.resizing-panels #members-panel { transition:none; }
+body.resizing-panels, body.resizing-panels * { cursor:col-resize !important; user-select:none !important; }
 #sidebar-header { padding:14px 16px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
 #sidebar-header .server-name { font-weight:800; font-size:1.05rem; color:var(--text-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #back-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; padding:2px 4px; border-radius:4px; flex-shrink:0; }
@@ -749,7 +760,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 #send-btn:disabled { opacity:.3; cursor:default; }
 
 /* Members panel */
-#members-panel { width:var(--members-w); background:var(--bg-dark); border-left:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; transition:width .2s ease,opacity .2s ease; overflow:hidden; }
+#members-panel { width:var(--members-w); background:var(--bg-dark); border-left:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; transition:width .2s ease,opacity .2s ease; overflow:hidden; position:relative; }
 #members-panel.collapsed { width:0; opacity:0; border-left:none; }
 #members-panel.searching { width:calc(var(--members-w) * 1.5); }
 #members-panel-inner { padding:12px 10px; overflow-y:auto; flex:1; }
@@ -1013,6 +1024,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
 <div id="screen-chat" class="hidden">
   <div id="sidebar">
+    <div class="resize-handle" id="sidebar-resize" title="Drag to resize · double-click to reset"></div>
     <div id="sidebar-header">
       <img id="sidebar-banner-img" alt="" draggable="false">
       <span class="server-title">
@@ -1074,6 +1086,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         </div>
       </div>
       <div id="members-panel" class="collapsed">
+        <div class="resize-handle" id="members-resize" title="Drag to resize · double-click to reset"></div>
         <div id="members-panel-inner">
           <div id="members-normal">
             <div class="members-section-label">Online</div><div id="members-online"></div>
@@ -5727,6 +5740,55 @@ function setTitlebarLocation(text){
   document.title=text?`${text} — Chriscord`:'Chriscord';
 }
 
+// ── RESIZABLE PANELS ─────────────────────────────────────────────
+// Drag the edge of the channel list or the member list to resize it.
+// Each has a minimum (and a maximum), and the chat in the middle always
+// keeps at least CHAT_MIN_W of room. Widths are remembered; double-click a
+// handle to go back to the default.
+const PANELS={
+  sidebar:{varName:'--sidebar-w',key:'sidebarWidth',def:330,min:220,max:520,edge:'right'},
+  members:{varName:'--members-w',key:'membersWidth',def:200,min:160,max:420,edge:'left'},
+};
+const CHAT_MIN_W=360;
+const panelWidth=name=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue(PANELS[name].varName))||PANELS[name].def;
+function setPanelWidth(name,w,save=true){
+  const p=PANELS[name];
+  // Never squeeze the chat below its minimum (in CSS px — the zoom divides out).
+  const other=name==='sidebar'?(document.getElementById('members-panel').classList.contains('collapsed')?0:panelWidth('members')):panelWidth('sidebar');
+  const room=document.documentElement.clientWidth/uiScale()-other-CHAT_MIN_W;
+  w=Math.round(Math.max(p.min,Math.min(p.max,room,w)));
+  document.documentElement.style.setProperty(p.varName,w+'px');
+  if(save)localStorage.setItem(p.key,String(w));
+}
+function initPanelResize(){
+  for(const [name,p] of Object.entries(PANELS)){
+    const saved=parseFloat(localStorage.getItem(p.key));
+    if(saved)setPanelWidth(name,saved,false);
+    const handle=document.getElementById(name==='sidebar'?'sidebar-resize':'members-resize');
+    handle.addEventListener('pointerdown',e=>{
+      if(e.button!==0)return;
+      e.preventDefault();handle.setPointerCapture(e.pointerId);
+      const startX=e.clientX,startW=panelWidth(name),z=uiScale();
+      handle.classList.add('dragging');document.body.classList.add('resizing-panels');
+      const move=ev=>{
+        // Mouse movement is in screen px; widths are CSS px inside the zoom.
+        const dx=(ev.clientX-startX)/z;
+        setPanelWidth(name,p.edge==='right'?startW+dx:startW-dx,false);
+      };
+      const up=()=>{
+        handle.classList.remove('dragging');document.body.classList.remove('resizing-panels');
+        handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);
+        localStorage.setItem(p.key,String(panelWidth(name)));
+      };
+      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
+    });
+    handle.addEventListener('dblclick',()=>{localStorage.removeItem(p.key);document.documentElement.style.removeProperty(p.varName);});
+  }
+  // If the window shrinks, keep the chat from being squeezed out.
+  // (Re-applied from the width you chose, so it comes back when the window grows again.)
+  window.addEventListener('resize',()=>{for(const [n,p] of Object.entries(PANELS))setPanelWidth(n,parseFloat(localStorage.getItem(p.key))||p.def,false);});
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -6190,6 +6252,7 @@ function init(){
   document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
+  initPanelResize();
   initSpellcheck();
   initTitlebar();
   document.getElementById('mute-mentions-btn').addEventListener('click',toggleMentionMute);
