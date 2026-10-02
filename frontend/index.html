@@ -1282,11 +1282,14 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <button id="settings-mic-test-btn" class="settings-secondary-btn"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg> Test Voice</button>
       <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker, with your volume and sensitivity applied — exactly what others hear. The meter above moves while you're testing or in a call: the bar turns green when you're loud enough to be transmitted (and your speaking ring lights up).</p>
 
+      <label class="settings-label" for="snd-volume">Sound Effects Volume</label>
+      <div class="slider-row"><input type="range" id="snd-volume" min="0" max="100" step="1" aria-label="Sound effects volume"><span class="slider-val" id="snd-volume-val">70%</span>
+        <button class="settings-secondary-btn ap-mini" id="snd-test" type="button">Test</button></div>
+      <p class="settings-hint" style="margin-top:4px">One volume for all of the app's sound effects — joins and leaves, mutes and deafens, dropped calls and @mentions. It doesn't change how loud people sound in calls (that's Output Volume, above).</p>
+
       <label class="settings-label">Sounds</label>
       <label class="check-row"><input type="checkbox" id="snd-voice"> Play call sounds: people joining or leaving your channel, your call dropping, and muting or deafening yourself</label>
       <label class="check-row"><input type="checkbox" id="snd-mention"> Play a sound when someone @mentions you</label>
-      <div class="slider-row"><input type="range" id="snd-volume" min="0" max="100" step="1" aria-label="Sound volume"><span class="slider-val" id="snd-volume-val">70%</span>
-        <button class="settings-secondary-btn ap-mini" id="snd-test" type="button">Test</button></div>
 
     </div>
   </div>
@@ -1642,7 +1645,11 @@ function initSounds(){
   document.getElementById('snd-voice').addEventListener('change',e=>{soundSettings.voice=e.target.checked;saveSoundSettings();});
   document.getElementById('snd-mention').addEventListener('change',e=>{soundSettings.mention=e.target.checked;saveSoundSettings();});
   document.getElementById('snd-volume').addEventListener('input',e=>{soundSettings.volume=+e.target.value;document.getElementById('snd-volume-val').textContent=e.target.value+'%';});
-  document.getElementById('snd-volume').addEventListener('change',saveSoundSettings);
+  document.getElementById('snd-volume').addEventListener('change',()=>{
+    saveSoundSettings();
+    // Play a sample at the new level so you can hear what you picked.
+    const was={...soundSettings};soundSettings.voice=true;playSound('join');soundSettings.voice=was.voice;
+  });
   let n=0;
   document.getElementById('snd-test').addEventListener('click',()=>{
     const name=['join','leave','mention','error','mute','unmute','deafen','undeafen'][n++%8];
