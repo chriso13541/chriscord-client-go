@@ -680,6 +680,12 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
+/* Closing: the picture shrinks a little toward the centre while the whole
+   viewer fades out — quick, so it never feels like a wait. (The image's
+   own transform is its zoom/pan, so the shrink is on the stage around it.) */
+#lightbox.closing { opacity:0; transition:opacity .16s ease-in; pointer-events:none; }
+#lightbox.closing #lb-stage { transform:scale(.9); transition:transform .16s ease-in; }
+@media (prefers-reduced-motion: reduce) { #lightbox.closing, #lightbox.closing #lb-stage { transition:none; } }
 #lightbox-img { max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; transform-origin:center center; cursor:zoom-in; will-change:transform; }
 #lightbox-img.animating { transition:transform .15s ease-out; }
 #lightbox.zoomed #lightbox-img { cursor:grab; }
@@ -5837,6 +5843,8 @@ const LB_MAX_ZOOM=8, LB_STEP_ZOOM=2;
 const lb={open:false,scale:1,tx:0,ty:0,drag:null,dragged:false,attach:null};
 function openLightbox(src,attach,msg){
   const box=document.getElementById('lightbox'),img=document.getElementById('lightbox-img');
+  // Reopened while the last one was still fading out: cancel that.
+  if(lb.closeTimer){clearTimeout(lb.closeTimer);lb.closeTimer=null;box.classList.remove('closing');}
   lb.attach=attach||null;
   lbReset(false);
   img.src=src;
@@ -5858,8 +5866,14 @@ function closeLightbox(){
   if(!lb.open)return;
   lb.open=false;lb.drag=null;
   const box=document.getElementById('lightbox');
-  box.classList.add('hidden');box.classList.remove('dragging');
-  document.getElementById('lightbox-img').src='';
+  box.classList.remove('dragging');
+  box.classList.add('closing');
+  clearTimeout(lb.closeTimer);
+  lb.closeTimer=setTimeout(()=>{
+    lb.closeTimer=null;
+    box.classList.add('hidden');box.classList.remove('closing');
+    document.getElementById('lightbox-img').src='';
+  },170);
 }
 function lbApply(animate){
   const img=document.getElementById('lightbox-img');
