@@ -1283,7 +1283,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <p class="settings-hint">Speak into your microphone and you should hear yourself out of your speaker, with your volume and sensitivity applied — exactly what others hear. The meter above moves while you're testing or in a call: the bar turns green when you're loud enough to be transmitted (and your speaking ring lights up).</p>
 
       <label class="settings-label">Sounds</label>
-      <label class="check-row"><input type="checkbox" id="snd-voice"> Play a sound when people join or leave your voice channel, or your call drops</label>
+      <label class="check-row"><input type="checkbox" id="snd-voice"> Play call sounds: people joining or leaving your channel, your call dropping, and muting or deafening yourself</label>
       <label class="check-row"><input type="checkbox" id="snd-mention"> Play a sound when someone @mentions you</label>
       <div class="slider-row"><input type="range" id="snd-volume" min="0" max="100" step="1" aria-label="Sound volume"><span class="slider-val" id="snd-volume-val">70%</span>
         <button class="settings-secondary-btn ap-mini" id="snd-test" type="button">Test</button></div>
@@ -1645,7 +1645,7 @@ function initSounds(){
   document.getElementById('snd-volume').addEventListener('change',saveSoundSettings);
   let n=0;
   document.getElementById('snd-test').addEventListener('click',()=>{
-    const name=['join','leave','mention','error'][n++%4];
+    const name=['join','leave','mention','error','mute','unmute','deafen','undeafen'][n++%8];
     const was={...soundSettings};soundSettings.voice=soundSettings.mention=true;playSound(name);soundSettings.voice=was.voice;soundSettings.mention=was.mention;
     toast(`Played ${name}.wav`);
   });
@@ -2514,12 +2514,13 @@ function renderSidebar(){
             const key=`${board.id}:${user}`;
             const speaking=!!state.voiceSpeaking[key];
             const status=state.voiceMuteStatus[key]||{muted:false,deafened:false};
-            // Nothing beside a name normally; a red crossed-out mic when
-            // muted, or a red crossed-out headset when deafened (which
-            // includes muted, so only that one shows).
+            // Nothing beside a name normally; red icons only when muted or
+            // deafened (see below).
             const statusIcons=
               (user!==state.username&&getUserAudio(user).muted?`<span title="Muted by you" style="display:inline-flex">${icon('volume_off','local')}</span>`:'')+
-              (status.deafened?icon('headset_off','off'):status.muted?icon('mic_off','off'):'');
+              // Muted: the crossed-out mic. Deafened (which is also muted):
+              // the mic and, to its right, the crossed-out headset.
+              ((status.muted||status.deafened)?icon('mic_off','off'):'')+(status.deafened?icon('headset_off','off'):'');
             row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
             list.appendChild(row);
             applyUserAvatar(row.querySelector('.voice-occupant-avatar'),user);
@@ -2609,6 +2610,7 @@ async function toggleDeafen(){
   try{
     const deafened=await window.go.main.App.ToggleDeafen();
     setDeafenButtonState(deafened);
+    if(myVoiceBoard())playSound(deafened?'deafen':'undeafen');
     // Deafening also mutes on the Go side as a side effect — reflect
     // that here too rather than letting the mute button visually fall
     // out of sync with what actually happened.
@@ -2618,8 +2620,12 @@ async function toggleDeafen(){
 }
 async function toggleMute(){
   try{
+    // Unmuting while deafened undeafens too (as on Discord) — being able
+    // to talk but not hear isn't a state anyone means to be in.
+    if(await window.go.main.App.IsDeafened()){await toggleDeafen();return;}
     const muted=await window.go.main.App.ToggleMute();
     setMuteButtonState(muted);
+    if(myVoiceBoard())playSound(muted?'mute':'unmute');
   }catch(err){toast('Failed to toggle mute: '+err,true);}
 }
 
