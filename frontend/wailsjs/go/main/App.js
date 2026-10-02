@@ -38,6 +38,10 @@ export function FetchLinkPreview(arg1) {
   return window['go']['main']['App']['FetchLinkPreview'](arg1);
 }
 
+export function FetchRoles() {
+  return window['go']['main']['App']['FetchRoles']();
+}
+
 export function FetchServerBanner() {
   return window['go']['main']['App']['FetchServerBanner']();
 }
@@ -144,6 +148,10 @@ export function IsMuted() {
 
 export function JoinVoiceChannel(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['JoinVoiceChannel'](arg1, arg2, arg3, arg4);
+}
+
+export function KickMember(arg1, arg2, arg3) {
+  return window['go']['main']['App']['KickMember'](arg1, arg2, arg3);
 }
 
 export function LeaveVoiceChannel() {

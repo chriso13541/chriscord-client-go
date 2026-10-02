@@ -20,6 +20,8 @@ export function ExportAccount(arg1:string):Promise<string>;
 
 export function FetchLinkPreview(arg1:string):Promise<main.LinkPreview>;
 
+export function FetchRoles():Promise<string>;
+
 export function FetchServerBanner():Promise<string>;
 
 export function FetchServerIcon(arg1:string):Promise<string>;
@@ -73,6 +75,8 @@ export function IsDeafened():Promise<boolean>;
 export function IsMuted():Promise<boolean>;
 
 export function JoinVoiceChannel(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<void>;
+
+export function KickMember(arg1:string,arg2:boolean,arg3:string):Promise<void>;
 
 export function LeaveVoiceChannel():Promise<void>;
 

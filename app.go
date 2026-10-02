@@ -831,6 +831,7 @@ type serverMsg struct {
 	// key — "statuses" is already the voice status list below.
 	Presence      map[string]string   `json:"presence"`
 	Owner         string              `json:"owner"`  // on "users": the crowned member
+	DeniedMsg     string              `json:"message"` // on "action_denied": what you weren't allowed to do
 	Banned        bool                `json:"banned"` // on "kicked"
 	Reason        string              `json:"reason"` // on "kicked"
 	Typing        bool                `json:"typing"`
@@ -1022,6 +1023,10 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.voiceMuted.Store(false)
 			a.voiceDeafened.Store(false)
 			runtime.EventsEmit(a.ctx, "voice:moved", msg.BoardID)
+		case "roles_updated":
+			runtime.EventsEmit(a.ctx, "server:roles")
+		case "action_denied":
+			runtime.EventsEmit(a.ctx, "server:denied", msg.DeniedMsg)
 		case "server_updated":
 			runtime.EventsEmit(a.ctx, "server:updated")
 		case "kicked":
@@ -1268,6 +1273,35 @@ func (a *App) sendWS(v interface{}) {
 // ReactToMessage adds (on=true) or removes (on=false) your emoji reaction.
 // The server broadcasts the change as message_reaction, which is what
 // updates every client's view — including this one.
+// FetchRoles returns the server's roles, who has which, and this account's
+// permissions, as the JSON from GET /api/roles.
+func (a *App) FetchRoles() (string, error) {
+	data, err := a.fetchAuthed("/api/roles")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// KickMember kicks (or bans) a member, if your roles allow it.
+func (a *App) KickMember(username string, ban bool, reason string) error {
+	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
+	data, _ := json.Marshal(map[string]interface{}{"ban": ban, "reason": reason})
+	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/members/"+url.PathEscape(username)+"/kick", bytes.NewReader(data))
+	if err != nil { return err }
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil { return fmt.Errorf("network error: %w", err) }
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var e map[string]string; json.NewDecoder(resp.Body).Decode(&e)
+		if msg, ok := e["error"]; ok { return fmt.Errorf("%s", msg) }
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (a *App) ReactToMessage(msgID, emoji string, on bool) error {
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
 	data, _ := json.Marshal(map[string]interface{}{"emoji": emoji, "on": on})

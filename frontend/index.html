@@ -137,6 +137,8 @@ body.resizing-panels, body.resizing-panels * { cursor:col-resize !important; use
 #server-info-pop .sip-owner { margin-top:12px; font-size:.8rem; color:var(--text-muted); display:flex; align-items:center; gap:4px; }
 #server-info-pop .sip-owner .ic { width:14px; height:14px; color:var(--yellow); }
 .member-name { display:inline-flex; align-items:center; gap:4px; min-width:0; }
+body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !important; }
+.btn-danger { background:var(--red); color:#fff; }
 .owner-crown { display:inline-flex; color:var(--yellow); flex-shrink:0; }
 .owner-crown .ic { width:14px; height:14px; }
 #room-list { flex:1; overflow-y:auto; padding:8px 0; }
@@ -893,6 +895,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-fullscreen" viewBox="0 -960 960 960"><path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/></symbol>
   <symbol id="ic-fullscreen_exit" viewBox="0 -960 960 960"><path d="M240-120v-120H120v-80h200v200h-80Zm400 0v-200h200v80H720v120h-80ZM120-640v-80h120v-120h80v200H120Zm520 0v-200h80v120h120v80H640Z"/></symbol>
   <symbol id="ic-devices" viewBox="0 -960 960 960"><path d="M80-160v-120h80v-440q0-33 23.5-56.5T240-800h600v80H240v440h240v120H80Zm520 0q-17 0-28.5-11.5T560-200v-400q0-17 11.5-28.5T600-640h240q17 0 28.5 11.5T880-600v400q0 17-11.5 28.5T840-160H600Zm40-120h160v-280H640v280Zm0 0h160-160Z"/></symbol>
+  <symbol id="ic-person_remove" viewBox="0 -960 960 960"><path d="M640-520v-80h240v80H640Zm-280 40q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
+  <symbol id="ic-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -1104,8 +1108,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <div class="resize-handle" id="members-resize" title="Drag to resize · double-click to reset"></div>
         <div id="members-panel-inner">
           <div id="members-normal">
-            <div class="members-section-label">Online</div><div id="members-online"></div>
-            <div class="members-section-label" style="margin-top:12px">Offline</div><div id="members-offline"></div>
+            <div id="members-online"></div>
+            <div class="members-section-label" style="margin-top:12px" id="members-offline-label">Offline</div><div id="members-offline"></div>
           </div>
           <div id="members-results" class="hidden">
             <div id="results-summary"></div>
@@ -2281,6 +2285,7 @@ async function doConnect(domain,serverKey){
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';
+  state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
   serverBannerAt=-1; // a different server: forget the last one's banner
   state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
   const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.classList.remove('anim-paused');document.getElementById('sidebar-banner-img').removeAttribute('src');
@@ -2329,6 +2334,7 @@ async function refreshServerMeta(){
   if(customName)state.serverName=customName; // your own name for it wins
   else if(info?.name){state.serverName=info.name;}
   state.serverOwner=info?.owner||'';
+  loadRoles(); // (also when the crown moves — the owner can do everything)
   refreshServerIcon(domain,info);
   setServerTheme(info?.theme||null,domain);
   const nameEl=document.getElementById('sidebar-server-name');
@@ -2594,6 +2600,7 @@ async function toggleVoiceChannel(boardId){
   const occupants=state.voiceChannels[boardId]||[];
   try{
     if(state.voiceHere===boardId){await leaveVoiceHere();return;}
+    if(!can(PERM.CONNECT)){toast('You don\u2019t have permission to join voice channels on this server',true);return;}
     const micLabel=localStorage.getItem('audioMicLabel')||'';
     const speakerLabel=localStorage.getItem('audioSpeakerLabel')||'';
     const knownOthers=occupants.filter(u=>u!==state.username);
@@ -3080,6 +3087,7 @@ async function selectBoard(boardId,boardName,roomId){
   const hdr=document.getElementById('board-title-placeholder');hdr.className='board-title';hdr.textContent=boardName;
   document.getElementById('msg-input').placeholder=`Message  #${boardName}`;
   document.getElementById('msg-input').disabled=false;document.getElementById('send-btn').disabled=false;document.getElementById('attach-btn').disabled=false;document.getElementById('emoji-btn').disabled=false;
+  applyPermissionUI();
   document.getElementById('msg-input').focus();
   document.getElementById('messages').innerHTML='<div class="msg-placeholder">Loading history…</div>';
   renderSidebar();
@@ -3113,12 +3121,23 @@ function renderMembers(payload){
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}">${esc(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${esc(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
-  if(online.length)online.forEach(n=>onlineEl.appendChild(memberRow(n,true)));
-  else onlineEl.innerHTML='<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">Nobody online</div>';
+  // Online people are grouped under their highest "shown separately" role
+  // (most senior role first, like Discord); everyone else online is under
+  // "Online". Offline is one plain list.
+  const label=(text,n,first)=>{const d=document.createElement('div');d.className='members-section-label';if(!first)d.style.marginTop='12px';d.textContent=`${text} \u2014 ${n}`;return d;};
+  if(online.length){
+    const groups=new Map(),rest=[];
+    for(const n of online){const r=hoistRole(n);if(r){if(!groups.has(r.id))groups.set(r.id,{role:r,users:[]});groups.get(r.id).users.push(n);}else rest.push(n);}
+    const ordered=[...groups.values()].sort((a,b)=>b.role.position-a.role.position);
+    let first=true;
+    for(const g of ordered){onlineEl.appendChild(label(g.role.name,g.users.length,first));first=false;g.users.forEach(n=>onlineEl.appendChild(memberRow(n,true)));}
+    if(rest.length){onlineEl.appendChild(label('Online',rest.length,first));rest.forEach(n=>onlineEl.appendChild(memberRow(n,true)));}
+  }else{onlineEl.appendChild(label('Online',0,true));onlineEl.insertAdjacentHTML('beforeend','<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">Nobody online</div>');}
+  document.getElementById('members-offline-label').textContent=`Offline \u2014 ${offline.length}`;
   if(offline.length)offline.forEach(n=>offlineEl.appendChild(memberRow(n,false)));
   else offlineEl.innerHTML='<div style="font-size:.8rem;color:var(--text-muted);padding:2px 6px">—</div>';
 }
@@ -3993,7 +4012,7 @@ function buildMsgEl(msg,grouped){
       : `<div class="msg-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
-        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username">${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
+        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}
       </div>
       ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
@@ -4878,6 +4897,7 @@ async function toggleReaction(msg,emoji,forceOn){
   const mine=(msg.reactions||[]).find(r=>r.emoji===emoji)?.users?.includes(state.username);
   const on=forceOn??!mine;
   if(on&&mine)return;
+  if(on&&!can(PERM.REACT)){toast('You don\u2019t have permission to add reactions on this server',true);return;}
   applyReaction(msg,emoji,state.username,on);rerenderReactionsFor(msg.id);
   try{await window.go.main.App.ReactToMessage(msg.id,emoji,on);}
   catch(err){
@@ -5478,16 +5498,16 @@ function messageMenu(msgEl,msg,e){
     imgAttach?{label:'Copy Image',icon:'content_copy',action:()=>copyImage(img.currentSrc||img.src)}:null,
     imgAttach?{label:'Save Image',icon:'download',action:()=>downloadAttachment(imgAttach)}:null,
     (selection||link||imgAttach)?'-':null,
-    {label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))},
+    can(PERM.REACT)?{label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))}:null,
     msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content);toast('Text copied');}}:null,
     {label:'Copy Message Link',icon:'link',action:()=>{copyText(messageLink(msg));toast('Message link copied');}},
-    {label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
+    !(can(PERM.PIN)||can(PERM.MANAGE))?null:{label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
       try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
     }},
     isOwn?{label:'Edit Message',icon:'edit',action:()=>startEdit(msgEl,msg)}:null,
     ...(!imgAttach?attachments.map(a=>({label:`Download ${a.name||'file'}`,icon:'download',action:()=>downloadAttachment(a)})):[]),
-    isOwn?'-':null,
-    isOwn?{label:'Delete Message',icon:'delete',danger:true,action:()=>showDeleteConfirm(msg.id)}:null,
+    (isOwn||can(PERM.MANAGE))?'-':null,
+    (isOwn||can(PERM.MANAGE))?{label:'Delete Message',icon:'delete',danger:true,action:()=>showDeleteConfirm(msg.id)}:null,
   ];
 }
 function initContextMenus(){
@@ -5495,6 +5515,8 @@ function initContextMenus(){
     e.preventDefault(); // never the browser's own menu
     closeContextMenu();
     if(e.target.closest('.voice-occupant-row[data-user]'))return; // its own menu (initVoiceUserMenu)
+    const memberRowEl=e.target.closest('.member-row[data-user]');
+    if(memberRowEl){showContextMenu(memberMenu(memberRowEl.dataset.user,e),e.clientX,e.clientY);return;}
     const field=e.target.closest('input[type=text],input[type=password],input[type=search],input:not([type]),textarea');
     if(field){
       if(field.id==='msg-input'&&spellOn){
@@ -5863,6 +5885,65 @@ function initPanelResize(){
   window.addEventListener('resize',()=>{for(const [n,p] of Object.entries(PANELS))setPanelWidth(n,parseFloat(localStorage.getItem(p.key))||p.def,false);});
 }
 
+// ── ROLES & PERMISSIONS ──────────────────────────────────────────
+// The server's roles (set up in its admin panel): name colours (your
+// highest role that has a colour), online-list groups (your highest
+// "shown separately" role) and what you're allowed to do. The server
+// enforces permissions itself; the app just hides or disables what you
+// can't use so you're not offered it.
+const PERM={SEND:1,ATTACH:2,REACT:4,MANAGE:8,CONNECT:16,KICK:32,BAN:64,PIN:128,ADMIN:256};
+state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
+const can=p=>(state.myPerms&p)===p;
+function rolesOf(user){const ids=state.memberRoles[user]||[];return state.roles.filter(r=>ids.includes(r.id));} // highest first
+const nameColor=user=>rolesOf(user).find(r=>r.color)?.color||'';
+const hoistRole=user=>rolesOf(user).find(r=>r.hoist)||null;
+async function loadRoles(){
+  const domain=state.domain;
+  let d;try{d=JSON.parse(await window.go.main.App.FetchRoles());}catch(err){console.warn('roles: could not load:',err);return;}
+  if(state.domain!==domain)return;
+  state.roles=(d.roles||[]).sort((a,b)=>b.position-a.position);
+  state.memberRoles=d.members||{};
+  state.myPerms=d.my_permissions??state.myPerms;
+  refreshMemberList();
+  document.querySelectorAll('.msg-username[data-user]').forEach(el=>{el.style.color=nameColor(el.dataset.user)||'';});
+  applyPermissionUI();
+}
+function applyPermissionUI(){
+  const input=document.getElementById('msg-input');
+  if(!state.selectedBoardId||!input)return;
+  const send=can(PERM.SEND);
+  input.disabled=!send;document.getElementById('send-btn').disabled=!send;document.getElementById('emoji-btn').disabled=!send;
+  if(!send)input.placeholder='You don\u2019t have permission to send messages here';
+  else if(input.placeholder.startsWith('You don'))input.placeholder=`Message  #${state.selectedBoardName}`;
+  const attach=document.getElementById('attach-btn');
+  attach.disabled=!send||!can(PERM.ATTACH);attach.style.display=can(PERM.ATTACH)?'':'none';
+  document.body.classList.toggle('no-react',!can(PERM.REACT));
+}
+// Right-click a member: profile, and kick/ban if your roles allow it.
+function memberMenu(user,e){
+  const me=user===state.username,owner=user===state.serverOwner;
+  return [
+    {label:'View Profile',icon:'person',action:()=>openProfilePopup(user,e.target.closest('.member-row')||e.target)},
+    (!me&&!owner&&(can(PERM.KICK)||can(PERM.BAN)))?'-':null,
+    (!me&&!owner&&can(PERM.KICK))?{label:`Kick ${user}`,icon:'person_remove',danger:true,action:()=>confirmRemove(user,false)}:null,
+    (!me&&!owner&&can(PERM.BAN))?{label:`Ban ${user}`,icon:'block',danger:true,action:()=>confirmRemove(user,true)}:null,
+  ];
+}
+function confirmRemove(user,ban){
+  const ov=document.createElement('div');ov.className='modal-overlay';
+  ov.innerHTML=`<div class="modal"><h2>${ban?'Ban':'Kick'} ${esc(user)}?</h2>
+    <p style="color:var(--text-muted);margin:0 0 12px">${ban?'They\\u2019re removed now and can\\u2019t rejoin unless the server owner unbans them.':'They\\u2019re removed now, but can rejoin later.'}</p>
+    <div class="form-group"><label>Reason (optional, shown to them)</label><input type="text" maxlength="200" id="rm-reason"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="rm-cancel">Cancel</button><button class="btn btn-danger" id="rm-go">${ban?'Ban':'Kick'}</button></div></div>`;
+  document.body.appendChild(ov);ov.querySelector('#rm-reason').focus();
+  const close=()=>ov.remove();
+  ov.querySelector('#rm-cancel').onclick=close;ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+  ov.querySelector('#rm-go').onclick=async()=>{
+    try{await window.go.main.App.KickMember(user,ban,ov.querySelector('#rm-reason').value);close();toast(`${user} was ${ban?'banned':'kicked'}.`);}
+    catch(err){toast(String(err),true);}
+  };
+}
+
 // ── LIGHTBOX ──────────────────────────────────────────────────────
 // Discord-style image viewer: sender card top-left (avatar, name, when it
 // was sent), controls top-right (zoom, save, close). Zoom starts from the
@@ -6213,6 +6294,8 @@ function init(){
   });
   window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshPresenceBadges();renderComposerHighlight();});
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
+  window.runtime.EventsOn('server:roles',()=>loadRoles());
+  window.runtime.EventsOn('server:denied',m=>toast(m||'You don\u2019t have permission to do that',true));
   window.runtime.EventsOn('server:kicked',e=>handleKicked(e));
   window.runtime.EventsOn('chat:typing',e=>{if(e?.username&&e.username!==state.username)setRemoteTyping(e.username,!!e.typing);});
   window.runtime.EventsOn('rooms:updated',()=>refreshRoomsAndBoards());
