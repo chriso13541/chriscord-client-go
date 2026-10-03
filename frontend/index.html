@@ -393,6 +393,14 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 .mp-up-btn:hover { color:var(--text-strong); filter:brightness(1.15); }
 .mp-up-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
 .mp-up-btn:disabled { opacity:.8; cursor:default; }
+/* Plays, but without sound (or picture): a strip across the top */
+.mp-partial { position:absolute; left:0; right:0; top:0; z-index:3; display:flex; align-items:center; gap:10px; padding:8px 10px;
+  background:rgba(0,0,0,.78); color:#fff; font-size:.8rem; }
+.mp-partial > .ic { width:18px; height:18px; flex-shrink:0; }
+.mp-partial > span { flex:1; min-width:0; }
+.mp-partial .mp-up-btn { padding:4px 10px; font-size:.78rem; }
+.mp-partial-x { background:none; border:none; color:#fff; opacity:.7; cursor:pointer; padding:2px; display:inline-flex; }
+.mp-partial-x:hover { opacity:1; } .mp-partial-x .ic { width:16px; height:16px; }
 .msg-video { width:480px; max-width:100%; height:270px; object-fit:contain; border-radius:8px; margin-top:6px; display:block; border:1px solid var(--border); background:#000; }
 .msg-audio { width:320px; margin-top:6px; display:block; }
 .msg-file-chip { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:8px 12px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--text); font-size:.85rem; transition:border-color .15s; user-select:text; }
@@ -4370,11 +4378,75 @@ function buildMediaPlayer(a,kind){
   // A format this app can't play (e.g. MKV with HEVC video): say so, and
   // offer to open it in the computer's own player, or download it.
   attachMediaSource(media,a.url,()=>showUnplayable(wrap,a,kind));
+  if(kind==='video')watchPartialPlayback(wrap,media,a);
   paintPlay();paintVol();
   return wrap;
 }
 // onUnplayable(code) is called if the file still won't load with a fresh
 // link — i.e. the format itself can't be played here, not an expired link.
+// Some files play only partly: the browser decodes the picture but not the
+// sound (e.g. DTS audio), or the sound but not the picture. Nothing errors,
+// so after a couple of seconds of playing, compare how much audio and video
+// has actually been decoded. "No audio decoded" can also mean the file
+// simply has no sound, so in that case the file's header is checked for an
+// audio track before saying anything.
+function watchPartialPlayback(wrap,media,a){
+  let checked=false;
+  media.addEventListener('playing',()=>{
+    if(checked)return;
+    setTimeout(async()=>{
+      if(checked||media.paused||!wrap.isConnected)return;
+      const vDec=media.webkitVideoDecodedByteCount,aDec=media.webkitAudioDecodedByteCount;
+      if(vDec===undefined||aDec===undefined)return; // this engine doesn't report it
+      checked=true;
+      if(vDec===0&&aDec>0)return showPartialNotice(wrap,a,'video');
+      if(aDec===0&&vDec>0&&await fileHasAudioTrack(a.url))showPartialNotice(wrap,a,'audio');
+    },2000);
+  });
+}
+// Looks for an audio track in the container's header (Matroska/WebM track
+// entries, or an MP4/MOV sound handler — which can sit at the end of the
+// file, so the end is read too). Only the first and last 1 MB are fetched.
+async function fileHasAudioTrack(rel){
+  try{
+    const url=await getAttachLink(rel);
+    const grab=async range=>{const r=await fetch(url,{headers:{Range:range}});return r.ok?new Uint8Array(await r.arrayBuffer()):new Uint8Array();};
+    const has=bytes=>{
+      // One char per byte (TextDecoder's "latin1" is really Windows-1252, which remaps 0x80–0x9F).
+      let t='';for(let i=0;i<bytes.length;i+=8192)t+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
+      // Matroska: a CodecID (element 0x86) starting "A_" (A_AAC, A_AC3, A_DTS…)
+      if(/\x86[\x80-\xff]A_/.test(t))return true;
+      // MP4/MOV: a track whose handler is "soun"
+      return /hdlr[\s\S]{8}soun/.test(t);
+    };
+    if(has(await grab('bytes=0-1048575')))return true;
+    return has(await grab('bytes=-1048576'));
+  }catch{return false;}
+}
+function showPartialNotice(wrap,a,missing){
+  if(wrap.querySelector('.mp-partial'))return;
+  const bar=document.createElement('div');bar.className='mp-partial';
+  bar.innerHTML=`${icon(missing==='audio'?'volume_off':'movie')}<span>${missing==='audio'?'No sound — this video\u2019s audio codec isn\u2019t supported in the app.':'No picture — this video\u2019s video codec isn\u2019t supported in the app.'}</span>
+    <button class="mp-up-btn primary" data-open>${icon('open_in_new')}Open in video player</button><button class="mp-partial-x" title="Dismiss">${icon('close')}</button>`;
+  bar.addEventListener('click',e=>e.stopPropagation());
+  bar.querySelector('.mp-partial-x').onclick=()=>bar.remove();
+  wireOpenExternally(bar.querySelector('[data-open]'),a);
+  wrap.appendChild(bar);
+}
+function wireOpenExternally(btn,a){
+  btn.onclick=async e=>{
+    e.stopPropagation();
+    if(btn.disabled)return;
+    btn.disabled=true;const label=btn.innerHTML;
+    const off=window.runtime.EventsOn('file:open-progress',p=>{
+      if(p.path!==a.url)return;
+      btn.innerHTML=`<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>${p.total>0?`Downloading ${Math.floor(100*p.done/p.total)}%`:'Downloading\u2026'}`;
+    });
+    try{await window.go.main.App.OpenAttachmentExternally(a.url,a.name||'attachment');}
+    catch(err){toast('Couldn\u2019t open it: '+err,true);}
+    finally{off?.();btn.disabled=false;btn.innerHTML=label;}
+  };
+}
 function showUnplayable(wrap,a,kind){
   if(wrap.classList.contains('unplayable'))return;
   wrap.classList.add('unplayable');
@@ -4382,22 +4454,10 @@ function showUnplayable(wrap,a,kind){
   const box=document.createElement('div');box.className='mp-unplayable';
   box.innerHTML=`${icon(kind==='video'?'movie':'music_note','mp-up-ic')}
     <div class="mp-up-text"><b>${kind==='video'?'This video':'This audio'} can\u2019t be played here</b>
-      <span>${ext&&ext.length<6?esc(ext)+' file — ':''}its format isn\u2019t one the app can play (that\u2019s ${kind==='video'?'MP4 or WebM with H.264, VP9 or AV1':'MP3, AAC, Ogg, Opus, FLAC or WAV'}).</span></div>
+      <span>${ext&&ext.length<6?esc(ext)+' file — ':''}${kind==='video'?'its video or audio codec':'its audio codec'} isn\u2019t supported in the app.</span></div>
     <div class="mp-up-actions"><button class="mp-up-btn primary" data-open>${icon('open_in_new')}Open in ${kind==='video'?'video':'audio'} player</button><button class="mp-up-btn" data-dl>${icon('download')}Download</button></div>`;
   box.querySelector('[data-dl]').onclick=e=>{e.stopPropagation();downloadAttachment(a);};
-  const open=box.querySelector('[data-open]');
-  open.onclick=async e=>{
-    e.stopPropagation();
-    if(open.disabled)return;
-    open.disabled=true;const label=open.innerHTML;
-    const off=window.runtime.EventsOn('file:open-progress',p=>{
-      if(p.path!==a.url)return;
-      open.innerHTML=`<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>${p.total>0?`Downloading ${Math.floor(100*p.done/p.total)}%`:'Downloading\u2026'}`;
-    });
-    try{await window.go.main.App.OpenAttachmentExternally(a.url,a.name||'attachment');}
-    catch(err){toast('Couldn\u2019t open it: '+err,true);}
-    finally{off?.();open.disabled=false;open.innerHTML=label;}
-  };
+  wireOpenExternally(box.querySelector('[data-open]'),a);
   if(kind==='video'){wrap.innerHTML='';wrap.appendChild(box);}
   else wrap.querySelector('.mp-bar')?.replaceWith(box);
 }
