@@ -97,6 +97,17 @@ type ChatMessage struct {
 	CreatedAt   string       `json:"created_at"`
 	Pinned      bool         `json:"pinned"`
 	Reactions   []Reaction   `json:"reactions"`
+	ReplyTo     string        `json:"reply_to,omitempty"` // the message this replies to
+	Reply       *ReplyPreview `json:"reply,omitempty"`    // and a preview of it
+}
+
+// ReplyPreview is what a reply shows of the message it answers.
+type ReplyPreview struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	Content     string `json:"content"`
+	Attachments int    `json:"attachments"`
+	Deleted     bool   `json:"deleted"`
 }
 
 // Reaction is one emoji's reactions on a message, in the order that emoji

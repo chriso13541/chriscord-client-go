@@ -68,6 +68,26 @@ export namespace main {
 	        this.is_private = source["is_private"];
 	    }
 	}
+	export class ReplyPreview {
+	    id: string;
+	    username: string;
+	    content: string;
+	    attachments: number;
+	    deleted: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReplyPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.username = source["username"];
+	        this.content = source["content"];
+	        this.attachments = source["attachments"];
+	        this.deleted = source["deleted"];
+	    }
+	}
 	export class Reaction {
 	    emoji: string;
 	    count: number;
@@ -94,6 +114,8 @@ export namespace main {
 	    created_at: string;
 	    pinned: boolean;
 	    reactions: Reaction[];
+	    reply_to?: string;
+	    reply?: ReplyPreview;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatMessage(source);
@@ -110,6 +132,8 @@ export namespace main {
 	        this.created_at = source["created_at"];
 	        this.pinned = source["pinned"];
 	        this.reactions = this.convertValues(source["reactions"], Reaction);
+	        this.reply_to = source["reply_to"];
+	        this.reply = this.convertValues(source["reply"], ReplyPreview);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -185,6 +209,7 @@ export namespace main {
 	    }
 	}
 	
+	
 	export class Room {
 	    id: string;
 	    name: string;
@@ -233,6 +258,8 @@ export namespace main {
 	    created_at: string;
 	    pinned: boolean;
 	    reactions: Reaction[];
+	    reply_to?: string;
+	    reply?: ReplyPreview;
 	    board_name: string;
 	    room_id: string;
 	
@@ -251,6 +278,8 @@ export namespace main {
 	        this.created_at = source["created_at"];
 	        this.pinned = source["pinned"];
 	        this.reactions = this.convertValues(source["reactions"], Reaction);
+	        this.reply_to = source["reply_to"];
+	        this.reply = this.convertValues(source["reply"], ReplyPreview);
 	        this.board_name = source["board_name"];
 	        this.room_id = source["room_id"];
 	    }

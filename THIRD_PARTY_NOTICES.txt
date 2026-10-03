@@ -23,9 +23,9 @@ folder_open, folder_zip, fullscreen, fullscreen_exit, gpp_maybe, group,
 headphones, headset_off, image, info, keep, keep_off, link, lock, mic,
 mic_off, mood, more_horiz, movie, music_note, notifications,
 notifications_off, open_in_new, pause, person, picture_as_pdf,
-play_arrow, progress_activity, schedule, search, select_all, send,
-settings, stop, tag, verified_user, video_file, volume_off, volume_up,
-zoom_in.
+play_arrow, progress_activity, reply, schedule, search, select_all,
+send, settings, stop, tag, verified_user, video_file, volume_off,
+volume_up, zoom_in.
 
 OpenMoji (emoji graphics)
 -------------------------

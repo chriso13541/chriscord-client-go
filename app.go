@@ -1143,17 +1143,23 @@ func (a *App) SubscribeBoard(boardID string) error {
 // the actual WebRTC session they establish — this used to be a
 // presence-only stub here.
 
-func (a *App) SendMessage(boardID, content string, attachments []Attachment) error {
+// SendMessage posts a message; replyTo is the id of the message it replies
+// to, or "".
+func (a *App) SendMessage(boardID, content string, attachments []Attachment, replyTo string) error {
 	a.writeMu.Lock(); defer a.writeMu.Unlock()
 	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
 	if conn == nil { return fmt.Errorf("not connected") }
 	if attachments == nil { attachments = []Attachment{} }
-	payload, _ := json.Marshal(map[string]interface{}{
+	msg := map[string]interface{}{
 		"type":        "message",
 		"board_id":    boardID,
 		"content":     content,
 		"attachments": attachments,
-	})
+	}
+	if replyTo != "" {
+		msg["reply_to"] = replyTo
+	}
+	payload, _ := json.Marshal(msg)
 	return conn.WriteMessage(websocket.TextMessage, payload)
 }
 

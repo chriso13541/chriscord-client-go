@@ -314,6 +314,30 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 .msg-avatar-time .hover-time { font-size:.68rem; color:var(--text-muted); opacity:0; transition:opacity .1s; white-space:nowrap; }
 .msg-group:hover .msg-avatar-time .hover-time { opacity:1; }
 .msg-body { flex:1; min-width:0; }
+/* Replies: a line above the message showing what it answers, joined to the
+   avatar by a curved "spine" like Discord's. Click it to jump there. */
+.msg-group.has-reply { flex-wrap:wrap; row-gap:2px; }
+.msg-reply { flex-basis:100%; position:relative; display:flex; align-items:center; gap:6px; min-width:0; padding-left:48px; font-size:.82rem; color:var(--text-muted); cursor:pointer; }
+/* The spine stops at the avatar's top edge (half the line's height, plus
+   the 2px row gap and the avatar's 2px top margin), and the avatar sits
+   above it, so it never shows over the picture. */
+.msg-reply::before { content:''; position:absolute; left:17px; top:50%; width:24px; height:calc(50% + 3px); border-left:2px solid var(--border); border-top:2px solid var(--border); border-top-left-radius:6px; pointer-events:none; }
+.msg-group.has-reply > .msg-avatar { position:relative; z-index:1; }
+.msg-reply .mr-avatar { width:16px; height:16px; border-radius:50%; flex-shrink:0; font-size:.5rem; font-weight:700; color:#fff; display:flex; align-items:center; justify-content:center; background-size:cover; background-position:center; }
+.msg-reply .mr-name { font-weight:600; color:var(--text); flex-shrink:0; }
+.msg-reply .mr-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.msg-reply .mr-text img.emoji { width:1.2em; height:1.2em; vertical-align:-.25em; }
+.msg-reply .mr-text i { font-style:italic; }
+.msg-reply:hover .mr-text { color:var(--text-strong); }
+.msg-reply.deleted { cursor:default; } .msg-reply.deleted .mr-text { font-style:italic; }
+.msg-group.reply-target-flash { background:rgba(114,137,218,.18); }
+/* The "Replying to …" bar above the message box */
+#reply-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; margin:0 0 -6px; border-radius:8px 8px 0 0; background:var(--bg-dark); border:1px solid var(--border); border-bottom:none; font-size:.85rem; color:var(--text-muted); }
+#reply-bar.hidden { display:none; }
+#reply-bar b { color:var(--text-strong); }
+#reply-bar .rb-x { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; display:inline-flex; padding:2px; border-radius:50%; }
+#reply-bar .rb-x:hover { color:var(--text-strong); background:var(--bg-light); }
+#reply-bar .rb-x .ic { width:16px; height:16px; }
 .msg-meta { display:flex; align-items:baseline; gap:8px; margin-bottom:2px; }
 .msg-username { font-weight:700; font-size:.9rem; color:var(--text-strong); }
 .msg-time { font-size:.72rem; color:var(--text-muted); }
@@ -854,8 +878,11 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .date-separator::before, .date-separator::after { content:''; flex:1; height:1px; background:var(--border); }
 .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; display:inline-block; }
 @keyframes spin { to { transform:rotate(360deg); } }
-#toast { position:fixed; bottom:20px; left:50%; max-width:min(420px,80%); text-align:center; transform:translateX(-50%) translateY(150%); background:var(--bg-light); border:1px solid var(--border); border-radius:8px; padding:10px 18px; font-size:.88rem; color:var(--text); transition:transform .25s ease; pointer-events:none; z-index:300; }
-#toast.show { transform:translateX(-50%) translateY(0); }
+/* Hidden toasts are fully invisible, not just pushed off the bottom — moved
+   by a fraction of their own height, an empty one could still peek up at
+   the window's edge after resizing or zooming. */
+#toast { position:fixed; bottom:20px; left:50%; max-width:min(420px,80%); text-align:center; transform:translateX(-50%) translateY(24px); opacity:0; visibility:hidden; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; padding:10px 18px; font-size:.88rem; color:var(--text); transition:transform .25s ease, opacity .2s ease, visibility 0s linear .25s; pointer-events:none; z-index:300; }
+#toast.show { transform:translateX(-50%) translateY(0); opacity:1; visibility:visible; transition:transform .25s ease, opacity .2s ease, visibility 0s; }
 #toast.error { border-color:var(--red); color:var(--red); }
 
 /* ACCOUNT GATE */
@@ -935,6 +962,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-person_remove" viewBox="0 -960 960 960"><path d="M640-520v-80h240v80H640Zm-280 40q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
   <symbol id="ic-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
   <symbol id="ic-lock" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></symbol>
+  <symbol id="ic-reply" viewBox="0 -960 960 960"><path d="M760-200v-160q0-50-35-85t-85-35H273l144 144-57 56-240-240 240-240 57 56-144 144h367q83 0 141.5 58.5T840-360v160h-80Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -1133,6 +1161,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <div id="input-area">
           <div id="emoji-picker" class="hidden" role="dialog" aria-label="Emoji"></div>
           <div id="emoji-suggest" class="hidden" role="listbox"></div>
+          <div id="reply-bar" class="hidden"><svg class="ic" aria-hidden="true" style="width:16px;height:16px"><use href="#ic-reply"/></svg><span>Replying to <b id="reply-bar-name"></b></span><button class="rb-x" id="reply-bar-x" title="Cancel reply (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
             <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
@@ -1778,6 +1807,65 @@ function voiceSoundsFor(prev,next,prevDropped={},nextDropped={}){
   const a=who(prev||{},prevDropped||{}),b=who(next||{},nextDropped||{});
   if([...b].some(u=>!a.has(u)))playSound('join');
   else if([...a].some(u=>!b.has(u)))playSound('leave');
+}
+
+// ── REPLIES ──────────────────────────────────────────────────────
+// Reply (from the message's hover bar, right-click or ⋯ menu) shows a
+// "Replying to …" bar above the message box; the sent message carries
+// reply_to, and the server adds a preview of the original. Messages that
+// reply show it above themselves — click it to jump to the original.
+// A reply to one of your messages pings you like an @mention.
+state.replyingTo=null;
+const pingsMe=msg=>msg.username!==state.username&&(mentionsMe(msg.content)||msg.reply?.username===state.username&&!msg.reply?.deleted);
+function startReply(msg){
+  state.replyingTo={id:msg.id,username:msg.username};
+  document.getElementById('reply-bar-name').textContent=msg.username;
+  document.getElementById('reply-bar').classList.remove('hidden');
+  document.getElementById('msg-input').focus();
+}
+function cancelReply(){
+  state.replyingTo=null;
+  document.getElementById('reply-bar')?.classList.add('hidden');
+}
+function replyPreviewText(r){
+  if(!r||r.deleted)return '<i>Original message was deleted</i>';
+  if(r.content)return emojify(esc(r.content.replace(/\s+/g,' ')));
+  return r.attachments?`<i>Click to see attachment${r.attachments>1?'s':''}</i>`:'<i>(no text)</i>';
+}
+function replyLineHTML(r,replyTo){
+  const deleted=!r||r.deleted;
+  const name=r?.username||'';
+  return `<div class="msg-reply${deleted?' deleted':''}" data-reply-id="${esc(replyTo)}" title="${deleted?'':'Jump to the original message'}">
+    ${deleted?'':`<span class="mr-avatar" data-pfp-user="${esc(name)}"></span><span class="mr-name"${nameColor(name)?` style="color:${nameColor(name)}"`:''}>${esc(name)}</span>`}
+    <span class="mr-text">${replyPreviewText(r)}</span></div>`;
+}
+// Original edited (content) or deleted (null): update every reply to it.
+function updateReplyPreviews(id,content){
+  for(const m of state.messages){
+    if(m.reply_to!==id||!m.reply)continue;
+    if(content===null)m.reply={...m.reply,deleted:true};else m.reply={...m.reply,content:content.slice(0,200)};
+  }
+  document.querySelectorAll(`.msg-reply[data-reply-id="${CSS.escape(id)}"]`).forEach(el=>{
+    const m=state.messages.find(x=>x.reply_to===id);
+    if(!m)return;
+    const fresh=document.createElement('div');fresh.innerHTML=replyLineHTML(m.reply,id);
+    el.querySelector('.mr-text').innerHTML=fresh.querySelector('.mr-text').innerHTML;
+    if(content===null){el.classList.add('deleted');el.querySelectorAll('.mr-avatar,.mr-name').forEach(x=>x.remove());}
+  });
+}
+// Jump to the original: straight there if it's loaded, otherwise load the
+// conversation around it first.
+function goToRepliedMessage(id){
+  if(document.querySelector(`.msg-group[data-id="${CSS.escape(id)}"]`))scrollToAndHighlight(id);
+  else jumpToMessageId(id);
+}
+function initReplies(){
+  document.getElementById('reply-bar-x').addEventListener('click',cancelReply);
+  document.getElementById('msg-input').addEventListener('keydown',e=>{
+    // Esc cancels the reply (unless it's closing the emoji/@ suggestions).
+    const suggesting=!document.getElementById('emoji-suggest')?.classList.contains('hidden');
+    if(e.key==='Escape'&&state.replyingTo&&!suggesting)cancelReply();
+  });
 }
 
 // ── MESSAGE LINKS ────────────────────────────────────────────────
@@ -3042,7 +3130,10 @@ function avatarStill(url){
   return avatarStills.get(url);
 }
 function setAvatarImage(el,url){
-  const paint=u=>{el.style.backgroundImage=`url("${u}")`;el.style.backgroundSize='cover';el.style.backgroundPosition='center';el.textContent='';};
+  // The fallback colour is cleared once a picture is in: left underneath,
+  // it shows as a thin coloured fringe round the circle's edge on scaled
+  // (125%/150%) Windows displays — easily mistaken for a speaking ring.
+  const paint=u=>{el.style.backgroundImage=`url("${u}")`;el.style.backgroundColor='transparent';el.style.backgroundSize='cover';el.style.backgroundPosition='center';el.textContent='';};
   if(el.closest?.('.profile-card')||el.id==='pfp-current-circle'){paint(url);return;}
   el.dataset.pfpSrc=url;
   avatarStill(url).then(still=>{if(el.dataset.pfpSrc===url)paint(still||url);});
@@ -3152,6 +3243,7 @@ async function selectBoard(boardId,boardName,roomId){
   if(state.selectedBoardId===boardId)return;
   state.selectedBoardId=boardId;state.selectedBoardName=boardName;state.selectedRoomId=roomId??state.selectedRoomId;state.messages=[];clearAttachQueue();
   updateTitlebarLocation();
+  cancelReply();
   state.unreadBoards.delete(boardId);
   if(state.mentionCounts)delete state.mentionCounts[boardId];
   const pinsWereOpen=state.resultsMode==='pins';
@@ -3393,6 +3485,10 @@ function initPasteAttachments(){
 }
 async function pickAndAttach(){
   const paths=await window.go.main.App.PickFiles();
+  // Back to the message box (not the + button), so pressing Enter next sends
+  // the message instead of opening the file picker again.
+  const input=document.getElementById('msg-input');
+  if(!input.disabled){input.focus();const n=input.value.length;input.setSelectionRange(n,n);}
   if(paths?.length)await queueFiles(paths);
 }
 
@@ -3494,7 +3590,7 @@ const GROUP_WINDOW_MS = 7*60*1000;
 function isGroupedWith(prev,msg){
   // A pinned message always starts its own group, so its name line — and
   // the pin icon beside it — is always shown.
-  if(!prev||prev.username!==msg.username||msg.pinned)return false;
+  if(!prev||prev.username!==msg.username||msg.pinned||msg.reply_to)return false;
   const t1=Date.parse(prev.created_at),t2=Date.parse(msg.created_at);
   if(!isFinite(t1)||!isFinite(t2))return false;
   return (t2-t1)>=0 && (t2-t1)<GROUP_WINDOW_MS;
@@ -4103,9 +4199,9 @@ function buildMsgEl(msg,grouped){
   const attachments=msg.attachments||[];
 
   const div=document.createElement('div');
-  div.className='msg-group'+(grouped?' grouped':'')+(msg.username!==state.username&&mentionsMe(msg.content)?' mentions-me':'');
+  div.className='msg-group'+(grouped?' grouped':'')+(msg.reply_to?' has-reply':'')+(pingsMe(msg)?' mentions-me':'');
   div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
-  div.innerHTML=`
+  div.innerHTML=`${msg.reply_to?replyLineHTML(msg.reply,msg.reply_to):''}
     ${grouped
       ? `<div class="msg-avatar msg-avatar-time"><span class="hover-time" title="${hoverTime}">${time}</span></div>`
       : `<div class="msg-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div>`}
@@ -4116,7 +4212,7 @@ function buildMsgEl(msg,grouped){
       </div>
       ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
-    <div class="msg-actions"><button class="msg-action-btn msg-react-btn" title="Add Reaction">${icon('add_reaction')}</button><button class="msg-action-btn msg-more-btn" title="More options">${icon('more_horiz')}</button></div>`;
+    <div class="msg-actions"><button class="msg-action-btn msg-reply-btn" title="Reply">${icon('reply')}</button><button class="msg-action-btn msg-react-btn" title="Add Reaction">${icon('add_reaction')}</button><button class="msg-action-btn msg-more-btn" title="More options">${icon('more_horiz')}</button></div>`;
 
   // Grouped follow-up messages show a hover timestamp instead of an
   // avatar, so there's only something to apply on a group's first message.
@@ -4169,6 +4265,13 @@ function buildMsgEl(msg,grouped){
   body.appendChild(reactBar);
   renderReactions(div,msg);
   div.querySelector('.msg-react-btn').addEventListener('click',e=>{e.stopPropagation();openReactionPicker(msg,e.currentTarget);});
+  div.querySelector('.msg-reply-btn').addEventListener('click',e=>{e.stopPropagation();startReply(msg);});
+  const replyLine=div.querySelector('.msg-reply');
+  if(replyLine){
+    const av=replyLine.querySelector('.mr-avatar');
+    if(av){setAvatarFallback(av,msg.reply.username);applyUserAvatar(av,msg.reply.username);}
+    replyLine.addEventListener('click',e=>{e.stopPropagation();if(!replyLine.classList.contains('deleted'))goToRepliedMessage(msg.reply_to);});
+  }
 
   // Async link preview (fire and forget)
   if(msg.content)maybeRenderPreviews(div,msg.content);
@@ -4308,7 +4411,9 @@ async function sendMessage(){
   // straight back from the server.
   readyAttachments.forEach(a=>{if(a.preview&&a.url&&!imageBlobs.has(a.url))imageBlobs.set(a.url,Promise.resolve(a.preview));});
   clearAttachQueue();
-  try{await window.go.main.App.SendMessage(state.selectedBoardId,content,attachObjs);}
+  const replyTo=state.replyingTo?.id||'';
+  cancelReply();
+  try{await window.go.main.App.SendMessage(state.selectedBoardId,content,attachObjs,replyTo);}
   catch(err){toast('Send failed: '+err,true);input.value=content;}
 }
 
@@ -5689,6 +5794,7 @@ function messageMenu(msgEl,msg,e){
     imgAttach?{label:'Copy Image',icon:'content_copy',action:()=>copyImage(img.currentSrc||img.src)}:null,
     imgAttach?{label:'Save Image',icon:'download',action:()=>downloadAttachment(imgAttach)}:null,
     (selection||link||imgAttach)?'-':null,
+    can(PERM.SEND)?{label:'Reply',icon:'reply',action:()=>startReply(msg)}:null,
     can(PERM.REACT)?{label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))}:null,
     msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content);toast('Text copied');}}:null,
     {label:'Copy Message Link',icon:'link',action:()=>{copyText(messageLink(msg));toast('Message link copied');}},
@@ -6487,7 +6593,7 @@ function init(){
   });
   window.runtime.EventsOn('chat:message',msg=>{
     if(!msg)return;
-    if(msg.username!==state.username&&mentionsMe(msg.content)){
+    if(pingsMe(msg)){
       playSound('mention');
       if(msg.board_id!==state.selectedBoardId)markBoardMentioned(msg.board_id);
     }
@@ -6502,6 +6608,7 @@ function init(){
   window.runtime.EventsOn('chat:edit',ev=>{
     if(!ev||ev.board_id!==state.selectedBoardId)return;
     const m=state.messages.find(m=>m.id===ev.id);if(m){m.content=ev.content;m.edited=true;if(m.pinned)refreshPinsIfOpen(ev.board_id);}
+    updateReplyPreviews(ev.id,ev.content);
     const el=document.querySelector(`.msg-group[data-id="${CSS.escape(ev.id)}"]`);
     if(el){
       // Skip while you're editing this message yourself — your own save
@@ -6512,6 +6619,8 @@ function init(){
   });
   window.runtime.EventsOn('chat:delete',ev=>{
     if(!ev||ev.board_id!==state.selectedBoardId)return;
+    updateReplyPreviews(ev.id,null);
+    if(state.replyingTo?.id===ev.id)cancelReply();
     removeMessageFromDOM(ev.id);
     refreshPinsIfOpen(ev.board_id);
   });
@@ -6671,6 +6780,7 @@ function init(){
   document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
+  initReplies();
   initVideoConvert();
   initChatPinning();
   initPanelResize();

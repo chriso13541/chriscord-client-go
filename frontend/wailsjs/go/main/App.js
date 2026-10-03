@@ -258,8 +258,8 @@ export function SearchServerFiltered(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['SearchServerFiltered'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function SendMessage(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3);
+export function SendMessage(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3, arg4);
 }
 
 export function SendTyping(arg1) {
@@ -280,6 +280,10 @@ export function SetMessagePinned(arg1, arg2) {
 
 export function SetPresence(arg1) {
   return window['go']['main']['App']['SetPresence'](arg1);
+}
+
+export function SetTranscodeSettings(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetTranscodeSettings'](arg1, arg2, arg3);
 }
 
 export function SetUserAudio(arg1, arg2, arg3) {
@@ -320,6 +324,10 @@ export function UploadFile(arg1) {
 
 export function UploadFileData(arg1, arg2) {
   return window['go']['main']['App']['UploadFileData'](arg1, arg2);
+}
+
+export function UploadFileWithProgress(arg1, arg2) {
+  return window['go']['main']['App']['UploadFileWithProgress'](arg1, arg2);
 }
 
 export function VideoConversionInfo() {
