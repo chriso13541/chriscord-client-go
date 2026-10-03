@@ -1393,12 +1393,25 @@ func (a *App) PickFiles() ([]string, error) {
 
 // UploadFile streams a file to the server without loading it all into memory.
 func (a *App) UploadFile(filePath string) (*UploadResult, error) {
+	return a.UploadFileWithProgress(filePath, "")
+}
+
+// UploadFileWithProgress is UploadFile that also reports how far along it
+// is: "upload:progress" {id, percent} a few times a second, where id is the
+// jobID the app passed in (nothing is reported for an empty jobID).
+func (a *App) UploadFileWithProgress(filePath, jobID string) (*UploadResult, error) {
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
 	if domain == "" { return nil, fmt.Errorf("not connected") }
 
-	f, err := os.Open(filePath)
+	file, err := os.Open(filePath)
 	if err != nil { return nil, fmt.Errorf("could not open file: %w", err) }
-	defer f.Close()
+	defer file.Close()
+	var f io.Reader = file
+	if st, err := file.Stat(); err == nil && jobID != "" {
+		f = &progressReader{r: file, total: st.Size(), report: func(pct int) {
+			runtime.EventsEmit(a.ctx, "upload:progress", map[string]interface{}{"id": jobID, "percent": pct})
+		}}
+	}
 
 	filename := filepath.Base(filePath)
 	pr, pw   := io.Pipe()
@@ -1429,6 +1442,34 @@ func (a *App) UploadFile(filePath string) (*UploadResult, error) {
 	var result UploadResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil { return nil, err }
 	return &result, nil
+}
+
+// progressReader counts bytes as the upload reads the file and reports the
+// percentage (at most every 200 ms, and once more at 100%). It measures
+// what has been handed to the network, which tracks what has been sent.
+type progressReader struct {
+	r      io.Reader
+	total  int64
+	done   int64
+	last   time.Time
+	lastP  int
+	report func(int)
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	p.done += int64(n)
+	if p.total > 0 {
+		pct := int(p.done * 100 / p.total)
+		if pct > 100 {
+			pct = 100
+		}
+		if pct != p.lastP && (time.Since(p.last) > 200*time.Millisecond || pct == 100) {
+			p.last, p.lastP = time.Now(), pct
+			p.report(pct)
+		}
+	}
+	return n, err
 }
 
 // UploadFileData uploads a file the frontend has in memory rather than on

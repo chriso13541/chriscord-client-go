@@ -3217,7 +3217,7 @@ function renderAttachQueue(){
   state.attachQueue.forEach(item=>{
     const tile=document.createElement('div');tile.className='attach-tile '+item.status;
     const status=item.status==='converting'?`${icon('progress_activity','spin')}${esc(item.convertStage||'Converting')}${item.convertPct?` ${item.convertPct}%`:''}`
-      :item.status==='pending'?`${icon('progress_activity','spin')}Uploading`
+      :item.status==='pending'?`${icon('progress_activity','spin')}Uploading${item.uploadPct!=null?` ${item.uploadPct}%`:''}`
       :item.status==='error'?`${icon('error')}Failed`:'';
     tile.innerHTML=`<div class="tile-thumb">${status?`<span class="tile-status">${status}</span>`:''}</div><span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
     const thumb=tile.querySelector('.tile-thumb');
@@ -3290,7 +3290,7 @@ async function queueFiles(filePaths){
       still.status='pending';renderAttachQueue();
     }
     try{
-      const result=await window.go.main.App.UploadFile(uploadPath);
+      const result=await window.go.main.App.UploadFileWithProgress(uploadPath,'up'+id);
       if(converted)window.go.main.App.DiscardConverted(converted);
       const item=state.attachQueue.find(a=>a.id===id);
       if(item){
@@ -6386,6 +6386,12 @@ function initVideoConvert(){
         :' No FFmpeg is available in this build of the app, so videos are sent as they are.';
     }catch{}
   },3000);
+  // Upload progress for each attachment tile ("Uploading 42%").
+  window.runtime.EventsOn('upload:progress',p=>{
+    const item=state.attachQueue.find(a=>'up'+a.id===p.id);
+    if(!item||item.status!=='pending')return;
+    item.uploadPct=p.percent;renderAttachQueue();
+  });
   window.runtime.EventsOn('convert:progress',p=>{
     const item=state.attachQueue.find(a=>'att'+a.id===p.id);
     if(!item||item.status!=='converting')return;
