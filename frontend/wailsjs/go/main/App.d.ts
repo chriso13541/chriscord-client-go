@@ -4,11 +4,17 @@ import {main} from '../models';
 
 export function CancelAccountExport():Promise<void>;
 
+export function CancelConversion(arg1:string):Promise<void>;
+
 export function Connect(arg1:string,arg2:string):Promise<void>;
+
+export function ConvertVideoForPlayback(arg1:string,arg2:string):Promise<string>;
 
 export function CreateAccount(arg1:string,arg2:string,arg3:string):Promise<main.AccountView>;
 
 export function DeleteMessage(arg1:string):Promise<void>;
+
+export function DiscardConverted(arg1:string):Promise<void>;
 
 export function Disconnect():Promise<void>;
 
@@ -84,6 +90,8 @@ export function ListAccounts():Promise<Array<main.AccountSummary>>;
 
 export function OpenAttachmentExternally(arg1:string,arg2:string):Promise<void>;
 
+export function OpenURL(arg1:string):Promise<void>;
+
 export function PickAccountFile():Promise<string>;
 
 export function PickAccountFolder():Promise<string>;
@@ -112,6 +120,8 @@ export function ResolveServerAddress(arg1:string):Promise<string>;
 
 export function SaveAccountExport():Promise<string>;
 
+export function SaveAttachment(arg1:string,arg2:string):Promise<string>;
+
 export function SaveClientSettings(arg1:string):Promise<void>;
 
 export function SaveProfile(arg1:string,arg2:string):Promise<void>;
@@ -136,6 +146,8 @@ export function SetPresence(arg1:string):Promise<void>;
 
 export function SetUserAudio(arg1:string,arg2:number,arg3:boolean):Promise<void>;
 
+export function ShowInFolder(arg1:string):Promise<void>;
+
 export function StartMicTest(arg1:string,arg2:string):Promise<void>;
 
 export function StopMicTest():Promise<void>;
@@ -153,3 +165,5 @@ export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Pr
 export function UploadFile(arg1:string):Promise<main.UploadResult>;
 
 export function UploadFileData(arg1:string,arg2:string):Promise<main.UploadResult>;
+
+export function VideoConversionInfo():Promise<Record<string, any>>;

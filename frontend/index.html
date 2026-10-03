@@ -706,6 +706,7 @@ body.tb-mac #titlebar .tb-title { padding-left:78px; justify-content:center; pad
 /* Full-screen layers start below the bar, so it's never covered. */
 body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom-titlebar #settings-modal { top:var(--titlebar-h); }
 
+#toast .toast-action { margin-left:10px; padding:3px 10px; border-radius:4px; border:none; background:var(--accent); color:#fff; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; pointer-events:auto; }
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -1234,6 +1235,10 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <p class="settings-hint" id="ap-override-hint" style="margin-top:0"></p>
       </div>
       <div class="ap-override">
+        <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-convert"> Convert videos before sending so everyone can play them</label>
+        <p class="settings-hint" style="margin-top:0" id="ap-convert-hint">MKVs, HEVC and other formats become MP4s on your computer before they're sent. Videos that already play everywhere are sent as they are.</p>
+      </div>
+      <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-spell"> Check spelling while typing</label>
         <p class="settings-hint" style="margin-top:0">Misspelled words get a red underline in the message box; right-click one for suggestions or to add it to your dictionary.</p>
       </div>
@@ -1430,7 +1435,15 @@ function showScreen(id){
   try{updateTitlebarLocation();}catch{}
 }
 let toastTimer;
-function toast(msg,isError=false){const el=document.getElementById('toast');el.textContent=msg;el.className='show'+(isError?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3500);}
+// toast(message, isError, action?, sticky?) — action {label, fn} adds a
+// button (and keeps it up a little longer); sticky keeps it until replaced.
+function toast(msg,isError=false,action=null,sticky=false){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='show'+(isError?' error':'');
+  if(action){const b=document.createElement('button');b.className='toast-action';b.textContent=action.label;b.onclick=()=>{action.fn();el.classList.remove('show');};el.appendChild(document.createTextNode(' '));el.appendChild(b);}
+  clearTimeout(toastTimer);
+  if(!sticky)toastTimer=setTimeout(()=>el.classList.remove('show'),action?6000:3500);
+}
 function esc(str){return String(str??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ── ACCOUNT GATE ─────────────────────────────────────────────────
@@ -3178,6 +3191,10 @@ let attachIdCounter=0;
 function clearAttachQueue(){state.attachQueue=[];renderAttachQueue();}
 const PREVIEWABLE_IMAGE=/\.(png|jpe?g|gif|webp|bmp|avif)$/i;
 const PREVIEWABLE_VIDEO=/\.(mp4|webm|mov|m4v|ogv)$/i;
+// Videos that go through the converter before sending (it leaves ones that
+// already play everywhere untouched).
+const CONVERTIBLE_VIDEO=/\.(mkv|mp4|m4v|mov|avi|webm|wmv|flv|ts|m2ts|mts|mpg|mpeg|vob|ogv|3gp)$/i;
+let videoConvertOn=localStorage.getItem('videoConvert')!=='0';
 
 // Material Symbol that best describes a file, for attachment tiles and
 // file chips in messages. Checked by extension first (it's all there is
@@ -3199,7 +3216,8 @@ function renderAttachQueue(){
   el.classList.remove('empty');
   state.attachQueue.forEach(item=>{
     const tile=document.createElement('div');tile.className='attach-tile '+item.status;
-    const status=item.status==='pending'?`${icon('progress_activity','spin')}Uploading`
+    const status=item.status==='converting'?`${icon('progress_activity','spin')}${esc(item.convertStage||'Converting')}${item.convertPct?` ${item.convertPct}%`:''}`
+      :item.status==='pending'?`${icon('progress_activity','spin')}Uploading`
       :item.status==='error'?`${icon('error')}Failed`:'';
     tile.innerHTML=`<div class="tile-thumb">${status?`<span class="tile-status">${status}</span>`:''}</div><span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
     const thumb=tile.querySelector('.tile-thumb');
@@ -3214,7 +3232,9 @@ function renderAttachQueue(){
     }else{
       thumb.insertAdjacentHTML('afterbegin',icon(fileTypeIcon(item.filename,item.mime),'tile-type-ic'));
     }
-    tile.querySelector('.chip-remove').addEventListener('click',e=>{e.stopPropagation();const id=+e.currentTarget.dataset.id;state.attachQueue=state.attachQueue.filter(a=>a.id!==id);renderAttachQueue();});
+    tile.querySelector('.chip-remove').addEventListener('click',e=>{e.stopPropagation();const id=+e.currentTarget.dataset.id;
+      if(state.attachQueue.find(a=>a.id===id)?.status==='converting')window.go.main.App.CancelConversion('att'+id);
+      state.attachQueue=state.attachQueue.filter(a=>a.id!==id);renderAttachQueue();});
     el.appendChild(tile);
   });
 }
@@ -3252,8 +3272,26 @@ async function queueFiles(filePaths){
         if(item){item.preview=dataUrl;renderAttachQueue();}
       }).catch(err=>console.warn('attachment preview failed:',err));
     }
+    // Videos are converted first if other people's apps might not be able to
+    // play them (see transcode.go) — then the converted copy is uploaded.
+    let uploadPath=path,converted=null;
+    if(videoConvertOn&&CONVERTIBLE_VIDEO.test(filename)){
+      const item=state.attachQueue.find(a=>a.id===id);
+      if(item){item.status='converting';item.convertPct=0;item.convertStage='Checking video';renderAttachQueue();}
+      try{
+        converted=await window.go.main.App.ConvertVideoForPlayback(path,'att'+id);
+        if(converted)uploadPath=converted;
+      }catch(err){
+        if(String(err).includes('cancelled'))continue; // tile was removed
+        toast(`Couldn\u2019t convert ${filename} \u2014 sending the original. (${err})`,true);
+      }
+      const still=state.attachQueue.find(a=>a.id===id);
+      if(!still){if(converted)window.go.main.App.DiscardConverted(converted);continue;}
+      still.status='pending';renderAttachQueue();
+    }
     try{
-      const result=await window.go.main.App.UploadFile(path);
+      const result=await window.go.main.App.UploadFile(uploadPath);
+      if(converted)window.go.main.App.DiscardConverted(converted);
       const item=state.attachQueue.find(a=>a.id===id);
       if(item){
         item.url=result.url;item.mime=result.mime;item.filename=result.filename;item.status='done';
@@ -3415,8 +3453,9 @@ function appendPreviewCard(body,p,url){
 function openExternalURL(url){
   const ml=parseMessageLink(url);
   if(ml){openMessageLink(ml);return;} // a chriscord message link: jump, don't open a browser
-  // In Wails, BrowserOpenURL opens in the OS default browser
-  window.runtime.BrowserOpenURL(url);
+  // Opened by the app's Go side, not Wails' BrowserOpenURL — that one turns
+  // away links with characters like ( ) ! ~ or spaces, which real links have.
+  window.go.main.App.OpenURL(url).catch(err=>toast('Couldn\u2019t open that link: '+err,true));
 }
 
 // ── MESSAGES ─────────────────────────────────────────────────────
@@ -4128,14 +4167,21 @@ function toggleDropdown(msgEl,msg){
 // itself never touches the bytes — previously the Go side re-fetched the
 // whole file into a Save dialog on top of whatever the chat view had
 // already loaded to display it.
+// Downloads are saved by the app itself: a Save dialog (starting in your
+// Downloads folder, with the file's name filled in), progress while it
+// downloads, then a "Show in folder" button. (It used to hand a link to the
+// browser, which Wails refused for file names with ( ) ! ~ or spaces.)
 async function downloadAttachment(a){
+  const name=a.name||'file';
+  const off=window.runtime.EventsOn('file:save-progress',p=>{
+    if(p.path!==a.url)return;
+    toast(p.total>0?`Downloading ${name} \u2014 ${Math.floor(100*p.done/p.total)}%`:`Downloading ${name}\u2026`,false,null,true);
+  });
   try{
-    // Always a brand-new link (not the cached one used for display), so
-    // the browser gets the full 5 minutes to start the download.
-    const base=await getAttachLink(a.url,true);
-    const sep=base.includes('?')?'&':'?';
-    window.runtime.BrowserOpenURL(`${base}${sep}download=1&name=${encodeURIComponent(a.name||'file')}`);
+    const saved=await window.go.main.App.SaveAttachment(a.url,name);
+    if(saved)toast(`Saved ${name}`,false,{label:'Show in folder',fn:()=>window.go.main.App.ShowInFolder(saved)});
   }catch(err){toast('Download failed: '+err,true);}
+  finally{off?.();}
 }
 function closeDropdown(){if(dotsMenuFor)closeContextMenu();state.activeDropdown=null;}
 
@@ -4225,6 +4271,7 @@ async function sendMessage(){
   const readyAttachments=state.attachQueue.filter(a=>a.status==='done');
   if(!content&&!readyAttachments.length)return;
   if(!state.selectedBoardId)return;
+  if(state.attachQueue.some(a=>a.status==='converting')){toast('Still converting a video, please wait…');return;}
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
   input.value='';autoResize(input);closeEmojiSuggest();renderComposerHighlight();
   stopTyping(); // sent — back to the plain green circle
@@ -5276,7 +5323,7 @@ function initPresence(){
 // locally, so they travel in the exported account key. On sign-in the
 // account's copy wins — that's how an imported account brings its look.
 function collectClientSettings(){
-  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords};
+  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords,videoConvert:videoConvertOn};
 }
 async function persistClientSettings(){
   try{await window.go.main.App.SaveClientSettings(JSON.stringify(collectClientSettings()));}
@@ -5290,6 +5337,7 @@ async function loadClientSettings(){
   if(s.appearance){appearance={...APPEARANCE_DEFAULTS,...s.appearance};try{localStorage.setItem('appearance',JSON.stringify(appearance));}catch{}}
   if(typeof s.appearanceOverride==='boolean'){appearanceOverride=s.appearanceOverride;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');}
   if(s.sounds&&typeof s.sounds==='object'){soundSettings={...SOUND_DEFAULTS,...s.sounds};localStorage.setItem('soundSettings',JSON.stringify(soundSettings));try{renderSoundSettings();}catch{}}
+  if(typeof s.videoConvert==='boolean'){videoConvertOn=s.videoConvert;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');const b=document.getElementById('ap-convert');if(b)b.checked=videoConvertOn;}
   if(typeof s.spellcheck==='boolean'){spellOn=s.spellcheck;localStorage.setItem('spellcheck',spellOn?'1':'0');const b=document.getElementById('ap-spell');if(b)b.checked=spellOn;if(spellOn)startSpellcheck();}
   if(Array.isArray(s.spellWords)){spellWords=s.spellWords.filter(w=>typeof w==='string');localStorage.setItem('spellWords',JSON.stringify(spellWords));spellWorker?.postMessage({type:'setCustom',words:spellWords});}
   if(typeof s.elasticScroll==='boolean'){elasticOn=s.elasticScroll;localStorage.setItem('elasticScroll',elasticOn?'1':'0');const b=document.getElementById('ap-elastic');if(b)b.checked=elasticOn;}
@@ -6327,6 +6375,25 @@ function addSpellWord(word){
   spellCache.set(word,true);
   persistClientSettings();renderComposerHighlight();
 }
+function initVideoConvert(){
+  const box=document.getElementById('ap-convert'),hint=document.getElementById('ap-convert-hint');
+  box.checked=videoConvertOn;
+  box.addEventListener('change',()=>{videoConvertOn=box.checked;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');persistClientSettings();});
+  // Say what will do the work (checked once, a little after start-up).
+  setTimeout(async()=>{
+    try{
+      const i=await window.go.main.App.VideoConversionInfo();
+      const enc={h264_nvenc:'your NVIDIA graphics card',h264_mf:'your graphics card (via Windows Media Foundation)',libx264:'your CPU'}[i.encoder]||i.encoder;
+      hint.textContent+=i.available?` Conversions use ${enc}${i.ffmpeg==='system'?' and the FFmpeg installed on this computer':''}.`
+        :' No FFmpeg is available in this build of the app, so videos are sent as they are.';
+    }catch{}
+  },3000);
+  window.runtime.EventsOn('convert:progress',p=>{
+    const item=state.attachQueue.find(a=>'att'+a.id===p.id);
+    if(!item||item.status!=='converting')return;
+    item.convertPct=p.percent;item.convertStage=p.stage||'Converting';renderAttachQueue();
+  });
+}
 function initSpellcheck(){
   const box=document.getElementById('ap-spell');
   box.checked=spellOn;
@@ -6544,6 +6611,7 @@ function init(){
   document.addEventListener('click',e=>{if(!e.target.closest('#ping-popover'))closePingPanel();});
   initLightbox();
   initProfilePopups();
+  initVideoConvert();
   initChatPinning();
   initPanelResize();
   initSpellcheck();

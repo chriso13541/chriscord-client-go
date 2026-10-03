@@ -42,3 +42,6 @@ Thumbs.db
 *.sublime-workspace
 
 *.md
+
+# FFmpeg build work folders (the finished ffmpeg/<os>/ffmpeg*.gz is kept)
+/ffmpeg/.build-*/

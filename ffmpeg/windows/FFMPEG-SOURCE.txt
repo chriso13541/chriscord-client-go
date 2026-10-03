@@ -1,0 +1,6 @@
+This FFmpeg (ffmpeg.exe, gzipped) was built by ffmpeg/build-ffmpeg.sh from:
+  FFmpeg           n8.1   https://github.com/FFmpeg/FFmpeg/tree/n8.1
+  x264             stable     https://code.videolan.org/videolan/x264 (mirror: https://github.com/mirror/x264)
+  nv-codec-headers n13.0.19.0    https://github.com/FFmpeg/nv-codec-headers/tree/n13.0.19.0
+It is licensed under the GNU GPL (see FFMPEG-LICENSE.txt). The exact build
+recipe is build-ffmpeg.sh in this directory.

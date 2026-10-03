@@ -1,0 +1,104 @@
+#!/bin/sh
+# Builds the small FFmpeg that ships inside chriscord, for converting
+# videos so they play in the app (see ../transcode.go).
+#
+#   ffmpeg/build-ffmpeg.sh windows    # → ffmpeg/windows/ffmpeg.exe.gz   (run on Linux / WSL)
+#   ffmpeg/build-ffmpeg.sh linux      # → ffmpeg/linux/ffmpeg.gz
+#
+# Then build the app as usual (wails build); the matching file is embedded.
+# Without one, the app falls back to an ffmpeg on the PATH, and without
+# that, videos are just sent as they are.
+#
+# It's FFmpeg with only what chriscord needs: the common video/audio
+# decoders (H.264, HEVC, VP8/9, MPEG-2/4, VC-1; AAC, AC-3, E-AC-3, DTS,
+# TrueHD, FLAC, Opus, Vorbis, MP3…), the MKV/MP4/AVI/TS/etc. readers, MP4
+# and WebM writers, and H.264 encoders: x264 (software) plus NVIDIA NVENC
+# and, on Windows, Media Foundation (Intel/AMD/NVIDIA hardware). About
+# 10–15 MB instead of ~165 MB for a full build.
+#
+# Needs: a C compiler, make, nasm, pkg-config, curl; for Windows also
+# mingw-w64 (Debian/Ubuntu: sudo apt install build-essential nasm pkg-config curl mingw-w64).
+#
+# Licence: with x264 the result is GPL-licensed FFmpeg. Shipping it next to
+# chriscord is fine (it's a separate program chriscord runs), as long as its
+# licence and source go with it — this script records both in
+# ffmpeg/<os>/FFMPEG-LICENSE.txt and FFMPEG-SOURCE.txt.
+set -eu
+
+TARGET=${1:-}
+case "$TARGET" in windows|linux) ;; *) echo "usage: $0 windows|linux" >&2; exit 2 ;; esac
+
+FFMPEG_VER=n8.1          # FFmpeg release tag
+X264_REF=stable          # x264 branch
+NVHDR_REF=n13.0.19.0     # nv-codec-headers (NVENC) tag
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+WORK=${WORK:-$HERE/.build-$TARGET}
+PREFIX=$WORK/prefix
+OUT=$HERE/$TARGET
+JOBS=$(nproc 2>/dev/null || echo 4)
+mkdir -p "$WORK" "$PREFIX" "$OUT"
+cd "$WORK"
+
+get() { # url dir
+  [ -d "$2" ] || { mkdir -p "$2"; curl -fsSL "$1" | tar xz --strip-components=1 -C "$2"; }
+}
+get "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/refs/tags/$FFMPEG_VER" ffmpeg-src
+get "https://codeload.github.com/mirror/x264/tar.gz/refs/heads/$X264_REF" x264-src
+get "https://codeload.github.com/FFmpeg/nv-codec-headers/tar.gz/refs/tags/$NVHDR_REF" nvhdr-src
+
+if [ "$TARGET" = windows ]; then
+  CROSS=x86_64-w64-mingw32-
+  X264_HOST="--host=x86_64-w64-mingw32 --cross-prefix=$CROSS"
+  FF_TARGET="--arch=x86_64 --target-os=mingw32 --cross-prefix=$CROSS"
+  HW_ENC="h264_nvenc,h264_mf"
+  EXE=ffmpeg.exe
+  EXTRA_LIBS="-static -static-libgcc"
+else
+  X264_HOST=""
+  FF_TARGET=""
+  HW_ENC="h264_nvenc"
+  EXE=ffmpeg
+  EXTRA_LIBS=""
+fi
+
+echo "== nv-codec-headers"
+make -C nvhdr-src PREFIX="$PREFIX" install >/dev/null
+
+echo "== x264"
+(cd x264-src && ./configure --prefix="$PREFIX" $X264_HOST --enable-static --enable-pic --disable-cli --disable-opencl >/dev/null && make -j"$JOBS" >/dev/null && make install >/dev/null)
+
+echo "== ffmpeg"
+cd ffmpeg-src
+PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure $FF_TARGET \
+  --prefix="$PREFIX" --pkg-config=pkg-config --pkg-config-flags=--static \
+  --extra-cflags="-I$PREFIX/include" --extra-ldflags="-L$PREFIX/lib $EXTRA_LIBS" \
+  --enable-gpl --enable-libx264 --enable-ffnvcodec --enable-nvenc \
+  --disable-everything --disable-autodetect --disable-doc --disable-debug --disable-network \
+  --disable-ffplay --disable-ffprobe --enable-small \
+  $( [ "$TARGET" = windows ] && echo --enable-mediafoundation --enable-d3d11va ) \
+  --enable-protocol=file,pipe \
+  --enable-demuxer=matroska,mov,avi,mpegts,mpegps,flv,asf,ogg,wav,mp3,aac,ac3,eac3,dts,m4v,h264,hevc \
+  --enable-muxer=mp4,webm,null \
+  --enable-decoder=h264,hevc,mpeg1video,mpeg2video,mpeg4,msmpeg4v3,vc1,wmv3,vp8,vp9,mjpeg,theora,aac,aac_latm,ac3,eac3,dca,truehd,mlp,mp1,mp2,mp3,flac,alac,opus,vorbis,wmav2,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be \
+  --enable-encoder=libx264,$HW_ENC,aac \
+  --enable-parser=h264,hevc,mpegvideo,mpeg4video,vc1,vp8,vp9,av1,aac,ac3,mpegaudio,dca,flac,opus,vorbis,mlp \
+  --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,aac_adtstoasc,vp9_superframe,extract_extradata \
+  --enable-indev=lavfi --enable-filter=scale,format,aformat,aresample,null,anull,color,anullsrc,setsar,fps \
+  --enable-swscale --enable-swresample >/dev/null
+make -j"$JOBS" >/dev/null
+cd ..
+
+${CROSS:-}strip -o "$WORK/$EXE" "ffmpeg-src/$EXE"
+gzip -9 -c "$WORK/$EXE" > "$OUT/$EXE.gz"
+cp ffmpeg-src/COPYING.GPLv3 "$OUT/FFMPEG-LICENSE.txt" 2>/dev/null || cp ffmpeg-src/COPYING.GPLv2 "$OUT/FFMPEG-LICENSE.txt"
+cat > "$OUT/FFMPEG-SOURCE.txt" <<SRC
+This FFmpeg ($EXE, gzipped) was built by ffmpeg/build-ffmpeg.sh from:
+  FFmpeg           $FFMPEG_VER   https://github.com/FFmpeg/FFmpeg/tree/$FFMPEG_VER
+  x264             $X264_REF     https://code.videolan.org/videolan/x264 (mirror: https://github.com/mirror/x264)
+  nv-codec-headers $NVHDR_REF    https://github.com/FFmpeg/nv-codec-headers/tree/$NVHDR_REF
+It is licensed under the GNU GPL (see FFMPEG-LICENSE.txt). The exact build
+recipe is build-ffmpeg.sh in this directory.
+SRC
+echo
+echo "Built $OUT/$EXE.gz ($(du -h "$OUT/$EXE.gz" | cut -f1) compressed, $(du -h "$WORK/$EXE" | cut -f1) unpacked)"

@@ -67,3 +67,20 @@ English (US) Hunspell dictionary
 - License: the permissive SCOWL terms — the full README, including every
   copyright and permission notice, is in
   frontend/licenses/en_US-dictionary-README.txt
+
+FFmpeg (video conversion)
+-------------------------
+
+- What: a small build of FFmpeg (with x264 and NVIDIA's nv-codec-headers),
+  made by ffmpeg/build-ffmpeg.sh and bundled inside the app as
+  ffmpeg/<os>/ffmpeg*.gz. chriscord runs it as a separate program to convert
+  videos before they're sent; it isn't linked into chriscord itself.
+- Sources: FFmpeg https://ffmpeg.org (https://github.com/FFmpeg/FFmpeg),
+  x264 https://www.videolan.org/developers/x264.html,
+  nv-codec-headers https://github.com/FFmpeg/nv-codec-headers — the exact
+  versions are listed in ffmpeg/<os>/FFMPEG-SOURCE.txt, and the build recipe
+  is ffmpeg/build-ffmpeg.sh.
+- License: GNU General Public License (because it includes x264) — full text
+  in ffmpeg/<os>/FFMPEG-LICENSE.txt. The corresponding source code is
+  available from the links above; anyone receiving the app can rebuild the
+  same FFmpeg with build-ffmpeg.sh.

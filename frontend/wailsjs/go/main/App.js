@@ -6,8 +6,16 @@ export function CancelAccountExport() {
   return window['go']['main']['App']['CancelAccountExport']();
 }
 
+export function CancelConversion(arg1) {
+  return window['go']['main']['App']['CancelConversion'](arg1);
+}
+
 export function Connect(arg1, arg2) {
   return window['go']['main']['App']['Connect'](arg1, arg2);
+}
+
+export function ConvertVideoForPlayback(arg1, arg2) {
+  return window['go']['main']['App']['ConvertVideoForPlayback'](arg1, arg2);
 }
 
 export function CreateAccount(arg1, arg2, arg3) {
@@ -16,6 +24,10 @@ export function CreateAccount(arg1, arg2, arg3) {
 
 export function DeleteMessage(arg1) {
   return window['go']['main']['App']['DeleteMessage'](arg1);
+}
+
+export function DiscardConverted(arg1) {
+  return window['go']['main']['App']['DiscardConverted'](arg1);
 }
 
 export function Disconnect() {
@@ -166,6 +178,10 @@ export function OpenAttachmentExternally(arg1, arg2) {
   return window['go']['main']['App']['OpenAttachmentExternally'](arg1, arg2);
 }
 
+export function OpenURL(arg1) {
+  return window['go']['main']['App']['OpenURL'](arg1);
+}
+
 export function PickAccountFile() {
   return window['go']['main']['App']['PickAccountFile']();
 }
@@ -222,6 +238,10 @@ export function SaveAccountExport() {
   return window['go']['main']['App']['SaveAccountExport']();
 }
 
+export function SaveAttachment(arg1, arg2) {
+  return window['go']['main']['App']['SaveAttachment'](arg1, arg2);
+}
+
 export function SaveClientSettings(arg1) {
   return window['go']['main']['App']['SaveClientSettings'](arg1);
 }
@@ -270,6 +290,10 @@ export function SetUserAudio(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetUserAudio'](arg1, arg2, arg3);
 }
 
+export function ShowInFolder(arg1) {
+  return window['go']['main']['App']['ShowInFolder'](arg1);
+}
+
 export function StartMicTest(arg1, arg2) {
   return window['go']['main']['App']['StartMicTest'](arg1, arg2);
 }
@@ -304,4 +328,8 @@ export function UploadFile(arg1) {
 
 export function UploadFileData(arg1, arg2) {
   return window['go']['main']['App']['UploadFileData'](arg1, arg2);
+}
+
+export function VideoConversionInfo() {
+  return window['go']['main']['App']['VideoConversionInfo']();
 }
