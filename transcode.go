@@ -105,7 +105,9 @@ func unpackBundledFFmpeg() (string, error) {
 }
 
 // hideWindow keeps a console window from flashing up on Windows while
-// FFmpeg runs (see transcode_windows.go).
+// FFmpeg runs, and starts it at below-normal priority when asked (see
+// transcode_windows.go). lowerPriority does the latter elsewhere
+// (transcode_unix.go).
 var hideWindow = func(cmd *exec.Cmd) {}
 
 func ffmpegCmd(args ...string) *exec.Cmd {
@@ -201,6 +203,40 @@ func planConversion(info mediaInfo) convertPlan {
 	return p
 }
 
+// ── Performance settings (Settings → Performance) ────────────────────────────
+
+var (
+	settingsMu       sync.Mutex
+	transcodeThreads int // 0 = let FFmpeg use every core
+	transcodeLowPrio = true
+	transcodeUseGPU  = true
+)
+
+// SetTranscodeSettings applies the Performance settings: how much of the
+// CPU conversions may use (as a percentage of its threads; 100 = all), whether
+// they run at low priority so games and other apps stay smooth, and whether
+// the graphics card's encoder may be used.
+func (a *App) SetTranscodeSettings(cpuPercent int, lowPriority, useGPU bool) {
+	settingsMu.Lock()
+	defer settingsMu.Unlock()
+	transcodeThreads = 0
+	if cpuPercent > 0 && cpuPercent < 100 {
+		n := (goruntime.NumCPU()*cpuPercent + 50) / 100
+		if n < 1 {
+			n = 1
+		}
+		transcodeThreads = n
+	}
+	transcodeLowPrio = lowPriority
+	transcodeUseGPU = useGPU
+}
+
+func transcodeSettings() (threads int, lowPrio, useGPU bool) {
+	settingsMu.Lock()
+	defer settingsMu.Unlock()
+	return transcodeThreads, transcodeLowPrio, transcodeUseGPU
+}
+
 // ── H.264 encoders ───────────────────────────────────────────────────────────
 
 var (
@@ -210,8 +246,12 @@ var (
 
 // pickEncoder tries the graphics card's H.264 encoder first (NVIDIA NVENC;
 // on Windows also Media Foundation, which reaches Intel Quick Sync and AMD
-// too), with a tiny test encode, and falls back to x264 on the CPU.
+// too), with a tiny test encode, and falls back to x264 on the CPU — or
+// goes straight to x264 if the graphics card is turned off in settings.
 func pickEncoder() string {
+	if _, _, useGPU := transcodeSettings(); !useGPU {
+		return "libx264"
+	}
 	encoderOnce.Do(func() {
 		candidates := []string{"h264_nvenc"}
 		if goruntime.GOOS == "windows" {
@@ -303,8 +343,16 @@ func (a *App) ConvertVideoForPlayback(path, jobID string) (string, error) {
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	out := filepath.Join(dir, base+".mp4")
 
-	args := []string{"-hide_banner", "-nostdin", "-y", "-i", path,
-		"-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "0"}
+	threads, lowPrio, _ := transcodeSettings()
+	args := []string{"-hide_banner", "-nostdin", "-y"}
+	if threads > 0 { // decoding (often the heaviest part, e.g. 10-bit HEVC) obeys the limit too
+		args = append(args, "-threads", strconv.Itoa(threads))
+	}
+	args = append(args, "-i", path,
+		"-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "0")
+	if threads > 0 {
+		args = append(args, "-threads", strconv.Itoa(threads), "-filter_threads", strconv.Itoa(threads))
+	}
 	if plan.CopyVideo {
 		args = append(args, "-c:v", "copy")
 	} else {
@@ -325,6 +373,9 @@ func (a *App) ConvertVideoForPlayback(path, jobID string) (string, error) {
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		return "", err
+	}
+	if lowPrio {
+		lowerPriority(cmd) // (on Windows it's set when the process is created)
 	}
 	convertMu.Lock()
 	convertJobs[jobID] = cmd
@@ -389,8 +440,18 @@ func (a *App) DiscardConverted(path string) {
 // VideoConversionInfo tells the settings page whether conversion is
 // available and how: {"available", "ffmpeg": "bundled"|"system", "encoder"}.
 func (a *App) VideoConversionInfo() map[string]interface{} {
+	cores := goruntime.NumCPU()
 	if findFFmpeg() == "" {
-		return map[string]interface{}{"available": false}
+		return map[string]interface{}{"available": false, "cores": cores}
 	}
-	return map[string]interface{}{"available": true, "ffmpeg": ffmpegFrom, "encoder": pickEncoder()}
+	// What the graphics card can do, regardless of the current setting.
+	settingsMu.Lock()
+	saved := transcodeUseGPU
+	transcodeUseGPU = true
+	settingsMu.Unlock()
+	hw := pickEncoder()
+	settingsMu.Lock()
+	transcodeUseGPU = saved
+	settingsMu.Unlock()
+	return map[string]interface{}{"available": true, "ffmpeg": ffmpegFrom, "encoder": pickEncoder(), "gpuEncoder": hw, "cores": cores}
 }

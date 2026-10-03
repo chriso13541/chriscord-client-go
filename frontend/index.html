@@ -707,6 +707,15 @@ body.tb-mac #titlebar .tb-title { padding-left:78px; justify-content:center; pad
 body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom-titlebar #settings-modal { top:var(--titlebar-h); }
 
 #toast .toast-action { margin-left:10px; padding:3px 10px; border-radius:4px; border:none; background:var(--accent); color:#fff; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; pointer-events:auto; }
+/* Performance tab */
+.pf-seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; margin:4px 0 6px; }
+.pf-seg button { padding:7px 16px; border:none; background:var(--bg-dark); color:var(--text); font:inherit; font-size:.85rem; font-weight:600; cursor:pointer; }
+.pf-seg button + button { border-left:1px solid var(--border); }
+.pf-seg button:hover { background:var(--bg-light); }
+.pf-seg button.on { background:var(--accent); color:#fff; }
+#pf-limits.off { opacity:.45; pointer-events:none; }
+#settings-tab-performance .settings-hint { margin-bottom:18px; }
+#settings-tab-performance #pf-cpu-hint { margin-top:2px; }
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
 #lb-stage { position:absolute; inset:64px 16px 16px; display:flex; align-items:center; justify-content:center; }
@@ -1168,6 +1177,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div class="settings-tab active" data-tab="profile">Profile</div>
     <div class="settings-tab" data-tab="appearance">Appearance</div>
     <div class="settings-tab" data-tab="voice">Voice</div>
+    <div class="settings-tab" data-tab="performance">Performance</div>
   </div>
   <div id="settings-content">
     <div id="settings-tab-profile" class="settings-tab-pane active">
@@ -1233,10 +1243,6 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-override"> Use my own theme instead of the server's</label>
         <p class="settings-hint" id="ap-override-hint" style="margin-top:0"></p>
-      </div>
-      <div class="ap-override">
-        <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-convert"> Convert videos before sending so everyone can play them</label>
-        <p class="settings-hint" style="margin-top:0" id="ap-convert-hint">MKVs, HEVC and other formats become MP4s on your computer before they're sent. Videos that already play everywhere are sent as they are.</p>
       </div>
       <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-spell"> Check spelling while typing</label>
@@ -1320,6 +1326,29 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
           </div>
           <div class="ap-preview-btn"><button class="btn btn-primary">Sample button</button></div>
         </div>
+      </div>
+    </div>
+
+    <div id="settings-tab-performance" class="settings-tab-pane">
+      <h2>Performance</h2>
+
+      <label class="settings-label">Video transcoding</label>
+      <label class="check-row"><input type="checkbox" id="pf-transcode"> Transcode videos before sending, so everyone can play them in the app</label>
+      <p class="settings-hint" style="margin-top:0" id="pf-transcode-hint">MKVs, HEVC, 10-bit and other formats become MP4s on your computer before they're sent; videos that already play everywhere are sent as they are.
+        Turn this off to send <b>untranscoded video</b> — anyone whose app can't play it gets <i>Open in video player</i> and <i>Download</i> instead.</p>
+
+      <div id="pf-limits">
+        <label class="settings-label">CPU use while transcoding</label>
+        <div class="pf-seg" id="pf-cpu" role="radiogroup" aria-label="CPU use while transcoding">
+          <button type="button" data-pct="25">25%</button><button type="button" data-pct="50">50%</button><button type="button" data-pct="75">75%</button><button type="button" data-pct="100">All</button>
+        </div>
+        <p class="settings-hint" id="pf-cpu-hint"></p>
+
+        <label class="check-row"><input type="checkbox" id="pf-lowprio"> Transcode at low priority</label>
+        <p class="settings-hint" style="margin-top:0">Games, calls and everything else you're doing come first; transcoding uses whatever's left over (so it can take longer while you're busy).</p>
+
+        <label class="check-row"><input type="checkbox" id="pf-gpu"> Use the graphics card when it can</label>
+        <p class="settings-hint" style="margin-top:0" id="pf-gpu-hint">Much faster and lighter on the CPU. Turn off to always use the CPU.</p>
       </div>
     </div>
 
@@ -5321,7 +5350,7 @@ function initPresence(){
 // locally, so they travel in the exported account key. On sign-in the
 // account's copy wins — that's how an imported account brings its look.
 function collectClientSettings(){
-  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords,videoConvert:videoConvertOn};
+  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords,videoConvert:videoConvertOn,performance:perfSettings};
 }
 async function persistClientSettings(){
   try{await window.go.main.App.SaveClientSettings(JSON.stringify(collectClientSettings()));}
@@ -5335,7 +5364,8 @@ async function loadClientSettings(){
   if(s.appearance){appearance={...APPEARANCE_DEFAULTS,...s.appearance};try{localStorage.setItem('appearance',JSON.stringify(appearance));}catch{}}
   if(typeof s.appearanceOverride==='boolean'){appearanceOverride=s.appearanceOverride;localStorage.setItem('appearanceOverride',appearanceOverride?'1':'0');}
   if(s.sounds&&typeof s.sounds==='object'){soundSettings={...SOUND_DEFAULTS,...s.sounds};localStorage.setItem('soundSettings',JSON.stringify(soundSettings));try{renderSoundSettings();}catch{}}
-  if(typeof s.videoConvert==='boolean'){videoConvertOn=s.videoConvert;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');const b=document.getElementById('ap-convert');if(b)b.checked=videoConvertOn;}
+  if(typeof s.videoConvert==='boolean'){videoConvertOn=s.videoConvert;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');}
+  if(s.performance&&typeof s.performance==='object'){perfSettings={...perfSettings,...s.performance};localStorage.setItem('perfSettings',JSON.stringify(perfSettings));try{applyPerfSettings(false);}catch{}}
   if(typeof s.spellcheck==='boolean'){spellOn=s.spellcheck;localStorage.setItem('spellcheck',spellOn?'1':'0');const b=document.getElementById('ap-spell');if(b)b.checked=spellOn;if(spellOn)startSpellcheck();}
   if(Array.isArray(s.spellWords)){spellWords=s.spellWords.filter(w=>typeof w==='string');localStorage.setItem('spellWords',JSON.stringify(spellWords));spellWorker?.postMessage({type:'setCustom',words:spellWords});}
   if(typeof s.elasticScroll==='boolean'){elasticOn=s.elasticScroll;localStorage.setItem('elasticScroll',elasticOn?'1':'0');const b=document.getElementById('ap-elastic');if(b)b.checked=elasticOn;}
@@ -6373,19 +6403,45 @@ function addSpellWord(word){
   spellCache.set(word,true);
   persistClientSettings();renderComposerHighlight();
 }
+// ── PERFORMANCE SETTINGS ─────────────────────────────────────────
+// Transcoding on/off ("untranscoded video" when off), how much of the CPU
+// it may use, low priority, and whether the graphics card may be used.
+// Saved with your account; handed to the Go side (SetTranscodeSettings).
+let perfSettings=(()=>{try{return {cpu:100,lowPriority:true,gpu:true,...JSON.parse(localStorage.getItem('perfSettings')||'{}')};}catch{return {cpu:100,lowPriority:true,gpu:true};}})();
+let convInfo=null;
+function applyPerfSettings(save){
+  window.go.main.App.SetTranscodeSettings(perfSettings.cpu,perfSettings.lowPriority,perfSettings.gpu).catch(()=>{});
+  if(save){localStorage.setItem('perfSettings',JSON.stringify(perfSettings));persistClientSettings();}
+  renderPerfSettings();
+}
+function renderPerfSettings(){
+  const t=document.getElementById('pf-transcode');if(!t)return;
+  t.checked=videoConvertOn;
+  document.getElementById('pf-limits').classList.toggle('off',!videoConvertOn);
+  document.querySelectorAll('#pf-cpu button').forEach(b=>b.classList.toggle('on',+b.dataset.pct===perfSettings.cpu));
+  document.getElementById('pf-lowprio').checked=perfSettings.lowPriority;
+  document.getElementById('pf-gpu').checked=perfSettings.gpu;
+  const cores=convInfo?.cores;
+  const n=perfSettings.cpu>=100||!cores?null:Math.max(1,Math.round(cores*perfSettings.cpu/100));
+  document.getElementById('pf-cpu-hint').textContent=cores
+    ?(n?`Uses at most ${n} of your ${cores} CPU threads. The graphics card, if used, isn\u2019t limited by this.`:`Can use all ${cores} of your CPU threads.`)
+    :'';
+  const gpuName={h264_nvenc:'your NVIDIA graphics card',h264_mf:'your graphics card (Windows Media Foundation)'}[convInfo?.gpuEncoder];
+  document.getElementById('pf-gpu-hint').textContent=convInfo
+    ?(gpuName?`Found: ${gpuName}. Much faster and lighter on the CPU; turn off to always use the CPU.`:'No graphics card encoder was found on this computer, so the CPU is used either way.')
+    :'Much faster and lighter on the CPU. Turn off to always use the CPU.';
+  if(convInfo&&!convInfo.available)document.getElementById('pf-transcode-hint').textContent='No FFmpeg is available in this build of the app, so videos are always sent untranscoded.';
+}
 function initVideoConvert(){
-  const box=document.getElementById('ap-convert'),hint=document.getElementById('ap-convert-hint');
-  box.checked=videoConvertOn;
-  box.addEventListener('change',()=>{videoConvertOn=box.checked;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');persistClientSettings();});
-  // Say what will do the work (checked once, a little after start-up).
-  setTimeout(async()=>{
-    try{
-      const i=await window.go.main.App.VideoConversionInfo();
-      const enc={h264_nvenc:'your NVIDIA graphics card',h264_mf:'your graphics card (via Windows Media Foundation)',libx264:'your CPU'}[i.encoder]||i.encoder;
-      hint.textContent+=i.available?` Conversions use ${enc}${i.ffmpeg==='system'?' and the FFmpeg installed on this computer':''}.`
-        :' No FFmpeg is available in this build of the app, so videos are sent as they are.';
-    }catch{}
-  },3000);
+  document.getElementById('pf-transcode').addEventListener('change',e=>{
+    videoConvertOn=e.target.checked;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');persistClientSettings();renderPerfSettings();
+  });
+  document.querySelectorAll('#pf-cpu button').forEach(b=>b.addEventListener('click',()=>{perfSettings.cpu=+b.dataset.pct;applyPerfSettings(true);}));
+  document.getElementById('pf-lowprio').addEventListener('change',e=>{perfSettings.lowPriority=e.target.checked;applyPerfSettings(true);});
+  document.getElementById('pf-gpu').addEventListener('change',e=>{perfSettings.gpu=e.target.checked;applyPerfSettings(true);});
+  applyPerfSettings(false);
+  // What this computer has (checked once, a little after start-up).
+  setTimeout(async()=>{try{convInfo=await window.go.main.App.VideoConversionInfo();renderPerfSettings();}catch{}},3000);
   // Upload progress for each attachment tile ("Uploading 42%").
   window.runtime.EventsOn('upload:progress',p=>{
     const item=state.attachQueue.find(a=>'up'+a.id===p.id);
