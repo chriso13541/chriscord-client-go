@@ -380,6 +380,19 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 .mp-video.playing.idle video { cursor:none; }
 .mp-video:fullscreen { width:100%; border:none; border-radius:0; display:flex; align-items:center; }
 .mp-video:fullscreen video { max-height:none; height:100%; aspect-ratio:auto; }
+/* A file the app can't play: say so, offer the system player / download */
+.mp.unplayable.mp-video { background:var(--bg-mid); aspect-ratio:auto; }
+.mp-unplayable { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px; }
+.mp-audio .mp-unplayable { padding:0; }
+.mp-up-ic { width:32px; height:32px; color:var(--text-muted); flex-shrink:0; }
+.mp-up-text { flex:1; min-width:180px; font-size:.85rem; color:var(--text-muted); }
+.mp-up-text b { display:block; color:var(--text-strong); font-size:.9rem; margin-bottom:2px; }
+.mp-up-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.mp-up-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-light); color:var(--text); font:inherit; font-size:.82rem; font-weight:600; cursor:pointer; }
+.mp-up-btn .ic { width:16px; height:16px; }
+.mp-up-btn:hover { color:var(--text-strong); filter:brightness(1.15); }
+.mp-up-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.mp-up-btn:disabled { opacity:.8; cursor:default; }
 .msg-video { width:480px; max-width:100%; height:270px; object-fit:contain; border-radius:8px; margin-top:6px; display:block; border:1px solid var(--border); background:#000; }
 .msg-audio { width:320px; margin-top:6px; display:block; }
 .msg-file-chip { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:8px 12px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--text); font-size:.85rem; transition:border-color .15s; user-select:text; }
@@ -4354,17 +4367,49 @@ function buildMediaPlayer(a,kind){
     document.addEventListener('fullscreenchange',()=>{const on=document.fullscreenElement===wrap;fsBtn.innerHTML=icon(on?'fullscreen_exit':'fullscreen');fsBtn.dataset.tip=fsBtn.title=on?'Exit fullscreen':'Fullscreen';});
     media.addEventListener('dblclick',e=>{e.preventDefault();fsBtn.click();});
   }
-  attachMediaSource(media,a.url);
+  // A format this app can't play (e.g. MKV with HEVC video): say so, and
+  // offer to open it in the computer's own player, or download it.
+  attachMediaSource(media,a.url,()=>showUnplayable(wrap,a,kind));
   paintPlay();paintVol();
   return wrap;
 }
-function attachMediaSource(el,rel){
-  let retrying=false;
+// onUnplayable(code) is called if the file still won't load with a fresh
+// link — i.e. the format itself can't be played here, not an expired link.
+function showUnplayable(wrap,a,kind){
+  if(wrap.classList.contains('unplayable'))return;
+  wrap.classList.add('unplayable');
+  const ext=(a.name||'').split('.').pop().toUpperCase();
+  const box=document.createElement('div');box.className='mp-unplayable';
+  box.innerHTML=`${icon(kind==='video'?'movie':'music_note','mp-up-ic')}
+    <div class="mp-up-text"><b>${kind==='video'?'This video':'This audio'} can\u2019t be played here</b>
+      <span>${ext&&ext.length<6?esc(ext)+' file — ':''}its format isn\u2019t one the app can play (that\u2019s ${kind==='video'?'MP4 or WebM with H.264, VP9 or AV1':'MP3, AAC, Ogg, Opus, FLAC or WAV'}).</span></div>
+    <div class="mp-up-actions"><button class="mp-up-btn primary" data-open>${icon('open_in_new')}Open in ${kind==='video'?'video':'audio'} player</button><button class="mp-up-btn" data-dl>${icon('download')}Download</button></div>`;
+  box.querySelector('[data-dl]').onclick=e=>{e.stopPropagation();downloadAttachment(a);};
+  const open=box.querySelector('[data-open]');
+  open.onclick=async e=>{
+    e.stopPropagation();
+    if(open.disabled)return;
+    open.disabled=true;const label=open.innerHTML;
+    const off=window.runtime.EventsOn('file:open-progress',p=>{
+      if(p.path!==a.url)return;
+      open.innerHTML=`<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>${p.total>0?`Downloading ${Math.floor(100*p.done/p.total)}%`:'Downloading\u2026'}`;
+    });
+    try{await window.go.main.App.OpenAttachmentExternally(a.url,a.name||'attachment');}
+    catch(err){toast('Couldn\u2019t open it: '+err,true);}
+    finally{off?.();open.disabled=false;open.innerHTML=label;}
+  };
+  if(kind==='video'){wrap.innerHTML='';wrap.appendChild(box);}
+  else wrap.querySelector('.mp-bar')?.replaceWith(box);
+}
+function attachMediaSource(el,rel,onUnplayable){
+  let retrying=false,refreshed=false;
   getAttachLink(rel).then(u=>{el.src=u;}).catch(err=>console.error('media link failed:',err));
-  el.addEventListener('loadeddata',()=>{retrying=false;});
+  el.addEventListener('loadeddata',()=>{retrying=false;refreshed=false;});
   el.addEventListener('error',async()=>{
+    // Failing again right after a fresh link: it's the file, not the link.
+    if(refreshed&&el.error&&(el.error.code===3||el.error.code===4)){onUnplayable?.(el.error.code);return;}
     if(retrying)return;
-    retrying=true;
+    retrying=true;refreshed=true;
     const t=el.currentTime,wasPlaying=!el.paused;
     try{
       el.src=await getAttachLink(rel,true);

@@ -82,6 +82,8 @@ export function LeaveVoiceChannel():Promise<void>;
 
 export function ListAccounts():Promise<Array<main.AccountSummary>>;
 
+export function OpenAttachmentExternally(arg1:string,arg2:string):Promise<void>;
+
 export function PickAccountFile():Promise<string>;
 
 export function PickAccountFolder():Promise<string>;

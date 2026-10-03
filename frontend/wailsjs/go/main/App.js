@@ -162,6 +162,10 @@ export function ListAccounts() {
   return window['go']['main']['App']['ListAccounts']();
 }
 
+export function OpenAttachmentExternally(arg1, arg2) {
+  return window['go']['main']['App']['OpenAttachmentExternally'](arg1, arg2);
+}
+
 export function PickAccountFile() {
   return window['go']['main']['App']['PickAccountFile']();
 }
