@@ -120,8 +120,6 @@ export function ResolveServerAddress(arg1:string):Promise<string>;
 
 export function SaveAccountExport():Promise<string>;
 
-export function SaveAttachment(arg1:string,arg2:string):Promise<string>;
-
 export function SaveClientSettings(arg1:string):Promise<void>;
 
 export function SaveProfile(arg1:string,arg2:string):Promise<void>;
@@ -145,8 +143,6 @@ export function SetMessagePinned(arg1:string,arg2:boolean):Promise<void>;
 export function SetPresence(arg1:string):Promise<void>;
 
 export function SetUserAudio(arg1:string,arg2:number,arg3:boolean):Promise<void>;
-
-export function ShowInFolder(arg1:string):Promise<void>;
 
 export function StartMicTest(arg1:string,arg2:string):Promise<void>;
 

@@ -238,10 +238,6 @@ export function SaveAccountExport() {
   return window['go']['main']['App']['SaveAccountExport']();
 }
 
-export function SaveAttachment(arg1, arg2) {
-  return window['go']['main']['App']['SaveAttachment'](arg1, arg2);
-}
-
 export function SaveClientSettings(arg1) {
   return window['go']['main']['App']['SaveClientSettings'](arg1);
 }
@@ -288,10 +284,6 @@ export function SetPresence(arg1) {
 
 export function SetUserAudio(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetUserAudio'](arg1, arg2, arg3);
-}
-
-export function ShowInFolder(arg1) {
-  return window['go']['main']['App']['ShowInFolder'](arg1);
 }
 
 export function StartMicTest(arg1, arg2) {

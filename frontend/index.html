@@ -4167,21 +4167,19 @@ function toggleDropdown(msgEl,msg){
 // itself never touches the bytes — previously the Go side re-fetched the
 // whole file into a Save dialog on top of whatever the chat view had
 // already loaded to display it.
-// Downloads are saved by the app itself: a Save dialog (starting in your
-// Downloads folder, with the file's name filled in), progress while it
-// downloads, then a "Show in folder" button. (It used to hand a link to the
-// browser, which Wails refused for file names with ( ) ! ~ or spaces.)
+// Downloads open in your browser, which saves the file the usual way. The
+// link goes to the browser through the app's Go side (OpenURL), not Wails'
+// BrowserOpenURL — that one refuses URLs with characters like ( ) ! ~ — and
+// the file name is fully percent-encoded so nothing in it is left raw.
+const strictEncode=v=>encodeURIComponent(v).replace(/[!'()*~]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
 async function downloadAttachment(a){
-  const name=a.name||'file';
-  const off=window.runtime.EventsOn('file:save-progress',p=>{
-    if(p.path!==a.url)return;
-    toast(p.total>0?`Downloading ${name} \u2014 ${Math.floor(100*p.done/p.total)}%`:`Downloading ${name}\u2026`,false,null,true);
-  });
   try{
-    const saved=await window.go.main.App.SaveAttachment(a.url,name);
-    if(saved)toast(`Saved ${name}`,false,{label:'Show in folder',fn:()=>window.go.main.App.ShowInFolder(saved)});
+    // Always a brand-new link (not the cached one used for display), so
+    // the browser gets the full 5 minutes to start the download.
+    const base=await getAttachLink(a.url,true);
+    const sep=base.includes('?')?'&':'?';
+    await window.go.main.App.OpenURL(`${base}${sep}download=1&name=${strictEncode(a.name||'file')}`);
   }catch(err){toast('Download failed: '+err,true);}
-  finally{off?.();}
 }
 function closeDropdown(){if(dotsMenuFor)closeContextMenu();state.activeDropdown=null;}
 
