@@ -12,6 +12,8 @@ export function ConvertVideoForPlayback(arg1:string,arg2:string):Promise<string>
 
 export function CreateAccount(arg1:string,arg2:string,arg3:string):Promise<main.AccountView>;
 
+export function CreateInvite():Promise<main.InviteInfo>;
+
 export function DeleteMessage(arg1:string):Promise<void>;
 
 export function DiscardConverted(arg1:string):Promise<void>;
@@ -81,6 +83,8 @@ export function IsDeafened():Promise<boolean>;
 export function IsMuted():Promise<boolean>;
 
 export function JoinVoiceChannel(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<void>;
+
+export function JoinWithInvite(arg1:string,arg2:string):Promise<void>;
 
 export function KickMember(arg1:string,arg2:boolean,arg3:string):Promise<void>;
 

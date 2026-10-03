@@ -131,6 +131,13 @@ body.resizing-panels, body.resizing-panels * { cursor:col-resize !important; use
 #server-info-pop .sip-icon-wrap { width:84px; height:84px; margin:-42px 0 0 14px; padding:5px; border-radius:50%; background:var(--bg-mid); box-sizing:border-box; position:relative; }
 #server-info-pop .sip-icon { width:74px; height:74px; border-radius:50%; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:700; color:#fff; }
 #server-info-pop .sip-body { padding:6px 16px 14px; }
+#server-info-pop .sip-invite-btn { display:inline-flex; align-items:center; gap:6px; margin-top:2px; }
+#server-info-pop .sip-invite-btn .ic, #server-info-pop .sip-copy .ic { width:16px; height:16px; }
+#server-info-pop .sip-link-row { display:flex; gap:6px; margin-top:2px; }
+#server-info-pop .sip-link { flex:1; min-width:0; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text-strong); font:inherit; font-size:.78rem; font-family:Consolas,monospace; }
+#server-info-pop .sip-copy { display:inline-flex; align-items:center; gap:4px; padding:6px 10px; font-size:.8rem; }
+#server-info-pop .sip-hint { font-size:.74rem; color:var(--text-muted); margin-top:6px; }
+#server-info-pop .sip-hint a { color:var(--accent); }
 #server-info-pop .sip-name { font-weight:800; font-size:1rem; color:var(--text-strong); margin-bottom:8px; word-break:break-word; }
 #server-info-pop .sip-label { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:4px; }
 #server-info-pop .sip-desc { font-size:.86rem; line-height:1.45; white-space:pre-wrap; word-break:break-word; color:var(--text); }
@@ -317,6 +324,14 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 /* Replies: a line above the message showing what it answers, joined to the
    avatar by a curved "spine" like Discord's. Click it to jump there. */
 .msg-group.has-reply { flex-wrap:wrap; row-gap:2px; }
+/* System lines ("… joined the server.") */
+.msg-group.msg-system { align-items:center; padding-top:6px; padding-bottom:6px; }
+.msg-system .sys-icon { width:36px; flex-shrink:0; display:flex; justify-content:center; color:var(--green); }
+.msg-system .sys-icon .ic { width:18px; height:18px; }
+.msg-system .sys-line { color:var(--text-muted); font-size:.92rem; }
+.msg-system .sys-name { font-weight:600; color:var(--text-strong); cursor:pointer; }
+.msg-system .sys-name:hover { text-decoration:underline; }
+.msg-system .msg-time { margin-left:8px; font-size:.72rem; }
 .msg-reply { flex-basis:100%; position:relative; display:flex; align-items:center; gap:6px; min-width:0; padding-left:48px; font-size:.82rem; color:var(--text-muted); cursor:pointer; }
 /* The spine stops at the avatar's top edge (half the line's height, plus
    the 2px row gap and the avatar's 2px top margin), and the avatar sits
@@ -963,6 +978,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
   <symbol id="ic-lock" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></symbol>
   <symbol id="ic-reply" viewBox="0 -960 960 960"><path d="M760-200v-160q0-50-35-85t-85-35H273l144 144-57 56-240-240 240-240 57 56-144 144h367q83 0 141.5 58.5T840-360v160h-80Z"/></symbol>
+  <symbol id="ic-person_add" viewBox="0 -960 960 960"><path d="M720-400v-120H600v-80h120v-120h80v120h120v80H800v120h-80Zm-360-80q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
+  <symbol id="ic-arrow_forward" viewBox="0 -960 960 960"><path d="M647-440H160v-80h487L423-744l57-56 320 320-320 320-57-56 224-224Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
   <symbol id="ic-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
   <symbol id="ic-attach_file" viewBox="0 -960 960 960"><path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z"/></symbol>
@@ -1050,7 +1067,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <div class="modal">
     <h2>Add a Server</h2>
     <div class="error-msg hidden" id="add-error"></div>
-    <div class="form-group"><label>Domain / IP</label><input id="f-domain" type="text" placeholder="chris-domain1.com  or  192.168.1.10:7070" autocomplete="off"><div class="hint">The address of the homelab running chriscord-server. No need to type https:// or http:// — it tries https first, then http.</div></div>
+    <div class="form-group"><label>Domain / IP — or an invite link</label><input id="f-domain" type="text" placeholder="chris-domain1.com  or  192.168.1.10:7070  or  an invite link" autocomplete="off"><div class="hint">The address of the homelab running chriscord-server (no need to type https:// — it tries https first, then http), or paste an invite link someone sent you and leave the key blank.</div></div>
     <div class="form-group"><label>Join Key <span style="font-weight:400;text-transform:none;letter-spacing:0">(leave blank if server is open)</span></label><input id="f-key" type="text" placeholder="e.g. a3f9bc12" autocomplete="off"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancel-add-btn">Cancel</button>
@@ -2170,7 +2187,8 @@ async function submitAddServer(){
   const errEl=document.getElementById('add-error'),btn=document.getElementById('connect-btn');
   if(!domain){errEl.textContent='Domain is required.';errEl.classList.remove('hidden');return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
-  try{await doConnect(domain,key);closeAddModal();}
+  const inv=parseInviteLink(domain); // an invite link works here too — no join key needed
+  try{if(inv)await joinViaInvite(inv);else await doConnect(domain,key);closeAddModal();}
   catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
   finally{btn.disabled=false;btn.textContent='Connect';}
 }
@@ -2404,7 +2422,7 @@ function closePingPanel(){
   pop.classList.add('hidden');schedulePing();
 }
 
-async function doConnect(domain,serverKey){
+async function doConnect(domain,serverKey,inviteCode=''){
   try{
     // "myserver.com" → https://myserver.com (or http:// if that's what
     // answers). A saved entry without a scheme is updated to the working one.
@@ -2431,7 +2449,8 @@ async function doConnect(domain,serverKey){
     // has no call running here — so if the server still lists us in one,
     // that's left over from a crashed/closed app: clear it (see voice:state).
     state.clearStaleVoice=true;
-    await window.go.main.App.Connect(domain,serverKey);
+    if(inviteCode)await window.go.main.App.JoinWithInvite(domain,inviteCode);
+    else await window.go.main.App.Connect(domain,serverKey);
   }
   catch(err){toast(String(err),true);throw err;}
   state.username=await window.go.main.App.GetUsername();
@@ -2498,8 +2517,8 @@ async function refreshServerMeta(){
   const nameEl=document.getElementById('sidebar-server-name');
   nameEl.textContent=state.serverName;updateTitlebarLocation();
   state.serverDescription=(info?.description||'').trim();
-  document.getElementById('server-info-btn').classList.toggle('hidden',!state.serverDescription);
-  if(!state.serverDescription)closeServerInfo();else if(serverInfoOpen)renderServerInfo();
+  document.getElementById('server-info-btn').classList.remove('hidden'); // (invites live here, so it's always there)
+  if(serverInfoOpen)renderServerInfo();
   document.getElementById('msg-search-input').placeholder='Search '+state.serverName;
   const header=document.getElementById('sidebar-header');
   const at=info?.banner_updated_at||0;
@@ -2529,14 +2548,79 @@ async function refreshServerMeta(){
 let serverInfoOpen=false;
 // Laid out like a user's profile card: the server banner (or a colour
 // picked from its icon), the icon large, then name, About and owner.
+// ── INVITE LINKS ──
+// Made in the server info card: a link like https://<server>/invite/<code>
+// that lets someone join without the join key (which it never contains),
+// for a few minutes. Copy it and send it; pasted into Add a Server, or
+// clicked in a chat, it joins. (A role permission for making invites can
+// gate the button later — the server's /api/invites is the place to check.)
+const INVITE_MINUTES=10;
+let invite=null,inviteTimer=null; // the current link for this server: {domain, code, url, expires_at}
+function inviteHTML(){
+  return `<div class="sip-link-row"><input class="sip-link" readonly value="${esc(invite.url)}" aria-label="Invite link"><button class="btn btn-primary sip-copy" id="sip-copy">${icon('content_copy')}Copy</button></div>
+    <div class="sip-hint"><span id="sip-countdown"></span> · <a href="#" id="sip-new">New link</a></div>`;
+}
+function inviteCountdown(){
+  const el=document.getElementById('sip-countdown');if(!el||!invite)return;
+  const left=Math.max(0,Date.parse(invite.expires_at)-Date.now());
+  if(!left){invite=null;clearInterval(inviteTimer);if(serverInfoOpen)renderServerInfo();return;}
+  const m=Math.floor(left/60000),s=Math.floor(left/1000)%60;
+  el.textContent=`Expires in ${m}:${String(s).padStart(2,'0')}`;
+}
+async function makeInvite(){
+  try{
+    const r=await window.go.main.App.CreateInvite();
+    invite={domain:state.domain,code:r.code,expires_at:r.expires_at,url:`${serverBase()}/invite/${r.code}`};
+    renderServerInfo();
+  }catch(err){toast('Couldn\u2019t make an invite: '+err,true);}
+}
+function wireInvite(pop){
+  if(invite&&invite.domain!==state.domain)invite=null;
+  pop.querySelector('#sip-invite-make')?.addEventListener('click',e=>{e.stopPropagation();makeInvite();});
+  const copy=pop.querySelector('#sip-copy');
+  if(copy){
+    copy.addEventListener('click',async e=>{e.stopPropagation();await copyText(invite.url);copy.innerHTML=`${icon('check')}Copied`;setTimeout(()=>{if(copy.isConnected)copy.innerHTML=`${icon('content_copy')}Copy`;},1500);});
+    pop.querySelector('.sip-link').addEventListener('focus',e=>e.target.select());
+    pop.querySelector('#sip-new').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();makeInvite();});
+    clearInterval(inviteTimer);inviteTimer=setInterval(inviteCountdown,1000);inviteCountdown();
+  }
+}
+// https://<server>/invite/<code> → {base, code}
+function parseInviteLink(text){
+  const m=String(text).trim().match(/^(https?:\/\/[^/\s]+)\/invite\/([A-Za-z0-9]{6,32})\/?$/i);
+  return m?{base:m[1],code:m[2]}:null;
+}
+async function joinViaInvite(inv){
+  await doConnect(inv.base,'',inv.code);
+}
+function confirmJoinInvite(inv){
+  const host=inv.base.replace(/^https?:\/\//i,'');
+  if(state.domain&&serverBase().replace(/^https?:\/\//i,'').toLowerCase()===host.toLowerCase()){toast('That\u2019s an invite to this server \u2014 you\u2019re already here.');return;}
+  const ov=document.createElement('div');ov.className='modal-overlay';
+  ov.innerHTML=`<div class="modal"><h2>Join ${esc(host)}?</h2>
+    <p style="color:var(--text-muted);margin:0 0 16px">You\u2019ve been sent an invite to a chriscord server. Joining adds it to your server list.</p>
+    <div class="error-msg hidden" id="ij-err"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="ij-no">Not now</button><button class="btn btn-primary" id="ij-yes">Join server</button></div></div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.querySelector('#ij-no').onclick=close;ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+  ov.querySelector('#ij-yes').onclick=async()=>{
+    const b=ov.querySelector('#ij-yes');b.disabled=true;b.innerHTML='<span class="spinner"></span>';
+    try{if(state.domain)await goBack();await joinViaInvite(inv);close();}
+    catch(err){const e=ov.querySelector('#ij-err');e.textContent=String(err);e.classList.remove('hidden');b.disabled=false;b.textContent='Join server';}
+  };
+}
 function renderServerInfo(){
   const pop=document.getElementById('server-info-pop');
   const iconUrl=(serverIconCache[state.domain]||serverIconMem[state.domain])?.url||'';
   pop.innerHTML=`<div class="sip-banner"></div>
     <div class="sip-icon-wrap"><div class="sip-icon"></div></div>
     <div class="sip-body"><div class="sip-name">${esc(state.serverName)}</div>
-    <div class="sip-label">About</div><div class="sip-desc">${renderTextWithLinks(state.serverDescription||'')}</div>
-    ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}</div>`;
+    ${state.serverDescription?`<div class="sip-label">About</div><div class="sip-desc">${renderTextWithLinks(state.serverDescription)}</div>`:''}
+    ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}
+    <div class="sip-label">Invite people</div>
+    <div class="sip-invite" id="sip-invite">${invite&&Date.parse(invite.expires_at)>Date.now()?inviteHTML():`<button class="btn btn-primary sip-invite-btn" id="sip-invite-make">${icon('person_add')}Create invite link</button><div class="sip-hint">Anyone with the link can join for ${INVITE_MINUTES} minutes. It doesn\u2019t contain the server\u2019s join key.</div>`}</div></div>`;
+  wireInvite(pop);
   const banner=pop.querySelector('.sip-banner'),ic=pop.querySelector('.sip-icon');
   const fallback=avatarColour(state.domain||state.serverName||'?');
   if(serverBannerURL)banner.style.backgroundImage=`url("${serverBannerURL}")`;
@@ -3578,6 +3662,8 @@ function appendPreviewCard(body,p,url){
 function openExternalURL(url){
   const ml=parseMessageLink(url);
   if(ml){openMessageLink(ml);return;} // a chriscord message link: jump, don't open a browser
+  const inv=parseInviteLink(url);
+  if(inv){confirmJoinInvite(inv);return;} // an invite link: offer to join
   // Opened by the app's Go side, not Wails' BrowserOpenURL — that one turns
   // away links with characters like ( ) ! ~ or spaces, which real links have.
   window.go.main.App.OpenURL(url).catch(err=>toast('Couldn\u2019t open that link: '+err,true));
@@ -3590,7 +3676,7 @@ const GROUP_WINDOW_MS = 7*60*1000;
 function isGroupedWith(prev,msg){
   // A pinned message always starts its own group, so its name line — and
   // the pin icon beside it — is always shown.
-  if(!prev||prev.username!==msg.username||msg.pinned||msg.reply_to)return false;
+  if(!prev||prev.username!==msg.username||msg.pinned||msg.reply_to||msg.kind||prev.kind)return false;
   const t1=Date.parse(prev.created_at),t2=Date.parse(msg.created_at);
   if(!isFinite(t1)||!isFinite(t2))return false;
   return (t2-t1)>=0 && (t2-t1)<GROUP_WINDOW_MS;
@@ -4193,7 +4279,23 @@ function buildSearchResultRow(msg){
   return row;
 }
 
+// "<name> joined the server." — a system line instead of a normal message.
+function buildSystemMsgEl(msg){
+  const div=document.createElement('div');
+  div.className='msg-group msg-system';div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
+  const name=`<span class="msg-username sys-name" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${esc(msg.username)}</span>`;
+  // A few friendly variations, picked by message id so everyone sees the same one.
+  const lines=[n=>`${n} joined the server.`,n=>`Welcome, ${n}! Say hi.`,n=>`${n} just showed up.`,n=>`Everyone welcome ${n}!`,n=>`${n} hopped into the server.`];
+  const pick=[...msg.id].reduce((a,c)=>a+c.charCodeAt(0),0)%lines.length;
+  div.innerHTML=`<div class="sys-icon">${icon('arrow_forward')}</div>
+    <div class="msg-body"><div class="sys-line">${lines[pick](name)}<span class="msg-time" title="${esc(formatHoverTime(msg.created_at))}">${formatTime(msg.created_at)}</span></div><div class="msg-reactions"></div></div>
+    <div class="msg-actions"><button class="msg-action-btn msg-react-btn" title="Add Reaction">${icon('add_reaction')}</button></div>`;
+  div.querySelector('.msg-react-btn').addEventListener('click',e=>{e.stopPropagation();openReactionPicker(msg,e.currentTarget);});
+  div.querySelector('.sys-name').addEventListener('click',e=>{e.stopPropagation();openProfilePopup(msg.username,e.currentTarget);});
+  return div;
+}
 function buildMsgEl(msg,grouped){
+  if(msg.kind==='join'){const d=buildSystemMsgEl(msg);renderReactions(d,msg);return d;}
   const colour=avatarColour(msg.username),initial=msg.username[0].toUpperCase();
   const time=formatTime(msg.created_at),hoverTime=esc(formatHoverTime(msg.created_at)),isOwn=msg.username===state.username;
   const attachments=msg.attachments||[];
@@ -5801,7 +5903,7 @@ function messageMenu(msgEl,msg,e){
     !(can(PERM.PIN)||can(PERM.MANAGE))?null:{label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
       try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
     }},
-    isOwn?{label:'Edit Message',icon:'edit',action:()=>startEdit(msgEl,msg)}:null,
+    isOwn&&!msg.kind?{label:'Edit Message',icon:'edit',action:()=>startEdit(msgEl,msg)}:null,
     ...(!imgAttach?attachments.map(a=>({label:`Download ${a.name||'file'}`,icon:'download',action:()=>downloadAttachment(a)})):[]),
     (isOwn||can(PERM.MANAGE))?'-':null,
     (isOwn||can(PERM.MANAGE))?{label:'Delete Message',icon:'delete',danger:true,action:()=>showDeleteConfirm(msg.id)}:null,

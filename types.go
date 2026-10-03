@@ -99,6 +99,7 @@ type ChatMessage struct {
 	Reactions   []Reaction   `json:"reactions"`
 	ReplyTo     string        `json:"reply_to,omitempty"` // the message this replies to
 	Reply       *ReplyPreview `json:"reply,omitempty"`    // and a preview of it
+	Kind        string        `json:"kind,omitempty"`     // "join" = "<username> joined the server."
 }
 
 // ReplyPreview is what a reply shows of the message it answers.

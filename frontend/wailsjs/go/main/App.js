@@ -22,6 +22,10 @@ export function CreateAccount(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateAccount'](arg1, arg2, arg3);
 }
 
+export function CreateInvite() {
+  return window['go']['main']['App']['CreateInvite']();
+}
+
 export function DeleteMessage(arg1) {
   return window['go']['main']['App']['DeleteMessage'](arg1);
 }
@@ -160,6 +164,10 @@ export function IsMuted() {
 
 export function JoinVoiceChannel(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['JoinVoiceChannel'](arg1, arg2, arg3, arg4);
+}
+
+export function JoinWithInvite(arg1, arg2) {
+  return window['go']['main']['App']['JoinWithInvite'](arg1, arg2);
 }
 
 export function KickMember(arg1, arg2, arg3) {

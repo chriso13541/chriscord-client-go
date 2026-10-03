@@ -116,6 +116,7 @@ export namespace main {
 	    reactions: Reaction[];
 	    reply_to?: string;
 	    reply?: ReplyPreview;
+	    kind?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatMessage(source);
@@ -134,6 +135,7 @@ export namespace main {
 	        this.reactions = this.convertValues(source["reactions"], Reaction);
 	        this.reply_to = source["reply_to"];
 	        this.reply = this.convertValues(source["reply"], ReplyPreview);
+	        this.kind = source["kind"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -172,6 +174,22 @@ export namespace main {
 	        this.issuer = source["issuer"];
 	        this.subject = source["subject"];
 	        this.expires_at = source["expires_at"];
+	    }
+	}
+	export class InviteInfo {
+	    code: string;
+	    expires_at: string;
+	    minutes: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new InviteInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.expires_at = source["expires_at"];
+	        this.minutes = source["minutes"];
 	    }
 	}
 	export class LinkPreview {
@@ -260,6 +278,7 @@ export namespace main {
 	    reactions: Reaction[];
 	    reply_to?: string;
 	    reply?: ReplyPreview;
+	    kind?: string;
 	    board_name: string;
 	    room_id: string;
 	
@@ -280,6 +299,7 @@ export namespace main {
 	        this.reactions = this.convertValues(source["reactions"], Reaction);
 	        this.reply_to = source["reply_to"];
 	        this.reply = this.convertValues(source["reply"], ReplyPreview);
+	        this.kind = source["kind"];
 	        this.board_name = source["board_name"];
 	        this.room_id = source["room_id"];
 	    }

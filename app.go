@@ -765,6 +765,17 @@ func requestChallenge(base, publicKeyHex string) (string, error) {
 // UnlockAccount). The username comes from the account, not per-server —
 // one identity, same name everywhere, same as Discord.
 func (a *App) Connect(domain, serverKey string) error {
+	return a.connect(domain, serverKey, "")
+}
+
+// JoinWithInvite joins a server through an invite link's code instead of
+// its join key (which invite links never contain). After that you're a
+// member, so later connections need neither.
+func (a *App) JoinWithInvite(domain, inviteCode string) error {
+	return a.connect(domain, "", inviteCode)
+}
+
+func (a *App) connect(domain, serverKey, invite string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.account == nil { return fmt.Errorf("no account unlocked") }
@@ -791,6 +802,7 @@ func (a *App) Connect(domain, serverKey string) error {
 		"signature":  hex.EncodeToString(signature),
 	}
 	if serverKey != "" { joinBody["server_key"] = serverKey }
+	if invite != "" { joinBody["invite"] = invite }
 	var joinResp JoinResponse
 	if err := postJSON(base+"/api/join", joinBody, &joinResp); err != nil { return err }
 
@@ -1286,6 +1298,32 @@ func (a *App) sendWS(v interface{}) {
 // ReactToMessage adds (on=true) or removes (on=false) your emoji reaction.
 // The server broadcasts the change as message_reaction, which is what
 // updates every client's view — including this one.
+// InviteInfo is a freshly made invite: its code and when it stops working.
+type InviteInfo struct {
+	Code      string `json:"code"`
+	ExpiresAt string `json:"expires_at"`
+	Minutes   int    `json:"minutes"`
+}
+
+// CreateInvite makes a short-lived invite link code for this server.
+func (a *App) CreateInvite() (*InviteInfo, error) {
+	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
+	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/invites", nil)
+	if err != nil { return nil, err }
+	req.Header.Set("X-Session-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil { return nil, fmt.Errorf("network error: %w", err) }
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var e map[string]string; json.NewDecoder(resp.Body).Decode(&e)
+		if msg, ok := e["error"]; ok { return nil, fmt.Errorf("%s", msg) }
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	var inv InviteInfo
+	if err := json.NewDecoder(resp.Body).Decode(&inv); err != nil { return nil, err }
+	return &inv, nil
+}
+
 // FetchRoles returns the server's roles, who has which, and this account's
 // permissions, as the JSON from GET /api/roles.
 func (a *App) FetchRoles() (string, error) {
