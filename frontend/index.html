@@ -1971,7 +1971,8 @@ function markBoardMentioned(boardId){
 // ── SOUNDS ───────────────────────────────────────────────────────
 // Short effects from frontend/sounds/: join.wav / leave.wav for your voice
 // channel, error.wav when your call drops (lost connection), mention.wav
-// when someone @mentions you. Each can be turned off
+// when someone @mentions you, webcam_start.wav / webcam_stop.wav when you
+// turn your camera on or off (in a call, or with Test Camera in Settings). Each can be turned off
 // (Settings → Voice → Sounds) and they share one volume. A missing or
 // empty file just plays nothing.
 const SOUND_DEFAULTS={voice:true,mention:true,volume:70};
@@ -2026,7 +2027,8 @@ function initSounds(){
   });
   let n=0;
   document.getElementById('snd-test').addEventListener('click',()=>{
-    const name=['join','leave','mention','error','mute','unmute','deafen','undeafen'][n++%8];
+    const list=['join','leave','mention','error','mute','unmute','deafen','undeafen','webcam_start','webcam_stop'];
+    const name=list[n++%list.length];
     const was={...soundSettings};soundSettings.voice=soundSettings.mention=true;playSound(name);soundSettings.voice=was.voice;soundSettings.mention=was.mention;
     toast(`Played ${name}.wav`);
   });
@@ -3320,6 +3322,7 @@ function closeSettings(){
   setLevelMeter(false);
   if(bannerCrop.img)closeBannerCropper();
   if(micTestRunning)stopMicTest();
+  if(camPreview.stream)playSound('webcam_stop');
   stopCameraPreview();
   if(pfpCrop.img)closePfpCropper();
 }
@@ -3347,7 +3350,7 @@ function switchSettingsTab(name){
   if(name==='appearance'){apDraft={...appearance};renderAppearanceEditor();updateOverrideHint();}
   setLevelMeter(name==='voice'&&!document.getElementById('settings-modal').classList.contains('hidden'));
   if(name==='voice'&&!document.getElementById('settings-modal').classList.contains('hidden'))populateCameraSettings();
-  else stopCameraPreview();
+  else{if(camPreview.stream)playSound('webcam_stop');stopCameraPreview();}
   document.getElementById('settings-content').classList.toggle('wide',name==='profile'||name==='appearance');
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
@@ -6505,11 +6508,11 @@ function b64ToBytes(b64){const s=atob(b64),u=new Uint8Array(s.length);for(let i=
 const inMyCall=()=>!!state.voiceHere&&(state.voiceChannels[state.voiceHere]||[]).includes(state.username);
 
 async function toggleCamera(){
-  if(cam.on||cam.starting){stopCamera();return;}
+  if(cam.on||cam.starting){const was=cam.on;stopCamera();if(was)playSound('webcam_stop');return;}
   if(!inMyCall()){toast('Join a voice channel to turn on your camera',true);return;}
   if(!camSupported()){toast('Cameras aren\u2019t supported in this version of the app\u2019s web view',true);return;}
   cam.starting=true;updateCameraButton();
-  try{await startCamera();}
+  try{await startCamera();playSound('webcam_start');}
   catch(err){toast('Camera: '+(err?.message||err),true);stopCamera(true);}
   finally{cam.starting=false;updateCameraButton();}
 }
@@ -6531,10 +6534,10 @@ async function startCamera(){
   if(!inMyCall()){stopStream(stream);throw new Error('You left the call');}
   const track=stream.getVideoTracks()[0];
   Object.assign(cam,{stream,mode,fps:mode.fps,forceKey:true,lastKeyAt:0,lastFrameAt:0,inflight:0,actualFps:Math.round(track.getSettings?.().frameRate||0)});
-  cam.encoder=new VideoEncoder({output:onCamChunk,error:e=>{console.warn('video: encoder error',e);toast('Camera stopped: '+e.message,true);stopCamera();}});
+  cam.encoder=new VideoEncoder({output:onCamChunk,error:e=>{console.warn('video: encoder error',e);toast('Camera stopped: '+e.message,true);stopCamera();playSound('webcam_stop');}});
   cam.encoder.configure(cfg);
   cam.on=true;
-  track.addEventListener('ended',()=>{if(cam.stream===stream){toast('Your camera was disconnected',true);stopCamera();}});
+  track.addEventListener('ended',()=>{if(cam.stream===stream){toast('Your camera was disconnected',true);stopCamera();playSound('webcam_stop');}});
   pumpCamera(track);
   await window.go.main.App.SetVideoEnabled(true).catch(()=>{});
   cam.announcedAt=Date.now();
@@ -6891,7 +6894,11 @@ function initCameraSettings(){
     applyCameraSetting();
   });
   fpsSel.addEventListener('change',()=>{localStorage.setItem('camFps',fpsSel.value);applyCameraSetting();});
-  document.getElementById('settings-cam-test-btn').addEventListener('click',()=>{camPreview.stream?stopCameraPreview():startCameraPreview();});
+  document.getElementById('settings-cam-test-btn').addEventListener('click',async()=>{
+    if(camPreview.stream){stopCameraPreview();playSound('webcam_stop');return;}
+    await startCameraPreview();
+    if(camPreview.stream)playSound('webcam_start');
+  });
   document.getElementById('settings-cam-recheck').addEventListener('click',()=>{
     // Re-checking reopens the camera at every size — not while it's live in a call.
     if(cam.on||cam.starting){toast('Turn your camera off first, then re-check it',true);return;}
