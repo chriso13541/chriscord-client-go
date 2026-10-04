@@ -229,6 +229,11 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile.me video { transform:scaleX(-1); }
 .vs-tile:not(.live)::after { content:'Connecting\2026'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.6); font-size:.85rem; }
 .vs-tile .vs-name { position:absolute; left:8px; bottom:8px; display:flex; align-items:center; gap:6px; z-index:1; max-width:calc(100% - 16px); padding:3px 8px; border-radius:4px; background:rgba(0,0,0,.6); color:#fff; font-size:.8rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vs-tile .vs-stats { position:absolute; top:6px; right:6px; z-index:2; max-width:calc(100% - 12px); padding:5px 8px; border-radius:5px; background:rgba(0,0,0,.72); color:#cfe; font:11px/1.35 ui-monospace,Consolas,monospace; white-space:pre; overflow:hidden; pointer-events:none; }
+.vs-tile .vs-stats:empty { display:none; }
+.vs-tile .vs-selfoff { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:rgba(255,255,255,.75); font-size:.85rem; font-weight:600; }
+.vs-tile .vs-selfoff .ic { width:28px; height:28px; opacity:.8; }
+.vs-tile .vs-selfoff small { font-weight:400; font-size:.75rem; color:rgba(255,255,255,.5); }
 .vs-tile .vs-unsup { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; text-align:center; color:rgba(255,255,255,.7); font-size:.82rem; }
 .vs-tile:fullscreen { border-radius:0; cursor:default; width:100% !important; height:100% !important; }
 .vs-tile .vs-name .vs-av { width:18px; height:18px; font-size:.65rem; }
@@ -1639,6 +1644,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <button id="settings-cam-test-btn" class="settings-secondary-btn" type="button"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg> Test Camera</button>
         <button id="settings-cam-recheck" class="settings-secondary-btn" type="button" title="Look again at what this camera supports (e.g. after a driver update)">Re-check camera</button>
       </div>
+      <label class="check-row"><input type="checkbox" id="cam-selfview"> Show my own camera in calls</label>
+      <label class="check-row"><input type="checkbox" id="cam-stats"> Show video stats on camera tiles</label>
       <p class="settings-hint">Only sizes and frame rates your camera actually supports are listed, and your camera is never asked for anything else. Turn your camera on during a call with the camera button next to mute.</p>
 
       <h3 class="settings-sub">Sounds</h3>
@@ -6592,13 +6599,16 @@ function pumpCamera(track){
   // reach this code: arrival times jitter, which used to drop perfectly
   // good frames (visible as stutter). When the camera runs at the chosen
   // rate nothing is dropped; above it, frames are thinned evenly.
+  const st=vStats.self=newVideoStats();
   const encodeFrame=frame=>{
     const now=performance.now(),gapUs=1e6/cam.fps,ts=frame.timestamp;
-    if(!cam.on||!cam.encoder||cam.encoder.state!=='configured'||cam.encoder.encodeQueueSize>2||cam.inflight>4){frame.close();return;}
-    if(cam.nextTs&&ts<cam.nextTs-gapUs*.5){frame.close();return;}
+    st.camIn++;
+    if(!cam.on||!cam.encoder||cam.encoder.state!=='configured'||cam.encoder.encodeQueueSize>2||cam.inflight>4){st.dropBusy++;frame.close();return;}
+    if(cam.nextTs&&ts<cam.nextTs-gapUs*.5){st.dropPace++;frame.close();return;}
     cam.nextTs=Math.max((cam.nextTs||ts)+gapUs,ts);
     const key=cam.forceKey||now-cam.lastKeyAt>3000;
     if(key){cam.forceKey=false;cam.lastKeyAt=now;}
+    st.encStart.set(ts,now);
     try{cam.encoder.encode(frame,{keyFrame:key});}catch{}
     frame.close();
   };
@@ -6623,10 +6633,18 @@ function pumpCamera(track){
 }
 function onCamChunk(chunk){
   if(!cam.on)return;
+  const st=vStats.self;
+  if(st){
+    const t0=st.encStart.get(chunk.timestamp);
+    if(t0!==undefined){st.encMs+=performance.now()-t0;st.encN++;st.encStart.delete(chunk.timestamp);}
+    if(st.encStart.size>60)st.encStart.clear();
+    st.sent++;st.bytes+=chunk.byteLength;if(chunk.type==='key')st.keys++;
+  }
   const buf=new Uint8Array(chunk.byteLength);chunk.copyTo(buf);
   cam.inflight++;
+  const t1=performance.now();
   window.go.main.App.PushVideoFrame(bytesToB64(buf),Math.round(1000/cam.fps))
-    .catch(()=>{}).finally(()=>{cam.inflight--;});
+    .catch(()=>{}).finally(()=>{cam.inflight--;if(st){st.ipcMs+=performance.now()-t1;st.ipcN++;}});
 }
 function stopCamera(quiet){
   const was=cam.on;
@@ -6652,7 +6670,7 @@ function remoteVideo(user){
   let r=vRemote.get(user);
   if(r)return r;
   if(!decodeSupported())return null;
-  r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null};
+  r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null,stats:newVideoStats()};
   const markLive=()=>{if(!r.live){r.live=true;r.el.closest('.vs-tile')?.classList.add('live');}};
   if(window.MediaStreamTrackGenerator){
     // Decoded frames go straight into a video track that a <video> plays:
@@ -6662,7 +6680,8 @@ function remoteVideo(user){
     v.srcObject=new MediaStream([gen]);v.play().catch(()=>{});
     r.el=v;r.gen=gen;r.writer=writer;
     r.write=frame=>{
-      if(r.pending>2){frame.close();return;} // display can't keep up: skip this one
+      r.stats.decoded++;
+      if(r.pending>2){r.stats.dropShow++;frame.close();return;} // display can't keep up: skip this one
       r.pending++;markLive();
       writer.write(frame).catch(()=>{try{frame.close();}catch{}}).finally(()=>{r.pending--;});
     };
@@ -6670,6 +6689,7 @@ function remoteVideo(user){
     const canvas=document.createElement('canvas');canvas.width=640;canvas.height=360;
     const ctx=canvas.getContext('2d');r.el=canvas;
     r.write=frame=>{
+      r.stats.decoded++;
       if(canvas.width!==frame.displayWidth||canvas.height!==frame.displayHeight){canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;}
       ctx.drawImage(frame,0,0);frame.close();markLive();
     };
@@ -6705,15 +6725,54 @@ function onVideoFrame(f){
   if(!f?.user||!state.voiceVideo.has(f.user)||!inMyCall())return;
   const r=remoteVideo(f.user);if(!r)return;
   const codec=f.codec||'vp8';
+  r.stats.recv++;r.stats.bytes+=f.data.length*3/4;if(f.key)r.stats.keys++;r.stats.codec=codec;
   if(r.codec!==codec||!r.decoder||r.decoder.state==='closed')configureDecoder(f.user,r,codec);
   if(r.decoder.state!=='configured')return;
-  if(r.needKey&&!f.key){askKeyframe(f.user,r);return;}
-  if(r.decoder.decodeQueueSize>6){r.needKey=true;askKeyframe(f.user,r);return;} // fallen behind: skip to the next keyframe
+  if(r.needKey&&!f.key){r.stats.dropWait++;askKeyframe(f.user,r);return;}
+  if(r.decoder.decodeQueueSize>6){r.stats.dropBusy++;r.needKey=true;askKeyframe(f.user,r);return;} // fallen behind: skip to the next keyframe
   try{
     r.decoder.decode(new EncodedVideoChunk({type:f.key?'key':'delta',timestamp:(r.ts+=33333),data:b64ToBytes(f.data)}));
     r.needKey=false;
   }catch(err){r.needKey=true;askKeyframe(f.user,r);}
 }
+
+// ── Video stats (Settings → Voice & Video → "Show video stats") ──
+// A small readout on each camera tile, once a second, to see where frames
+// go: for your camera, what the camera delivers vs what's sent, frames
+// skipped because the encoder/connection was busy or to keep to the frame
+// rate, encode time and bitrate; for others, what arrives vs what's
+// decoded and shown. (A camera delivering fewer fps than chosen usually
+// means it's slowing itself down for low light.)
+const vStats={self:null};
+function newVideoStats(){return {camIn:0,sent:0,bytes:0,keys:0,dropBusy:0,dropPace:0,encMs:0,encN:0,ipcMs:0,ipcN:0,encStart:new Map(),recv:0,decoded:0,dropShow:0,dropWait:0,codec:''};}
+function resetCounts(st){Object.assign(st,{camIn:0,sent:0,bytes:0,keys:0,dropBusy:0,dropPace:0,encMs:0,encN:0,ipcMs:0,ipcN:0,recv:0,decoded:0,dropShow:0,dropWait:0});}
+function renderVideoStats(){
+  const on=localStorage.getItem('videoStats')==='1';
+  document.querySelectorAll('#video-stage .vs-tile').forEach(tile=>{
+    let box=tile.querySelector('.vs-stats');
+    if(!on){box?.remove();return;}
+    if(!box){box=document.createElement('div');box.className='vs-stats';tile.appendChild(box);}
+    const u=tile.dataset.user;let lines;
+    if(u===state.username){
+      const st=vStats.self;if(!st||!cam.on){box.textContent='';return;}
+      const enc=st.encN?(st.encMs/st.encN).toFixed(1):'\u2013',ipc=st.ipcN?(st.ipcMs/st.ipcN).toFixed(1):'\u2013';
+      lines=[`${cam.mode?.w}\u00d7${cam.mode?.h} \u00b7 ${cam.codecLabel||''}`,
+        `camera ${st.camIn} fps \u2192 sent ${st.sent} fps (target ${cam.fps})`,
+        `skipped: ${st.dropPace} pacing \u00b7 ${st.dropBusy} busy`,
+        `encode ${enc} ms \u00b7 hand-off ${ipc} ms \u00b7 ${(st.bytes*8/1000).toFixed(0)} kbps`];
+      resetCounts(st);
+    }else{
+      const r=vRemote.get(u);if(!r){box.textContent='';return;}
+      const st=r.stats;
+      lines=[`${(st.codec||'').toUpperCase()} \u00b7 ${(st.bytes*8/1000).toFixed(0)} kbps`,
+        `received ${st.recv} fps \u2192 shown ${st.decoded-st.dropShow} fps`,
+        `skipped: ${st.dropWait} waiting for keyframe \u00b7 ${st.dropBusy} decoder behind \u00b7 ${st.dropShow} display`];
+      resetCounts(st);
+    }
+    box.textContent=lines.join('\n');
+  });
+}
+setInterval(renderVideoStats,1000);
 
 // ── The video area above the messages ──
 // Shown while you're in a call where someone (you included) has a camera
@@ -6742,9 +6801,18 @@ function renderVideoStage(){
       grid.appendChild(tile);
     }
     if(u===state.username){
+      // Your own preview can be turned off (Settings → Voice & Video): one
+      // less video for the graphics card to draw every frame.
+      const show=localStorage.getItem('selfView')!=='0';
       let v=tile.querySelector('video');
-      if(!v){v=document.createElement('video');v.muted=true;v.playsInline=true;v.autoplay=true;tile.prepend(v);}
-      if(v.srcObject!==cam.stream){v.srcObject=cam.stream;v.play().catch(()=>{});}
+      if(show){
+        tile.querySelector('.vs-selfoff')?.remove();
+        if(!v){v=document.createElement('video');v.muted=true;v.playsInline=true;v.autoplay=true;v.disablePictureInPicture=true;tile.prepend(v);}
+        if(v.srcObject!==cam.stream){v.srcObject=cam.stream;v.play().catch(()=>{});}
+      }else{
+        if(v){v.srcObject=null;v.remove();}
+        if(!tile.querySelector('.vs-selfoff'))tile.insertAdjacentHTML('afterbegin',`<div class="vs-selfoff">${icon('videocam')}<span>Your camera is on</span><small>Your own preview is hidden</small></div>`);
+      }
       tile.classList.add('live');
     }else{
       const r=remoteVideo(u);
@@ -6949,6 +7017,11 @@ function stopCameraPreview(keepLabel){
   if(!keepLabel)document.getElementById('settings-cam-test-btn').innerHTML=`${icon('videocam')} Test Camera`;
 }
 function initCameraSettings(){
+  const self=document.getElementById('cam-selfview'),stats=document.getElementById('cam-stats');
+  self.checked=localStorage.getItem('selfView')!=='0';
+  stats.checked=localStorage.getItem('videoStats')==='1';
+  self.addEventListener('change',()=>{localStorage.setItem('selfView',self.checked?'1':'0');renderVideoStage();});
+  stats.addEventListener('change',()=>{localStorage.setItem('videoStats',stats.checked?'1':'0');renderVideoStats();});
   const sel=document.getElementById('settings-cam-select'),resSel=document.getElementById('settings-cam-res'),fpsSel=document.getElementById('settings-cam-fps');
   sel.addEventListener('change',async()=>{
     localStorage.setItem('camDevice',sel.value);
