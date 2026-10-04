@@ -421,6 +421,22 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .mp-video .mp-bar .mp-btn, .mp-video .mp-time { color:#fff; }
 .mp-video .mp-time { color:rgba(255,255,255,.85); }
 .mp-video.playing.idle .mp-bar { opacity:0; }
+/* The video's file name across the top, like the controls along the
+   bottom: shown while paused, and while playing only when the pointer is
+   moving over it (it hides with the controls). */
+.mp-video .mp-title { position:absolute; left:0; right:0; top:0; z-index:2; display:flex; align-items:center; gap:8px; padding:8px 12px 22px; background:linear-gradient(rgba(0,0,0,.75),transparent); color:#fff; font-size:.85rem; font-weight:600; pointer-events:none; transition:opacity .2s; }
+.mp-video .mp-title .ic { width:18px; height:18px; flex-shrink:0; opacity:.85; }
+.mp-video .mp-title span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+.mp-video.playing.idle .mp-title { opacity:0; }
+.mp-video:fullscreen .mp-title { font-size:1rem; padding:14px 18px 30px; }
+.mp-video:focus { outline:none; }
+.mp-video:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+/* "« 5s" / "5s »" flash when skipping with the arrow keys */
+.mp-video .mp-skip { position:absolute; top:50%; z-index:2; padding:10px 16px; border-radius:24px; background:rgba(0,0,0,.6); color:#fff; font-weight:800; font-size:.95rem; pointer-events:none; opacity:0; transform:translateY(-50%); white-space:nowrap; }
+.mp-video .mp-skip.left { left:10%; } .mp-video .mp-skip.right { right:10%; }
+.mp-video .mp-skip.show { animation:mp-skip .65s ease-out; }
+@keyframes mp-skip { 0% { opacity:0; transform:translateY(-50%) scale(.9); } 15% { opacity:1; transform:translateY(-50%) scale(1); } 70% { opacity:1; } 100% { opacity:0; transform:translateY(-50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .mp-video .mp-skip.show { animation-duration:.01s; } }
 .mp-video.playing.idle video { cursor:none; }
 .mp-video:fullscreen { width:100%; border:none; border-radius:0; display:flex; align-items:center; }
 .mp-video:fullscreen video { max-height:none; height:100%; aspect-ratio:auto; }
@@ -834,7 +850,13 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
    own transform is its zoom/pan, so the shrink is on the stage around it.) */
 #lightbox.closing { opacity:0; transition:opacity .16s ease-in; pointer-events:none; }
 #lightbox.closing #lb-stage { transform:scale(.9); transition:transform .16s ease-in; }
-@media (prefers-reduced-motion: reduce) { #lightbox.closing, #lightbox.closing #lb-stage { transition:none; } }
+/* Opening: the reverse — the viewer fades in while the picture grows
+   into place from slightly smaller. */
+#lightbox.opening { animation:lb-fade-in .18s ease-out; }
+#lightbox.opening #lb-stage { animation:lb-grow-in .18s cubic-bezier(.2,.8,.3,1); }
+@keyframes lb-fade-in { from { opacity:0; } to { opacity:1; } }
+@keyframes lb-grow-in { from { transform:scale(.9); } to { transform:none; } }
+@media (prefers-reduced-motion: reduce) { #lightbox.closing, #lightbox.closing #lb-stage { transition:none; } #lightbox.opening, #lightbox.opening #lb-stage { animation:none; } }
 #lightbox-img { max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; transform-origin:center center; cursor:zoom-in; will-change:transform; }
 #lightbox-img.animating { transition:transform .15s ease-out; }
 #lightbox.zoomed #lightbox-img { cursor:grab; }
@@ -4970,7 +4992,8 @@ function buildMediaPlayer(a,kind){
       <button class="mp-btn mp-dl" title="Download">${icon('download')}</button></div>${bar}`;
     wrap.appendChild(media);
   }else{
-    wrap.innerHTML=`<button class="mp-big" title="Play">${icon('play_arrow')}</button>${bar}`;
+    const title=a.name||'Video';
+    wrap.innerHTML=`<div class="mp-title" title="${esc(title)}">${icon('video_file')}<span>${esc(title)}</span></div><button class="mp-big" title="Play">${icon('play_arrow')}</button>${bar}`;
     wrap.prepend(media);
   }
   const $=sel=>wrap.querySelector(sel);
@@ -5016,13 +5039,34 @@ function buildMediaPlayer(a,kind){
   });
   wrap.querySelectorAll('.mp-dl').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();downloadAttachment(a);}));
   if(kind==='video'){
-    // Controls fade out after a moment of no mouse movement while playing.
+    // Controls fade out after a moment of no mouse movement while playing,
+    // and come back on any movement — in fullscreen the movement is picked
+    // up document-wide (see initMediaKeys), since the player's own events
+    // don't always arrive there. Leaving the player hides them, except in
+    // fullscreen, where there's nowhere to leave to.
     let idleT=null;
-    const wake=()=>{wrap.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>wrap.classList.add('idle'),2200);};
-    wrap.addEventListener('mousemove',wake);wrap.addEventListener('mouseleave',()=>{clearTimeout(idleT);wrap.classList.add('idle');});
+    const wake=()=>{wrap.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!media.paused)wrap.classList.add('idle');},2200);};
+    wrap.addEventListener('pointermove',wake);
+    wrap.addEventListener('mouseleave',()=>{if(document.fullscreenElement===wrap)return;clearTimeout(idleT);wrap.classList.add('idle');});
+    // Keyboard: clicking the player gives it the keys (see initMediaKeys).
+    wrap.tabIndex=-1;
+    wrap.addEventListener('pointerdown',()=>{if(!wrap.contains(document.activeElement)||document.activeElement===wrap)wrap.focus({preventScroll:true});});
+    const skipEl=document.createElement('div');skipEl.className='mp-skip';wrap.appendChild(skipEl);
+    const skip=secs=>{
+      if(!isFinite(media.duration))return;
+      media.currentTime=Math.max(0,Math.min(media.duration,media.currentTime+secs));
+      paint();wake();
+      skipEl.textContent=secs<0?`\u00ab ${-secs}s`:`${secs}s \u00bb`;
+      skipEl.className='mp-skip '+(secs<0?'left':'right');void skipEl.offsetWidth;skipEl.classList.add('show');
+    };
+    wrap._mp={skip,toggle:()=>{toggle();wake();},wake};
+    initMediaKeys();
     const fsBtn=$('.mp-fs');
     fsBtn.addEventListener('click',e=>{e.stopPropagation();document.fullscreenElement===wrap?document.exitFullscreen():wrap.requestFullscreen?.().catch(()=>{});});
-    document.addEventListener('fullscreenchange',()=>{const on=document.fullscreenElement===wrap;fsBtn.innerHTML=icon(on?'fullscreen_exit':'fullscreen');fsBtn.dataset.tip=fsBtn.title=on?'Exit fullscreen':'Fullscreen';});
+    document.addEventListener('fullscreenchange',()=>{
+      const on=document.fullscreenElement===wrap;fsBtn.innerHTML=icon(on?'fullscreen_exit':'fullscreen');fsBtn.dataset.tip=fsBtn.title=on?'Exit fullscreen':'Fullscreen';
+      if(on){wrap.focus({preventScroll:true});wake();}
+    });
     media.addEventListener('dblclick',e=>{e.preventDefault();fsBtn.click();});
   }
   // A format this app can't play (e.g. MKV with HEVC video): say so, and
@@ -5031,6 +5075,29 @@ function buildMediaPlayer(a,kind){
   if(kind==='video')watchPartialPlayback(wrap,media,a);
   paintPlay();paintVol();
   return wrap;
+}
+// Keys for the video player that has them — the one in fullscreen, or the
+// one you last clicked: ← / → skip 5 s (Shift: 1 s), J / L skip 10 s,
+// Space / K play-pause. Typing in a text box keeps its arrow keys, except
+// in fullscreen. Also: in fullscreen, any mouse movement brings the
+// controls back.
+let mediaKeysReady=false;
+function initMediaKeys(){
+  if(mediaKeysReady)return;mediaKeysReady=true;
+  document.addEventListener('keydown',e=>{
+    if(e.ctrlKey||e.metaKey||e.altKey)return;
+    const fs=document.fullscreenElement,t=e.target;
+    const wrap=fs?._mp?fs:t.closest?.('.mp-video');
+    if(!wrap?._mp)return;
+    if(!fs&&t.matches?.('input,textarea,select,[contenteditable="true"]'))return;
+    const k=e.key.length===1?e.key.toLowerCase():e.key;
+    if(k==='ArrowLeft'||k==='ArrowRight')wrap._mp.skip((k==='ArrowRight'?1:-1)*(e.shiftKey?1:5));
+    else if(k==='j'||k==='l')wrap._mp.skip(k==='l'?10:-10);
+    else if(k===' '||k==='k'){if(t.closest?.('button')&&k===' ')return;wrap._mp.toggle();}
+    else return;
+    e.preventDefault();e.stopPropagation();
+  });
+  document.addEventListener('pointermove',()=>{document.fullscreenElement?._mp?.wake();},true);
 }
 // onUnplayable(code) is called if the file still won't load with a fresh
 // link — i.e. the format itself can't be played here, not an expired link.
@@ -7325,12 +7392,15 @@ function openLightbox(src,attach,msg){
   }else sender.style.display='none';
   document.getElementById('lb-save').style.display=attach?'':'none';
   box.classList.remove('hidden');lb.open=true;
+  // Restart the opening animation (it may still be on from a quick reopen).
+  box.classList.remove('opening');void box.offsetWidth;box.classList.add('opening');
+  clearTimeout(lb.openTimer);lb.openTimer=setTimeout(()=>box.classList.remove('opening'),220);
 }
 function closeLightbox(){
   if(!lb.open)return;
   lb.open=false;lb.drag=null;
   const box=document.getElementById('lightbox');
-  box.classList.remove('dragging');
+  box.classList.remove('dragging','opening');clearTimeout(lb.openTimer);
   box.classList.add('closing');
   clearTimeout(lb.closeTimer);
   lb.closeTimer=setTimeout(()=>{
