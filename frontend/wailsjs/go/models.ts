@@ -425,6 +425,28 @@ export namespace main {
 		}
 	}
 	
+	export class Sticker {
+	    id: string;
+	    name: string;
+	    description: string;
+	    animated: boolean;
+	    hidden: boolean;
+	    created_by: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Sticker(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.animated = source["animated"];
+	        this.hidden = source["hidden"];
+	        this.created_by = source["created_by"];
+	    }
+	}
 	export class UploadResult {
 	    url: string;
 	    filename: string;

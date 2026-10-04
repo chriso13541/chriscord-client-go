@@ -18,6 +18,8 @@ export function DeleteEmoji(arg1:string):Promise<void>;
 
 export function DeleteMessage(arg1:string):Promise<void>;
 
+export function DeleteSticker(arg1:string):Promise<void>;
+
 export function DiscardConverted(arg1:string):Promise<void>;
 
 export function Disconnect():Promise<void>;
@@ -74,6 +76,8 @@ export function GetServerInfo(arg1:string):Promise<main.ServerInfo>;
 
 export function GetServers():Promise<Array<main.SavedServer>>;
 
+export function GetStickers():Promise<Array<main.Sticker>>;
+
 export function GetSystemIdleSeconds():Promise<number>;
 
 export function GetUsername():Promise<string>;
@@ -119,6 +123,8 @@ export function PickEmojiFiles(arg1:Array<string>):Promise<Array<main.EmojiFile>
 export function PickFiles():Promise<Array<string>>;
 
 export function PickPfp():Promise<string>;
+
+export function PickStickerFiles():Promise<Array<main.EmojiFile>>;
 
 export function PingServer():Promise<number>;
 
@@ -178,6 +184,8 @@ export function UpdateEmoji(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<main.SavedServer>>;
 
+export function UpdateSticker(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
+
 export function UploadEmojiFile(arg1:string,arg2:string):Promise<main.CustomEmoji>;
 
 export function UploadFile(arg1:string):Promise<main.UploadResult>;
@@ -185,5 +193,7 @@ export function UploadFile(arg1:string):Promise<main.UploadResult>;
 export function UploadFileData(arg1:string,arg2:string):Promise<main.UploadResult>;
 
 export function UploadFileWithProgress(arg1:string,arg2:string):Promise<main.UploadResult>;
+
+export function UploadStickerFile(arg1:string,arg2:string,arg3:string):Promise<main.Sticker>;
 
 export function VideoConversionInfo():Promise<Record<string, any>>;

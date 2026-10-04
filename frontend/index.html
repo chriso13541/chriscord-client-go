@@ -607,6 +607,38 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .em-row .btn { padding:4px 10px; font-size:.8rem; }
 .em-row .em-del.confirm { color:var(--red); }
 .em-empty { padding:24px; text-align:center; color:var(--text-muted); font-size:.88rem; }
+.em-tabs { display:flex; gap:4px; margin:-4px 0 14px; border-bottom:1px solid var(--border); }
+.em-tabs button { border:none; background:none; color:var(--text-muted); font:inherit; font-weight:700; font-size:.9rem; padding:8px 12px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+.em-tabs button:hover { color:var(--text); }
+.em-tabs button.active { color:var(--text-strong); border-bottom-color:var(--accent); }
+.em-list.stickers .em-row img { width:56px; height:56px; }
+/* Stickers */
+#sticker-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px 2px; display:inline-flex; align-items:center; flex-shrink:0; transition:color .15s; }
+#sticker-btn .ic { width:24px; height:24px; }
+#sticker-btn:hover:not(:disabled), #sticker-btn.active { color:var(--text-strong); }
+#sticker-btn:disabled { opacity:.3; cursor:default; }
+#sticker-picker { position:absolute; right:20px; bottom:100%; margin-bottom:8px; width:424px; height:440px; max-height:calc(100vh - 140px); display:flex; flex-direction:column; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); z-index:60; overflow:hidden; }
+#sticker-picker .sp-main { flex:1; overflow-y:auto; padding:0 10px 10px; }
+#sticker-picker .sp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:6px; }
+#sticker-picker .sp-grid button { aspect-ratio:1; border:none; border-radius:8px; background:none; cursor:pointer; padding:6px; display:flex; align-items:center; justify-content:center; }
+#sticker-picker .sp-grid button:hover, #sticker-picker .sp-grid button:focus-visible { background:var(--bg-light); outline:none; }
+#sticker-picker .sp-grid img { max-width:100%; max-height:100%; object-fit:contain; }
+#sticker-picker .sp-grid .sp-add { border:1px dashed var(--border); color:var(--text-muted); }
+#sticker-picker .sp-grid .sp-add:hover { color:var(--text-strong); border-color:var(--accent); }
+#sticker-picker .sp-grid .sp-add .ic { width:28px; height:28px; }
+#sticker-picker .sp-empty { padding:50px 20px; text-align:center; color:var(--text-muted); font-size:.88rem; line-height:1.5; }
+#sticker-picker .sp-empty .btn { margin-top:12px; }
+.msg-stickers { display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; white-space:normal; }
+.msg-stickers img.sticker { width:160px; height:160px; object-fit:contain; display:block; }
+.sticker-missing { display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border:1px dashed var(--border); border-radius:8px; color:var(--text-muted); font-size:.85rem; }
+.sticker-missing .ic { width:18px; height:18px; }
+.sticker-inline img { width:1.2em; height:1.2em; vertical-align:-.25em; object-fit:contain; }
+/* Big hover preview for emoji in messages and reactions */
+#emoji-card { position:fixed; z-index:400; pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:6px; max-width:240px; padding:10px 14px; background:var(--bg-darkest); border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.5); opacity:0; transform:translateY(4px); transition:opacity .12s, transform .12s; }
+#emoji-card.on { opacity:1; transform:none; }
+#emoji-card img { width:72px; height:72px; object-fit:contain; }
+#emoji-card .ec-name { font-weight:800; font-size:.88rem; color:var(--text-strong); text-align:center; word-break:break-word; }
+#emoji-card .ec-sub { font-size:.75rem; color:var(--text-muted); text-align:center; }
 .em-row .em-edit { display:inline-flex; border:none; background:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:4px; }
 .em-row .em-edit:hover { color:var(--text-strong); background:var(--bg-light); }
 .em-row .em-edit .ic { width:16px; height:16px; }
@@ -622,7 +654,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .ep-empty { padding:40px 10px; text-align:center; color:var(--text-muted); font-size:.85rem; }
 .ep-foot { display:flex; align-items:center; gap:10px; padding:8px 12px; border-top:1px solid var(--border); background:var(--bg-dark); min-height:44px; box-sizing:border-box; position:relative; z-index:2; }
 .ep-body { overflow:hidden; }
-.ep-foot img { width:28px; height:28px; }
+.ep-foot img { width:40px; height:40px; }
 .ep-foot .ep-name { flex:1; font-weight:700; font-size:.85rem; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ep-credit { font-size:.68rem; color:var(--text-muted); white-space:nowrap; }
 .ep-credit a { color:var(--text-muted); }
@@ -977,6 +1009,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-video_file" viewBox="0 -960 960 960"><path d="M360-240h160q17 0 28.5-11.5T560-280v-40l80 42v-164l-80 42v-40q0-17-11.5-28.5T520-480H360q-17 0-28.5 11.5T320-440v160q0 17 11.5 28.5T360-240ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-keep" viewBox="0 -960 960 960"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></symbol>
   <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
+  <symbol id="ic-sticker" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v373L507-120H200Zm280-80v-160q0-50 35-85t85-35h160v-280H200v560h280Zm80-23 217-217H600q-17 0-28.5 11.5T560-400v177ZM360-520q-25 0-42.5-17.5T300-580q0-25 17.5-42.5T360-640q25 0 42.5 17.5T420-580q0 25-17.5 42.5T360-520Zm240 0q-25 0-42.5-17.5T540-580q0-25 17.5-42.5T600-640q25 0 42.5 17.5T660-580q0 25-17.5 42.5T600-520Z"/></symbol>
   <symbol id="ic-mood" viewBox="0 -960 960 960"><path d="M620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Zm0 180q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></symbol>
   <symbol id="ic-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
   <symbol id="ic-add_reaction" viewBox="0 -960 960 960"><path d="M480-480Zm0 400q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q43 0 83 8.5t77 24.5v90q-35-20-75.5-31.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q133 0 226.5-93.5T800-480q0-32-6.5-62T776-600h86q9 29 13.5 58.5T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm320-600v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80ZM620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Z"/></symbol>
@@ -1113,26 +1146,27 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   </div>
 </div>
 
-<!-- Server emoji manager (Manage Emoji permission) -->
+<!-- Server emoji & sticker manager (Manage Emoji & Stickers permission) -->
 <div class="modal-overlay hidden" id="modal-emoji">
   <div class="modal emoji-manage">
-    <h2>Server Emoji</h2>
+    <h2>Server Emoji &amp; Stickers</h2>
+    <div class="em-tabs"><button type="button" data-kind="emoji">Emoji</button><button type="button" data-kind="sticker">Stickers</button></div>
     <div class="error-msg hidden" id="em-error" style="white-space:pre-line"></div>
     <div class="em-top">
-      <button class="btn btn-primary" id="em-upload">Upload emoji</button>
-      <span class="hint">PNG, JPEG, GIF or WebP, any size — pick several at once. Click a name (or the pencil) to rename it.</span>
+      <button class="btn btn-primary" id="em-upload">Add emoji</button>
+      <span class="hint" id="em-hint"></span>
     </div>
     <div class="em-list" id="em-list"></div>
     <div class="modal-actions"><button class="btn btn-ghost" id="em-close">Close</button></div>
   </div>
 </div>
 
-<!-- Add emoji: name the picked images, then upload -->
+<!-- Add emoji / stickers: name the picked images, then upload -->
 <div class="modal-overlay hidden" id="modal-emoji-add">
   <div class="modal emoji-manage">
-    <h2>Add Emoji</h2>
+    <h2 id="ea-title">Add Emoji</h2>
     <div class="error-msg hidden" id="ea-error" style="white-space:pre-line"></div>
-    <div class="em-top"><span class="hint">Give each one a name — that's what you type between colons, like :party_parrot:. Letters, numbers and _ only, 2–32 characters.</span></div>
+    <div class="em-top"><span class="hint" id="ea-hint"></span></div>
     <div class="em-list" id="ea-list"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="ea-more" style="margin-right:auto">+ Choose more…</button>
@@ -1243,12 +1277,14 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         </div>
         <div id="input-area">
           <div id="emoji-picker" class="hidden" role="dialog" aria-label="Emoji"></div>
+          <div id="sticker-picker" class="hidden" role="dialog" aria-label="Stickers"></div>
           <div id="emoji-suggest" class="hidden" role="listbox"></div>
           <div id="reply-bar" class="hidden"><svg class="ic" aria-hidden="true" style="width:16px;height:16px"><use href="#ic-reply"/></svg><span>Replying to <b id="reply-bar-name"></b></span><button class="rb-x" id="reply-bar-x" title="Cancel reply (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
             <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
             <div id="composer-field"><div id="msg-hl" aria-hidden="true"></div><textarea id="msg-input" rows="1" placeholder="Select a board to chat" spellcheck="false" disabled></textarea></div>
+            <button id="sticker-btn" title="Stickers" disabled><svg class="ic" aria-hidden="true"><use href="#ic-sticker"/></svg></button>
             <button id="emoji-btn" title="Emoji" disabled><svg class="ic" aria-hidden="true"><use href="#ic-mood"/></svg></button>
             <button id="send-btn" disabled title="Send"><svg class="ic" aria-hidden="true"><use href="#ic-send"/></svg></button>
           </div>
@@ -1748,6 +1784,13 @@ async function saveExport(){
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 
 function renderTextWithLinks(text) {
+  // Stickers (<s:name:id>) come out of the text and show big below it.
+  const stickers=[];
+  if(text.includes('<s:'))text=text.replace(STICKER_TOKEN_RE,(m,name,id)=>{stickers.push([name,id]);return '';}).replace(/^\s+|\s+$/g,'');
+  const html=text?renderTextOnly(text):'';
+  return stickers.length?html+`<div class="msg-stickers">${stickers.map(([n,id])=>stickerHTML(n,id)).join('')}</div>`:html;
+}
+function renderTextOnly(text) {
   return emojify(mentionsOutsideLinks(esc(text).replace(/https?:\/\/[^\s&]+/g, match => {
     // match is already escaped, unescape for the href
     const raw = match.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
@@ -2029,8 +2072,10 @@ function emojify(html){
     if(part.startsWith('<'))return part;
     if(!part.includes('&lt;'))return emojifyText(part);
     let out='',last=0;
-    for(const m of part.matchAll(CUSTOM_TOKEN_ESC_RE)){
-      out+=emojifyText(part.slice(last,m.index))+customTokenHTML(m[2],m[3]);
+    for(const m of part.matchAll(ANY_TOKEN_ESC_RE)){
+      // m[2]: an emoji's name; m[3]: a sticker's (small, for previews —
+      // full messages draw stickers big, see renderTextWithLinks).
+      out+=emojifyText(part.slice(last,m.index))+(m[3]!==undefined?stickerInlineHTML(m[3],m[4]):customTokenHTML(m[2],m[4]));
       last=m.index+m[0].length;
     }
     return out+emojifyText(part.slice(last));
@@ -2076,13 +2121,15 @@ function isEmojiOnly(text){
 // but aren't offered in the picker or autocomplete.
 const CUSTOM_TOKEN_RE=/<(a?):([A-Za-z0-9_]{2,32}):([0-9a-fA-F-]{36})>/g;
 const CUSTOM_TOKEN_ESC_RE=/&lt;(a?):([A-Za-z0-9_]{2,32}):([0-9a-fA-F-]{36})&gt;/g;
+// Emoji or sticker token in escaped HTML (names are escaped too).
+const ANY_TOKEN_ESC_RE=/&lt;(?:(a?):([A-Za-z0-9_]{2,32})|s:([^:\n]{1,200}?)):([0-9a-fA-F-]{36})&gt;/g;
 let CUSTOM_BY_ID=new Map(),CUSTOM_BY_NAME=new Map(); // id → emoji; lowercase name → visible emoji
 const customSrc=id=>`/cc-emoji/${id}`;
 const customToken=c=>`<${c.animated?'a':''}:${c.name}:${c.id}>`;
 // Animated ones get .emoji-anim: they play a few times, then rest until
 // hovered (see ANIMATION LIMIT — initEmojiAnimationLimit).
 const animCls=c=>c.animated?' emoji-anim':'';
-function customEmojiImg(c){return `<img class="emoji custom${animCls(c)}" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" title=":${esc(c.name)}:" draggable="false">`;}
+function customEmojiImg(c){return `<img class="emoji custom${animCls(c)}" src="${customSrc(c.id)}" data-cid="${esc(c.id)}" alt=":${esc(c.name)}:" title=":${esc(c.name)}:" draggable="false">`;}
 function customTokenHTML(name,id){const c=CUSTOM_BY_ID.get(id.toLowerCase());return c?customEmojiImg(c):`:${name}:`;}
 function visibleCustomEmojis(){return [...CUSTOM_BY_ID.values()].filter(c=>!c.hidden);}
 // ":name:" → token, for each visible custom emoji name you typed.
@@ -2113,6 +2160,39 @@ function setCustomEmojis(list){
   if(before!==after&&state.messages?.length)renderMessages(false);
   const p=document.getElementById('emoji-picker');
   if(emojiPickerBuilt&&!p.classList.contains('hidden')&&!p.querySelector('.ep-search').value.trim())p.renderAll();
+  if(!document.getElementById('modal-emoji').classList.contains('hidden'))renderEmojiManager();
+}
+
+// ── STICKERS ─────────────────────────────────────────────────────
+// Custom server stickers. Sending one posts a message whose text is the
+// token <s:name:id> (the Discord importer writes the same thing), drawn
+// as a big image under any text; a deleted sticker shows as its name. In
+// reply previews they're a small image and the name. Hidden ones still
+// show where they were used but aren't in the sticker menu.
+const STICKER_TOKEN_RE=/<s:([^<>:\n]{1,64}):([0-9a-fA-F-]{36})>/g;
+let STICKER_BY_ID=new Map();
+const stickerSrc=id=>`/cc-sticker/${id}`;
+const stickerToken=st=>`<s:${st.name}:${st.id}>`;
+function stickerHTML(name,id){
+  const st=STICKER_BY_ID.get(id.toLowerCase());
+  if(!st)return `<span class="sticker-missing">${icon('image')}<span>${esc(name)}</span><i>sticker deleted</i></span>`;
+  return `<img class="sticker${st.animated?' emoji-anim':''}" src="${stickerSrc(st.id)}" alt="${esc(st.name)}" title="${esc(st.name)}${st.description?' \u2014 '+esc(st.description):''}" draggable="false">`;
+}
+// For escaped HTML (reply previews): `name` is already escaped.
+function stickerInlineHTML(name,id){
+  const st=STICKER_BY_ID.get(id.toLowerCase());
+  return st?`<span class="sticker-inline"><img src="${stickerSrc(st.id)}" alt=""> ${esc(st.name)}</span>`:`<i>Sticker: ${name}</i>`;
+}
+function visibleStickers(){return [...STICKER_BY_ID.values()].filter(st=>!st.hidden);}
+async function loadStickers(){
+  const domain=state.domain;
+  let list;try{list=await window.go.main.App.GetStickers()||[];}catch(err){console.warn('stickers: could not load:',err);return;}
+  if(state.domain!==domain)return;
+  const key=l=>l.map(x=>x.id+x.name+x.hidden+x.description).join();
+  const changed=key([...STICKER_BY_ID.values()])!==key(list);
+  STICKER_BY_ID=new Map(list.map(st=>[st.id.toLowerCase(),st]));
+  if(changed&&state.messages?.some(m=>m.content?.includes('<s:')))renderMessages(false);
+  if(!document.getElementById('sticker-picker').classList.contains('hidden'))renderStickerPicker();
   if(!document.getElementById('modal-emoji').classList.contains('hidden'))renderEmojiManager();
 }
 
@@ -2595,7 +2675,7 @@ async function doConnect(domain,serverKey,inviteCode=''){
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';
   state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
-  CUSTOM_BY_ID=new Map();CUSTOM_BY_NAME=new Map();
+  CUSTOM_BY_ID=new Map();CUSTOM_BY_NAME=new Map();STICKER_BY_ID=new Map();closeStickerPicker();
   serverBannerAt=-1; // a different server: forget the last one's banner
   state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
   const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.classList.remove('anim-paused');document.getElementById('sidebar-banner-img').removeAttribute('src');
@@ -2646,6 +2726,7 @@ async function refreshServerMeta(){
   state.serverOwner=info?.owner||'';
   loadRoles(); // (also when the crown moves — the owner can do everything)
   loadCustomEmojis();
+  loadStickers();
   refreshServerIcon(domain,info);
   setServerTheme(info?.theme||null,domain);
   const nameEl=document.getElementById('sidebar-server-name');
@@ -5518,7 +5599,7 @@ const expandedReactions=new Set(); // message ids whose bar is expanded
 function reactionEmojiHTML(emoji){
   if(emoji.startsWith('c:')){
     const c=CUSTOM_BY_ID.get(emoji.slice(2).toLowerCase());
-    return c?`<img class="emoji custom${animCls(c)}" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" draggable="false">`:`<span class="r-text">?</span>`;
+    return c?`<img class="emoji custom${animCls(c)}" src="${customSrc(c.id)}" data-cid="${esc(c.id)}" alt=":${esc(c.name)}:" draggable="false">`:`<span class="r-text">?</span>`;
   }
   const e=EMOJI_BY_CHAR.get(emoji.replace(/\uFE0F/g,''));
   return e?`<img class="emoji" src="${emojiSrc(e[0])}" alt="${e[1]}" draggable="false">`:`<span class="r-text">${esc(emoji)}</span>`;
@@ -5620,7 +5701,7 @@ function customButton(c){
   return `<button type="button" data-hex="c:${esc(c.id)}" title=":${esc(c.name)}:"><img class="${animCls(c).trim()}" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" loading="lazy" draggable="false"></button>`;
 }
 // The picker's "Add emoji" tile (Manage Emoji only).
-const addEmojiTile=()=>`<button type="button" class="ep-add" title="Add emoji">${icon('add')}</button>`;
+const addEmojiTile=()=>`<button type="button" class="ep-add" title="Add or manage server emoji">${icon('add')}</button>`;
 function emojiKeyButton(h){
   return h.startsWith('c:')?customButton(CUSTOM_BY_ID.get(h.slice(2).toLowerCase())):emojiButton(EMOJI_BY_HEX.get(h));
 }
@@ -5676,7 +5757,9 @@ function buildEmojiPicker(){
     const b=e.target.closest('button[data-target]');if(!b)return;
     if(search.value){search.value='';renderAll();}
     const sec=main.querySelector(`[data-sec="${b.dataset.target}"]`);
-    if(sec)main.scrollTop=sec.offsetTop;
+    // Where the section is inside the scroll area, screen px → CSS px so it
+    // lands exactly at any Ctrl +/- zoom (+1 so the rail marks it active).
+    if(sec)main.scrollTop+=(sec.getBoundingClientRect().top-main.getBoundingClientRect().top)/uiScale()+1;
   });
   search.addEventListener('input',()=>{const q=search.value.trim();if(q)renderSearch(q);else{renderAll();main.scrollTop=0;}});
   search.addEventListener('keydown',e=>{
@@ -5685,7 +5768,7 @@ function buildEmojiPicker(){
   const prevImg=p.querySelector('.ep-prev'),prevName=p.querySelector('.ep-name');
   main.addEventListener('mouseover',e=>{
     const b=e.target.closest('.ep-grid button');if(!b)return;
-    if(b.classList.contains('ep-add')){prevImg.style.visibility='hidden';prevName.textContent='Add a custom emoji';return;}
+    if(b.classList.contains('ep-add')){prevImg.style.visibility='hidden';prevName.textContent='Add or manage server emoji';return;}
     if(b.dataset.hex.startsWith('c:')){
       const c=CUSTOM_BY_ID.get(b.dataset.hex.slice(2).toLowerCase());if(!c)return;
       prevImg.src=customSrc(c.id);prevImg.style.visibility='visible';prevName.textContent=`:${c.name}:`;return;
@@ -5694,8 +5777,8 @@ function buildEmojiPicker(){
     prevImg.src=emojiSrc(em[0]);prevImg.style.visibility='visible';prevName.textContent=`:${em[2]}:`;
   });
   main.addEventListener('click',e=>{
-    if(e.target.closest('.ep-manage')){closeEmojiPicker();openEmojiManager();return;}
-    if(e.target.closest('.ep-add')){closeEmojiPicker();startAddEmoji();return;}
+    if(e.target.closest('.ep-manage')){closeEmojiPicker();openEmojiManager(null,'emoji');return;}
+    if(e.target.closest('.ep-add')){closeEmojiPicker();openEmojiManager(null,'emoji');return;}
     const b=e.target.closest('.ep-grid button');if(b)pickEmoji(b.dataset.hex,e.shiftKey);
   });
   // Right-click a server emoji to rename, hide or delete it.
@@ -5705,13 +5788,13 @@ function buildEmojiPicker(){
     e.preventDefault();
     const c=CUSTOM_BY_ID.get(b.dataset.hex.slice(2).toLowerCase());if(!c)return;
     showContextMenu([
-      {label:'Rename',icon:'edit',action:()=>{closeEmojiPicker();openEmojiManager(c.id);}},
+      {label:'Rename',icon:'edit',action:()=>{closeEmojiPicker();openEmojiManager(c.id,'emoji');}},
       {label:'Hide from picker',action:async()=>{
         try{await window.go.main.App.UpdateEmoji(c.id,c.name,true);toast(`:${c.name}: is hidden \u2014 old messages still show it.`);}catch(err){toast(String(err),true);}
         loadCustomEmojis();
       }},
       '-',
-      {label:'Manage emoji\u2026',icon:'settings',action:()=>{closeEmojiPicker();openEmojiManager();}},
+      {label:'Manage emoji\u2026',icon:'settings',action:()=>{closeEmojiPicker();openEmojiManager(null,'emoji');}},
     ],e.clientX,e.clientY);
   });
   p.querySelectorAll('.ep-credit a').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
@@ -5746,6 +5829,7 @@ function pickEmoji(hex,keepOpen){
 }
 // target: {type:'input'} (the message box) or {type:'reaction', msg, anchor}.
 function openEmojiPicker(target={type:'input'}){
+  closeStickerPicker();
   const p=document.getElementById('emoji-picker');
   if(!emojiPickerBuilt)buildEmojiPicker();
   emojiPickerTarget=target;
@@ -5795,121 +5879,172 @@ function initEmojiPicker(){
   },true);
 }
 
-// ── SERVER EMOJI MANAGER ─────────────────────────────────────────
-// For people with Manage Emoji (opened from the picker). Upload several
-// at once; click a name to rename it (Enter or clicking away saves); Hide
-// takes one out of the picker without breaking old messages; Delete is
-// for good (asks once more). Hidden ones — e.g. emoji imported from other
-// Discord servers — are listed separately.
-// focusId: start renaming that emoji.
-function openEmojiManager(focusId){
+// ── SERVER EMOJI & STICKER MANAGER ──────────────────────────────
+// One window with an Emoji tab and a Stickers tab, for people with Manage
+// Emoji & Stickers (opened from the + / Manage in either picker). Add
+// several at once; click a name (or the pencil) to rename it — Enter or
+// clicking away saves, Esc undoes; Hide takes one out of the pickers
+// without breaking old messages; Delete is for good (asks once more).
+// Hidden ones — e.g. emoji imported from other Discord servers — are
+// listed separately. Everything kind-specific lives in EXPR.
+const EXPR={
+  emoji:{
+    one:'emoji',many:'emoji',Title:'Emoji',
+    all:()=>[...CUSTOM_BY_ID.values()],byId:id=>CUSTOM_BY_ID.get(String(id).toLowerCase()),src:id=>customSrc(id),
+    reload:()=>loadCustomEmojis(),
+    pick:items=>window.go.main.App.PickEmojiFiles(items.map(i=>i.name)),
+    upload:it=>window.go.main.App.UploadEmojiFile(it.path,it.name.trim()),
+    update:(c,name,hidden)=>window.go.main.App.UpdateEmoji(c.id,name,hidden),
+    del:c=>window.go.main.App.DeleteEmoji(c.id),
+    maxLen:32,
+    rule:'Letters, numbers and _ only, 2\u201332 characters',
+    validName:n=>/^[A-Za-z0-9_]{2,32}$/.test(n),
+    // Visible emoji names are unique: :name: has to mean one emoji.
+    clash:n=>CUSTOM_BY_NAME.has(n.toLowerCase()),
+    unique:true,
+    hint:'PNG, JPEG, GIF or WebP, any size \u2014 add several at once. Click a name (or the pencil) to rename it.',
+    addHint:'Give each one a name \u2014 that\u2019s what you type between colons, like :party_parrot:. Letters, numbers and _ only, 2\u201332 characters.',
+  },
+  sticker:{
+    one:'sticker',many:'stickers',Title:'Stickers',
+    all:()=>[...STICKER_BY_ID.values()],byId:id=>STICKER_BY_ID.get(String(id).toLowerCase()),src:id=>stickerSrc(id),
+    reload:()=>loadStickers(),
+    pick:()=>window.go.main.App.PickStickerFiles(),
+    upload:it=>window.go.main.App.UploadStickerFile(it.path,it.name.trim(),''),
+    update:(c,name,hidden)=>window.go.main.App.UpdateSticker(c.id,name,c.description||'',hidden),
+    del:c=>window.go.main.App.DeleteSticker(c.id),
+    maxLen:30,
+    rule:'2\u201330 characters, without < > or :',
+    validName:n=>n.length>=2&&n.length<=30&&!/[<>:\u0000-\u001f]/.test(n),
+    clash:()=>false, // stickers are picked from a grid, never typed: names can repeat
+    unique:false,
+    hint:'PNG, JPEG, GIF or WebP, any size \u2014 add several at once. Click a name (or the pencil) to rename it.',
+    addHint:'Give each sticker a name (it shows when you hover it). 2\u201330 characters, spaces are fine.',
+  },
+};
+const emMgr={kind:'emoji'};
+// focusId: start renaming that one. kind: which tab ('emoji' / 'sticker').
+function openEmojiManager(focusId,kind){
   if(!can(PERM.EMOJI))return;
+  if(kind)emMgr.kind=kind;
   document.getElementById('em-error').classList.add('hidden');
   document.getElementById('modal-emoji').classList.remove('hidden');
-  renderEmojiManager();
+  renderEmojiManager(true);
   if(focusId){
     const row=document.querySelector(`#em-list .em-row[data-id="${CSS.escape(focusId)}"]`);
     if(row){row.scrollIntoView({block:'center'});row.classList.add('flash');const inp=row.querySelector('.em-name');inp.focus();inp.select();}
   }
-  loadCustomEmojis();
+  EXPR.emoji.reload();EXPR.sticker.reload();
 }
 function closeEmojiManager(){document.getElementById('modal-emoji').classList.add('hidden');}
 function emojiManagerError(msg){
   const el=document.getElementById('em-error');
   el.textContent=msg;el.classList.toggle('hidden',!msg);
 }
-function renderEmojiManager(){
-  const list=document.getElementById('em-list');
-  if(list.contains(document.activeElement)&&document.activeElement.classList.contains('em-name'))return; // don't yank a name you're typing
-  const all=[...CUSTOM_BY_ID.values()];
+function renderEmojiManager(force){
+  const K=EXPR[emMgr.kind],list=document.getElementById('em-list');
+  if(!force&&list.contains(document.activeElement)&&document.activeElement.classList.contains('em-name'))return; // don't yank a name you're typing
+  document.querySelectorAll('#modal-emoji .em-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.kind===emMgr.kind));
+  document.getElementById('em-upload').textContent=`Add ${K.many}`;
+  document.getElementById('em-hint').textContent=K.hint;
+  list.classList.toggle('stickers',emMgr.kind==='sticker');
+  const all=K.all();
   const row=c=>`<div class="em-row" data-id="${esc(c.id)}">
-    <img src="${customSrc(c.id)}" alt="">
-    <input class="em-name" value="${esc(c.name)}" maxlength="32" spellcheck="false" title="Click to rename">
+    <img src="${K.src(c.id)}" alt="" class="${c.animated?'emoji-anim':''}">
+    <input class="em-name" value="${esc(c.name)}" maxlength="${K.maxLen}" spellcheck="false" title="Click to rename">
     <button class="em-edit" type="button" title="Rename">${icon('edit')}</button>
-    ${c.created_by?`<span class="em-by" title="Uploaded by ${esc(c.created_by)}">${esc(c.created_by)}</span>`:''}
+    ${c.created_by?`<span class="em-by" title="Added by ${esc(c.created_by)}">${esc(c.created_by)}</span>`:''}
     <button class="btn btn-ghost em-hide" type="button">${c.hidden?'Show':'Hide'}</button>
     <button class="btn btn-ghost em-del" type="button" title="Delete">${icon('delete')}</button></div>`;
   const shown=all.filter(c=>!c.hidden),hidden=all.filter(c=>c.hidden);
-  list.innerHTML=!all.length?'<div class="em-empty">No custom emoji yet.</div>'
-    :`<div class="em-head">In the picker — ${shown.length}</div>${shown.map(row).join('')}`+
-     (hidden.length?`<div class="em-head">Hidden — still shown in old messages — ${hidden.length}</div>${hidden.map(row).join('')}`:'');
+  list.innerHTML=!all.length?`<div class="em-empty">No custom ${K.many} yet.</div>`
+    :`<div class="em-head">Shown in the picker \u2014 ${shown.length}</div>${shown.map(row).join('')}`+
+     (hidden.length?`<div class="em-head">Hidden \u2014 still shown in old messages \u2014 ${hidden.length}</div>${hidden.map(row).join('')}`:'');
 }
 function initEmojiManager(){
   const modal=document.getElementById('modal-emoji'),list=document.getElementById('em-list');
   document.getElementById('em-close').addEventListener('click',closeEmojiManager);
+  modal.querySelector('.em-tabs').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-kind]');if(!b||b.dataset.kind===emMgr.kind)return;
+    emMgr.kind=b.dataset.kind;emojiManagerError('');renderEmojiManager(true);
+  });
   modal.addEventListener('click',e=>{if(e.target===modal)closeEmojiManager();});
   modal.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.target.classList.contains('em-name')){e.stopPropagation();closeEmojiManager();}});
-  document.getElementById('em-upload').addEventListener('click',()=>{emojiManagerError('');startAddEmoji();});
+  document.getElementById('em-upload').addEventListener('click',()=>{emojiManagerError('');startAddEmoji(emMgr.kind);});
   const save=async input=>{
-    const id=input.closest('.em-row').dataset.id,c=CUSTOM_BY_ID.get(id.toLowerCase());
+    const K=EXPR[emMgr.kind],c=K.byId(input.closest('.em-row').dataset.id);
     const name=input.value.trim();
     if(!c||name===c.name){if(c)input.value=c.name;return;}
-    if(!/^[A-Za-z0-9_]{2,32}$/.test(name)){emojiManagerError('Emoji names are 2–32 letters, numbers or underscores.');input.value=c.name;return;}
-    try{await window.go.main.App.UpdateEmoji(c.id,name,c.hidden);emojiManagerError('');}
+    if(!K.validName(name)){emojiManagerError(K.rule+'.');input.value=c.name;return;}
+    try{await K.update(c,name,c.hidden);emojiManagerError('');}
     catch(err){emojiManagerError(String(err));input.value=c.name;}
-    input.blur();loadCustomEmojis();
+    input.blur();K.reload();
   };
   list.addEventListener('keydown',e=>{
     if(!e.target.classList.contains('em-name'))return;
     if(e.key==='Enter'){e.preventDefault();e.target.blur();}
-    if(e.key==='Escape'){e.preventDefault();const c=CUSTOM_BY_ID.get(e.target.closest('.em-row').dataset.id.toLowerCase());if(c)e.target.value=c.name;e.target.blur();}
+    if(e.key==='Escape'){e.preventDefault();const c=EXPR[emMgr.kind].byId(e.target.closest('.em-row').dataset.id);if(c)e.target.value=c.name;e.target.blur();}
   });
   list.addEventListener('focusout',e=>{if(e.target.classList.contains('em-name'))save(e.target);});
   list.addEventListener('click',async e=>{
-    const rowEl=e.target.closest('.em-row');if(!rowEl)return;
-    const c=CUSTOM_BY_ID.get(rowEl.dataset.id.toLowerCase());if(!c)return;
+    const K=EXPR[emMgr.kind],rowEl=e.target.closest('.em-row');if(!rowEl)return;
+    const c=K.byId(rowEl.dataset.id);if(!c)return;
     const hideBtn=e.target.closest('.em-hide'),delBtn=e.target.closest('.em-del');
     if(e.target.closest('.em-edit')){const inp=rowEl.querySelector('.em-name');inp.focus();inp.select();return;}
     if(hideBtn){
-      try{await window.go.main.App.UpdateEmoji(c.id,c.name,!c.hidden);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
-      loadCustomEmojis();
+      try{await K.update(c,c.name,!c.hidden);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
+      K.reload();
     }else if(delBtn){
       if(!delBtn.classList.contains('confirm')){ // first click arms it
         delBtn.classList.add('confirm');delBtn.textContent='Delete?';
         setTimeout(()=>{if(delBtn.isConnected){delBtn.classList.remove('confirm');delBtn.innerHTML=icon('delete');}},3000);
         return;
       }
-      try{await window.go.main.App.DeleteEmoji(c.id);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
-      loadCustomEmojis();
+      try{await K.del(c);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
+      K.reload();
     }
   });
 }
 
-// ── ADD EMOJI ────────────────────────────────────────────────────
+// ── ADD EMOJI / STICKERS ─────────────────────────────────────────
 // Pick images (several at once), see them with a suggested name each
-// (from the file name), fix the names, then Add. Each name is checked as
-// you type: the format, and not already used by another emoji (visible
-// ones) or another file in the list. Failed uploads stay in the list with
-// the reason, so you can fix the name and press Add again.
-const addEmoji={items:[]}; // {path,file,name,size,preview,error}
+// (from the file name), fix the names, then Add. Names are checked as you
+// type. Failed uploads stay in the list with the reason, so you can fix
+// it and press Add again.
+const addEmoji={kind:'emoji',items:[]}; // {path,file,name,size,preview,error}
 const fmtSize=n=>n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(0)} KB`:`${(n/1048576).toFixed(1)} MB`;
-async function startAddEmoji(){
-  if(!can(PERM.EMOJI)){toast('You don\u2019t have permission to manage emoji on this server',true);return;}
+async function startAddEmoji(kind){
+  if(!can(PERM.EMOJI)){toast('You don\u2019t have permission to manage emoji and stickers on this server',true);return;}
+  if(kind&&kind!==addEmoji.kind){addEmoji.kind=kind;addEmoji.items=[];}
+  const K=EXPR[addEmoji.kind];
   let files;
-  try{files=await window.go.main.App.PickEmojiFiles(addEmoji.items.map(i=>i.name))||[];}
+  try{files=await K.pick(addEmoji.items)||[];}
   catch(err){toast('Couldn\u2019t open those files: '+err,true);return;}
   if(!files.length&&!addEmoji.items.length)return;
   addEmoji.items.push(...files.map(f=>({...f,error:''})));
+  document.getElementById('ea-title').textContent=`Add ${K.Title}`;
+  document.getElementById('ea-hint').textContent=K.addHint;
   document.getElementById('ea-error').classList.add('hidden');
   document.getElementById('modal-emoji-add').classList.remove('hidden');
   renderAddEmoji();
   document.querySelector('#ea-list .em-name')?.focus();
 }
 function addEmojiNameProblem(item){
-  const n=item.name.trim();
-  if(!/^[A-Za-z0-9_]{2,32}$/.test(n))return 'Letters, numbers and _ only, 2\u201332 characters';
-  if(CUSTOM_BY_NAME.has(n.toLowerCase()))return `There\u2019s already a :${n}:`;
-  if(addEmoji.items.some(o=>o!==item&&o.name.trim().toLowerCase()===n.toLowerCase()))return 'Two files have this name';
+  const K=EXPR[addEmoji.kind],n=item.name.trim();
+  if(!K.validName(n))return K.rule;
+  if(K.clash(n))return `There\u2019s already a :${n}:`;
+  if(K.unique&&addEmoji.items.some(o=>o!==item&&o.name.trim().toLowerCase()===n.toLowerCase()))return 'Two files have this name';
   return '';
 }
 function renderAddEmoji(){
-  const list=document.getElementById('ea-list');
+  const K=EXPR[addEmoji.kind],list=document.getElementById('ea-list');
   if(!addEmoji.items.length){closeAddEmoji();return;}
+  list.classList.toggle('stickers',addEmoji.kind==='sticker');
   list.innerHTML=addEmoji.items.map((it,i)=>{
     const prob=it.error||addEmojiNameProblem(it);
     return `<div class="em-row" data-i="${i}">
       <img src="${it.preview}" alt="" title="${esc(it.file)}">
-      <input class="em-name${prob?' bad':''}" value="${esc(it.name)}" maxlength="32" spellcheck="false">
+      <input class="em-name${prob?' bad':''}" value="${esc(it.name)}" maxlength="${K.maxLen}" spellcheck="false">
       ${prob?`<span class="em-err">${esc(prob)}</span>`:`<span class="em-size" title="${esc(it.file)}">${fmtSize(it.size)}</span>`}
       <button class="btn btn-ghost ea-remove" type="button" title="Don\u2019t add this one">${icon('close')}</button></div>`;
   }).join('');
@@ -5921,7 +6056,7 @@ function closeAddEmoji(){
 function initAddEmoji(){
   const modal=document.getElementById('modal-emoji-add'),list=document.getElementById('ea-list');
   document.getElementById('ea-cancel').addEventListener('click',closeAddEmoji);
-  document.getElementById('ea-more').addEventListener('click',startAddEmoji);
+  document.getElementById('ea-more').addEventListener('click',()=>startAddEmoji());
   modal.addEventListener('click',e=>{if(e.target===modal)closeAddEmoji();});
   modal.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();closeAddEmoji();}});
   list.addEventListener('input',e=>{
@@ -5945,8 +6080,8 @@ function initAddEmoji(){
   });
   const addBtn=document.getElementById('ea-add');
   addBtn.addEventListener('click',async()=>{
-    const bad=addEmoji.items.filter(it=>addEmojiNameProblem(it));
-    if(bad.length){
+    const K=EXPR[addEmoji.kind];
+    if(addEmoji.items.some(it=>addEmojiNameProblem(it))){
       const err=document.getElementById('ea-error');err.textContent='Fix the names marked in red first.';err.classList.remove('hidden');
       renderAddEmoji();return;
     }
@@ -5955,16 +6090,154 @@ function initAddEmoji(){
     let added=0;
     for(const it of [...addEmoji.items]){
       try{
-        const c=await window.go.main.App.UploadEmojiFile(it.path,it.name.trim());
+        const c=await K.upload(it);
         added++;addEmoji.items.splice(addEmoji.items.indexOf(it),1);
-        if(c)CUSTOM_BY_NAME.set(c.name.toLowerCase(),c); // so later names in this batch see it as taken
+        if(c&&addEmoji.kind==='emoji')CUSTOM_BY_NAME.set(c.name.toLowerCase(),c); // later names in this batch see it as taken
       }catch(err){it.error=String(err).replace(/^Error: /,'');}
     }
     addBtn.disabled=false;addBtn.textContent='Add';
-    if(added)toast(`Added ${added} emoji.`);
-    loadCustomEmojis();
+    if(added)toast(`Added ${added} ${added===1?K.one:K.many}.`);
+    K.reload();
     renderAddEmoji(); // closes when everything went up
   });
+}
+
+// ── STICKER PICKER ───────────────────────────────────────────────
+// The button left of the emoji button. The server's stickers in a grid
+// (search by name); click one to send it right away (into the reply, if
+// you're replying), Shift+click to send and keep the menu open. People
+// with Manage Emoji & Stickers get a + tile that opens the manager.
+function renderStickerPicker(){
+  const p=document.getElementById('sticker-picker');
+  if(!p.firstChild){
+    p.innerHTML=`<div class="ep-top"><input class="ep-search" type="text" placeholder="Find a sticker" autocomplete="off" spellcheck="false"></div>
+      <div class="sp-main"></div>
+      <div class="ep-foot"><img class="ep-prev" alt="" style="visibility:hidden"><span class="ep-name">Pick a sticker\u2026</span></div>`;
+    const search=p.querySelector('.ep-search'),main=p.querySelector('.sp-main');
+    search.addEventListener('input',renderStickerPicker);
+    search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();main.querySelector('.sp-grid button[data-id]')?.click();}});
+    main.addEventListener('click',e=>{
+      if(e.target.closest('.sp-add,.sp-manage')){closeStickerPicker();openEmojiManager(null,'sticker');return;}
+      const b=e.target.closest('button[data-id]');if(b)sendSticker(b.dataset.id,e.shiftKey);
+    });
+    main.addEventListener('mouseover',e=>{
+      const b=e.target.closest('.sp-grid button');if(!b)return;
+      const prevImg=p.querySelector('.ep-prev'),prevName=p.querySelector('.ep-name');
+      if(!b.dataset.id){prevImg.style.visibility='hidden';prevName.textContent='Add or manage server stickers';return;}
+      const st=STICKER_BY_ID.get(b.dataset.id.toLowerCase());if(!st)return;
+      prevImg.src=stickerSrc(st.id);prevImg.style.visibility='visible';prevName.textContent=st.name;
+    });
+    main.addEventListener('contextmenu',e=>{
+      const b=e.target.closest('.sp-grid button[data-id]');
+      if(!b||!can(PERM.EMOJI))return;
+      e.preventDefault();
+      showContextMenu([
+        {label:'Rename',icon:'edit',action:()=>{closeStickerPicker();openEmojiManager(b.dataset.id,'sticker');}},
+        {label:'Manage stickers\u2026',icon:'settings',action:()=>{closeStickerPicker();openEmojiManager(null,'sticker');}},
+      ],e.clientX,e.clientY);
+    });
+    if(typeof attachElastic==='function')attachElastic(main);
+  }
+  const q=p.querySelector('.ep-search').value.trim().toLowerCase(),main=p.querySelector('.sp-main');
+  const manage=can(PERM.EMOJI);
+  const list=visibleStickers().filter(st=>!q||st.name.toLowerCase().includes(q));
+  const tile=st=>`<button type="button" data-id="${esc(st.id)}" title="${esc(st.name)}"><img class="${st.animated?'emoji-anim':''}" src="${stickerSrc(st.id)}" alt="${esc(st.name)}" loading="lazy" draggable="false"></button>`;
+  if(!visibleStickers().length){
+    main.innerHTML=`<div class="sp-empty">This server doesn\u2019t have any stickers yet.${manage?`<br><button type="button" class="btn btn-primary sp-manage">Add stickers</button>`:''}</div>`;
+    return;
+  }
+  main.innerHTML=`<div class="ep-section-title">${esc(state.serverName||'Server')}${manage?'<button type="button" class="ep-manage sp-manage">Manage</button>':''}</div>`+
+    (list.length?`<div class="sp-grid">${list.map(tile).join('')}${manage&&!q?`<button type="button" class="sp-add" title="Add or manage server stickers">${icon('add')}</button>`:''}</div>`
+      :'<div class="sp-empty">No stickers match that.</div>');
+}
+function openStickerPicker(){
+  closeEmojiPicker();
+  const p=document.getElementById('sticker-picker');
+  renderStickerPicker();
+  const search=p.querySelector('.ep-search');search.value='';renderStickerPicker();
+  p.classList.remove('hidden');
+  document.getElementById('sticker-btn').classList.add('active');
+  search.focus();
+  loadStickers();
+}
+function closeStickerPicker(){
+  document.getElementById('sticker-picker')?.classList.add('hidden');
+  document.getElementById('sticker-btn')?.classList.remove('active');
+}
+async function sendSticker(id,keepOpen){
+  const st=STICKER_BY_ID.get(id.toLowerCase());
+  if(!st||!state.selectedBoardId)return;
+  if(!can(PERM.SEND)){toast('You don\u2019t have permission to send messages here',true);return;}
+  if(!keepOpen)closeStickerPicker();
+  const replyTo=state.replyingTo?.id||'';
+  cancelReply();
+  try{await window.go.main.App.SendMessage(state.selectedBoardId,stickerToken(st),[],replyTo);}
+  catch(err){toast('Send failed: '+err,true);}
+  if(!keepOpen)document.getElementById('msg-input').focus();
+}
+function initStickerPicker(){
+  const btn=document.getElementById('sticker-btn'),emojiBtn=document.getElementById('emoji-btn');
+  // Usable whenever the emoji button is (a channel is open and you can send).
+  const sync=()=>{btn.disabled=emojiBtn.disabled;if(btn.disabled)closeStickerPicker();};
+  new MutationObserver(sync).observe(emojiBtn,{attributes:true,attributeFilter:['disabled']});sync();
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(document.getElementById('sticker-picker').classList.contains('hidden'))openStickerPicker();else closeStickerPicker();
+  });
+  document.addEventListener('mousedown',e=>{
+    if(!e.target.closest('#sticker-picker,#sticker-btn,#ctx-menu'))closeStickerPicker();
+  },true);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&!document.getElementById('sticker-picker').classList.contains('hidden')){e.stopImmediatePropagation();closeStickerPicker();document.getElementById('msg-input').focus();}
+  },true);
+}
+
+// ── EMOJI HOVER CARD ─────────────────────────────────────────────
+// Hovering an emoji in a message, reply or search result shows it big
+// with its name (and, for a server emoji, where it's from); hovering a
+// reaction shows its emoji big with who reacted. Replaces the plain
+// tooltip. The pickers have their own preview footer instead.
+function initEmojiCard(){
+  const card=document.createElement('div');card.id='emoji-card';document.body.appendChild(card);
+  let timer=null,cur=null;
+  const hide=()=>{clearTimeout(timer);timer=null;cur=null;card.classList.remove('on');};
+  const show=el=>{
+    const isReaction=el.classList.contains('reaction');
+    const img=isReaction?el.querySelector('img.emoji'):el;
+    if(!img)return;
+    const cid=img.dataset.cid,c=cid&&CUSTOM_BY_ID.get(cid.toLowerCase());
+    let name,sub='';
+    if(isReaction){
+      name=el.dataset.tip||'';
+      if(c)sub=`:${c.name}:`;
+    }else{
+      name=c?`:${c.name}:`:(img.dataset.tip||img.alt||'');
+      if(c)sub=c.hidden?'Custom emoji':`Server emoji \u00b7 ${state.serverName||''}`;
+    }
+    const src=cid?customSrc(cid):img.getAttribute('src');
+    card.innerHTML=`<img src="${esc(src)}" alt=""><div class="ec-name">${esc(name)}</div>${sub?`<div class="ec-sub">${esc(sub)}</div>`:''}`;
+    // Above the emoji (below if there's no room), screen px → CSS px for zoom.
+    const z=uiScale(),r=el.getBoundingClientRect();
+    card.style.left='0px';card.style.top='0px';card.classList.add('on');
+    const w=card.offsetWidth*z,h=card.offsetHeight*z,m=8;
+    let x=r.left+r.width/2-w/2,y=r.top-h-8;
+    if(y<m)y=r.bottom+8;
+    x=Math.max(m,Math.min(innerWidth-w-m,x));
+    card.style.left=x/z+'px';card.style.top=y/z+'px';
+  };
+  document.addEventListener('mouseover',e=>{
+    // A reaction chip wins over the emoji inside it (it says who reacted).
+    const el=e.target.closest?.('.reaction:not(.add):not(.more)')||e.target.closest?.('img.emoji');
+    if(el===cur)return;
+    hide();
+    if(!el||el.closest('#emoji-picker,#sticker-picker,#emoji-suggest,.modal'))return;
+    // Keep the plain tooltip from showing on top of the card.
+    if(el.title){el.dataset.tip=el.title;el.removeAttribute('title');}
+    cur=el;timer=setTimeout(()=>{if(cur===el&&el.isConnected)show(el);},250);
+  });
+  document.addEventListener('scroll',hide,true);
+  document.addEventListener('mousedown',hide,true);
+  window.addEventListener('blur',hide);
 }
 
 // ── PRESENCE ─────────────────────────────────────────────────────
@@ -6427,7 +6700,7 @@ function messageMenu(msgEl,msg,e){
     (selection||link||imgAttach)?'-':null,
     can(PERM.SEND)?{label:'Reply',icon:'reply',action:()=>startReply(msg)}:null,
     can(PERM.REACT)?{label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))}:null,
-    msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content.replace(CUSTOM_TOKEN_RE,(m,a,name,id)=>`:${CUSTOM_BY_ID.get(id.toLowerCase())?.name||name}:`));toast('Text copied');}}:null,
+    msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content.replace(CUSTOM_TOKEN_RE,(m,a,name,id)=>`:${CUSTOM_BY_ID.get(id.toLowerCase())?.name||name}:`).replace(STICKER_TOKEN_RE,(m,name,id)=>`[sticker: ${STICKER_BY_ID.get(id.toLowerCase())?.name||name}]`));toast('Text copied');}}:null,
     {label:'Copy Message Link',icon:'link',action:()=>{copyText(messageLink(msg));toast('Message link copied');}},
     !(can(PERM.PIN)||can(PERM.MANAGE))?null:{label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
       try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
@@ -7319,6 +7592,7 @@ function init(){
   // Roles changed: colours/permissions, and which channels you can see.
   window.runtime.EventsOn('server:roles',()=>{loadRoles();refreshRoomsAndBoards();});
   window.runtime.EventsOn('server:emojis',()=>loadCustomEmojis());
+  window.runtime.EventsOn('server:stickers',()=>loadStickers());
   window.runtime.EventsOn('voice:removed',m=>{
     state.voiceHere=null;voiceRejoin=null;playSound('leave');
     toast(m||'You no longer have access to that voice channel',true);
@@ -7476,6 +7750,8 @@ function init(){
   initSidebarDrag();
   initEmojiManager();
   initAddEmoji();
+  initStickerPicker();
+  initEmojiCard();
   initEmojiAnimationLimit();
   initEmojiPicker();
   initVoiceUserMenu();

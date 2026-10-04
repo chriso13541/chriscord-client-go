@@ -201,24 +201,38 @@ func validEmojiID(id string) bool {
 	return true
 }
 
-// serveEmojiAsset answers the page's requests for /cc-emoji/<id>: from
-// the disk cache, or else fetched from the connected server and cached.
+// serveEmojiAsset answers the page's requests for /cc-emoji/<id> and
+// /cc-sticker/<id>: from the disk cache, or else fetched from the
+// connected server and cached. Both kinds never change once uploaded.
 func (a *App) serveEmojiAsset(w http.ResponseWriter, r *http.Request) {
-	id, ok := strings.CutPrefix(r.URL.Path, "/cc-emoji/")
-	if !ok || !validEmojiID(id) {
-		http.NotFound(w, r)
+	kinds := []struct{ prefix, api, dir string }{
+		{"/cc-emoji/", "/api/emojis/", "emoji"},
+		{"/cc-sticker/", "/api/stickers/", "stickers"},
+	}
+	for _, k := range kinds {
+		id, ok := strings.CutPrefix(r.URL.Path, k.prefix)
+		if !ok {
+			continue
+		}
+		if !validEmojiID(id) {
+			break
+		}
+		a.serveCachedImage(w, r, strings.ToLower(id), k.api, filepath.Join(filepath.Dir(emojiCacheDir()), k.dir))
 		return
 	}
-	id = strings.ToLower(id)
-	path := filepath.Join(emojiCacheDir(), id)
+	http.NotFound(w, r)
+}
+
+func (a *App) serveCachedImage(w http.ResponseWriter, r *http.Request, id, api, dir string) {
+	path := filepath.Join(dir, id)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		data, err = a.fetchAuthed("/api/emojis/" + id)
+		data, err = a.fetchAuthed(api + id)
 		if err != nil || len(data) == 0 {
 			http.NotFound(w, r)
 			return
 		}
-		if os.MkdirAll(emojiCacheDir(), 0700) == nil {
+		if os.MkdirAll(dir, 0700) == nil {
 			tmp := path + ".part"
 			if os.WriteFile(tmp, data, 0600) == nil {
 				os.Rename(tmp, path)

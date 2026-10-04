@@ -34,6 +34,10 @@ export function DeleteMessage(arg1) {
   return window['go']['main']['App']['DeleteMessage'](arg1);
 }
 
+export function DeleteSticker(arg1) {
+  return window['go']['main']['App']['DeleteSticker'](arg1);
+}
+
 export function DiscardConverted(arg1) {
   return window['go']['main']['App']['DiscardConverted'](arg1);
 }
@@ -146,6 +150,10 @@ export function GetServers() {
   return window['go']['main']['App']['GetServers']();
 }
 
+export function GetStickers() {
+  return window['go']['main']['App']['GetStickers']();
+}
+
 export function GetSystemIdleSeconds() {
   return window['go']['main']['App']['GetSystemIdleSeconds']();
 }
@@ -236,6 +244,10 @@ export function PickFiles() {
 
 export function PickPfp() {
   return window['go']['main']['App']['PickPfp']();
+}
+
+export function PickStickerFiles() {
+  return window['go']['main']['App']['PickStickerFiles']();
 }
 
 export function PingServer() {
@@ -354,6 +366,10 @@ export function UpdateServer(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateServer'](arg1, arg2, arg3, arg4);
 }
 
+export function UpdateSticker(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateSticker'](arg1, arg2, arg3, arg4);
+}
+
 export function UploadEmojiFile(arg1, arg2) {
   return window['go']['main']['App']['UploadEmojiFile'](arg1, arg2);
 }
@@ -368,6 +384,10 @@ export function UploadFileData(arg1, arg2) {
 
 export function UploadFileWithProgress(arg1, arg2) {
   return window['go']['main']['App']['UploadFileWithProgress'](arg1, arg2);
+}
+
+export function UploadStickerFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UploadStickerFile'](arg1, arg2, arg3);
 }
 
 export function VideoConversionInfo() {
