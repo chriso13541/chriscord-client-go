@@ -166,6 +166,10 @@ export function HasAccount() {
   return window['go']['main']['App']['HasAccount']();
 }
 
+export function ImageFromURL(arg1) {
+  return window['go']['main']['App']['ImageFromURL'](arg1);
+}
+
 export function ImportAccount(arg1, arg2) {
   return window['go']['main']['App']['ImportAccount'](arg1, arg2);
 }
@@ -234,20 +238,16 @@ export function PickBanner() {
   return window['go']['main']['App']['PickBanner']();
 }
 
-export function PickEmojiFiles(arg1) {
-  return window['go']['main']['App']['PickEmojiFiles'](arg1);
-}
-
 export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }
 
-export function PickPfp() {
-  return window['go']['main']['App']['PickPfp']();
+export function PickImageFiles(arg1) {
+  return window['go']['main']['App']['PickImageFiles'](arg1);
 }
 
-export function PickStickerFiles() {
-  return window['go']['main']['App']['PickStickerFiles']();
+export function PickPfp() {
+  return window['go']['main']['App']['PickPfp']();
 }
 
 export function PingServer() {
@@ -264,6 +264,10 @@ export function ReactToMessage(arg1, arg2, arg3) {
 
 export function ReadImageAsDataURL(arg1) {
   return window['go']['main']['App']['ReadImageAsDataURL'](arg1);
+}
+
+export function ReadImageFiles(arg1) {
+  return window['go']['main']['App']['ReadImageFiles'](arg1);
 }
 
 export function RemoveServer(arg1) {
@@ -370,6 +374,10 @@ export function UpdateSticker(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateSticker'](arg1, arg2, arg3, arg4);
 }
 
+export function UploadEmojiData(arg1, arg2) {
+  return window['go']['main']['App']['UploadEmojiData'](arg1, arg2);
+}
+
 export function UploadEmojiFile(arg1, arg2) {
   return window['go']['main']['App']['UploadEmojiFile'](arg1, arg2);
 }
@@ -384,6 +392,10 @@ export function UploadFileData(arg1, arg2) {
 
 export function UploadFileWithProgress(arg1, arg2) {
   return window['go']['main']['App']['UploadFileWithProgress'](arg1, arg2);
+}
+
+export function UploadStickerData(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UploadStickerData'](arg1, arg2, arg3);
 }
 
 export function UploadStickerFile(arg1, arg2, arg3) {

@@ -607,6 +607,8 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .em-row .btn { padding:4px 10px; font-size:.8rem; }
 .em-row .em-del.confirm { color:var(--red); }
 .em-empty { padding:24px; text-align:center; color:var(--text-muted); font-size:.88rem; }
+.modal.emoji-manage { position:relative; }
+.modal.emoji-manage.dropping::after { content:'Drop images to add them'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(14,17,23,.88); border:2px dashed var(--accent); border-radius:12px; color:var(--text-strong); font-weight:800; font-size:1.05rem; pointer-events:none; z-index:5; }
 .em-tabs { display:flex; gap:4px; margin:-4px 0 14px; border-bottom:1px solid var(--border); }
 .em-tabs button { border:none; background:none; color:var(--text-muted); font:inherit; font-weight:700; font-size:.9rem; padding:8px 12px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
 .em-tabs button:hover { color:var(--text); }
@@ -3977,7 +3979,9 @@ function initDragDrop(){
   try {
     if(typeof window.runtime?.OnFileDrop==='function'){
       window.runtime.OnFileDrop(async(x,y,paths)=>{
-        if(!state.selectedBoardId||!paths?.length)return;
+        if(!paths?.length)return;
+        if(onExpressionFileDrop(paths))return; // the emoji / sticker windows take it
+        if(!state.selectedBoardId)return;
         await queueFiles(paths);
       },false);
     }
@@ -5892,8 +5896,8 @@ const EXPR={
     one:'emoji',many:'emoji',Title:'Emoji',
     all:()=>[...CUSTOM_BY_ID.values()],byId:id=>CUSTOM_BY_ID.get(String(id).toLowerCase()),src:id=>customSrc(id),
     reload:()=>loadCustomEmojis(),
-    pick:items=>window.go.main.App.PickEmojiFiles(items.map(i=>i.name)),
-    upload:it=>window.go.main.App.UploadEmojiFile(it.path,it.name.trim()),
+    pickTitle:'Choose emoji images',
+    upload:it=>it.path?window.go.main.App.UploadEmojiFile(it.path,it.name.trim()):window.go.main.App.UploadEmojiData(it.name.trim(),it.preview),
     update:(c,name,hidden)=>window.go.main.App.UpdateEmoji(c.id,name,hidden),
     del:c=>window.go.main.App.DeleteEmoji(c.id),
     maxLen:32,
@@ -5902,15 +5906,15 @@ const EXPR={
     // Visible emoji names are unique: :name: has to mean one emoji.
     clash:n=>CUSTOM_BY_NAME.has(n.toLowerCase()),
     unique:true,
-    hint:'PNG, JPEG, GIF or WebP, any size \u2014 add several at once. Click a name (or the pencil) to rename it.',
-    addHint:'Give each one a name \u2014 that\u2019s what you type between colons, like :party_parrot:. Letters, numbers and _ only, 2\u201332 characters.',
+    hint:'PNG, JPEG, GIF or WebP, any size. Add several at once \u2014 or drag images in, or paste one (Ctrl+V). Click a name (or the pencil) to rename it.',
+    addHint:'Give each one a name \u2014 that\u2019s what you type between colons, like :party_parrot:. Letters, numbers and _ only, 2\u201332 characters. Drag in or paste more images any time.',
   },
   sticker:{
     one:'sticker',many:'stickers',Title:'Stickers',
     all:()=>[...STICKER_BY_ID.values()],byId:id=>STICKER_BY_ID.get(String(id).toLowerCase()),src:id=>stickerSrc(id),
     reload:()=>loadStickers(),
-    pick:()=>window.go.main.App.PickStickerFiles(),
-    upload:it=>window.go.main.App.UploadStickerFile(it.path,it.name.trim(),''),
+    pickTitle:'Choose sticker images',
+    upload:it=>it.path?window.go.main.App.UploadStickerFile(it.path,it.name.trim(),''):window.go.main.App.UploadStickerData(it.name.trim(),'',it.preview),
     update:(c,name,hidden)=>window.go.main.App.UpdateSticker(c.id,name,c.description||'',hidden),
     del:c=>window.go.main.App.DeleteSticker(c.id),
     maxLen:30,
@@ -5918,8 +5922,8 @@ const EXPR={
     validName:n=>n.length>=2&&n.length<=30&&!/[<>:\u0000-\u001f]/.test(n),
     clash:()=>false, // stickers are picked from a grid, never typed: names can repeat
     unique:false,
-    hint:'PNG, JPEG, GIF or WebP, any size \u2014 add several at once. Click a name (or the pencil) to rename it.',
-    addHint:'Give each sticker a name (it shows when you hover it). 2\u201330 characters, spaces are fine.',
+    hint:'PNG, JPEG, GIF or WebP, any size. Add several at once \u2014 or drag images in, or paste one (Ctrl+V). Click a name (or the pencil) to rename it.',
+    addHint:'Give each sticker a name (it shows when you hover it). 2\u201330 characters, spaces are fine. Drag in or paste more images any time.',
   },
 };
 const emMgr={kind:'emoji'};
@@ -6013,21 +6017,128 @@ function initEmojiManager(){
 // it and press Add again.
 const addEmoji={kind:'emoji',items:[]}; // {path,file,name,size,preview,error}
 const fmtSize=n=>n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(0)} KB`:`${(n/1048576).toFixed(1)} MB`;
+const addOpen=()=>!document.getElementById('modal-emoji-add').classList.contains('hidden');
 async function startAddEmoji(kind){
   if(!can(PERM.EMOJI)){toast('You don\u2019t have permission to manage emoji and stickers on this server',true);return;}
-  if(kind&&kind!==addEmoji.kind){addEmoji.kind=kind;addEmoji.items=[];}
+  kind=addOpen()?addEmoji.kind:(kind||emMgr.kind);
+  let paths;
+  try{paths=await window.go.main.App.PickImageFiles(EXPR[kind].pickTitle)||[];}
+  catch(err){toast('Couldn\u2019t open the file picker: '+err,true);return;}
+  if(paths.length)addExpressionPaths(kind,paths);
+}
+// A name from a file name: for emoji letters/numbers/_ ("Party Parrot
+// (2).gif" → Party_Parrot_2), for stickers readable text ("cat_wave.png"
+// → "cat wave"). Emoji names get _2, _3… if taken (by the server's emoji
+// or another file waiting here).
+function suggestExprName(kind,file){
+  const stem=String(file||'').replace(/[?#].*$/,'').replace(/\.[^.]*$/,'');
+  let name;
+  if(kind==='emoji'){
+    name=stem.replace(/[^A-Za-z0-9_]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,28).replace(/_$/,'');
+    if(name.length<2)name='emoji';
+  }else{
+    name=stem.replace(/[_-]+/g,' ').replace(/[<>:\u0000-\u001f]/g,'').replace(/\s+/g,' ').trim().slice(0,30).trim();
+    if(name.length<2)name='sticker';
+  }
+  if(!EXPR[kind].unique)return name;
+  const taken=n=>CUSTOM_BY_NAME.has(n.toLowerCase())||addEmoji.items.some(i=>i.name.trim().toLowerCase()===n.toLowerCase());
+  if(!taken(name))return name;
+  for(let i=2;;i++){const n=`${name}_${i}`;if(!taken(n))return n;}
+}
+// Adds images to the Add window (opening it). files: {path,file,size,preview}.
+// While it's open, everything goes in as its kind.
+function addExpressionItems(kind,files){
+  if(!files.length)return;
+  if(!addOpen()){addEmoji.kind=kind;addEmoji.items=[];}
+  for(const f of files)addEmoji.items.push({...f,name:suggestExprName(addEmoji.kind,f.file),error:''});
+  showAddEmoji();
+}
+async function addExpressionPaths(kind,paths){
+  const files=await window.go.main.App.ReadImageFiles(paths)||[];
+  if(files.length<paths.length)toast(`Skipped ${paths.length-files.length} file${paths.length-files.length===1?'':'s'} that ${paths.length-files.length===1?'isn\u2019t a':'aren\u2019t'} PNG, JPEG, GIF or WebP.`,true);
+  addExpressionItems(kind,files);
+}
+const EXPR_TYPES=['image/png','image/jpeg','image/gif','image/webp'];
+function addExpressionBlobs(kind,blobs){
+  const ok=blobs.filter(b=>EXPR_TYPES.includes(b.type));
+  if(ok.length<blobs.length)toast('Only PNG, JPEG, GIF or WebP images can be emoji or stickers.',true);
+  return Promise.all(ok.map(b=>new Promise(res=>{
+    const r=new FileReader();
+    r.onload=()=>res({path:'',file:b.name&&b.name!=='image.png'?b.name:'pasted.png',size:b.size,preview:r.result});
+    r.onerror=()=>res(null);r.readAsDataURL(b);
+  }))).then(files=>addExpressionItems(kind,files.filter(Boolean)));
+}
+async function addExpressionURLs(kind,urls){
+  const files=[];
+  for(const u of urls.slice(0,20)){
+    try{files.push(await window.go.main.App.ImageFromURL(u));}
+    catch(err){toast(`Couldn\u2019t add that image: ${String(err).replace(/^Error: /,'')}`,true);}
+  }
+  addExpressionItems(kind,files);
+}
+// Which kind a drop or paste right now is for: the Add window's, else the
+// manager's tab — or null when neither window is open (chat handles it).
+function exprDropKind(){
+  if(addOpen())return addEmoji.kind;
+  if(!document.getElementById('modal-emoji').classList.contains('hidden')&&can(PERM.EMOJI))return emMgr.kind;
+  return null;
+}
+let lastNativeExprDrop=0;
+function initExpressionDrop(){
+  // Drops from a web page (an image dragged out of a browser) arrive here
+  // as a file or a link. Files from your computer come through Wails'
+  // native drop (with real paths, see initDragDrop) — and on some systems
+  // here as well, so this waits a moment and steps aside if they did.
+  for(const id of ['modal-emoji','modal-emoji-add']){
+    const ov=document.getElementById(id),box=ov.querySelector('.modal');let n=0;
+    const off=()=>{n=0;box.classList.remove('dropping');};
+    ov.addEventListener('dragenter',e=>{if(!exprDropKind())return;e.preventDefault();n++;box.classList.add('dropping');});
+    ov.addEventListener('dragleave',()=>{if(--n<=0)off();});
+    ov.addEventListener('dragover',e=>{if(exprDropKind())e.preventDefault();});
+    ov.addEventListener('drop',e=>{
+      const kind=exprDropKind();off();if(!kind)return;
+      e.preventDefault();
+      const dt=e.dataTransfer,blobs=[...(dt?.files||[])];
+      const urls=(dt?.getData('text/uri-list')||'').split(/\r?\n/).map(l=>l.trim()).filter(l=>l&&!l.startsWith('#')&&/^https?:/i.test(l));
+      if(!urls.length){const m=(dt?.getData('text/html')||'').match(/<img[^>]+src="(https?:[^"]+)"/i);if(m)urls.push(m[1].replace(/&amp;/g,'&'));}
+      setTimeout(()=>{
+        if(Date.now()-lastNativeExprDrop<1000)return; // came in natively, with paths
+        if(blobs.length)addExpressionBlobs(kind,blobs);
+        else if(urls.length)addExpressionURLs(kind,urls);
+      },250);
+    });
+  }
+  // Ctrl+V while either window is open: a copied image (or an image link,
+  // when you're not typing in a box) is added. Plain text pastes normally.
+  document.addEventListener('paste',e=>{
+    const kind=exprDropKind();if(!kind)return;
+    const blobs=[...(e.clipboardData?.items||[])].filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean);
+    let url='';
+    if(!blobs.length&&!e.target.closest?.('input,textarea')){
+      const t=(e.clipboardData?.getData('text/plain')||'').trim();
+      if(/^https?:\/\/\S+$/i.test(t))url=t;
+    }
+    if(!blobs.length&&!url)return;
+    e.preventDefault();e.stopPropagation();
+    if(blobs.length)addExpressionBlobs(kind,blobs);else addExpressionURLs(kind,[url]);
+  },true);
+}
+// Native file drop (paths): from initDragDrop's Wails handler.
+function onExpressionFileDrop(paths){
+  const kind=exprDropKind();if(!kind)return false;
+  lastNativeExprDrop=Date.now();
+  addExpressionPaths(kind,paths);
+  return true;
+}
+function showAddEmoji(){
   const K=EXPR[addEmoji.kind];
-  let files;
-  try{files=await K.pick(addEmoji.items)||[];}
-  catch(err){toast('Couldn\u2019t open those files: '+err,true);return;}
-  if(!files.length&&!addEmoji.items.length)return;
-  addEmoji.items.push(...files.map(f=>({...f,error:''})));
   document.getElementById('ea-title').textContent=`Add ${K.Title}`;
   document.getElementById('ea-hint').textContent=K.addHint;
   document.getElementById('ea-error').classList.add('hidden');
   document.getElementById('modal-emoji-add').classList.remove('hidden');
   renderAddEmoji();
-  document.querySelector('#ea-list .em-name')?.focus();
+  const names=document.querySelectorAll('#ea-list .em-name');
+  names[names.length-1]?.focus(); // the newest one
 }
 function addEmojiNameProblem(item){
   const K=EXPR[addEmoji.kind],n=item.name.trim();
@@ -6056,7 +6167,7 @@ function closeAddEmoji(){
 function initAddEmoji(){
   const modal=document.getElementById('modal-emoji-add'),list=document.getElementById('ea-list');
   document.getElementById('ea-cancel').addEventListener('click',closeAddEmoji);
-  document.getElementById('ea-more').addEventListener('click',()=>startAddEmoji());
+  document.getElementById('ea-more').addEventListener('click',()=>startAddEmoji(addEmoji.kind));
   modal.addEventListener('click',e=>{if(e.target===modal)closeAddEmoji();});
   modal.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();closeAddEmoji();}});
   list.addEventListener('input',e=>{
@@ -7750,6 +7861,7 @@ function init(){
   initSidebarDrag();
   initEmojiManager();
   initAddEmoji();
+  initExpressionDrop();
   initStickerPicker();
   initEmojiCard();
   initEmojiAnimationLimit();

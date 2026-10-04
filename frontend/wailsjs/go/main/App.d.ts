@@ -84,6 +84,8 @@ export function GetUsername():Promise<string>;
 
 export function HasAccount():Promise<boolean>;
 
+export function ImageFromURL(arg1:string):Promise<main.EmojiFile>;
+
 export function ImportAccount(arg1:string,arg2:string):Promise<main.AccountView>;
 
 export function InVoiceCall():Promise<boolean>;
@@ -118,13 +120,11 @@ export function PickBackgroundImage():Promise<string>;
 
 export function PickBanner():Promise<string>;
 
-export function PickEmojiFiles(arg1:Array<string>):Promise<Array<main.EmojiFile>>;
-
 export function PickFiles():Promise<Array<string>>;
 
-export function PickPfp():Promise<string>;
+export function PickImageFiles(arg1:string):Promise<Array<string>>;
 
-export function PickStickerFiles():Promise<Array<main.EmojiFile>>;
+export function PickPfp():Promise<string>;
 
 export function PingServer():Promise<number>;
 
@@ -133,6 +133,8 @@ export function PrepareAccountExport(arg1:string,arg2:string):Promise<string>;
 export function ReactToMessage(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function ReadImageAsDataURL(arg1:string):Promise<string>;
+
+export function ReadImageFiles(arg1:Array<string>):Promise<Array<main.EmojiFile>>;
 
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
@@ -186,6 +188,8 @@ export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Pr
 
 export function UpdateSticker(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
+export function UploadEmojiData(arg1:string,arg2:string):Promise<main.CustomEmoji>;
+
 export function UploadEmojiFile(arg1:string,arg2:string):Promise<main.CustomEmoji>;
 
 export function UploadFile(arg1:string):Promise<main.UploadResult>;
@@ -193,6 +197,8 @@ export function UploadFile(arg1:string):Promise<main.UploadResult>;
 export function UploadFileData(arg1:string,arg2:string):Promise<main.UploadResult>;
 
 export function UploadFileWithProgress(arg1:string,arg2:string):Promise<main.UploadResult>;
+
+export function UploadStickerData(arg1:string,arg2:string,arg3:string):Promise<main.Sticker>;
 
 export function UploadStickerFile(arg1:string,arg2:string,arg3:string):Promise<main.Sticker>;
 

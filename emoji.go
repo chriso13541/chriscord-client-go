@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"path"
+	"time"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -38,9 +40,10 @@ func (a *App) GetEmojis() ([]CustomEmoji, error) {
 	return list, nil
 }
 
-// EmojiFile is an image picked to become an emoji: where it is, a
-// suggested name (from the file name, made unique), and a preview the
-// "Add Emoji" window shows while you pick names.
+// EmojiFile is an image waiting in the "Add Emoji / Stickers" window:
+// from a file (Path set — uploaded straight from disk) or from a link
+// (Path empty — the frontend uploads its Preview data). The frontend
+// suggests a Name from File.
 type EmojiFile struct {
 	Path    string `json:"path"`
 	File    string `json:"file"`
@@ -49,52 +52,86 @@ type EmojiFile struct {
 	Preview string `json:"preview"`
 }
 
-// PickEmojiFiles opens a file dialog (several files allowed) and returns
-// the picked images with suggested names; nothing is uploaded yet.
-// `pending` are names already chosen for other files waiting to upload,
-// so suggestions don't clash with them either.
-func (a *App) PickEmojiFiles(pending []string) ([]EmojiFile, error) {
-	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:   "Choose emoji images",
+// PickImageFiles opens a file dialog (several files allowed) for emoji or
+// sticker images and returns the chosen paths.
+func (a *App) PickImageFiles(title string) ([]string, error) {
+	return runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   title,
 		Filters: []runtime.FileFilter{{DisplayName: "Images (PNG, JPEG, GIF, WebP)", Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"}},
 	})
-	if err != nil || len(paths) == 0 {
-		return nil, err
+}
+
+func imageDataURL(data []byte) (string, bool) {
+	switch mime := pfpMime(data); mime {
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
+		return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), true
 	}
-	taken := map[string]bool{}
-	for _, n := range pending {
-		taken[strings.ToLower(n)] = true
-	}
-	if list, err := a.GetEmojis(); err == nil {
-		for _, e := range list {
-			if !e.Hidden {
-				taken[strings.ToLower(e.Name)] = true
-			}
-		}
-	}
+	return "", false
+}
+
+// ReadImageFiles loads picked or dropped files for the Add window,
+// skipping anything that isn't a PNG, JPEG, GIF or WebP.
+func (a *App) ReadImageFiles(paths []string) []EmojiFile {
 	var out []EmojiFile
 	for _, p := range paths {
 		data, err := os.ReadFile(p)
 		if err != nil {
 			continue
 		}
-		mime := pfpMime(data)
-		switch mime {
-		case "image/png", "image/jpeg", "image/gif", "image/webp":
-		default:
-			continue // not an image the server takes
+		if preview, ok := imageDataURL(data); ok {
+			out = append(out, EmojiFile{Path: p, File: filepath.Base(p), Size: int64(len(data)), Preview: preview})
 		}
-		name := freeEmojiName(emojiNameFromFile(p), taken)
-		taken[strings.ToLower(name)] = true
-		out = append(out, EmojiFile{
-			Path: p, File: filepath.Base(p), Name: name, Size: int64(len(data)),
-			Preview: "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data),
-		})
 	}
-	return out, nil
+	return out
 }
 
-// UploadEmojiFile uploads one picked image as an emoji called `name`.
+// ImageFromURL downloads an image someone dragged in from a web page
+// (e.g. an emoji out of Discord in a browser). The page itself can't
+// fetch other sites, so Go does it.
+func (a *App) ImageFromURL(raw string) (*EmojiFile, error) {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, fmt.Errorf("not a web link")
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (chriscord)")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't download it: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("couldn't download it (HTTP %d)", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 200<<20))
+	if err != nil {
+		return nil, err
+	}
+	preview, ok := imageDataURL(data)
+	if !ok {
+		return nil, fmt.Errorf("that link isn't a PNG, JPEG, GIF or WebP image")
+	}
+	file := path.Base(u.Path)
+	if file == "." || file == "/" {
+		file = "image"
+	}
+	return &EmojiFile{File: file, Size: int64(len(data)), Preview: preview}, nil
+}
+
+// decodeDataURL turns "data:image/…;base64,…" back into bytes.
+func decodeDataURL(dataURL string) ([]byte, error) {
+	comma := strings.Index(dataURL, ",")
+	if !strings.HasPrefix(dataURL, "data:") || comma < 0 || !strings.HasSuffix(dataURL[:comma], ";base64") {
+		return nil, fmt.Errorf("expected a base64 data URL")
+	}
+	return base64.StdEncoding.DecodeString(dataURL[comma+1:])
+}
+
+// UploadEmojiFile uploads an image file from disk as an emoji.
 func (a *App) UploadEmojiFile(path, name string) (*CustomEmoji, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -103,42 +140,13 @@ func (a *App) UploadEmojiFile(path, name string) (*CustomEmoji, error) {
 	return a.uploadEmoji(name, data)
 }
 
-// emojiNameFromFile turns "Party Parrot (2).gif" into "Party_Parrot_2".
-func emojiNameFromFile(path string) string {
-	stem := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	var b strings.Builder
-	lastUnderscore := true
-	for _, c := range stem {
-		ok := c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-		if !ok {
-			c = '_'
-		}
-		if c == '_' && lastUnderscore {
-			continue
-		}
-		b.WriteRune(c)
-		lastUnderscore = c == '_'
+// UploadEmojiData uploads a pasted or downloaded image (a data URL).
+func (a *App) UploadEmojiData(name, dataURL string) (*CustomEmoji, error) {
+	data, err := decodeDataURL(dataURL)
+	if err != nil {
+		return nil, err
 	}
-	name := strings.Trim(b.String(), "_")
-	if len(name) > 28 {
-		name = strings.TrimRight(name[:28], "_")
-	}
-	if len(name) < 2 {
-		name = "emoji"
-	}
-	return name
-}
-
-func freeEmojiName(name string, taken map[string]bool) string {
-	if !taken[strings.ToLower(name)] {
-		return name
-	}
-	for i := 2; ; i++ {
-		n := fmt.Sprintf("%s_%d", name, i)
-		if !taken[strings.ToLower(n)] {
-			return n
-		}
-	}
+	return a.uploadEmoji(name, data)
 }
 
 func (a *App) uploadEmoji(name string, data []byte) (*CustomEmoji, error) {

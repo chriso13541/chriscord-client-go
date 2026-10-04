@@ -9,7 +9,7 @@ require (
 	github.com/hraban/opus v0.0.0-20260708213942-bde8e4304501
 	github.com/jezek/xgb v1.3.1
 	github.com/pion/webrtc/v3 v3.3.6
-	github.com/wailsapp/wails/v2 v2.12.0
+	github.com/wailsapp/wails/v2 v2.16.0
 	golang.org/x/crypto v0.53.0
 )
 

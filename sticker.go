@@ -2,14 +2,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -35,65 +32,25 @@ func (a *App) GetStickers() ([]Sticker, error) {
 	return list, nil
 }
 
-// PickStickerFiles opens a file dialog and returns the picked images with
-// a suggested name each (from the file name); nothing is uploaded yet.
-func (a *App) PickStickerFiles() ([]EmojiFile, error) {
-	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:   "Choose sticker images",
-		Filters: []runtime.FileFilter{{DisplayName: "Images (PNG, JPEG, GIF, WebP)", Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"}},
-	})
-	if err != nil || len(paths) == 0 {
-		return nil, err
-	}
-	var out []EmojiFile
-	for _, p := range paths {
-		data, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		mime := pfpMime(data)
-		switch mime {
-		case "image/png", "image/jpeg", "image/gif", "image/webp":
-		default:
-			continue
-		}
-		out = append(out, EmojiFile{
-			Path: p, File: filepath.Base(p), Name: stickerNameFromFile(p), Size: int64(len(data)),
-			Preview: "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data),
-		})
-	}
-	return out, nil
-}
-
-// stickerNameFromFile keeps the file name readable ("Cat Wave" stays
-// "Cat Wave"), dropping only what the server refuses: < > : and control
-// characters. 2–30 characters.
-func stickerNameFromFile(path string) string {
-	stem := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	stem = strings.NewReplacer("_", " ", "-", " ").Replace(stem)
-	var b strings.Builder
-	for _, c := range stem {
-		if c == '<' || c == '>' || c == ':' || c < 0x20 || c == 0x7f {
-			continue
-		}
-		b.WriteRune(c)
-	}
-	name := strings.Join(strings.Fields(b.String()), " ")
-	if r := []rune(name); len(r) > 30 {
-		name = strings.TrimSpace(string(r[:30]))
-	}
-	if len([]rune(name)) < 2 {
-		name = "sticker"
-	}
-	return name
-}
-
-// UploadStickerFile uploads one picked image as a sticker.
+// UploadStickerFile uploads an image file from disk as a sticker.
 func (a *App) UploadStickerFile(path, name, description string) (*Sticker, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
+	return a.uploadSticker(name, description, data)
+}
+
+// UploadStickerData uploads a pasted or downloaded image (a data URL).
+func (a *App) UploadStickerData(name, description, dataURL string) (*Sticker, error) {
+	data, err := decodeDataURL(dataURL)
+	if err != nil {
+		return nil, err
+	}
+	return a.uploadSticker(name, description, data)
+}
+
+func (a *App) uploadSticker(name, description string, data []byte) (*Sticker, error) {
 	a.mu.Lock()
 	domain, token := a.domain, a.token
 	a.mu.Unlock()
