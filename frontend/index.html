@@ -206,7 +206,14 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #voice-connected-bar.elsewhere #voice-video-btn { display:none; }
 .voice-occupant-status .ic.cam { color:var(--text-muted); }
 /* Cameras in a call, above the messages */
-#video-stage { flex-shrink:0; display:flex; flex-direction:column; gap:8px; padding:8px 12px 12px; max-height:52%; background:var(--bg-darkest); border-bottom:1px solid var(--border); }
+#video-stage { position:relative; flex-shrink:0; display:flex; flex-direction:column; gap:8px; padding:8px 12px 14px; height:var(--vs-h,38vh); min-height:150px; max-height:75%; background:var(--bg-darkest); border-bottom:1px solid var(--border); }
+#video-stage.collapsed { height:auto; min-height:0; padding-bottom:8px; }
+#video-stage .vs-who { text-transform:none; letter-spacing:0; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+/* Drag the bottom edge to make the cameras bigger or smaller. */
+#video-stage .vs-resize { position:absolute; left:0; right:0; bottom:-4px; height:9px; cursor:ns-resize; z-index:3; }
+#video-stage .vs-resize::after { content:''; position:absolute; left:50%; top:3px; width:44px; height:3px; margin-left:-22px; border-radius:2px; background:var(--border); opacity:0; transition:opacity .15s; }
+#video-stage .vs-resize:hover::after, #video-stage.resizing .vs-resize::after { opacity:1; }
+#video-stage.collapsed .vs-resize { display:none; }
 #video-stage .vs-head { display:flex; align-items:center; gap:6px; font-size:.78rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; }
 #video-stage .vs-head .ic { width:16px; height:16px; }
 #video-stage .vs-collapse { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:2px; border-radius:4px; display:inline-flex; }
@@ -214,17 +221,17 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #video-stage .vs-collapse .ic { width:20px; height:20px; transition:transform .15s; }
 #video-stage.collapsed .vs-collapse .ic { transform:rotate(180deg); }
 #video-stage.collapsed .vs-grid { display:none; }
-#video-stage .vs-grid { display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); overflow-y:auto; min-height:0; }
-#video-stage .vs-grid.has-focus { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); }
-#video-stage .vs-grid.has-focus .vs-tile.focus { grid-column:1/-1; max-height:44vh; }
-.vs-tile { position:relative; aspect-ratio:16/9; background:#000; border-radius:8px; overflow:hidden; cursor:pointer; outline:2px solid transparent; outline-offset:-2px; transition:outline-color .15s; }
+#video-stage .vs-grid { flex:1; min-height:0; display:grid; gap:8px; justify-content:center; align-content:center; overflow:hidden; }
+#video-stage .vs-grid.has-focus .vs-tile.focus { grid-column:1/-1; justify-self:center; }
+.vs-tile { position:relative; background:#000; border-radius:8px; overflow:hidden; cursor:pointer; outline:2px solid transparent; outline-offset:-2px; transition:outline-color .15s; }
 .vs-tile.speaking { outline-color:var(--green); }
 .vs-tile canvas, .vs-tile video { width:100%; height:100%; object-fit:contain; display:block; background:#000; }
 .vs-tile.me video { transform:scaleX(-1); }
 .vs-tile:not(.live)::after { content:'Connecting\2026'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.6); font-size:.85rem; }
-.vs-tile .vs-name { position:absolute; left:8px; bottom:8px; z-index:1; max-width:calc(100% - 16px); padding:3px 8px; border-radius:4px; background:rgba(0,0,0,.6); color:#fff; font-size:.8rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vs-tile .vs-name { position:absolute; left:8px; bottom:8px; display:flex; align-items:center; gap:6px; z-index:1; max-width:calc(100% - 16px); padding:3px 8px; border-radius:4px; background:rgba(0,0,0,.6); color:#fff; font-size:.8rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .vs-tile .vs-unsup { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; text-align:center; color:rgba(255,255,255,.7); font-size:.82rem; }
-.vs-tile:fullscreen { border-radius:0; cursor:default; }
+.vs-tile:fullscreen { border-radius:0; cursor:default; width:100% !important; height:100% !important; }
+.vs-tile .vs-name .vs-av { width:18px; height:18px; font-size:.65rem; }
 /* Settings → Video */
 .settings-sub { margin:28px 0 0; padding-top:18px; border-top:1px solid var(--border); font-size:1rem; color:var(--text-strong); }
 #settings-cam-select, #settings-cam-res, #settings-cam-fps { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
@@ -662,6 +669,26 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .em-empty { padding:24px; text-align:center; color:var(--text-muted); font-size:.88rem; }
 .modal.emoji-manage { position:relative; }
 .modal.emoji-manage.dropping::after { content:'Drop images to add them'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(14,17,23,.88); border:2px dashed var(--accent); border-radius:12px; color:var(--text-strong); font-weight:800; font-size:1.05rem; pointer-events:none; z-index:5; }
+/* Settings feedback, like the admin panel's: a "Saved" pill pops up for
+   settings that apply as you change them, and Save buttons flash green
+   with a tick, with "Unsaved changes" beside them while there are some. */
+#settings-saved { position:absolute; right:28px; bottom:22px; z-index:20; display:flex; align-items:center; gap:8px; padding:9px 16px 9px 12px; border-radius:20px; background:var(--green); color:#fff; font-weight:700; font-size:.88rem; box-shadow:0 6px 18px rgba(0,0,0,.35); pointer-events:none; opacity:0; transform:translateY(10px) scale(.96); transition:opacity .18s, transform .18s; max-width:min(460px,calc(100% - 56px)); }
+#settings-saved.on { opacity:1; transform:none; }
+#settings-saved.busy { background:var(--bg-light); color:var(--text-strong); }
+#settings-saved.fail { background:var(--red); }
+#settings-saved .ic { width:18px; height:18px; flex-shrink:0; }
+#settings-saved.on:not(.busy) .ic { animation:saved-pop .35s cubic-bezier(.2,1.6,.4,1); }
+#settings-saved.busy .ic { animation:saved-spin 1s linear infinite; }
+#settings-saved span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@keyframes saved-pop { from { transform:scale(.3); } to { transform:none; } }
+@keyframes saved-spin { to { transform:rotate(360deg); } }
+.btn.saved-flash { background:var(--green) !important; border-color:var(--green) !important; color:#fff !important; opacity:1 !important; }
+.btn.saved-flash .ic { width:16px; height:16px; vertical-align:-3px; margin-right:4px; animation:saved-pop .35s cubic-bezier(.2,1.6,.4,1); }
+.unsaved-note { display:inline-flex; align-items:center; gap:6px; color:var(--yellow); font-size:.85rem; }
+.unsaved-note::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--yellow); animation:unsaved-breathe 1.6s ease-in-out infinite; }
+@keyframes unsaved-breathe { 50% { opacity:.35; } }
+@media (prefers-reduced-motion: reduce) { #settings-saved, #settings-saved .ic, .btn.saved-flash .ic, .unsaved-note::before { animation:none !important; transition:none; } }
+.pf-gpu-problem { color:var(--yellow); margin-top:-4px; }
 .em-tabs { display:flex; gap:4px; margin:-4px 0 14px; border-bottom:1px solid var(--border); }
 .em-tabs button { border:none; background:none; color:var(--text-muted); font:inherit; font-weight:700; font-size:.9rem; padding:8px 12px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
 .em-tabs button:hover { color:var(--text); }
@@ -1070,6 +1097,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-video_file" viewBox="0 -960 960 960"><path d="M360-240h160q17 0 28.5-11.5T560-280v-40l80 42v-164l-80 42v-40q0-17-11.5-28.5T520-480H360q-17 0-28.5 11.5T320-440v160q0 17 11.5 28.5T360-240ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-keep" viewBox="0 -960 960 960"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></symbol>
   <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
+  <symbol id="ic-sync" viewBox="0 -960 960 960"><path d="M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z"/></symbol>
   <symbol id="ic-expand_less" viewBox="0 -960 960 960"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></symbol>
   <symbol id="ic-videocam" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h480q33 0 56.5 23.5T720-720v180l160-160v440L720-420v180q0 33-23.5 56.5T640-160H160Zm0-80h480v-480H160v480Zm0 0v-480 480Z"/></symbol>
   <symbol id="ic-videocam_off" viewBox="0 -960 960 960"><path d="M880-260 720-420v67l-80-80v-287H353l-80-80h367q33 0 56.5 23.5T720-720v180l160-160v440ZM822-26 26-822l56-56L878-82l-56 56ZM498-575ZM382-464ZM160-800l80 80h-80v480h480v-80l80 80q0 33-23.5 56.5T640-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Z"/></symbol>
@@ -1337,8 +1365,9 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div id="chat-main">
         <div id="drop-overlay" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-folder_open"/></svg> Drop files to attach</div>
         <div id="video-stage" class="hidden">
-          <div class="vs-head"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg><span class="vs-count"></span><button class="vs-collapse" type="button" title="Hide cameras"><svg class="ic" aria-hidden="true"><use href="#ic-expand_less"/></svg></button></div>
+          <div class="vs-head"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg><span class="vs-count"></span><span class="vs-who"></span><button class="vs-collapse" type="button" title="Hide cameras"><svg class="ic" aria-hidden="true"><use href="#ic-expand_less"/></svg></button></div>
           <div class="vs-grid"></div>
+          <div class="vs-resize" title="Drag to resize"></div>
         </div>
         <div id="messages-area">
           <div id="messages"></div>
@@ -1389,6 +1418,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <div id="lb-stage"><img id="lightbox-img" src="" alt="" draggable="false"></div>
 </div>
 <div id="settings-modal" class="hidden">
+  <div id="settings-saved" role="status" aria-live="polite"><svg class="ic" aria-hidden="true"><use href="#ic-check"/></svg><span>Saved</span></div>
   <button id="settings-close-btn" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
   <div id="settings-tabs">
     <div class="settings-tab active" data-tab="profile">Profile</div>
@@ -1505,6 +1535,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
             <button class="btn btn-primary" id="ap-save" disabled>Save Changes</button>
             <button class="btn btn-ghost" id="ap-revert" disabled>Revert</button>
             <button class="btn btn-ghost" id="ap-default">Reset to Default</button>
+            <span class="hint" id="ap-save-hint"></span>
           </div>
           <div class="ap-defaults">
             <div class="settings-label" style="margin-top:0">Default colors, for reference</div>
@@ -1566,6 +1597,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
         <label class="check-row"><input type="checkbox" id="pf-gpu"> Use the graphics card when it can</label>
         <p class="settings-hint" style="margin-top:0" id="pf-gpu-hint">Much faster and lighter on the CPU. Turn off to always use the CPU.</p>
+        <p class="settings-hint pf-gpu-problem hidden" id="pf-gpu-problem"></p>
+        <button class="settings-secondary-btn" type="button" id="pf-gpu-recheck" style="margin-top:4px">Check again</button>
       </div>
     </div>
 
@@ -5045,11 +5078,16 @@ function getImageBlobURL(rel){
 // shared and remembered.
 const fmtTime=t=>{if(!isFinite(t)||t<0)t=0;t=Math.floor(t);const h=Math.floor(t/3600),m=Math.floor(t/60)%60,s=t%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0');};
 let mediaVolume=(()=>{const v=parseFloat(localStorage.getItem('mediaVolume'));return isFinite(v)?Math.max(0,Math.min(1,v)):1;})();
+// How loud each kind of player is at its slider's 100%. Videos are often
+// mastered loud, so in the app they top out at half volume; the slider
+// still reads 0–100% (and it's one remembered setting for all players).
+const MEDIA_GAIN={video:.5,audio:1};
 function buildMediaPlayer(a,kind){
   const wrap=document.createElement('div');wrap.className=`mp mp-${kind}`;
   const media=document.createElement(kind);media.preload='metadata';
   if(kind==='video')media.playsInline=true;
-  media.volume=mediaVolume;
+  const gain=MEDIA_GAIN[kind]??1;
+  media.volume=mediaVolume*gain;
   const bar=`<div class="mp-bar">
       <button class="mp-btn mp-play" title="Play">${icon('play_arrow')}</button>
       <span class="mp-time">0:00 / 0:00</span>
@@ -5084,7 +5122,7 @@ function buildMediaPlayer(a,kind){
   const paintVol=()=>{
     const silent=media.muted||media.volume===0;
     muteBtn.innerHTML=icon(silent?'volume_off':'volume_up');muteBtn.dataset.tip=muteBtn.title=silent?'Unmute':'Mute';
-    vol.value=media.muted?0:media.volume;
+    vol.value=media.muted?0:media.volume/gain;
   };
   playBtn.addEventListener('click',e=>{e.stopPropagation();toggle();});
   big?.addEventListener('click',e=>{e.stopPropagation();toggle();});
@@ -5097,8 +5135,8 @@ function buildMediaPlayer(a,kind){
   ['pause','ended'].forEach(ev=>media.addEventListener(ev,paintPlay));
   ['timeupdate','loadedmetadata','durationchange','progress'].forEach(ev=>media.addEventListener(ev,paint));
   media.addEventListener('volumechange',paintVol);
-  muteBtn.addEventListener('click',e=>{e.stopPropagation();if(media.muted||media.volume===0){media.muted=false;if(media.volume===0)media.volume=mediaVolume||1;}else media.muted=true;});
-  vol.addEventListener('input',e=>{e.stopPropagation();media.muted=false;media.volume=+vol.value;mediaVolume=media.volume;localStorage.setItem('mediaVolume',String(mediaVolume));});
+  muteBtn.addEventListener('click',e=>{e.stopPropagation();if(media.muted||media.volume===0){media.muted=false;if(media.volume===0)media.volume=(mediaVolume||1)*gain;}else media.muted=true;});
+  vol.addEventListener('input',e=>{e.stopPropagation();media.muted=false;mediaVolume=+vol.value;media.volume=mediaVolume*gain;localStorage.setItem('mediaVolume',String(mediaVolume));});
   // Seeking: click or drag along the bar.
   const seekTo=clientX=>{const r=seek.getBoundingClientRect(),f=Math.max(0,Math.min(1,(clientX-r.left)/r.width));if(isFinite(media.duration))media.currentTime=f*media.duration;paint();};
   seek.addEventListener('pointerdown',e=>{
@@ -5489,6 +5527,7 @@ function updateProfileEditorState(){
   const dirty=profileDirty();
   document.getElementById('profile-save-btn').disabled=!dirty||n>BIO_MAX;
   document.getElementById('profile-reset-btn').disabled=!dirty;
+  markUnsaved('profile-save-hint',dirty);
   const cur=document.getElementById('banner-current');
   if(profileDraft.banner){cur.style.backgroundImage=`url("${profileDraft.banner}")`;cur.style.backgroundColor='';}
   else{
@@ -5514,8 +5553,8 @@ async function saveProfile(){
     profileDraft.savedBio=profileDraft.bio;profileDraft.savedBanner=profileDraft.banner;
     document.getElementById('profile-bio').value=profileDraft.bio;
     delete profileCache[state.username];
-    document.getElementById('profile-save-hint').textContent='Saved.';
-    toast('Profile saved');
+    flashSaveButton(document.getElementById('profile-save-btn'));
+    settingsSaved('Profile saved');
   }catch(err){toast('Could not save profile: '+err,true);}
   updateProfileEditorState();
 }
@@ -6379,14 +6418,37 @@ const modeLabel=m=>{
 const stopStream=s=>s?.getTracks().forEach(t=>t.stop());
 const camKey=id=>'camModes:'+id;
 
-async function listCameras(){
-  try{return (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');}catch{return [];}
+// Until camera access has been allowed, the system lists each camera with
+// a blank name AND a blank id ("Camera 1") — and a blank id can't be
+// opened. (Allowing the microphone, which Settings asks for, doesn't count:
+// it's per kind.) So when that's the case, ask for camera access once,
+// close it straight away, and list again to get the real ids and names.
+async function listCameras({unlock=true}={}){
+  const list=async()=>{try{return (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');}catch{return [];}};
+  let cams=await list();
+  if(unlock&&cams.some(c=>!c.deviceId||!c.label)&&navigator.mediaDevices?.getUserMedia){
+    try{stopStream(await navigator.mediaDevices.getUserMedia({video:true}));}
+    catch(err){throw new Error(camErrorText(err));}
+    cams=await list();
+  }
+  return cams.filter(c=>c.deviceId); // ones that still have no id can't be used
+}
+// What went wrong opening a camera, in words.
+function camErrorText(err){
+  switch(err?.name){
+    case 'NotAllowedError':case 'SecurityError':return 'Camera access was blocked \u2014 allow it when the app asks (or in Windows Settings \u2192 Privacy \u2192 Camera)';
+    case 'NotFoundError':case 'DevicesNotFoundError':return 'No camera found';
+    case 'NotReadableError':case 'TrackStartError':return 'Your camera is busy \u2014 another app may be using it';
+    case 'OverconstrainedError':return 'That camera can\u2019t do the selected size \u2014 try Re-check camera in Settings';
+    case 'AbortError':return 'The camera didn\u2019t start \u2014 try again';
+    default:return `Couldn\u2019t open the camera${err?.name?` (${err.name})`:''}`;
+  }
 }
 // The camera to use: the saved one if it's still connected, else the first.
 async function pickCamera(){
   const cams=await listCameras();
-  const saved=localStorage.getItem('camDevice');
-  return cams.find(c=>c.deviceId===saved)||cams[0]||null;
+  const saved=localStorage.getItem('camDevice')||'';
+  return cams.find(c=>saved&&c.deviceId===saved)||cams[0]||null;
 }
 // Which sizes (and the best frame rate at each) this camera really has.
 // onProgress(done,total) for the settings page; cached per camera.
@@ -6399,7 +6461,7 @@ async function probeCameraModes(deviceId,{force=false,onProgress}={}){
     const s=await gum({width:{ideal:7680},height:{ideal:4320}});
     const c=s.getVideoTracks()[0].getCapabilities?.()||{};
     maxW=c.width?.max||maxW;maxH=c.height?.max||maxH;stopStream(s);
-  }catch(err){throw new Error(err?.name==='NotAllowedError'?'Camera access was blocked':'Couldn\u2019t open that camera');}
+  }catch(err){throw new Error(camErrorText(err));}
   const sizes=CAM_SIZES.filter(([w,h])=>w<=maxW&&h<=maxH);
   const modes=[];
   for(let i=0;i<sizes.length;i++){
@@ -6461,11 +6523,14 @@ async function startCamera(){
   const sup=await VideoEncoder.isConfigSupported(cfg).catch(()=>({supported:false}));
   if(!sup.supported)throw new Error(`Can\u2019t encode ${modeLabel(mode)} video here`);
   // Exactly that size, natively (no rescaling) — it's on the probed list.
-  const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:device.deviceId},
-    width:{exact:mode.w},height:{exact:mode.h},resizeMode:{exact:'none'},frameRate:{ideal:mode.fps}}});
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:device.deviceId},
+      width:{exact:mode.w},height:{exact:mode.h},resizeMode:{exact:'none'},frameRate:{ideal:mode.fps}}});
+  }catch(err){throw new Error(camErrorText(err));}
   if(!inMyCall()){stopStream(stream);throw new Error('You left the call');}
   const track=stream.getVideoTracks()[0];
-  Object.assign(cam,{stream,mode,fps:mode.fps,forceKey:true,lastKeyAt:0,lastFrameAt:0,inflight:0});
+  Object.assign(cam,{stream,mode,fps:mode.fps,forceKey:true,lastKeyAt:0,lastFrameAt:0,inflight:0,actualFps:Math.round(track.getSettings?.().frameRate||0)});
   cam.encoder=new VideoEncoder({output:onCamChunk,error:e=>{console.warn('video: encoder error',e);toast('Camera stopped: '+e.message,true);stopCamera();}});
   cam.encoder.configure(cfg);
   cam.on=true;
@@ -6592,14 +6657,16 @@ function renderVideoStage(){
   stage.classList.toggle('hidden',!users.length);
   if(!users.length){grid.innerHTML='';vsFocus=null;return;}
   if(vsFocus&&!users.includes(vsFocus))vsFocus=null;
-  stage.querySelector('.vs-count').textContent=`${users.length} camera${users.length===1?'':'s'}`;
+  stage.querySelector('.vs-count').textContent='Cameras \u2014';
+  stage.querySelector('.vs-who').textContent=users.map(u=>u===state.username?`${u} (you)`:u).join(', ');
   const keep=new Set(users);
   grid.querySelectorAll('.vs-tile').forEach(t=>{if(!keep.has(t.dataset.user))t.remove();});
   for(const u of users){
     let tile=grid.querySelector(`.vs-tile[data-user="${CSS.escape(u)}"]`);
     if(!tile){
       tile=document.createElement('div');tile.className='vs-tile'+(u===state.username?' me':'');tile.dataset.user=u;
-      tile.innerHTML=`<div class="vs-name">${esc(u===state.username?`${u} (you)`:u)}</div>`;
+      tile.innerHTML=`<div class="vs-name"><span>${esc(u===state.username?`${u} (you)`:u)}</span></div>`;
+      vsAvatar(tile,u);
       grid.appendChild(tile);
     }
     if(u===state.username){
@@ -6618,6 +6685,49 @@ function renderVideoStage(){
   grid.classList.toggle('has-focus',!!vsFocus);
   // The focused one first.
   if(vsFocus){const f=grid.querySelector('.vs-tile.focus');if(f&&grid.firstChild!==f)grid.prepend(f);}
+  layoutVideoStage();
+}
+// Their profile picture (or coloured initial) in their name chip — the
+// same avatar as in the call list.
+function vsAvatar(tile,user){
+  const chip=tile.querySelector('.vs-name');
+  chip.insertAdjacentHTML('afterbegin',`<span class="voice-occupant-avatar vs-av" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span>`);
+  applyUserAvatar(chip.querySelector('.vs-av'),user);
+}
+// Sizes the tiles so they all fit in the area with nothing to scroll: the
+// column count that gives the biggest 16:9 tiles. With one tile focused,
+// it takes the space above a row of the others.
+function layoutVideoStage(){
+  const grid=document.querySelector('#video-stage .vs-grid');
+  if(!grid||grid.closest('.hidden,.collapsed'))return;
+  const tiles=[...grid.querySelectorAll('.vs-tile')],n=tiles.length;if(!n)return;
+  const W=grid.clientWidth,H=grid.clientHeight,gap=8,ar=16/9;
+  if(W<10||H<10)return;
+  const fit=(count,w,h)=>{
+    let best={c:1,tw:0};
+    for(let c=1;c<=count;c++){
+      const rows=Math.ceil(count/c);
+      const tw=Math.min((w-(c-1)*gap)/c,((h-(rows-1)*gap)/rows)*ar);
+      if(tw>best.tw)best={c,tw};
+    }
+    return best;
+  };
+  const focus=tiles.find(t=>t.classList.contains('focus'));
+  if(focus&&n>1){
+    const stripH=Math.max(60,Math.min(120,H*.24)),others=n-1;
+    const s=fit(others,W,stripH);
+    const fh=Math.max(40,H-gap-Math.ceil(others/s.c)*(s.tw/ar)-(Math.ceil(others/s.c)-1)*gap);
+    const fw=Math.min(W,fh*ar);
+    grid.style.gridTemplateColumns=`repeat(${s.c},${Math.floor(s.tw)}px)`;
+    for(const t of tiles){
+      const f=t===focus;
+      t.style.width=Math.floor(f?fw:s.tw)+'px';t.style.height=Math.floor(f?fw/ar:s.tw/ar)+'px';
+    }
+  }else{
+    const b=fit(n,W,H);
+    grid.style.gridTemplateColumns=`repeat(${b.c},${Math.floor(b.tw)}px)`;
+    for(const t of tiles){t.style.width=Math.floor(b.tw)+'px';t.style.height=Math.floor(b.tw/ar)+'px';}
+  }
 }
 function initVideo(){
   const stage=document.getElementById('video-stage'),grid=stage.querySelector('.vs-grid');
@@ -6629,8 +6739,28 @@ function initVideo(){
     const t=e.target.closest('.vs-tile');if(!t)return;
     document.fullscreenElement===t?document.exitFullscreen():t.requestFullscreen?.().catch(()=>{});
   });
+  new ResizeObserver(()=>layoutVideoStage()).observe(grid);
+  const savedH=+localStorage.getItem('videoStageH');
+  if(savedH)stage.style.setProperty('--vs-h',savedH+'px');
+  stage.querySelector('.vs-resize').addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    const startY=e.clientY,startH=stage.getBoundingClientRect().height,z=uiScale();
+    const maxH=stage.parentElement.getBoundingClientRect().height*.75;
+    stage.classList.add('resizing');
+    const move=ev=>{
+      const h=Math.max(150*z,Math.min(maxH,startH+(ev.clientY-startY)));
+      stage.style.setProperty('--vs-h',Math.round(h/z)+'px');
+    };
+    const up=()=>{
+      window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);
+      stage.classList.remove('resizing');
+      localStorage.setItem('videoStageH',parseInt(stage.style.getPropertyValue('--vs-h'))||'');
+    };
+    window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
+  });
   stage.querySelector('.vs-collapse').addEventListener('click',()=>{
     stage.classList.toggle('collapsed');
+    requestAnimationFrame(layoutVideoStage);
     stage.querySelector('.vs-collapse').title=stage.classList.contains('collapsed')?'Show cameras':'Hide cameras';
   });
   document.getElementById('voice-video-btn').addEventListener('click',toggleCamera);
@@ -6660,7 +6790,9 @@ async function populateCameraSettings({force=false}={}){
     hint.textContent='Cameras aren\u2019t supported in this version of the app\u2019s web view.';
     return;
   }
-  let cams=await listCameras();
+  let cams;
+  try{cams=await listCameras();}
+  catch(err){sel.innerHTML='<option>Camera unavailable</option>';resSel.innerHTML=fpsSel.innerHTML='';hint.textContent=err.message;return;}
   if(!cams.length){sel.innerHTML='<option>No cameras found</option>';resSel.innerHTML=fpsSel.innerHTML='';hint.textContent='Plug in a camera and reopen this page.';return;}
   const current=(await pickCamera())?.deviceId;
   const fill=()=>{sel.innerHTML=cams.map((c,i)=>`<option value="${esc(c.deviceId)}">${esc(c.label||'Camera '+(i+1))}</option>`).join('');if(current)sel.value=current;};
@@ -6673,7 +6805,7 @@ async function populateCameraSettings({force=false}={}){
     modes=await probeCameraModes(id,{force,onProgress:(d,t)=>{hint.textContent=d<t?`Checking which sizes this camera supports\u2026 ${d}/${t}`:'';}});
   }catch(err){hint.textContent=err.message||String(err);resSel.innerHTML=fpsSel.innerHTML='';return;}
   // Names show up once camera access has been allowed.
-  if(cams.some(c=>!c.label)){cams=await listCameras();fill();}
+  if(cams.some(c=>!c.label)){cams=await listCameras({unlock:false});fill();}
   if(!modes.length){hint.textContent='Couldn\u2019t find a size this camera supports.';resSel.innerHTML=fpsSel.innerHTML='';return;}
   const chosen=chooseMode(modes);
   resSel.innerHTML=[...modes].sort((a,b)=>b.w*b.h-a.w*a.h).map(m=>`<option value="${m.w}x${m.h}">${modeLabel(m)}</option>`).join('');
@@ -6694,9 +6826,33 @@ function cachedModes(){
 }
 // A setting changed: save it, and restart the preview / live camera so it
 // takes effect right away.
+// Every open copy of the camera has to be closed first: the system runs a
+// camera at ONE native format for everyone using it, so if the preview (or
+// the old stream) is still open at 5 fps, a new request for 60 fps just
+// gets the 5 fps it's already running at — lowering always looked like it
+// worked (frames are dropped down to the new rate), raising never did.
+// So: close everything, give the camera a moment to actually let go, then
+// reopen the call stream first and the preview after it.
 async function applyCameraSetting(){
-  if(camPreview.stream)await startCameraPreview();
-  if(cam.on){stopCamera(true);cam.starting=true;updateCameraButton();try{await startCamera();}catch(err){toast('Camera: '+(err?.message||err),true);stopCamera();}finally{cam.starting=false;updateCameraButton();}}
+  const res=document.getElementById('settings-cam-res').value.replace('x','\u00d7'),fps=document.getElementById('settings-cam-fps').value;
+  const desc=`${res} at ${fps} fps`;
+  const hadPreview=!!camPreview.stream,wasOn=cam.on;
+  if(!hadPreview&&!wasOn){settingsSaved(`Saved \u2014 your camera will use ${desc}`);return;}
+  settingsSaved(wasOn?'Restarting your camera\u2026':'Applying\u2026','busy');
+  stopCameraPreview(true);
+  if(wasOn)stopCamera(true);
+  await new Promise(r=>setTimeout(r,300));
+  let failed=null;
+  if(wasOn){
+    cam.starting=true;updateCameraButton();
+    try{await startCamera();}catch(err){failed=err;stopCamera();}
+    finally{cam.starting=false;updateCameraButton();}
+  }
+  if(hadPreview)await startCameraPreview();
+  if(failed){settingsSaved('Camera: '+(failed?.message||failed),'fail');return;}
+  const got=wasOn?cam.actualFps:camPreview.actualFps;
+  if(got&&got<+fps*.8)settingsSaved(`Applied ${res} \u2014 but the camera is only giving ${got} fps right now`,'fail');
+  else settingsSaved(wasOn?`Camera restarted at ${desc}`:`Applied \u2014 ${desc}`);
 }
 async function startCameraPreview(){
   stopCameraPreview(true);
@@ -6707,6 +6863,7 @@ async function startCameraPreview(){
   try{
     camPreview.stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:id},width:{exact:m.w},height:{exact:m.h},resizeMode:{exact:'none'},frameRate:{ideal:m.fps}}});
   }catch(err){toast('Couldn\u2019t start the camera preview',true);return;}
+  camPreview.actualFps=Math.round(camPreview.stream.getVideoTracks()[0].getSettings?.().frameRate||0);
   const v=box.querySelector('video');v.srcObject=camPreview.stream;v.play().catch(()=>{});
   box.classList.add('live');
   btn.innerHTML=`${icon('videocam_off')} Stop Preview`;
@@ -6721,8 +6878,10 @@ function initCameraSettings(){
   const sel=document.getElementById('settings-cam-select'),resSel=document.getElementById('settings-cam-res'),fpsSel=document.getElementById('settings-cam-fps');
   sel.addEventListener('change',async()=>{
     localStorage.setItem('camDevice',sel.value);
+    const hadPreview=!!camPreview.stream;
     stopCameraPreview();
     await populateCameraSettings();
+    if(hadPreview)await startCameraPreview();
     applyCameraSetting();
   });
   resSel.addEventListener('change',()=>{
@@ -7138,6 +7297,7 @@ function renderAppearanceEditor(){
   document.getElementById('ap-dim').value=d.dim;document.getElementById('ap-dim-val').textContent=d.dim+'%';
   const dirty=JSON.stringify(d)!==JSON.stringify(appearance);
   document.getElementById('ap-save').disabled=!dirty;document.getElementById('ap-revert').disabled=!dirty;
+  markUnsaved('ap-save-hint',dirty);
 }
 // Background images are scaled to at most 1920×1080 and re-encoded as
 // JPEG, so even a big photo fits comfortably in local storage.
@@ -7182,10 +7342,57 @@ function initAppearance(){
     try{localStorage.setItem('appearance',JSON.stringify(apDraft));}
     catch{toast('That background image is too large to save — try a smaller one.',true);return;}
     appearance={...apDraft};applyAppearance();renderAppearanceEditor();persistClientSettings();
-    toast(serverThemeActive()?`Appearance saved. ${state.serverName} has its own theme, so you\u2019ll see yours on the server list \u2014 or tick \u201cUse my own theme\u201d to use it here too.`:'Appearance saved');
+    flashSaveButton(document.getElementById('ap-save'));settingsSaved('Appearance saved');
+    if(serverThemeActive())toast(serverThemeActive()?`${state.serverName} has its own theme, so you\u2019ll see yours on the server list \u2014 or tick \u201cUse my own theme\u201d to use it here too.`:'');
   });
   document.getElementById('ap-revert').addEventListener('click',()=>{apDraft={...appearance};renderAppearanceEditor();});
   document.getElementById('ap-default').addEventListener('click',()=>{apDraft={...APPEARANCE_DEFAULTS};renderAppearanceEditor();});
+}
+
+// ── SETTINGS FEEDBACK ────────────────────────────────────────────
+// Most settings take effect the moment you change them; each change pops
+// a green "Saved" pill in the corner so you know it stuck. Things that
+// take a moment (restarting your camera) show "Applying…" first, then
+// what was applied — or what went wrong. The profile and appearance
+// editors have Save buttons instead: those flash green with a tick on
+// saving, with "Unsaved changes" beside them while there are some.
+let savedTimer=null;
+function settingsSaved(text='Saved',kind='ok'){
+  const el=document.getElementById('settings-saved');if(!el)return;
+  el.classList.remove('busy','fail');
+  if(kind==='busy')el.classList.add('busy');
+  if(kind==='fail')el.classList.add('fail');
+  el.querySelector('use').setAttribute('href',kind==='busy'?'#ic-sync':kind==='fail'?'#ic-error':'#ic-check');
+  el.querySelector('span').textContent=text;
+  // Restart the pop.
+  el.classList.remove('on');void el.offsetWidth;el.classList.add('on');
+  clearTimeout(savedTimer);
+  if(kind!=='busy')savedTimer=setTimeout(()=>el.classList.remove('on'),kind==='fail'?4000:1800);
+}
+function flashSaveButton(btn){
+  if(!btn)return;
+  const label=btn.dataset.label||(btn.dataset.label=btn.textContent);
+  btn.classList.add('saved-flash');btn.innerHTML=`${icon('check')}Saved`;
+  clearTimeout(btn._savedT);
+  btn._savedT=setTimeout(()=>{btn.classList.remove('saved-flash');btn.textContent=label;},1600);
+}
+function markUnsaved(hintId,dirty){
+  const h=document.getElementById(hintId);if(!h)return;
+  h.className=dirty?'unsaved-note':'hint';
+  h.textContent=dirty?'Unsaved changes':'';
+}
+function initSettingsFeedback(){
+  const modal=document.getElementById('settings-modal');
+  // Instant settings: anything changed outside the two Save-button editors
+  // (and outside the camera's own controls, which report for themselves).
+  modal.addEventListener('change',e=>{
+    const t=e.target;
+    if(!t.matches('input,select,textarea'))return;
+    if(t.closest('#profile-editor,#appearance-editor,#settings-tab-profile'))return;
+    if(t.matches('#settings-cam-select,#settings-cam-res,#settings-cam-fps'))return;
+    if(t.type==='file'||t.type==='text'||t.type==='search')return;
+    settingsSaved();
+  });
 }
 
 // ── ELASTIC SCROLL ───────────────────────────────────────────────
@@ -8117,10 +8324,18 @@ function renderPerfSettings(){
   document.getElementById('pf-cpu-hint').textContent=cores
     ?(n?`Uses at most ${n} of your ${cores} CPU threads. The graphics card, if used, isn\u2019t limited by this.`:`Can use all ${cores} of your CPU threads.`)
     :'';
-  const gpuName={h264_nvenc:'your NVIDIA graphics card',h264_mf:'your graphics card (Windows Media Foundation)'}[convInfo?.gpuEncoder];
-  document.getElementById('pf-gpu-hint').textContent=convInfo
-    ?(gpuName?`Found: ${gpuName}. Much faster and lighter on the CPU; turn off to always use the CPU.`:'No graphics card encoder was found on this computer, so the CPU is used either way.')
-    :'Much faster and lighter on the CPU. Turn off to always use the CPU.';
+  // Which card (by name, when the system says), and if its encoder isn't
+  // usable, why — e.g. a graphics driver too old for this FFmpeg.
+  const gpus=convInfo?.gpus||[],nv=gpus.find(g=>/nvidia/i.test(g));
+  const card=convInfo?.gpuEncoder==='h264_nvenc'?(nv||'your NVIDIA graphics card'):(gpus[0]||'your graphics card');
+  const how={h264_nvenc:'NVIDIA NVENC',h264_mf:'Windows Media Foundation'}[convInfo?.gpuEncoder];
+  const hint=document.getElementById('pf-gpu-hint'),prob=document.getElementById('pf-gpu-problem');
+  hint.textContent=!convInfo?'Much faster and lighter on the CPU. Turn off to always use the CPU.'
+    :how?`Using ${card} (${how}). Much faster and lighter on the CPU; turn off to always use the CPU.`
+    :gpus.length?`Found ${gpus.join(', ')} \u2014 but its video encoder can\u2019t be used right now, so the CPU is used.`
+    :'No graphics card encoder was found on this computer, so the CPU is used either way.';
+  prob.textContent=!how&&convInfo?.gpuProblem?convInfo.gpuProblem:'';
+  prob.classList.toggle('hidden',!prob.textContent);
   if(convInfo&&!convInfo.available)document.getElementById('pf-transcode-hint').textContent='No FFmpeg is available in this build of the app, so videos are always sent untranscoded.';
 }
 function initVideoConvert(){
@@ -8133,6 +8348,16 @@ function initVideoConvert(){
   applyPerfSettings(false);
   // What this computer has (checked once, a little after start-up).
   setTimeout(async()=>{try{convInfo=await window.go.main.App.VideoConversionInfo();renderPerfSettings();}catch{}},3000);
+  document.getElementById('pf-gpu-recheck').addEventListener('click',async e=>{
+    const btn=e.currentTarget;btn.disabled=true;btn.textContent='Checking\u2026';
+    settingsSaved('Checking your graphics card\u2026','busy');
+    try{
+      convInfo=await window.go.main.App.RecheckGPUEncoder();renderPerfSettings();
+      if(convInfo?.gpuEncoder)settingsSaved('Graphics card encoder works');
+      else settingsSaved('Graphics card encoder still unavailable','fail');
+    }catch(err){settingsSaved('Check failed: '+err,'fail');}
+    btn.disabled=false;btn.textContent='Check again';
+  });
   // Upload progress for each attachment tile ("Uploading 42%").
   window.runtime.EventsOn('upload:progress',p=>{
     const item=state.attachQueue.find(a=>'up'+a.id===p.id);
@@ -8396,6 +8621,7 @@ function init(){
   initStickerPicker();
   initEmojiCard();
   initVideo();
+  initSettingsFeedback();
   initEmojiAnimationLimit();
   initEmojiPicker();
   initVoiceUserMenu();

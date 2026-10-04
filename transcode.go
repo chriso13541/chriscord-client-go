@@ -26,6 +26,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -239,46 +240,164 @@ func transcodeSettings() (threads int, lowPrio, useGPU bool) {
 
 // ── H.264 encoders ───────────────────────────────────────────────────────────
 
+// What the hardware-encoder check found. It runs once (or again on
+// "Check again" in Settings), with a tiny test encode per encoder, and
+// remembers WHY a graphics card's encoder didn't work, so Settings can say
+// so instead of just "not found".
 var (
-	encoderOnce sync.Once
-	encoderName string
+	encoderMu      sync.Mutex
+	encoderChecked bool
+	hwEncoder      string // "h264_nvenc" / "h264_mf" / "" (none worked)
+	hwCompat       bool   // NVENC only works with plain settings (older FFmpeg/driver combos)
+	hwProblem      string // why the graphics card's encoder isn't used, in words
 )
 
-// pickEncoder tries the graphics card's H.264 encoder first (NVIDIA NVENC;
-// on Windows also Media Foundation, which reaches Intel Quick Sync and AMD
-// too), with a tiny test encode, and falls back to x264 on the CPU — or
-// goes straight to x264 if the graphics card is turned off in settings.
+// pickEncoder returns the encoder to convert with: the graphics card's
+// (NVIDIA NVENC; on Windows also Media Foundation, which reaches Intel
+// Quick Sync and AMD too) if it works and is turned on in settings, else
+// x264 on the CPU.
 func pickEncoder() string {
 	if _, _, useGPU := transcodeSettings(); !useGPU {
 		return "libx264"
 	}
-	encoderOnce.Do(func() {
-		candidates := []string{"h264_nvenc"}
-		if goruntime.GOOS == "windows" {
-			candidates = append(candidates, "h264_mf")
+	if hw, _ := hardwareEncoder(); hw != "" {
+		return hw
+	}
+	return "libx264"
+}
+
+// hardwareEncoder checks (once) which graphics card encoder works.
+func hardwareEncoder() (string, string) {
+	encoderMu.Lock()
+	defer encoderMu.Unlock()
+	if encoderChecked {
+		return hwEncoder, hwProblem
+	}
+	encoderChecked = true
+	hwEncoder, hwCompat, hwProblem = "", false, ""
+	available := ffmpegEncoders()
+	var problems []string
+	candidates := []string{"h264_nvenc"}
+	if goruntime.GOOS == "windows" {
+		candidates = append(candidates, "h264_mf")
+	}
+	for _, enc := range candidates {
+		if available != nil && !available[enc] {
+			continue // this FFmpeg wasn't built with it
 		}
-		for _, enc := range candidates {
-			args := append([]string{"-hide_banner", "-nostdin", "-loglevel", "error",
-				"-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.3", "-c:v", enc}, encoderArgs(enc, 320, 240)...)
-			args = append(args, "-f", "null", "-")
-			cmd := ffmpegCmd(args...)
-			done := make(chan error, 1)
-			if cmd.Start() == nil {
-				go func() { done <- cmd.Wait() }()
-				select {
-				case err := <-done:
-					if err == nil {
-						encoderName = enc
-						return
-					}
-				case <-time.After(15 * time.Second):
-					cmd.Process.Kill()
-				}
+		errText := testEncode(enc, encoderArgs(enc, 640, 360))
+		if errText == "" {
+			hwEncoder = enc
+			return hwEncoder, ""
+		}
+		if enc == "h264_nvenc" {
+			// Older FFmpeg/driver combinations reject some of the tuning
+			// options; try once with nothing but a bitrate.
+			if testEncode(enc, []string{"-b:v", "2M"}) == "" {
+				hwEncoder, hwCompat = enc, true
+				return hwEncoder, ""
 			}
 		}
-		encoderName = "libx264"
-	})
-	return encoderName
+		log.Printf("transcode: %s test failed: %s", enc, errText)
+		problems = append(problems, explainEncoderError(enc, errText))
+	}
+	switch {
+	case available != nil && !available["h264_nvenc"] && !available["h264_mf"]:
+		hwProblem = "This copy of FFmpeg was built without graphics card encoders."
+	case len(problems) > 0:
+		hwProblem = problems[0] // NVIDIA's reason first: it's the one people usually have
+	}
+	return "", hwProblem
+}
+
+// ffmpegEncoders lists the H.264 encoders this FFmpeg has (nil if it
+// couldn't be asked).
+func ffmpegEncoders() map[string]bool {
+	out, err := ffmpegCmd("-hide_banner", "-encoders").Output()
+	if err != nil {
+		return nil
+	}
+	have := map[string]bool{}
+	for _, enc := range []string{"h264_nvenc", "h264_mf", "libx264"} {
+		have[enc] = strings.Contains(string(out), " "+enc+" ")
+	}
+	return have
+}
+
+// testEncode encodes a second of black with `enc` and returns FFmpeg's
+// error output ("" if it worked). The black comes straight from a filter
+// graph rather than an "-f lavfi" input: newer FFmpeg passes lavfi input
+// frames through a "wrapped_avframe" decoder, which the bundled build
+// (--disable-everything) doesn't include, so that form failed for every
+// encoder — which is what made the graphics card look unusable.
+func testEncode(enc string, extra []string) string {
+	args := append([]string{"-hide_banner", "-nostdin", "-loglevel", "error",
+		"-filter_complex", "color=c=black:s=640x360:r=30:d=1[v]", "-map", "[v]", "-c:v", enc}, extra...)
+	args = append(args, "-f", "null", "-")
+	cmd := ffmpegCmd(args...)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return err.Error()
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err == nil {
+			return ""
+		}
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return msg
+		}
+		return err.Error()
+	case <-time.After(20 * time.Second):
+		cmd.Process.Kill()
+		return "the test encode didn't finish (timed out)"
+	}
+}
+
+// explainEncoderError turns FFmpeg's complaint into something actionable.
+func explainEncoderError(enc, msg string) string {
+	low := strings.ToLower(msg)
+	if enc == "h264_nvenc" {
+		switch {
+		case strings.Contains(low, "driver does not support the required nvenc api version"):
+			need := ""
+			if i := strings.Index(msg, "Required:"); i >= 0 {
+				need = strings.TrimSpace(strings.SplitN(msg[i:], "\n", 2)[0])
+			}
+			s := "Your NVIDIA driver is older than this app's FFmpeg needs for NVENC — update the graphics driver (GeForce Experience / NVIDIA App, or nvidia.com)."
+			if need != "" {
+				s += " (" + need + ")"
+			}
+			return s
+		case strings.Contains(low, "cannot load nvcuda") || strings.Contains(low, "cannot load libcuda") ||
+			strings.Contains(low, "cannot load nvencodeapi") || strings.Contains(low, "cannot load libnvidia-encode"):
+			return "The NVIDIA driver's video encoder couldn't be loaded — reinstalling or updating the graphics driver usually fixes this."
+		case strings.Contains(low, "no capable devices found") || strings.Contains(low, "no nvenc capable devices"):
+			return "NVIDIA's encoder says no capable graphics card is available (is the card in use by something that has it locked, or disabled?)."
+		case strings.Contains(low, "out of memory") || strings.Contains(low, "incompatible client key") || strings.Contains(low, "openencodesessionex failed"):
+			return "The NVIDIA encoder refused to start — usually too many programs are recording/streaming with it at once. Close OBS/ShadowPlay and check again."
+		}
+	}
+	first := strings.SplitN(strings.TrimSpace(msg), "\n", 2)[0]
+	if len(first) > 160 {
+		first = first[:160] + "…"
+	}
+	name := map[string]string{"h264_nvenc": "NVIDIA NVENC", "h264_mf": "Windows Media Foundation"}[enc]
+	return name + " didn't work: " + first
+}
+
+// RecheckGPUEncoder forgets the last hardware-encoder check and runs it
+// again (Settings → Performance → "Check again"), returning the same
+// information as VideoConversionInfo.
+func (a *App) RecheckGPUEncoder() map[string]interface{} {
+	encoderMu.Lock()
+	encoderChecked = false
+	encoderMu.Unlock()
+	gpuListOnce = sync.Once{}
+	return a.VideoConversionInfo()
 }
 
 // encoderArgs: good-looking settings per encoder. Hardware encoders work
@@ -298,9 +417,13 @@ func encoderArgs(enc string, w, h int) []string {
 	}
 	switch enc {
 	case "h264_nvenc":
+		if hwCompat {
+			return []string{"-b:v", rate, "-maxrate", rate}
+		}
 		return []string{"-preset", "p4", "-rc", "vbr", "-cq", "23", "-b:v", rate, "-maxrate", rate}
 	case "h264_mf":
-		return []string{"-hw_encoding", "1", "-rate_control", "u_vbr", "-b:v", rate}
+		// Hardware Media Foundation encoders take NV12.
+		return []string{"-hw_encoding", "1", "-rate_control", "u_vbr", "-b:v", rate, "-pix_fmt", "nv12"}
 	default:
 		return []string{"-preset", "veryfast", "-crf", "21"}
 	}
@@ -444,14 +567,9 @@ func (a *App) VideoConversionInfo() map[string]interface{} {
 	if findFFmpeg() == "" {
 		return map[string]interface{}{"available": false, "cores": cores}
 	}
-	// What the graphics card can do, regardless of the current setting.
-	settingsMu.Lock()
-	saved := transcodeUseGPU
-	transcodeUseGPU = true
-	settingsMu.Unlock()
-	hw := pickEncoder()
-	settingsMu.Lock()
-	transcodeUseGPU = saved
-	settingsMu.Unlock()
-	return map[string]interface{}{"available": true, "ffmpeg": ffmpegFrom, "encoder": pickEncoder(), "gpuEncoder": hw, "cores": cores}
+	// What the graphics card can do, regardless of the current setting —
+	// and if it can't, why not, plus which graphics cards there are.
+	hw, problem := hardwareEncoder()
+	return map[string]interface{}{"available": true, "ffmpeg": ffmpegFrom, "encoder": pickEncoder(),
+		"gpuEncoder": hw, "gpuProblem": problem, "gpus": listGPUs(), "cores": cores}
 }

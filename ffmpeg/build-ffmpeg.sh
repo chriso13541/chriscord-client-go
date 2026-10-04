@@ -13,11 +13,21 @@
 # decoders (H.264, HEVC, VP8/9, MPEG-2/4, VC-1; AAC, AC-3, E-AC-3, DTS,
 # TrueHD, FLAC, Opus, Vorbis, MP3…), the MKV/MP4/AVI/TS/etc. readers, MP4
 # and WebM writers, and H.264 encoders: x264 (software) plus NVIDIA NVENC
-# and, on Windows, Media Foundation (Intel/AMD/NVIDIA hardware). About
-# 10–15 MB instead of ~165 MB for a full build.
+# and, on Windows, Media Foundation (Intel/AMD/NVIDIA hardware). Plus
+# graphics-card DECODING, so a whole movie can be converted without the
+# CPU doing the decode: NVIDIA NVDEC everywhere, and on Windows D3D11VA
+# (any Intel/AMD/NVIDIA card) — H.264, HEVC, VP9, AV1, MPEG-2 and VC-1.
+# AV1 files can only be decoded on a graphics card that supports AV1
+# (RTX 30-series and newer, RX 6000+, Intel Arc/11th gen+). About
+# 12–17 MB instead of ~165 MB for a full build.
 #
 # Needs: a C compiler, make, nasm, pkg-config, curl; for Windows also
 # mingw-w64 (Debian/Ubuntu: sudo apt install build-essential nasm pkg-config curl mingw-w64).
+# Run it in WSL/Linux (also for the Windows build — it cross-compiles).
+# Building inside /mnt/c is slow; point WORK somewhere on the Linux side:
+#   WORK=~/ffmpeg-build-windows sh ffmpeg/build-ffmpeg.sh windows
+# After changing any version below, delete the WORK folder first: sources
+# and installed headers are reused if they're already there.
 #
 # Licence: with x264 the result is GPL-licensed FFmpeg. Shipping it next to
 # chriscord is fine (it's a separate program chriscord runs), as long as its
@@ -30,7 +40,9 @@ case "$TARGET" in windows|linux) ;; *) echo "usage: $0 windows|linux" >&2; exit 
 
 FFMPEG_VER=n8.1          # FFmpeg release tag
 X264_REF=stable          # x264 branch
-NVHDR_REF=n13.0.19.0     # nv-codec-headers (NVENC) tag
+NVHDR_REF=n12.1.14.0     # nv-codec-headers (NVENC) tag. This sets the OLDEST NVIDIA driver
+                         # NVENC will work with: 12.1 needs 531.61+ (Windows) / 530.41+ (Linux);
+                         # 13.0 would need 570+. FFmpeg 8 still accepts 12.1.
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 WORK=${WORK:-$HERE/.build-$TARGET}
@@ -74,18 +86,23 @@ PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure $FF_TARGET \
   --prefix="$PREFIX" --pkg-config=pkg-config --pkg-config-flags=--static \
   --extra-cflags="-I$PREFIX/include" --extra-ldflags="-L$PREFIX/lib $EXTRA_LIBS" \
   --enable-gpl --enable-libx264 --enable-ffnvcodec --enable-nvenc \
+  --enable-cuda --enable-nvdec --enable-cuvid \
+  --enable-hwaccel=h264_nvdec,hevc_nvdec,vp9_nvdec,av1_nvdec,mpeg2_nvdec,vc1_nvdec \
   --disable-everything --disable-autodetect --disable-doc --disable-debug --disable-network \
   --disable-ffplay --disable-ffprobe --enable-small \
-  $( [ "$TARGET" = windows ] && echo --enable-mediafoundation --enable-d3d11va ) \
+  $( [ "$TARGET" = windows ] && echo --enable-mediafoundation --enable-d3d11va \
+       --enable-hwaccel=h264_d3d11va,h264_d3d11va2,hevc_d3d11va,hevc_d3d11va2,vp9_d3d11va,vp9_d3d11va2,av1_d3d11va,av1_d3d11va2,mpeg2_d3d11va,mpeg2_d3d11va2,vc1_d3d11va,vc1_d3d11va2 ) \
   --enable-protocol=file,pipe \
-  --enable-demuxer=matroska,mov,avi,mpegts,mpegps,flv,asf,ogg,wav,mp3,aac,ac3,eac3,dts,m4v,h264,hevc \
+  --enable-demuxer=matroska,mov,avi,mpegts,mpegps,flv,asf,ogg,wav,mp3,aac,ac3,eac3,dts,m4v,h264,hevc,ivf,obu \
   --enable-muxer=mp4,webm,null \
-  --enable-decoder=h264,hevc,mpeg1video,mpeg2video,mpeg4,msmpeg4v3,vc1,wmv3,vp8,vp9,mjpeg,theora,aac,aac_latm,ac3,eac3,dca,truehd,mlp,mp1,mp2,mp3,flac,alac,opus,vorbis,wmav2,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be \
+  --enable-decoder=wrapped_avframe,h264,hevc,av1,mpeg1video,mpeg2video,mpeg4,msmpeg4v3,vc1,wmv3,vp8,vp9,mjpeg,theora,aac,aac_latm,ac3,eac3,dca,truehd,mlp,mp1,mp2,mp3,flac,alac,opus,vorbis,wmav2,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be \
   --enable-encoder=libx264,$HW_ENC,aac \
   --enable-parser=h264,hevc,mpegvideo,mpeg4video,vc1,vp8,vp9,av1,aac,ac3,mpegaudio,dca,flac,opus,vorbis,mlp \
   --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,aac_adtstoasc,vp9_superframe,extract_extradata \
-  --enable-indev=lavfi --enable-filter=scale,format,aformat,aresample,null,anull,color,anullsrc,setsar,fps \
-  --enable-swscale --enable-swresample >/dev/null
+  --enable-indev=lavfi --enable-filter=scale,format,aformat,aresample,null,anull,color,anullsrc,setsar,fps,hwdownload \
+  --enable-swscale --enable-swresample >"$WORK/configure.log" 2>&1 || {
+    echo "FFmpeg's configure failed. Last lines of $WORK/configure.log"
+    echo "(full details: $WORK/ffmpeg-src/ffbuild/config.log):"; tail -15 "$WORK/configure.log"; exit 1; }
 make -j"$JOBS" >/dev/null
 cd ..
 

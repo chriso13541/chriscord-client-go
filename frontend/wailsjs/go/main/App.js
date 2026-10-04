@@ -26,8 +26,16 @@ export function CreateInvite() {
   return window['go']['main']['App']['CreateInvite']();
 }
 
+export function DeleteEmoji(arg1) {
+  return window['go']['main']['App']['DeleteEmoji'](arg1);
+}
+
 export function DeleteMessage(arg1) {
   return window['go']['main']['App']['DeleteMessage'](arg1);
+}
+
+export function DeleteSticker(arg1) {
+  return window['go']['main']['App']['DeleteSticker'](arg1);
 }
 
 export function DiscardConverted(arg1) {
@@ -94,6 +102,10 @@ export function GetConnectionSecurity() {
   return window['go']['main']['App']['GetConnectionSecurity']();
 }
 
+export function GetEmojis() {
+  return window['go']['main']['App']['GetEmojis']();
+}
+
 export function GetFileLink(arg1) {
   return window['go']['main']['App']['GetFileLink'](arg1);
 }
@@ -138,12 +150,24 @@ export function GetServers() {
   return window['go']['main']['App']['GetServers']();
 }
 
+export function GetStickers() {
+  return window['go']['main']['App']['GetStickers']();
+}
+
+export function GetSystemIdleSeconds() {
+  return window['go']['main']['App']['GetSystemIdleSeconds']();
+}
+
 export function GetUsername() {
   return window['go']['main']['App']['GetUsername']();
 }
 
 export function HasAccount() {
   return window['go']['main']['App']['HasAccount']();
+}
+
+export function ImageFromURL(arg1) {
+  return window['go']['main']['App']['ImageFromURL'](arg1);
 }
 
 export function ImportAccount(arg1, arg2) {
@@ -182,6 +206,14 @@ export function ListAccounts() {
   return window['go']['main']['App']['ListAccounts']();
 }
 
+export function MoveBoard(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MoveBoard'](arg1, arg2, arg3);
+}
+
+export function MoveRooms(arg1) {
+  return window['go']['main']['App']['MoveRooms'](arg1);
+}
+
 export function OpenAttachmentExternally(arg1, arg2) {
   return window['go']['main']['App']['OpenAttachmentExternally'](arg1, arg2);
 }
@@ -210,6 +242,10 @@ export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }
 
+export function PickImageFiles(arg1) {
+  return window['go']['main']['App']['PickImageFiles'](arg1);
+}
+
 export function PickPfp() {
   return window['go']['main']['App']['PickPfp']();
 }
@@ -222,6 +258,10 @@ export function PrepareAccountExport(arg1, arg2) {
   return window['go']['main']['App']['PrepareAccountExport'](arg1, arg2);
 }
 
+export function PushVideoFrame(arg1, arg2) {
+  return window['go']['main']['App']['PushVideoFrame'](arg1, arg2);
+}
+
 export function ReactToMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['ReactToMessage'](arg1, arg2, arg3);
 }
@@ -230,12 +270,24 @@ export function ReadImageAsDataURL(arg1) {
   return window['go']['main']['App']['ReadImageAsDataURL'](arg1);
 }
 
+export function ReadImageFiles(arg1) {
+  return window['go']['main']['App']['ReadImageFiles'](arg1);
+}
+
+export function RecheckGPUEncoder() {
+  return window['go']['main']['App']['RecheckGPUEncoder']();
+}
+
 export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
 }
 
 export function ReorderServers(arg1) {
   return window['go']['main']['App']['ReorderServers'](arg1);
+}
+
+export function RequestVideoKeyframe(arg1) {
+  return window['go']['main']['App']['RequestVideoKeyframe'](arg1);
 }
 
 export function ResolveServerAddress(arg1) {
@@ -298,6 +350,10 @@ export function SetUserAudio(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetUserAudio'](arg1, arg2, arg3);
 }
 
+export function SetVideoEnabled(arg1) {
+  return window['go']['main']['App']['SetVideoEnabled'](arg1);
+}
+
 export function StartMicTest(arg1, arg2) {
   return window['go']['main']['App']['StartMicTest'](arg1, arg2);
 }
@@ -322,8 +378,24 @@ export function UnlockAccount(arg1) {
   return window['go']['main']['App']['UnlockAccount'](arg1);
 }
 
+export function UpdateEmoji(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateEmoji'](arg1, arg2, arg3);
+}
+
 export function UpdateServer(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateServer'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateSticker(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateSticker'](arg1, arg2, arg3, arg4);
+}
+
+export function UploadEmojiData(arg1, arg2) {
+  return window['go']['main']['App']['UploadEmojiData'](arg1, arg2);
+}
+
+export function UploadEmojiFile(arg1, arg2) {
+  return window['go']['main']['App']['UploadEmojiFile'](arg1, arg2);
 }
 
 export function UploadFile(arg1) {
@@ -338,82 +410,14 @@ export function UploadFileWithProgress(arg1, arg2) {
   return window['go']['main']['App']['UploadFileWithProgress'](arg1, arg2);
 }
 
-export function VideoConversionInfo() {
-  return window['go']['main']['App']['VideoConversionInfo']();
-}
-
-export function GetSystemIdleSeconds() {
-  return window['go']['main']['App']['GetSystemIdleSeconds']();
-}
-
-export function MoveBoard(arg1, arg2, arg3) {
-  return window['go']['main']['App']['MoveBoard'](arg1, arg2, arg3);
-}
-
-export function MoveRooms(arg1) {
-  return window['go']['main']['App']['MoveRooms'](arg1);
-}
-
-export function DeleteEmoji(arg1) {
-  return window['go']['main']['App']['DeleteEmoji'](arg1);
-}
-
-export function GetEmojis() {
-  return window['go']['main']['App']['GetEmojis']();
-}
-
-export function UpdateEmoji(arg1, arg2, arg3) {
-  return window['go']['main']['App']['UpdateEmoji'](arg1, arg2, arg3);
-}
-
-export function UploadEmojiFile(arg1, arg2) {
-  return window['go']['main']['App']['UploadEmojiFile'](arg1, arg2);
-}
-
-export function DeleteSticker(arg1) {
-  return window['go']['main']['App']['DeleteSticker'](arg1);
-}
-
-export function GetStickers() {
-  return window['go']['main']['App']['GetStickers']();
-}
-
-export function UpdateSticker(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['UpdateSticker'](arg1, arg2, arg3, arg4);
+export function UploadStickerData(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UploadStickerData'](arg1, arg2, arg3);
 }
 
 export function UploadStickerFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['UploadStickerFile'](arg1, arg2, arg3);
 }
 
-export function ImageFromURL(arg1) {
-  return window['go']['main']['App']['ImageFromURL'](arg1);
-}
-
-export function PickImageFiles(arg1) {
-  return window['go']['main']['App']['PickImageFiles'](arg1);
-}
-
-export function ReadImageFiles(arg1) {
-  return window['go']['main']['App']['ReadImageFiles'](arg1);
-}
-
-export function UploadEmojiData(arg1, arg2) {
-  return window['go']['main']['App']['UploadEmojiData'](arg1, arg2);
-}
-
-export function UploadStickerData(arg1, arg2, arg3) {
-  return window['go']['main']['App']['UploadStickerData'](arg1, arg2, arg3);
-}
-
-export function PushVideoFrame(arg1, arg2) {
-  return window['go']['main']['App']['PushVideoFrame'](arg1, arg2);
-}
-
-export function RequestVideoKeyframe(arg1) {
-  return window['go']['main']['App']['RequestVideoKeyframe'](arg1);
-}
-
-export function SetVideoEnabled(arg1) {
-  return window['go']['main']['App']['SetVideoEnabled'](arg1);
+export function VideoConversionInfo() {
+  return window['go']['main']['App']['VideoConversionInfo']();
 }
