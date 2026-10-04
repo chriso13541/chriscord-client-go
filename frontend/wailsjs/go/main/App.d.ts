@@ -176,6 +176,8 @@ export function SetTranscodeSettings(arg1:number,arg2:boolean,arg3:boolean):Prom
 
 export function SetUserAudio(arg1:string,arg2:number,arg3:boolean):Promise<void>;
 
+export function SetVideoCodec(arg1:string):Promise<void>;
+
 export function SetVideoEnabled(arg1:boolean):Promise<void>;
 
 export function StartMicTest(arg1:string,arg2:string):Promise<void>;
@@ -211,3 +213,5 @@ export function UploadStickerData(arg1:string,arg2:string,arg3:string):Promise<m
 export function UploadStickerFile(arg1:string,arg2:string,arg3:string):Promise<main.Sticker>;
 
 export function VideoConversionInfo():Promise<Record<string, any>>;
+
+export function VideoSendCodec():Promise<string>;

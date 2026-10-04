@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
@@ -20,10 +21,17 @@ import (
 
 // Webcam video in calls.
 //
-// The camera itself is captured and VP8-encoded in the page (getUserMedia
-// + WebCodecs — the webview already knows every camera and what it
+// The camera itself is captured and encoded in the page (getUserMedia +
+// WebCodecs — the webview already knows every camera and what it
 // supports), and each encoded frame is handed to PushVideoFrame, which
 // writes it to a video track on the call's existing WebRTC connection.
+//
+// The codec is H.264 wherever the page can encode it — Windows hands that
+// to the graphics card (Quick Sync / NVENC / AMD) through Media
+// Foundation, so a camera costs next to no CPU — falling back to software
+// H.264, and to VP8 only where H.264 isn't available at all. The page
+// says which at startup (SetVideoCodec); each person's choice travels
+// with their stream, so senders don't have to agree.
 // Everyone else's video arrives here as RTP, is put back together into
 // whole frames (samplebuilder), and goes to the page as "video:frame"
 // events for it to decode and draw. So the server only ever forwards
@@ -36,18 +44,49 @@ import (
 
 // videoFrameEvent is one whole encoded frame from someone else's camera.
 type videoFrameEvent struct {
-	User string `json:"user"`
-	Key  bool   `json:"key"`
-	Data string `json:"data"` // base64 VP8 frame
+	User  string `json:"user"`
+	Codec string `json:"codec"` // "h264" (Annex B) or "vp8"
+	Key   bool   `json:"key"`
+	Data  string `json:"data"` // base64 frame
+}
+
+// The codec this app sends its camera in, as chosen by the page.
+var (
+	videoCodecMu sync.Mutex
+	videoCodec   = "h264"
+)
+
+// SetVideoCodec is called by the page at startup with what it can encode:
+// "h264" or "vp8". Takes effect for the next call joined.
+func (a *App) SetVideoCodec(codec string) {
+	if codec != "h264" && codec != "vp8" {
+		return
+	}
+	videoCodecMu.Lock()
+	videoCodec = codec
+	videoCodecMu.Unlock()
+}
+
+func videoCapability() webrtc.RTPCodecCapability {
+	videoCodecMu.Lock()
+	c := videoCodec
+	videoCodecMu.Unlock()
+	if c == "vp8" {
+		return webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8, ClockRate: 90000}
+	}
+	// Constrained Baseline (no B-frames — right for live video), the one
+	// every WebRTC stack and hardware encoder agrees on.
+	return webrtc.RTPCodecCapability{
+		MimeType:    webrtc.MimeTypeH264,
+		ClockRate:   90000,
+		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+	}
 }
 
 // addVideoSender adds this session's outgoing camera track — called
 // after the audio placeholders so it's the last section of the offer.
 func (s *VoiceSession) addVideoSender() {
-	track, err := webrtc.NewTrackLocalStaticSample(
-		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8, ClockRate: 90000},
-		"video", "chriscord-video",
-	)
+	track, err := webrtc.NewTrackLocalStaticSample(videoCapability(), "video", "chriscord-video")
 	if err != nil {
 		log.Printf("video: local track: %v", err)
 		return
@@ -80,8 +119,9 @@ func (s *VoiceSession) addVideoSender() {
 	}(tr.Sender())
 }
 
-// PushVideoFrame sends one encoded VP8 frame from the page's camera
-// encoder into the call. durationMs is how long the frame is shown for.
+// PushVideoFrame sends one encoded frame from the page's camera encoder
+// (H.264 in Annex B form, or VP8 — whichever SetVideoCodec chose) into the
+// call. durationMs is how long the frame is shown for.
 func (a *App) PushVideoFrame(data string, durationMs int) error {
 	a.voiceMu.Lock()
 	session := a.voice
@@ -97,6 +137,21 @@ func (a *App) PushVideoFrame(data string, durationMs int) error {
 		durationMs = 33
 	}
 	return session.videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Duration(durationMs) * time.Millisecond})
+}
+
+// VideoSendCodec says which codec the current call's camera track is in
+// ("h264" / "vp8"; "" when not in a call) — the page encodes to match.
+func (a *App) VideoSendCodec() string {
+	a.voiceMu.Lock()
+	session := a.voice
+	a.voiceMu.Unlock()
+	if session == nil || session.videoTrack == nil {
+		return ""
+	}
+	if strings.EqualFold(session.videoTrack.Codec().MimeType, webrtc.MimeTypeH264) {
+		return "h264"
+	}
+	return "vp8"
 }
 
 // SetVideoEnabled tells everyone whether this camera is on.
@@ -135,15 +190,23 @@ func (a *App) sendVoiceJSON(v interface{}) error {
 	return a.ws.WriteMessage(websocket.TextMessage, msg)
 }
 
-// handleRemoteVideo reassembles someone's camera stream into whole VP8
-// frames and passes each to the page. The server names these tracks
-// "video-<username>".
+// handleRemoteVideo reassembles someone's camera stream into whole frames
+// (H.264 or VP8, whichever they send) and passes each to the page. The
+// server names these tracks "video-<username>".
 func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 	user := strings.TrimPrefix(track.ID(), "video-")
-	log.Printf("video: receiving %s's camera", user)
+	codec := "vp8"
+	var depacketizer rtp.Depacketizer = &codecs.VP8Packet{}
+	isKey := func(f []byte) bool { return f[0]&0x01 == 0 } // VP8 frame tag: bit 0 clear = keyframe
+	if strings.EqualFold(track.Codec().MimeType, webrtc.MimeTypeH264) {
+		codec = "h264"
+		depacketizer = &codecs.H264Packet{} // gives Annex B, which the page's decoder takes
+		isKey = h264HasKeyframe
+	}
+	log.Printf("video: receiving %s's camera (%s)", user, codec)
 	// The picture can only start from a keyframe.
 	go s.app.RequestVideoKeyframe(user)
-	builder := samplebuilder.New(256, &codecs.VP8Packet{}, 90000)
+	builder := samplebuilder.New(512, depacketizer, 90000)
 	var once sync.Once
 	for {
 		select {
@@ -166,10 +229,29 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 			}
 			once.Do(func() { log.Printf("video: first frame from %s", user) })
 			wailsruntime.EventsEmit(s.ctx, "video:frame", videoFrameEvent{
-				User: user,
-				Key:  sample.Data[0]&0x01 == 0, // VP8 frame tag: bit 0 clear = keyframe
-				Data: base64.StdEncoding.EncodeToString(sample.Data),
+				User:  user,
+				Codec: codec,
+				Key:   isKey(sample.Data),
+				Data:  base64.StdEncoding.EncodeToString(sample.Data),
 			})
 		}
 	}
+}
+
+// h264HasKeyframe reports whether an Annex B access unit holds an IDR
+// picture (or the SPS that comes with one) — something a decoder can
+// start from.
+func h264HasKeyframe(au []byte) bool {
+	for i := 0; i+3 < len(au); i++ {
+		// A start code is 00 00 01 (possibly after another 00).
+		if au[i] != 0 || au[i+1] != 0 || au[i+2] != 1 {
+			continue
+		}
+		switch au[i+3] & 0x1f {
+		case 5, 7: // IDR slice, sequence parameter set
+			return true
+		}
+		i += 2
+	}
+	return false
 }

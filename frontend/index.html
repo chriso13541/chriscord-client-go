@@ -6393,11 +6393,14 @@ function initAddEmoji(){
 }
 
 // ── VIDEO (webcams in calls) ─────────────────────────────────────
-// The camera is captured here (getUserMedia), encoded to VP8 with
-// WebCodecs, and each encoded frame is handed to Go (PushVideoFrame),
+// The camera is captured here (getUserMedia), encoded with WebCodecs —
+// H.264 on the graphics card wherever Windows offers it (Quick Sync,
+// NVENC, AMD), else software H.264, else VP8 — and each encoded frame is
+// handed to Go (PushVideoFrame),
 // which sends it over the call's WebRTC connection. Other people's
-// cameras come back from Go as whole VP8 frames ("video:frame"), decoded
-// here and drawn into the video area above the messages. Who has a
+// cameras come back from Go as whole frames ("video:frame", tagged with
+// their codec), decoded here (on the graphics card where possible) and
+// played through a <video> element — no per-frame canvas copies. Who has a
 // camera on comes from the server (voice_state's video_on).
 //
 // Only modes the camera really has are offered or streamed: each camera
@@ -6503,9 +6506,45 @@ function camBitrate(w,h,fps){
   const px=w*h,base=px<=320*240?300e3:px<=640*480?800e3:px<=1280*720?1.8e6:px<=1920*1080?3.5e6:8e6;
   return Math.round(base*Math.max(.5,Math.min(2,fps/30)));
 }
-function bytesToB64(u8){let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s);}
-function b64ToBytes(b64){const s=atob(b64),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
+function bytesToB64(u8){if(u8.toBase64)return u8.toBase64();let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s);}
+function b64ToBytes(b64){if(Uint8Array.fromBase64)return Uint8Array.fromBase64(b64);const s=atob(b64),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
 const inMyCall=()=>!!state.voiceHere&&(state.voiceChannels[state.voiceHere]||[]).includes(state.username);
+
+// What this app sends its camera in. Decided once at startup and told to
+// Go (which builds the call's video track to match); startCamera then
+// encodes in whatever the CURRENT call's track is, so a call joined before
+// this finished still works.
+const camCodec={send:'h264',hw:null};
+async function chooseCamCodec(){
+  if(!window.VideoEncoder)return;
+  const base={codec:'avc1.42e01f',width:1280,height:720,bitrate:1.8e6,framerate:30,latencyMode:'realtime',avc:{format:'annexb'}};
+  let ok=false;
+  for(const hw of ['prefer-hardware','no-preference']){
+    try{if((await VideoEncoder.isConfigSupported({...base,hardwareAcceleration:hw})).supported){ok=true;camCodec.hw=hw==='prefer-hardware';break;}}catch{}
+  }
+  camCodec.send=ok?'h264':'vp8';
+  window.go.main.App.SetVideoCodec(camCodec.send).catch(()=>{});
+}
+// The H.264 level a size and frame rate need (the "LL" of avc1.42e0LL).
+function avcLevel(w,h,fps){
+  const mbs=Math.ceil(w/16)*Math.ceil(h/16),rate=mbs*fps;
+  const levels=[[0x1e,40500,1620],[0x1f,108000,3600],[0x20,216000,5120],[0x28,245760,8192],[0x2a,522240,8704],[0x32,589824,22080],[0x33,983040,36864],[0x34,2073600,36864]];
+  for(const [l,r,f] of levels)if(rate<=r&&mbs<=f)return l.toString(16);
+  return '34';
+}
+// The encoder settings for a mode: graphics card first, then software.
+async function camEncoderConfig(codec,mode){
+  const common={width:mode.w,height:mode.h,bitrate:camBitrate(mode.w,mode.h,mode.fps),framerate:mode.fps,latencyMode:'realtime'};
+  const tries=codec==='h264'
+    ?[{...common,codec:'avc1.42e0'+avcLevel(mode.w,mode.h,mode.fps),avc:{format:'annexb'},hardwareAcceleration:'prefer-hardware'},
+      {...common,codec:'avc1.42e0'+avcLevel(mode.w,mode.h,mode.fps),avc:{format:'annexb'},hardwareAcceleration:'no-preference'}]
+    :[{...common,codec:'vp8'}];
+  for(const cfg of tries){
+    try{if((await VideoEncoder.isConfigSupported(cfg)).supported)return cfg;}catch{}
+  }
+  return null;
+}
+const codecLabel=cfg=>!cfg?'':cfg.codec.startsWith('avc1')?(cfg.hardwareAcceleration==='prefer-hardware'?'H.264 on your graphics card':'H.264 (software)'):'VP8 (software)';
 
 async function toggleCamera(){
   if(cam.on||cam.starting){const was=cam.on;stopCamera();if(was)playSound('webcam_stop');return;}
@@ -6522,9 +6561,11 @@ async function startCamera(){
   const modes=await probeCameraModes(device.deviceId);
   const mode=chooseMode(modes);
   if(!mode)throw new Error('Couldn\u2019t find a size this camera supports');
-  const cfg={codec:'vp8',width:mode.w,height:mode.h,bitrate:camBitrate(mode.w,mode.h,mode.fps),framerate:mode.fps,latencyMode:'realtime'};
-  const sup=await VideoEncoder.isConfigSupported(cfg).catch(()=>({supported:false}));
-  if(!sup.supported)throw new Error(`Can\u2019t encode ${modeLabel(mode)} video here`);
+  // The call's video track decides the codec (see chooseCamCodec).
+  const sending=await window.go.main.App.VideoSendCodec().catch(()=>'')||camCodec.send;
+  const cfg=await camEncoderConfig(sending,mode);
+  if(!cfg)throw new Error(sending==='h264'?`Can\u2019t encode ${modeLabel(mode)} H.264 video here \u2014 rejoin the call to switch to VP8`:`Can\u2019t encode ${modeLabel(mode)} video here`);
+  cam.codecLabel=codecLabel(cfg);
   // Exactly that size, natively (no rescaling) — it's on the probed list.
   let stream;
   try{
@@ -6533,7 +6574,7 @@ async function startCamera(){
   }catch(err){throw new Error(camErrorText(err));}
   if(!inMyCall()){stopStream(stream);throw new Error('You left the call');}
   const track=stream.getVideoTracks()[0];
-  Object.assign(cam,{stream,mode,fps:mode.fps,forceKey:true,lastKeyAt:0,lastFrameAt:0,inflight:0,actualFps:Math.round(track.getSettings?.().frameRate||0)});
+  Object.assign(cam,{stream,mode,fps:mode.fps,forceKey:true,lastKeyAt:0,nextTs:0,inflight:0,actualFps:Math.round(track.getSettings?.().frameRate||0)});
   cam.encoder=new VideoEncoder({output:onCamChunk,error:e=>{console.warn('video: encoder error',e);toast('Camera stopped: '+e.message,true);stopCamera();playSound('webcam_stop');}});
   cam.encoder.configure(cfg);
   cam.on=true;
@@ -6547,10 +6588,15 @@ async function startCamera(){
 // keyframe every 3 s or when someone needs one. Frames are skipped (never
 // half-sent) when the encoder or the connection falls behind.
 function pumpCamera(track){
+  // Paced by the frames' own capture timestamps rather than when they
+  // reach this code: arrival times jitter, which used to drop perfectly
+  // good frames (visible as stutter). When the camera runs at the chosen
+  // rate nothing is dropped; above it, frames are thinned evenly.
   const encodeFrame=frame=>{
-    const now=performance.now(),gap=1000/cam.fps;
-    if(!cam.on||!cam.encoder||cam.encoder.state!=='configured'||now-cam.lastFrameAt<gap*.85||cam.encoder.encodeQueueSize>2||cam.inflight>4){frame.close();return;}
-    cam.lastFrameAt=now;
+    const now=performance.now(),gapUs=1e6/cam.fps,ts=frame.timestamp;
+    if(!cam.on||!cam.encoder||cam.encoder.state!=='configured'||cam.encoder.encodeQueueSize>2||cam.inflight>4){frame.close();return;}
+    if(cam.nextTs&&ts<cam.nextTs-gapUs*.5){frame.close();return;}
+    cam.nextTs=Math.max((cam.nextTs||ts)+gapUs,ts);
     const key=cam.forceKey||now-cam.lastKeyAt>3000;
     if(key){cam.forceKey=false;cam.lastKeyAt=now;}
     try{cam.encoder.encode(frame,{keyFrame:key});}catch{}
@@ -6606,22 +6652,41 @@ function remoteVideo(user){
   let r=vRemote.get(user);
   if(r)return r;
   if(!decodeSupported())return null;
-  const canvas=document.createElement('canvas');canvas.width=640;canvas.height=360;
-  r={canvas,ctx:canvas.getContext('2d'),needKey:true,lastKeyReq:0,ts:0,decoder:null};
-  const make=()=>{
-    r.decoder=new VideoDecoder({
-      output:frame=>{
-        if(canvas.width!==frame.displayWidth||canvas.height!==frame.displayHeight){canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;}
-        r.ctx.drawImage(frame,0,0);frame.close();
-        canvas.closest('.vs-tile')?.classList.add('live');
-      },
-      error:e=>{console.warn('video: decoder error for',user,e);r.needKey=true;setTimeout(()=>{if(vRemote.get(user)===r){make();askKeyframe(user,r);}},100);},
-    });
-    r.decoder.configure({codec:'vp8',optimizeForLatency:true});
-  };
-  make();
+  r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null};
+  const markLive=()=>{if(!r.live){r.live=true;r.el.closest('.vs-tile')?.classList.add('live');}};
+  if(window.MediaStreamTrackGenerator){
+    // Decoded frames go straight into a video track that a <video> plays:
+    // the browser shows them on the GPU, with no copy per frame.
+    const gen=new MediaStreamTrackGenerator({kind:'video'}),writer=gen.writable.getWriter();
+    const v=document.createElement('video');v.muted=true;v.autoplay=true;v.playsInline=true;
+    v.srcObject=new MediaStream([gen]);v.play().catch(()=>{});
+    r.el=v;r.gen=gen;r.writer=writer;
+    r.write=frame=>{
+      if(r.pending>2){frame.close();return;} // display can't keep up: skip this one
+      r.pending++;markLive();
+      writer.write(frame).catch(()=>{try{frame.close();}catch{}}).finally(()=>{r.pending--;});
+    };
+  }else{
+    const canvas=document.createElement('canvas');canvas.width=640;canvas.height=360;
+    const ctx=canvas.getContext('2d');r.el=canvas;
+    r.write=frame=>{
+      if(canvas.width!==frame.displayWidth||canvas.height!==frame.displayHeight){canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;}
+      ctx.drawImage(frame,0,0);frame.close();markLive();
+    };
+  }
   vRemote.set(user,r);
   return r;
+}
+// (Re)makes the decoder for the codec their frames are in. Hardware is
+// used where the system has it (that's what "no-preference" allows).
+function configureDecoder(user,r,codec){
+  try{if(r.decoder&&r.decoder.state!=='closed')r.decoder.close();}catch{}
+  r.codec=codec;r.needKey=true;
+  r.decoder=new VideoDecoder({
+    output:frame=>r.write(frame),
+    error:e=>{console.warn('video: decoder error for',user,e);if(vRemote.get(user)===r){r.codec=null;askKeyframe(user,r);}},
+  });
+  r.decoder.configure({codec:codec==='h264'?'avc1.640034':'vp8',optimizeForLatency:true,hardwareAcceleration:'no-preference'});
 }
 function askKeyframe(user,r){
   const now=Date.now();
@@ -6632,11 +6697,15 @@ function askKeyframe(user,r){
 function dropRemoteVideo(user){
   const r=vRemote.get(user);if(!r)return;
   vRemote.delete(user);
-  try{if(r.decoder.state!=='closed')r.decoder.close();}catch{}
+  try{if(r.decoder&&r.decoder.state!=='closed')r.decoder.close();}catch{}
+  try{r.writer?.close();}catch{}
+  try{r.gen?.stop();}catch{}
 }
 function onVideoFrame(f){
   if(!f?.user||!state.voiceVideo.has(f.user)||!inMyCall())return;
   const r=remoteVideo(f.user);if(!r)return;
+  const codec=f.codec||'vp8';
+  if(r.codec!==codec||!r.decoder||r.decoder.state==='closed')configureDecoder(f.user,r,codec);
   if(r.decoder.state!=='configured')return;
   if(r.needKey&&!f.key){askKeyframe(f.user,r);return;}
   if(r.decoder.decodeQueueSize>6){r.needKey=true;askKeyframe(f.user,r);return;} // fallen behind: skip to the next keyframe
@@ -6680,7 +6749,7 @@ function renderVideoStage(){
     }else{
       const r=remoteVideo(u);
       if(!r){if(!tile.querySelector('.vs-unsup'))tile.insertAdjacentHTML('afterbegin','<div class="vs-unsup">Video can\u2019t be shown in this version of the app\u2019s web view</div>');}
-      else if(r.canvas.parentElement!==tile)tile.prepend(r.canvas);
+      else if(r.el.parentElement!==tile){tile.prepend(r.el);if(r.live)tile.classList.add('live');if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});}
     }
     tile.classList.toggle('focus',vsFocus===u);
     tile.classList.toggle('speaking',!!state.voiceSpeaking?.[`${board}:${u}`]);
@@ -6771,6 +6840,7 @@ function initVideo(){
   window.runtime.EventsOn('video:keyframe',()=>{cam.forceKey=true;});
   updateCameraButton();
   initCameraSettings();
+  chooseCamCodec();
 }
 // From voice:state — who has a camera on. Also re-announces ours if the
 // server lost track (e.g. after a dropped connection rejoined the call).
@@ -6815,7 +6885,8 @@ async function populateCameraSettings({force=false}={}){
   resSel.value=`${chosen.w}x${chosen.h}`;
   fillFps(modes,chosen.fps);
   resSel.disabled=fpsSel.disabled=false;
-  hint.textContent=`${modes.length} size${modes.length===1?'':'s'} supported by this camera.`;
+  const how=camCodec.send==='h264'?(camCodec.hw?'H.264 on your graphics card':camCodec.hw===false?'H.264 (software)':'H.264'):'VP8 (software)';
+  hint.textContent=`${modes.length} size${modes.length===1?'':'s'} supported by this camera · video is sent as ${how}.`;
 }
 function fillFps(modes,want){
   const resSel=document.getElementById('settings-cam-res'),fpsSel=document.getElementById('settings-cam-fps');
@@ -6855,7 +6926,7 @@ async function applyCameraSetting(){
   if(failed){settingsSaved('Camera: '+(failed?.message||failed),'fail');return;}
   const got=wasOn?cam.actualFps:camPreview.actualFps;
   if(got&&got<+fps*.8)settingsSaved(`Applied ${res} \u2014 but the camera is only giving ${got} fps right now`,'fail');
-  else settingsSaved(wasOn?`Camera restarted at ${desc}`:`Applied \u2014 ${desc}`);
+  else settingsSaved(wasOn?`Camera restarted at ${desc}${cam.codecLabel?` \u00b7 ${cam.codecLabel}`:''}`:`Applied \u2014 ${desc}`);
 }
 async function startCameraPreview(){
   stopCameraPreview(true);

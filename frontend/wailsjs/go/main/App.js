@@ -350,6 +350,10 @@ export function SetUserAudio(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetUserAudio'](arg1, arg2, arg3);
 }
 
+export function SetVideoCodec(arg1) {
+  return window['go']['main']['App']['SetVideoCodec'](arg1);
+}
+
 export function SetVideoEnabled(arg1) {
   return window['go']['main']['App']['SetVideoEnabled'](arg1);
 }
@@ -420,4 +424,8 @@ export function UploadStickerFile(arg1, arg2, arg3) {
 
 export function VideoConversionInfo() {
   return window['go']['main']['App']['VideoConversionInfo']();
+}
+
+export function VideoSendCodec() {
+  return window['go']['main']['App']['VideoSendCodec']();
 }
