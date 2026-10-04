@@ -14,6 +14,8 @@ export function CreateAccount(arg1:string,arg2:string,arg3:string):Promise<main.
 
 export function CreateInvite():Promise<main.InviteInfo>;
 
+export function DeleteEmoji(arg1:string):Promise<void>;
+
 export function DeleteMessage(arg1:string):Promise<void>;
 
 export function DiscardConverted(arg1:string):Promise<void>;
@@ -48,6 +50,8 @@ export function GetClientSettings():Promise<string>;
 
 export function GetConnectionSecurity():Promise<main.ConnectionSecurity>;
 
+export function GetEmojis():Promise<Array<main.CustomEmoji>>;
+
 export function GetFileLink(arg1:string):Promise<string>;
 
 export function GetFileURL(arg1:string):Promise<string>;
@@ -70,6 +74,8 @@ export function GetServerInfo(arg1:string):Promise<main.ServerInfo>;
 
 export function GetServers():Promise<Array<main.SavedServer>>;
 
+export function GetSystemIdleSeconds():Promise<number>;
+
 export function GetUsername():Promise<string>;
 
 export function HasAccount():Promise<boolean>;
@@ -91,6 +97,10 @@ export function KickMember(arg1:string,arg2:boolean,arg3:string):Promise<void>;
 export function LeaveVoiceChannel():Promise<void>;
 
 export function ListAccounts():Promise<Array<main.AccountSummary>>;
+
+export function MoveBoard(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function MoveRooms(arg1:Array<string>):Promise<void>;
 
 export function OpenAttachmentExternally(arg1:string,arg2:string):Promise<void>;
 
@@ -162,7 +172,11 @@ export function ToggleMute():Promise<boolean>;
 
 export function UnlockAccount(arg1:string):Promise<main.AccountView>;
 
+export function UpdateEmoji(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
 export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<main.SavedServer>>;
+
+export function UploadEmojiFiles():Promise<Array<main.EmojiUploadResult>>;
 
 export function UploadFile(arg1:string):Promise<main.UploadResult>;
 

@@ -1044,6 +1044,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "voice:moved", msg.BoardID)
 		case "roles_updated":
 			runtime.EventsEmit(a.ctx, "server:roles")
+		case "emojis_updated":
+			a.emitEmojisUpdated()
 		case "action_denied":
 			runtime.EventsEmit(a.ctx, "server:denied", msg.DeniedMsg)
 		case "server_updated":

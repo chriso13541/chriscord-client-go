@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"net/http"
 	goruntime "runtime"
 
 	"github.com/wailsapp/wails/v2"
@@ -24,6 +25,9 @@ func main() {
 		MinHeight: 500,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
+			// Anything not in the bundled frontend: custom emoji images
+			// (/cc-emoji/<id>), from a disk cache or the server.
+			Handler: http.HandlerFunc(app.serveEmojiAsset),
 		},
 		BackgroundColour: &options.RGBA{R: 14, G: 17, B: 23, A: 255},
 		// The window's title bar is drawn by the app itself, in the user's

@@ -176,6 +176,42 @@ export namespace main {
 	        this.expires_at = source["expires_at"];
 	    }
 	}
+	export class CustomEmoji {
+	    id: string;
+	    name: string;
+	    animated: boolean;
+	    hidden: boolean;
+	    created_by: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CustomEmoji(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.animated = source["animated"];
+	        this.hidden = source["hidden"];
+	        this.created_by = source["created_by"];
+	    }
+	}
+	export class EmojiUploadResult {
+	    file: string;
+	    name: string;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EmojiUploadResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.file = source["file"];
+	        this.name = source["name"];
+	        this.error = source["error"];
+	    }
+	}
 	export class InviteInfo {
 	    code: string;
 	    expires_at: string;

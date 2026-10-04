@@ -151,6 +151,11 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 #room-list { flex:1; overflow-y:auto; padding:8px 0; }
 .room-header { padding:6px 8px 4px 12px; font-size:.79rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; border-radius:4px; margin:0 4px; }
 .room-header:hover { color:var(--text); background:var(--bg-light); }
+/* Owner rearranging the sidebar (see SIDEBAR DRAG) */
+.sb-drop-line { position:fixed; height:2px; border-radius:1px; background:var(--accent); pointer-events:none; z-index:1000; }
+.room-header.sb-drop-into { color:var(--text-strong); background:var(--bg-light); box-shadow:inset 0 0 0 1px var(--accent); }
+.sb-dragging { opacity:.4; }
+body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-select:none !important; }
 /* More room between categories, so each reads as its own group. */
 .room-header:not(:first-child) { margin-top:16px; }
 /* Lock beside private (role-limited) categories and channels */
@@ -581,7 +586,28 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .ep-grid { display:grid; grid-template-columns:repeat(auto-fill,40px); gap:2px; }
 .ep-grid button { width:40px; height:40px; border:none; border-radius:6px; background:none; cursor:pointer; padding:4px; }
 .ep-grid button:hover, .ep-grid button:focus-visible { background:var(--bg-light); outline:none; }
-.ep-grid img { width:32px; height:32px; display:block; }
+.ep-grid img { width:32px; height:32px; display:block; object-fit:contain; }
+.ep-section-title .ep-manage { float:right; border:none; background:none; color:var(--accent); font:inherit; font-size:.72rem; font-weight:800; text-transform:uppercase; cursor:pointer; padding:0; }
+.ep-section-title .ep-manage:hover { text-decoration:underline; }
+.ep-none { padding:6px 4px 10px; font-size:.82rem; color:var(--text-muted); }
+.ep-foot img { object-fit:contain; }
+/* Server emoji manager */
+.modal.emoji-manage { width:600px; }
+.em-top { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.em-top .hint { font-size:.8rem; color:var(--text-muted); }
+.em-list { max-height:50vh; overflow-y:auto; border:1px solid var(--border); border-radius:8px; }
+.em-head { padding:8px 12px 4px; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); }
+.em-row { display:flex; align-items:center; gap:10px; padding:6px 12px; }
+.em-row + .em-row { border-top:1px solid var(--border); }
+.em-row img { width:32px; height:32px; object-fit:contain; flex-shrink:0; }
+.em-row .em-name { flex:1; min-width:0; padding:5px 8px; border-radius:6px; border:1px solid transparent; background:none; color:var(--text-strong); font:inherit; font-size:.9rem; }
+.em-row .em-name:hover { border-color:var(--border); }
+.em-row .em-name:focus { border-color:var(--accent); background:var(--bg-darkest); outline:none; }
+.em-row .em-by { font-size:.78rem; color:var(--text-muted); white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+.em-row .btn { padding:4px 10px; font-size:.8rem; }
+.em-row .em-del.confirm { color:var(--red); }
+.em-empty { padding:24px; text-align:center; color:var(--text-muted); font-size:.88rem; }
+
 .ep-empty { padding:40px 10px; text-align:center; color:var(--text-muted); font-size:.85rem; }
 .ep-foot { display:flex; align-items:center; gap:10px; padding:8px 12px; border-top:1px solid var(--border); background:var(--bg-dark); min-height:44px; box-sizing:border-box; position:relative; z-index:2; }
 .ep-body { overflow:hidden; }
@@ -1073,6 +1099,20 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <button class="btn btn-ghost" id="cancel-add-btn">Cancel</button>
       <button class="btn btn-primary" id="connect-btn">Connect</button>
     </div>
+  </div>
+</div>
+
+<!-- Server emoji manager (Manage Emoji permission) -->
+<div class="modal-overlay hidden" id="modal-emoji">
+  <div class="modal emoji-manage">
+    <h2>Server Emoji</h2>
+    <div class="error-msg hidden" id="em-error" style="white-space:pre-line"></div>
+    <div class="em-top">
+      <button class="btn btn-primary" id="em-upload">Upload emoji</button>
+      <span class="hint">PNG, JPEG, GIF or WebP, up to 512 KB each — pick several at once. Each is named after its file; click a name to change it.</span>
+    </div>
+    <div class="em-list" id="em-list"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="em-close">Close</button></div>
   </div>
 </div>
 
@@ -1956,11 +1996,22 @@ const EMOJI_BY_CHAR=new Map(), EMOJI_BY_HEX=new Map();
 const graphemes=typeof Intl!=='undefined'&&Intl.Segmenter?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;
 const emojiSrc=hex=>`emoji/svg/${hex}.svg`;
 function emojiImg(e){return `<img class="emoji" src="${emojiSrc(e[0])}" alt="${e[1]}" title=":${e[2]}:" draggable="false">`;}
-// Replaces known emoji in an HTML string's text (never inside tags).
+// Replaces known emoji in an HTML string's text (never inside tags):
+// Unicode emoji, and the server's custom emoji tokens (see CUSTOM EMOJI).
 function emojify(html){
-  if(!graphemes||!EMOJI_BY_CHAR.size)return html;
   return html.split(/(<[^>]*>)/).map(part=>{
-    if(part.startsWith('<')||!/[\u00A9\u00AE\u203C-\u3299\uD83C-\uDBFF]/.test(part))return part;
+    if(part.startsWith('<'))return part;
+    if(!part.includes('&lt;'))return emojifyText(part);
+    let out='',last=0;
+    for(const m of part.matchAll(CUSTOM_TOKEN_ESC_RE)){
+      out+=emojifyText(part.slice(last,m.index))+customTokenHTML(m[2],m[3]);
+      last=m.index+m[0].length;
+    }
+    return out+emojifyText(part.slice(last));
+  }).join('');
+}
+function emojifyText(part){
+    if(!graphemes||!EMOJI_BY_CHAR.size||!/[\u00A9\u00AE\u203C-\u3299\uD83C-\uDBFF]/.test(part))return part;
     let out='';
     for(const {segment} of graphemes.segment(part)){
       const e=EMOJI_BY_CHAR.get(segment.replace(/\uFE0F/g,''));
@@ -1971,17 +2022,69 @@ function emojify(html){
       out+=asEmoji?emojiImg(e):segment;
     }
     return out;
-  }).join('');
 }
 // True when a message is nothing but 1–3 emoji (spaces allowed) — those
 // are shown at 4× size. Any text, or a 4th emoji, keeps the normal size.
 const JUMBO_EMOJI_MAX=3;
 function isEmojiOnly(text){
-  const t=(text||'').replace(/\s+/g,'');
-  if(!t||!graphemes)return false;
-  let n=0;
+  let n=0,unknown=false;
+  const t=(text||'').replace(/\s+/g,'').replace(CUSTOM_TOKEN_RE,(m,a,name,id)=>{
+    if(CUSTOM_BY_ID.has(id.toLowerCase()))n++;else unknown=true;
+    return '';
+  });
+  if(unknown||n>JUMBO_EMOJI_MAX)return false;
+  if(!t)return n>0;
+  if(!graphemes)return false;
   for(const {segment} of graphemes.segment(t)){if(!EMOJI_BY_CHAR.has(segment.replace(/\uFE0F/g,''))||++n>JUMBO_EMOJI_MAX)return false;}
   return n>0;
+}
+
+// ── CUSTOM EMOJI ─────────────────────────────────────────────────
+// The server's own emoji. In messages they're tokens, <:name:id> (or
+// <a:name:id> when animated), and in reactions "c:<id>" — always by id, so
+// a rename never breaks old messages. You type :name: and it becomes a
+// token when sent (and back into :name: when you edit). Images load from
+// /cc-emoji/<id>, which the Go side serves from a disk cache. A token
+// whose emoji was deleted shows as plain :name:. Hidden emoji (e.g. ones
+// imported from other Discord servers) still show where they were used,
+// but aren't offered in the picker or autocomplete.
+const CUSTOM_TOKEN_RE=/<(a?):([A-Za-z0-9_]{2,32}):([0-9a-fA-F-]{36})>/g;
+const CUSTOM_TOKEN_ESC_RE=/&lt;(a?):([A-Za-z0-9_]{2,32}):([0-9a-fA-F-]{36})&gt;/g;
+let CUSTOM_BY_ID=new Map(),CUSTOM_BY_NAME=new Map(); // id → emoji; lowercase name → visible emoji
+const customSrc=id=>`/cc-emoji/${id}`;
+const customToken=c=>`<${c.animated?'a':''}:${c.name}:${c.id}>`;
+function customEmojiImg(c){return `<img class="emoji custom" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" title=":${esc(c.name)}:" draggable="false">`;}
+function customTokenHTML(name,id){const c=CUSTOM_BY_ID.get(id.toLowerCase());return c?customEmojiImg(c):`:${name}:`;}
+function visibleCustomEmojis(){return [...CUSTOM_BY_ID.values()].filter(c=>!c.hidden);}
+// ":name:" → token, for each visible custom emoji name you typed.
+function typedToTokens(text){
+  if(!CUSTOM_BY_NAME.size)return text;
+  return text.replace(/(?<![\w<]):([A-Za-z0-9_]{2,32}):(?!\w)/g,(m,name)=>{const c=CUSTOM_BY_NAME.get(name.toLowerCase());return c?customToken(c):m;});
+}
+// Token → ":name:" when typing that name back gives the same emoji.
+function tokensToTyped(text){
+  return text.replace(CUSTOM_TOKEN_RE,(m,a,name,id)=>{
+    const c=CUSTOM_BY_ID.get(id.toLowerCase());
+    return c&&CUSTOM_BY_NAME.get(c.name.toLowerCase())===c?`:${c.name}:`:m;
+  });
+}
+async function loadCustomEmojis(){
+  const domain=state.domain;
+  let list;try{list=await window.go.main.App.GetEmojis()||[];}catch(err){console.warn('emoji: could not load:',err);return;}
+  if(state.domain!==domain)return;
+  setCustomEmojis(list);
+}
+function setCustomEmojis(list){
+  const before=[...CUSTOM_BY_ID.keys()].join()+'|'+[...CUSTOM_BY_ID.values()].map(c=>c.name+c.hidden).join();
+  CUSTOM_BY_ID=new Map(list.map(c=>[c.id.toLowerCase(),c]));
+  CUSTOM_BY_NAME=new Map(list.filter(c=>!c.hidden).map(c=>[c.name.toLowerCase(),c]));
+  const after=[...CUSTOM_BY_ID.keys()].join()+'|'+[...CUSTOM_BY_ID.values()].map(c=>c.name+c.hidden).join();
+  // Reactions with a deleted emoji were removed on the server.
+  for(const m of state.messages||[])if(m.reactions)m.reactions=m.reactions.filter(r=>!r.emoji.startsWith('c:')||CUSTOM_BY_ID.has(r.emoji.slice(2).toLowerCase()));
+  if(before!==after&&state.messages?.length)renderMessages(false);
+  const p=document.getElementById('emoji-picker');
+  if(emojiPickerBuilt&&!p.classList.contains('hidden')&&!p.querySelector('.ep-search').value.trim())p.renderAll();
+  if(!document.getElementById('modal-emoji').classList.contains('hidden'))renderEmojiManager();
 }
 
 // Extract raw URLs from text
@@ -2463,6 +2566,7 @@ async function doConnect(domain,serverKey,inviteCode=''){
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';
   state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
+  CUSTOM_BY_ID=new Map();CUSTOM_BY_NAME=new Map();
   serverBannerAt=-1; // a different server: forget the last one's banner
   state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
   const hdr=document.getElementById('sidebar-header');hdr.classList.remove('has-banner');hdr.classList.remove('anim-paused');document.getElementById('sidebar-banner-img').removeAttribute('src');
@@ -2512,6 +2616,7 @@ async function refreshServerMeta(){
   else if(info?.name){state.serverName=info.name;}
   state.serverOwner=info?.owner||'';
   loadRoles(); // (also when the crown moves — the owner can do everything)
+  loadCustomEmojis();
   refreshServerIcon(domain,info);
   setServerTheme(info?.theme||null,domain);
   const nameEl=document.getElementById('sidebar-server-name');
@@ -2755,7 +2860,21 @@ async function refreshRoomsAndBoards(){
   if(anyRemoved)saveExpandedRooms(state.domain);
 
   if(state.selectedBoardId){
-    const stillExists=(state.boardsByRoom[state.selectedRoomId]||[]).some(b=>b.id===state.selectedBoardId);
+    // The open channel may have been moved to another category (maybe a
+    // collapsed one, whose list isn't loaded) rather than deleted.
+    const has=rid=>(state.boardsByRoom[rid]||[]).some(b=>b.id===state.selectedBoardId);
+    let home=has(state.selectedRoomId)?state.selectedRoomId:Object.keys(state.boardsByRoom).find(has);
+    if(!home)for(const r of rooms){
+      if(state.boardsByRoom[r.id])continue;
+      let bs;try{bs=await window.go.main.App.GetBoards(r.id)||[];}catch{continue;}
+      if(bs.some(b=>b.id===state.selectedBoardId)){
+        state.boardsByRoom[r.id]=bs;state.expandedRooms.add(r.id);saveExpandedRooms(state.domain);home=r.id;break;
+      }
+    }
+    if(home&&home!==state.selectedRoomId){
+      state.selectedRoomId=home;setLastBoard(state.domain,home,state.selectedBoardId,state.selectedBoardName);
+    }
+    const stillExists=!!home;
     if(!stillExists){
       state.selectedBoardId=null;state.selectedBoardName='';state.messages=[];
       const hdr=document.getElementById('board-title-placeholder');
@@ -2778,6 +2897,7 @@ function renderSidebar(){
     const isOpen=state.expandedRooms.has(room.id),boards=state.boardsByRoom[room.id]??null;
     const isVoiceRoom=room.room_type==='voice';
     const header=document.createElement('div');header.className='room-header';
+    header.dataset.room=room.id;header.dataset.type=isVoiceRoom?'voice':'text';
     header.innerHTML=`<span class="room-arrow ${isOpen?'open':''}">${icon('chevron_right')}</span>${isVoiceRoom?icon('volume_up','room-type-ic'):''}<span class="room-name">${esc(room.name)}</span>${room.is_private?`<span title="Private — only some roles can see this" style="display:inline-flex">${icon('lock','private-ic')}</span>`:''}`;
     header.addEventListener('click',()=>toggleRoom(room.id));list.appendChild(header);
     if(isOpen){
@@ -2792,6 +2912,7 @@ function renderSidebar(){
         if(!isJoined)for(const k of Object.keys(state.voiceSpeaking))if(k.startsWith(board.id+':'))delete state.voiceSpeaking[k];
         const item=document.createElement('div');
         item.className='voice-item'+(isJoined?' joined':'');
+        item.dataset.board=board.id;item.dataset.room=room.id;
         const total=occupants.length+(state.voiceReconnecting?.[board.id]||[]).filter(u=>!occupants.includes(u)).length;
         item.innerHTML=`${icon('volume_up','board-ic')}<span class="board-name">${esc(board.name)}</span>${board.is_private?`<span title="Private — only some roles can see this" style="display:inline-flex">${icon('lock','private-ic')}</span>`:''}${total?`<span class="voice-count">${total}</span>`:''}`;
         item.addEventListener('click',()=>toggleVoiceChannel(board.id));
@@ -2827,6 +2948,7 @@ function renderSidebar(){
         const isActive=state.selectedBoardId===board.id,isUnread=state.unreadBoards.has(board.id)&&!isActive;
         const item=document.createElement('div');
         item.className='board-item'+(isActive?' active':'')+(isUnread?' unread':'');
+        item.dataset.board=board.id;item.dataset.room=room.id;
         const mentions=!isActive?(state.mentionCounts?.[board.id]||0):0;
         item.innerHTML=`<span class="unread-dot">${isUnread?'•':''}</span><span class="board-hash">#</span><span class="board-name">${esc(board.name)}</span>${board.is_private?`<span title="Private — only some roles can see this" style="display:inline-flex">${icon('lock','private-ic')}</span>`:''}${mentions?`<span class="mention-badge" title="${mentions} mention${mentions===1?'':'s'}">${mentions>99?'99+':mentions}</span>`:''}`;
         item.addEventListener('click',()=>selectBoard(board.id,board.name,room.id));
@@ -3306,6 +3428,138 @@ async function ensureRoomExpanded(roomId){
     try{state.boardsByRoom[roomId]=await window.go.main.App.GetBoards(roomId)||[];}
     catch{state.boardsByRoom[roomId]=[];}
   }
+}
+// ── SIDEBAR DRAG (owner) ─────────────────────────────────────────
+// The server owner can drag categories and channels to reorder them, and
+// drag a channel into another category of the same kind (text or voice —
+// a channel's kind comes from its category). Dropping a channel on a
+// category's header puts it at the bottom of that category. Uses pointer
+// events rather than HTML drag-and-drop, which the window's file-drop
+// handling (and WebKitGTK) get in the way of. Esc cancels.
+const sbDrag={src:null,started:false,x:0,y:0,target:null,suppressClick:false};
+let sbDropLine=null,sbDropInto=null;
+function isServerOwner(){return !!state.username&&state.serverOwner===state.username;}
+function initSidebarDrag(){
+  const list=document.getElementById('room-list');
+  sbDropLine=document.createElement('div');sbDropLine.className='sb-drop-line hidden';document.body.appendChild(sbDropLine);
+  list.addEventListener('pointerdown',e=>{
+    if(e.button!==0||!isServerOwner())return;
+    const el=e.target.closest('.room-header,.board-item,.voice-item');
+    if(!el||!list.contains(el))return;
+    sbDrag.src=el.classList.contains('room-header')
+      ?{kind:'room',id:el.dataset.room,type:el.dataset.type}
+      :{kind:'board',id:el.dataset.board,room:el.dataset.room,type:list.querySelector(`.room-header[data-room="${CSS.escape(el.dataset.room)}"]`)?.dataset.type||'text'};
+    sbDrag.started=false;sbDrag.x=e.clientX;sbDrag.y=e.clientY;sbDrag.target=null;
+  });
+  window.addEventListener('pointermove',e=>{
+    if(!sbDrag.src)return;
+    if(!sbDrag.started){
+      if(Math.hypot(e.clientX-sbDrag.x,e.clientY-sbDrag.y)<6)return;
+      sbDrag.started=true;document.body.classList.add('sb-drag-active');
+    }
+    sbFindTarget(e.clientX,e.clientY);
+  });
+  window.addEventListener('pointerup',()=>{
+    if(!sbDrag.src)return;
+    const {src,started,target}=sbDrag;
+    sbEndDrag();
+    if(!started)return;
+    // The click that follows a drag mustn't open/collapse anything.
+    sbDrag.suppressClick=true;setTimeout(()=>{sbDrag.suppressClick=false;},0);
+    if(target)(src.kind==='room'?sbMoveRoom(src,target):sbMoveBoard(src,target));
+  });
+  window.addEventListener('pointercancel',()=>{if(sbDrag.src)sbEndDrag();});
+  window.addEventListener('keydown',e=>{if(e.key==='Escape'&&sbDrag.started){sbEndDrag();sbDrag.suppressClick=true;setTimeout(()=>{sbDrag.suppressClick=false;},0);}},true);
+  list.addEventListener('click',e=>{if(sbDrag.suppressClick){e.stopPropagation();e.preventDefault();}},true);
+}
+function sbEndDrag(){
+  sbDrag.src=null;sbDrag.started=false;sbDrag.target=null;
+  document.body.classList.remove('sb-drag-active');
+  document.querySelectorAll('#room-list .sb-dragging').forEach(el=>el.classList.remove('sb-dragging'));
+  sbShowLine(null);
+}
+// Draws the drop marker: a line across `el`'s top (or bottom), or with
+// into=true a highlight on a category header.
+function sbShowLine(el,bottom=false,into=false){
+  if(sbDropInto){sbDropInto.classList.remove('sb-drop-into');sbDropInto=null;}
+  if(!el){sbDropLine.classList.add('hidden');return;}
+  if(into){sbDropLine.classList.add('hidden');el.classList.add('sb-drop-into');sbDropInto=el;return;}
+  const r=el.getBoundingClientRect();
+  sbDropLine.style.left=r.left+'px';sbDropLine.style.width=r.width+'px';
+  sbDropLine.style.top=((bottom?r.bottom:r.top)-1)+'px';
+  sbDropLine.classList.remove('hidden');
+}
+function sbFindTarget(x,y){
+  const list=document.getElementById('room-list'),src=sbDrag.src;
+  const sel=src.kind==='room'?`.room-header[data-room="${CSS.escape(src.id)}"]`:`[data-board="${CSS.escape(src.id)}"]:is(.board-item,.voice-item)`;
+  list.querySelector(sel)?.classList.add('sb-dragging');
+  sbDrag.target=null;
+  const lr=list.getBoundingClientRect();
+  if(x<lr.left||x>lr.right||y<lr.top-20||y>lr.bottom+20){sbShowLine(null);return;}
+  if(src.kind==='room'){
+    // Goes above the first other category whose middle is below the pointer.
+    const headers=[...list.querySelectorAll('.room-header')].filter(h=>h.dataset.room!==src.id);
+    const next=headers.find(h=>{const r=h.getBoundingClientRect();return y<r.top+r.height/2;});
+    sbDrag.target={before:next?.dataset.room||null};
+    if(next)sbShowLine(next);else if(list.lastElementChild)sbShowLine(list.lastElementChild,true);
+    return;
+  }
+  let over=document.elementFromPoint(x,y);
+  if(!over||!list.contains(over)){sbShowLine(null);return;}
+  const occ=over.closest('.voice-occupant-row');
+  if(occ)over=list.querySelector(`.voice-item[data-board="${CSS.escape(occ.dataset.board)}"]`)||over;
+  const header=over.closest('.room-header'),item=over.closest('.board-item,.voice-item');
+  if(header){
+    if(header.dataset.type!==src.type){sbShowLine(null);return;}
+    sbDrag.target={room:header.dataset.room,before:null};sbShowLine(header,false,true);return;
+  }
+  if(!item||item.dataset.board===src.id){sbShowLine(null);return;}
+  const room=item.dataset.room;
+  if(list.querySelector(`.room-header[data-room="${CSS.escape(room)}"]`)?.dataset.type!==src.type){sbShowLine(null);return;}
+  const r=item.getBoundingClientRect(),above=y<r.top+r.height/2;
+  let before=item.dataset.board;
+  if(!above){ // after this one = before the next channel in that category
+    const ids=(state.boardsByRoom[room]||[]).map(b=>b.id).filter(id=>id!==src.id);
+    before=ids[ids.indexOf(item.dataset.board)+1]||null;
+  }
+  sbDrag.target={room,before};
+  if(above)sbShowLine(item);
+  else{ // below the item and any call members listed under it
+    let last=item;
+    while(last.nextElementSibling?.classList.contains('voice-occupant-row'))last=last.nextElementSibling;
+    sbShowLine(last,true);
+  }
+}
+async function sbMoveRoom(src,target){
+  const old=state.rooms.map(r=>r.id);
+  const ids=old.filter(id=>id!==src.id);
+  const at=target.before?ids.indexOf(target.before):-1;
+  ids.splice(at<0?ids.length:at,0,src.id);
+  if(ids.join()===old.join())return;
+  state.rooms=ids.map(id=>state.rooms.find(r=>r.id===id));
+  renderSidebar();
+  try{await window.go.main.App.MoveRooms(ids);}
+  catch(err){toast('Couldn\u2019t move that category: '+err,true);refreshRoomsAndBoards();}
+}
+async function sbMoveBoard(src,target){
+  const from=state.boardsByRoom[src.room]||[],to=target.room;
+  const board=from.find(b=>b.id===src.id);
+  if(!board)return;
+  const rest=(state.boardsByRoom[to]||[]).filter(b=>b.id!==src.id);
+  const at=target.before?rest.findIndex(b=>b.id===target.before):-1;
+  const placed=[...rest];placed.splice(at<0?placed.length:at,0,{...board,room_id:to});
+  if(to===src.room&&placed.map(b=>b.id).join()===from.map(b=>b.id).join())return;
+  // Show it straight away; the server's rooms_updated then refreshes the
+  // lists (and the lock icons — a category's privacy applies to it now).
+  state.boardsByRoom[src.room]=from.filter(b=>b.id!==src.id);
+  if(state.boardsByRoom[to]||to===src.room)state.boardsByRoom[to]=placed;
+  if(to!==src.room){
+    state.expandedRooms.add(to);saveExpandedRooms(state.domain);
+    if(state.selectedBoardId===src.id){state.selectedRoomId=to;setLastBoard(state.domain,to,src.id,state.selectedBoardName);}
+  }
+  renderSidebar();
+  try{await window.go.main.App.MoveBoard(src.id,to,target.before||'');}
+  catch(err){toast('Couldn\u2019t move that channel: '+err,true);refreshRoomsAndBoards();}
 }
 async function toggleRoom(roomId){
   if(state.expandedRooms.has(roomId)){state.expandedRooms.delete(roomId);renderSidebar();}
@@ -4469,7 +4723,7 @@ function startEdit(msgEl,msg){
   const contentEl=msgEl.querySelector('.msg-content');
   if(contentEl)contentEl.style.display='none';
   const wrap=document.createElement('div');wrap.className='msg-edit-wrap';
-  const ta=document.createElement('textarea');ta.className='msg-edit-input';ta.value=original;ta.rows=Math.min(original.split('\n').length+1,8);
+  const ta=document.createElement('textarea');ta.className='msg-edit-input';ta.value=tokensToTyped(original);ta.rows=Math.min(original.split('\n').length+1,8);
   if(!original)ta.placeholder='Add a message';
   const actions=document.createElement('div');actions.className='msg-edit-actions';
   const saveBtn=document.createElement('button');saveBtn.className='msg-edit-save';saveBtn.textContent='Save';
@@ -4477,7 +4731,7 @@ function startEdit(msgEl,msg){
   const close=()=>{wrap.remove();const c=msgEl.querySelector('.msg-content');if(c)c.style.display='';};
   cancelBtn.addEventListener('click',close);
   saveBtn.addEventListener('click',async()=>{
-    const newContent=ta.value.trim();
+    const newContent=typedToTokens(ta.value.trim());
     // Text can be emptied only if there's still an attachment to show;
     // otherwise the message would be blank (use Delete for that).
     if(newContent===original||(!newContent&&!hasAttachments)){close();return;}
@@ -4499,7 +4753,7 @@ function startEdit(msgEl,msg){
 // ── SEND ──────────────────────────────────────────────────────────
 async function sendMessage(){
   const input=document.getElementById('msg-input');
-  const content=input.value.trim();
+  const typed=input.value.trim(),content=typedToTokens(typed);
   const readyAttachments=state.attachQueue.filter(a=>a.status==='done');
   if(!content&&!readyAttachments.length)return;
   if(!state.selectedBoardId)return;
@@ -4516,7 +4770,7 @@ async function sendMessage(){
   const replyTo=state.replyingTo?.id||'';
   cancelReply();
   try{await window.go.main.App.SendMessage(state.selectedBoardId,content,attachObjs,replyTo);}
-  catch(err){toast('Send failed: '+err,true);input.value=content;}
+  catch(err){toast('Send failed: '+err,true);input.value=typed;}
 }
 
 async function goBack(){
@@ -5232,6 +5486,10 @@ function initVoiceUserMenu(){
 const REACTIONS_COLLAPSED=14;
 const expandedReactions=new Set(); // message ids whose bar is expanded
 function reactionEmojiHTML(emoji){
+  if(emoji.startsWith('c:')){
+    const c=CUSTOM_BY_ID.get(emoji.slice(2).toLowerCase());
+    return c?`<img class="emoji custom" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" draggable="false">`:`<span class="r-text">?</span>`;
+  }
   const e=EMOJI_BY_CHAR.get(emoji.replace(/\uFE0F/g,''));
   return e?`<img class="emoji" src="${emojiSrc(e[0])}" alt="${e[1]}" draggable="false">`:`<span class="r-text">${esc(emoji)}</span>`;
 }
@@ -5240,7 +5498,8 @@ function reactionTitle(r){
   const names=(r.users||[]).map(u=>u===state.username?'You':u);
   const who=names.length<=3?names.join(names.length===2?' and ':', ').replace(/, ([^,]*)$/,' and $1')
     :`${names.slice(0,3).join(', ')} and ${names.length-3} other${names.length-3===1?'':'s'}`;
-  return `${who} reacted with ${e?`:${e[2]}:`:r.emoji}`;
+  const c=r.emoji.startsWith('c:')&&CUSTOM_BY_ID.get(r.emoji.slice(2).toLowerCase());
+  return `${who} reacted with ${c?`:${c.name}:`:e?`:${e[2]}:`:r.emoji.startsWith('c:')?'a deleted emoji':r.emoji}`;
 }
 function renderReactions(msgEl,msg){
   const bar=msgEl.querySelector('.msg-reactions');
@@ -5314,13 +5573,24 @@ function openReactionPicker(msg,anchor){
 // images load lazily as they scroll into view.
 const EMOJI_RECENT_MAX=27;
 let emojiPickerBuilt=false;
-function getRecentEmoji(){try{return JSON.parse(localStorage.getItem('emojiRecent')||'[]').filter(h=>EMOJI_BY_HEX.has(h));}catch{return [];}}
+// Keys are a Unicode emoji's hex, or "c:<id>" for a custom one.
+function pickableEmojiKey(h){
+  if(h.startsWith('c:')){const c=CUSTOM_BY_ID.get(h.slice(2).toLowerCase());return !!c&&!c.hidden;}
+  return EMOJI_BY_HEX.has(h);
+}
+function getRecentEmoji(){try{return JSON.parse(localStorage.getItem('emojiRecent')||'[]').filter(pickableEmojiKey);}catch{return [];}}
 function noteRecentEmoji(hex){
   const r=[hex,...getRecentEmoji().filter(h=>h!==hex)].slice(0,EMOJI_RECENT_MAX);
   localStorage.setItem('emojiRecent',JSON.stringify(r));
 }
 function emojiButton(e){
   return `<button type="button" data-hex="${e[0]}" title=":${e[2]}:"><img src="${emojiSrc(e[0])}" alt="${e[1]}" loading="lazy" draggable="false"></button>`;
+}
+function customButton(c){
+  return `<button type="button" data-hex="c:${esc(c.id)}" title=":${esc(c.name)}:"><img src="${customSrc(c.id)}" alt=":${esc(c.name)}:" loading="lazy" draggable="false"></button>`;
+}
+function emojiKeyButton(h){
+  return h.startsWith('c:')?customButton(CUSTOM_BY_ID.get(h.slice(2).toLowerCase())):emojiButton(EMOJI_BY_HEX.get(h));
 }
 function buildEmojiPicker(){
   const p=document.getElementById('emoji-picker');
@@ -5330,6 +5600,7 @@ function buildEmojiPicker(){
     <div class="ep-body">
       <div class="ep-rail">
         <button type="button" data-target="recent" title="Frequently Used">${icon('schedule')}</button>
+        <button type="button" data-target="server" title="Server Emoji" class="ep-rail-server">${icon('add_reaction')}</button>
         ${groups.map((g,i)=>`<button type="button" data-target="g${i}" title="${esc(g.label)}"><img src="${emojiSrc(g.icon)}" alt=""></button>`).join('')}
       </div>
       <div class="ep-main"></div>
@@ -5340,8 +5611,14 @@ function buildEmojiPicker(){
   const byGroup=groups.map(()=>[]);
   for(const e of window.EMOJI_DATA||[])byGroup[e[3]]?.push(e);
   const renderAll=()=>{
-    const recent=getRecentEmoji().map(h=>EMOJI_BY_HEX.get(h));
-    main.innerHTML=(recent.length?`<div class="ep-section" data-sec="recent"><div class="ep-section-title">Frequently Used</div><div class="ep-grid">${recent.map(emojiButton).join('')}</div></div>`:'')+
+    const recent=getRecentEmoji();
+    const customs=visibleCustomEmojis(),manage=can(PERM.EMOJI);
+    const serverSec=(customs.length||manage)?`<div class="ep-section" data-sec="server"><div class="ep-section-title">${esc(state.serverName||'Server')}${manage?'<button type="button" class="ep-manage">Manage</button>':''}</div>`+
+      (customs.length?`<div class="ep-grid">${customs.map(customButton).join('')}</div>`:'<div class="ep-none">No custom emoji yet.</div>')+'</div>':'';
+    const railBtn=p.querySelector('.ep-rail-server');
+    railBtn.style.display=serverSec?'':'none';
+    railBtn.innerHTML=customs.length?`<img src="${customSrc(customs[0].id)}" alt="" style="object-fit:contain">`:icon('add_reaction');
+    main.innerHTML=(recent.length?`<div class="ep-section" data-sec="recent"><div class="ep-section-title">Frequently Used</div><div class="ep-grid">${recent.map(emojiKeyButton).join('')}</div></div>`:'')+serverSec+
       groups.map((g,i)=>`<div class="ep-section" data-sec="g${i}"><div class="ep-section-title">${esc(g.label)}</div><div class="ep-grid">${byGroup[i].map(emojiButton).join('')}</div></div>`).join('');
     p.querySelector('.ep-rail [data-target="recent"]').style.display=recent.length?'':'none';
     updateRail();
@@ -5349,7 +5626,8 @@ function buildEmojiPicker(){
   const renderSearch=q=>{
     const words=q.toLowerCase().split(/\s+/).filter(Boolean);
     const hits=(window.EMOJI_DATA||[]).filter(e=>{const hay=(e[2].replace(/_/g,' ')+' '+e[4]).toLowerCase();return words.every(w=>hay.includes(w));});
-    main.innerHTML=hits.length?`<div class="ep-section"><div class="ep-section-title">Results</div><div class="ep-grid">${hits.slice(0,300).map(emojiButton).join('')}</div></div>`
+    const customHits=visibleCustomEmojis().filter(c=>{const hay=c.name.toLowerCase().replace(/_/g,' ')+' '+c.name.toLowerCase();return words.every(w=>hay.includes(w));});
+    main.innerHTML=hits.length||customHits.length?`<div class="ep-section"><div class="ep-section-title">Results</div><div class="ep-grid">${customHits.map(customButton).join('')}${hits.slice(0,300).map(emojiButton).join('')}</div></div>`
       :'<div class="ep-empty">No emoji match that.</div>';
   };
   // Rail follows whichever section is at the top of the scroll area.
@@ -5374,10 +5652,17 @@ function buildEmojiPicker(){
   const prevImg=p.querySelector('.ep-prev'),prevName=p.querySelector('.ep-name');
   main.addEventListener('mouseover',e=>{
     const b=e.target.closest('.ep-grid button');if(!b)return;
+    if(b.dataset.hex.startsWith('c:')){
+      const c=CUSTOM_BY_ID.get(b.dataset.hex.slice(2).toLowerCase());if(!c)return;
+      prevImg.src=customSrc(c.id);prevImg.style.visibility='visible';prevName.textContent=`:${c.name}:`;return;
+    }
     const em=EMOJI_BY_HEX.get(b.dataset.hex);
     prevImg.src=emojiSrc(em[0]);prevImg.style.visibility='visible';prevName.textContent=`:${em[2]}:`;
   });
-  main.addEventListener('click',e=>{const b=e.target.closest('.ep-grid button');if(b)pickEmoji(b.dataset.hex,e.shiftKey);});
+  main.addEventListener('click',e=>{
+    if(e.target.closest('.ep-manage')){closeEmojiPicker();openEmojiManager();return;}
+    const b=e.target.closest('.ep-grid button');if(b)pickEmoji(b.dataset.hex,e.shiftKey);
+  });
   p.querySelectorAll('.ep-credit a').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
   p.renderAll=renderAll;p.updateRail=updateRail;
   attachElastic(main);
@@ -5385,17 +5670,24 @@ function buildEmojiPicker(){
 }
 let emojiPickerTarget={type:'input'};
 function pickEmoji(hex,keepOpen){
-  const e=EMOJI_BY_HEX.get(hex);if(!e)return;
+  const c=hex.startsWith('c:')?CUSTOM_BY_ID.get(hex.slice(2).toLowerCase()):null;
+  const e=c?null:EMOJI_BY_HEX.get(hex);if(!c&&!e)return;
+  // What a pick inserts / reacts with: the character, or for a custom
+  // emoji ":name:" in the box (made a token on send) and "c:<id>" as a reaction.
+  const text=c?`:${c.name}:`:e[1],reaction=c?`c:${c.id}`:e[1];
   if(emojiPickerTarget.type==='reaction'){
-    toggleReaction(emojiPickerTarget.msg,e[1],true);
+    toggleReaction(emojiPickerTarget.msg,reaction,true);
     noteRecentEmoji(hex);
     if(!keepOpen)closeEmojiPicker();
     return;
   }
   const ta=document.getElementById('msg-input');
   const start=ta.selectionStart??ta.value.length,end=ta.selectionEnd??start;
-  ta.value=ta.value.slice(0,start)+e[1]+ta.value.slice(end);
-  const pos=start+e[1].length;
+  // A custom :name: needs a space before it if it'd touch a word.
+  const before=c&&start>0&&/\w/.test(ta.value[start-1])?' ':'';
+  const ins=before+text;
+  ta.value=ta.value.slice(0,start)+ins+ta.value.slice(end);
+  const pos=start+ins.length;
   ta.focus();ta.setSelectionRange(pos,pos);autoResize(ta);
   ta.dispatchEvent(new Event('input',{bubbles:true}));
   noteRecentEmoji(hex);
@@ -5452,11 +5744,95 @@ function initEmojiPicker(){
   },true);
 }
 
+// ── SERVER EMOJI MANAGER ─────────────────────────────────────────
+// For people with Manage Emoji (opened from the picker). Upload several
+// at once; click a name to rename it (Enter or clicking away saves); Hide
+// takes one out of the picker without breaking old messages; Delete is
+// for good (asks once more). Hidden ones — e.g. emoji imported from other
+// Discord servers — are listed separately.
+function openEmojiManager(){
+  if(!can(PERM.EMOJI))return;
+  document.getElementById('em-error').classList.add('hidden');
+  document.getElementById('modal-emoji').classList.remove('hidden');
+  renderEmojiManager();
+  loadCustomEmojis();
+}
+function closeEmojiManager(){document.getElementById('modal-emoji').classList.add('hidden');}
+function emojiManagerError(msg){
+  const el=document.getElementById('em-error');
+  el.textContent=msg;el.classList.toggle('hidden',!msg);
+}
+function renderEmojiManager(){
+  const list=document.getElementById('em-list');
+  if(list.contains(document.activeElement)&&document.activeElement.classList.contains('em-name'))return; // don't yank a name you're typing
+  const all=[...CUSTOM_BY_ID.values()];
+  const row=c=>`<div class="em-row" data-id="${esc(c.id)}">
+    <img src="${customSrc(c.id)}" alt="">
+    <input class="em-name" value="${esc(c.name)}" maxlength="32" spellcheck="false" title="Click to rename">
+    ${c.created_by?`<span class="em-by" title="Uploaded by ${esc(c.created_by)}">${esc(c.created_by)}</span>`:''}
+    <button class="btn btn-ghost em-hide" type="button">${c.hidden?'Show':'Hide'}</button>
+    <button class="btn btn-ghost em-del" type="button" title="Delete">${icon('delete')}</button></div>`;
+  const shown=all.filter(c=>!c.hidden),hidden=all.filter(c=>c.hidden);
+  list.innerHTML=!all.length?'<div class="em-empty">No custom emoji yet.</div>'
+    :`<div class="em-head">In the picker — ${shown.length}</div>${shown.map(row).join('')}`+
+     (hidden.length?`<div class="em-head">Hidden — still shown in old messages — ${hidden.length}</div>${hidden.map(row).join('')}`:'');
+}
+function initEmojiManager(){
+  const modal=document.getElementById('modal-emoji'),list=document.getElementById('em-list');
+  document.getElementById('em-close').addEventListener('click',closeEmojiManager);
+  modal.addEventListener('click',e=>{if(e.target===modal)closeEmojiManager();});
+  modal.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.target.classList.contains('em-name')){e.stopPropagation();closeEmojiManager();}});
+  document.getElementById('em-upload').addEventListener('click',async()=>{
+    emojiManagerError('');
+    let results;
+    try{results=await window.go.main.App.UploadEmojiFiles()||[];}catch(err){emojiManagerError('Upload failed: '+err);return;}
+    const failed=results.filter(r=>r.error);
+    if(failed.length)emojiManagerError(failed.map(r=>`${r.file}: ${r.error}`).join('\n'));
+    const ok=results.length-failed.length;
+    if(ok)toast(`Added ${ok} emoji.`);
+    loadCustomEmojis();
+  });
+  const save=async input=>{
+    const id=input.closest('.em-row').dataset.id,c=CUSTOM_BY_ID.get(id.toLowerCase());
+    const name=input.value.trim();
+    if(!c||name===c.name){if(c)input.value=c.name;return;}
+    if(!/^[A-Za-z0-9_]{2,32}$/.test(name)){emojiManagerError('Emoji names are 2–32 letters, numbers or underscores.');input.value=c.name;return;}
+    try{await window.go.main.App.UpdateEmoji(c.id,name,c.hidden);emojiManagerError('');}
+    catch(err){emojiManagerError(String(err));input.value=c.name;}
+    input.blur();loadCustomEmojis();
+  };
+  list.addEventListener('keydown',e=>{
+    if(!e.target.classList.contains('em-name'))return;
+    if(e.key==='Enter'){e.preventDefault();e.target.blur();}
+    if(e.key==='Escape'){e.preventDefault();const c=CUSTOM_BY_ID.get(e.target.closest('.em-row').dataset.id.toLowerCase());if(c)e.target.value=c.name;e.target.blur();}
+  });
+  list.addEventListener('focusout',e=>{if(e.target.classList.contains('em-name'))save(e.target);});
+  list.addEventListener('click',async e=>{
+    const rowEl=e.target.closest('.em-row');if(!rowEl)return;
+    const c=CUSTOM_BY_ID.get(rowEl.dataset.id.toLowerCase());if(!c)return;
+    const hideBtn=e.target.closest('.em-hide'),delBtn=e.target.closest('.em-del');
+    if(hideBtn){
+      try{await window.go.main.App.UpdateEmoji(c.id,c.name,!c.hidden);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
+      loadCustomEmojis();
+    }else if(delBtn){
+      if(!delBtn.classList.contains('confirm')){ // first click arms it
+        delBtn.classList.add('confirm');delBtn.textContent='Delete?';
+        setTimeout(()=>{if(delBtn.isConnected){delBtn.classList.remove('confirm');delBtn.innerHTML=icon('delete');}},3000);
+        return;
+      }
+      try{await window.go.main.App.DeleteEmoji(c.id);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
+      loadCustomEmojis();
+    }
+  });
+}
+
 // ── PRESENCE ─────────────────────────────────────────────────────
 // Your status: the choice you make in your profile card (Online, Away or
 // Invisible — kept until you change it) and, while that choice is Online,
-// automatic Away after 10 minutes with no mouse/keyboard activity in the
-// window, back to Online as soon as you're active again. Invisible means
+// automatic Away after 10 minutes with no mouse/keyboard activity anywhere
+// on the computer (asked from the OS — so a game in the foreground keeps
+// you Online), back to Online as soon as you're active again. Where the OS
+// can't say (some Wayland desktops), activity in this window is used. Invisible means
 // connected but shown as offline to everyone else (you see a hollow
 // "invisible" ring on yourself). Closing the app is offline.
 //
@@ -5545,9 +5921,21 @@ function initPresence(){
   const onAct=()=>{const n=Date.now();if(n-last>1000){last=n;noteActivity();}};
   ['mousemove','mousedown','keydown','wheel','touchstart'].forEach(ev=>window.addEventListener(ev,onAct,{passive:true,capture:true}));
   window.addEventListener('focus',onAct);
-  setInterval(()=>{
-    if(presencePref==='online'&&!autoAway&&Date.now()-lastActivity>=AUTO_AWAY_MS){autoAway=true;pushPresence();}
-  },15000);
+  // Poll the OS: every 15 s while active, every 3 s while away so coming
+  // back to the keyboard (even in another app) flips you to Online quickly.
+  const check=async()=>{
+    let idle=Date.now()-lastActivity;
+    try{
+      const sys=await window.go.main.App.GetSystemIdleSeconds();
+      if(typeof sys==='number'&&isFinite(sys))idle=Math.min(idle,sys*1000);
+    }catch{} // this desktop can't tell: in-window activity only
+    if(presencePref==='online'){
+      if(!autoAway&&idle>=AUTO_AWAY_MS){autoAway=true;pushPresence();}
+      else if(autoAway&&idle<AUTO_AWAY_MS){autoAway=false;pushPresence();}
+    }
+    setTimeout(check,autoAway?3000:15000);
+  };
+  setTimeout(check,15000);
   pushPresence(); // tell Go before the first connect, so it connects with the right status
 }
 
@@ -5898,7 +6286,7 @@ function messageMenu(msgEl,msg,e){
     (selection||link||imgAttach)?'-':null,
     can(PERM.SEND)?{label:'Reply',icon:'reply',action:()=>startReply(msg)}:null,
     can(PERM.REACT)?{label:'Add Reaction',icon:'add_reaction',action:()=>openReactionPicker(msg,pointAnchor(e.clientX,e.clientY))}:null,
-    msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content);toast('Text copied');}}:null,
+    msg.content?{label:'Copy Text',icon:'content_copy',action:()=>{copyText(msg.content.replace(CUSTOM_TOKEN_RE,(m,a,name,id)=>`:${CUSTOM_BY_ID.get(id.toLowerCase())?.name||name}:`));toast('Text copied');}}:null,
     {label:'Copy Message Link',icon:'link',action:()=>{copyText(messageLink(msg));toast('Message link copied');}},
     !(can(PERM.PIN)||can(PERM.MANAGE))?null:{label:msg.pinned?'Unpin Message':'Pin Message',icon:msg.pinned?'keep_off':'keep',action:async()=>{
       try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
@@ -5987,6 +6375,11 @@ for(const [alias,name] of Object.entries(EMOJI_ALIASES)){const e=EMOJI_BY_NAME.g
 const ALIAS_OF=new Map(Object.entries(EMOJI_ALIASES).map(([a,n])=>[n,a]));
 function emojiMatches(q,limit=8){
   q=q.toLowerCase();
+  // The server's own emoji come first: they're what people reach for.
+  const custom=visibleCustomEmojis().filter(c=>c.name.toLowerCase().includes(q))
+    .map(c=>({c,n:c.name.toLowerCase()}))
+    .sort((a,b)=>(b.n===q)-(a.n===q)||(b.n.startsWith(q))-(a.n.startsWith(q))||a.n.length-b.n.length)
+    .map(({c})=>[c.name,{custom:c}]);
   const exact=[],prefix=[],word=[],seen=new Set();
   for(const [name,e] of EMOJI_BY_NAME){
     if(seen.has(e[0]))continue;
@@ -5998,14 +6391,14 @@ function emojiMatches(q,limit=8){
     else if(name.includes('_'+q)){word.push([name,e]);seen.add(e[0]);}
   }
   prefix.sort((a,b)=>a[0].length-b[0].length);
-  return [...exact,...prefix,...word].slice(0,limit);
+  return [...custom,...exact,...prefix,...word].slice(0,limit);
 }
 const suggest={open:false,items:[],index:0,start:0};
 function closeEmojiSuggest(){suggest.open=false;document.getElementById('emoji-suggest')?.classList.add('hidden');}
 function renderEmojiSuggest(q){
   const box=document.getElementById('emoji-suggest');
   box.innerHTML=`<div class="es-title">Emoji matching :${esc(q)}</div>`+suggest.items.map(([name,e],i)=>
-    `<div class="es-row${i===suggest.index?' on':''}" data-i="${i}"><img src="${emojiSrc(e[0])}" alt=""><span>:${esc(name)}:</span>${ALIAS_OF.has(name)?`<span class="es-alias">:${esc(ALIAS_OF.get(name))}:</span>`:''}</div>`).join('');
+    `<div class="es-row${i===suggest.index?' on':''}" data-i="${i}"><img src="${e.custom?customSrc(e.custom.id):emojiSrc(e[0])}" alt="" style="object-fit:contain"><span>:${esc(name)}:</span>${!e.custom&&ALIAS_OF.has(name)?`<span class="es-alias">:${esc(ALIAS_OF.get(name))}:</span>`:''}</div>`).join('');
   box.querySelectorAll('.es-row').forEach(r=>{
     r.addEventListener('mousedown',ev=>{ev.preventDefault();suggest.index=+r.dataset.i;acceptEmojiSuggest();});
     r.addEventListener('mousemove',()=>{if(suggest.index!==+r.dataset.i){suggest.index=+r.dataset.i;box.querySelectorAll('.es-row').forEach((x,i)=>x.classList.toggle('on',i===suggest.index));}});
@@ -6024,6 +6417,10 @@ function acceptEmojiSuggest(){
   closeEmojiSuggest();
   if(!pick)return;
   if(suggest.kind==='user'){replaceBeforeCaret(ta,suggest.start,'@'+pick.user+' ');ta.focus();return;}
+  if(pick[1].custom){
+    const c=pick[1].custom;
+    replaceBeforeCaret(ta,suggest.start,`:${c.name}: `);noteRecentEmoji('c:'+c.id);ta.focus();return;
+  }
   replaceBeforeCaret(ta,suggest.start,pick[1][1]+' ');
   noteRecentEmoji(pick[1][0]);ta.focus();
 }
@@ -6061,6 +6458,9 @@ function onShortcodeInput(ta){
   // A finished :code: — swap it for the emoji.
   const done=before.match(/(^|[\s(])(:([a-z0-9_+\-]+):)$/i);
   if(done){
+    // A server emoji's name wins: it stays :name: (it's sent as that emoji).
+    const c=CUSTOM_BY_NAME.get(done[3].toLowerCase());
+    if(c){closeEmojiSuggest();noteRecentEmoji('c:'+c.id);return;}
     const e=EMOJI_BY_NAME.get(done[3].toLowerCase());
     if(e){closeEmojiSuggest();replaceBeforeCaret(ta,before.length-done[2].length,e[1]);noteRecentEmoji(e[0]);return;}
   }
@@ -6290,7 +6690,7 @@ function initPanelResize(){
 // "shown separately" role) and what you're allowed to do. The server
 // enforces permissions itself; the app just hides or disables what you
 // can't use so you're not offered it.
-const PERM={SEND:1,ATTACH:2,REACT:4,MANAGE:8,CONNECT:16,KICK:32,BAN:64,PIN:128,ADMIN:256};
+const PERM={SEND:1,ATTACH:2,REACT:4,MANAGE:8,CONNECT:16,KICK:32,BAN:64,PIN:128,ADMIN:256,EMOJI:512};
 state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
 const can=p=>(state.myPerms&p)===p;
 function rolesOf(user){const ids=state.memberRoles[user]||[];return state.roles.filter(r=>ids.includes(r.id));} // highest first
@@ -6749,6 +7149,7 @@ function init(){
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
   // Roles changed: colours/permissions, and which channels you can see.
   window.runtime.EventsOn('server:roles',()=>{loadRoles();refreshRoomsAndBoards();});
+  window.runtime.EventsOn('server:emojis',()=>loadCustomEmojis());
   window.runtime.EventsOn('voice:removed',m=>{
     state.voiceHere=null;voiceRejoin=null;playSound('leave');
     toast(m||'You no longer have access to that voice channel',true);
@@ -6903,6 +7304,8 @@ function init(){
   initAppearance();
   initServerInfo();
   initPresence();
+  initSidebarDrag();
+  initEmojiManager();
   initEmojiPicker();
   initVoiceUserMenu();
   initAudioSettingsUI();

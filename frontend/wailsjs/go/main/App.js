@@ -26,6 +26,10 @@ export function CreateInvite() {
   return window['go']['main']['App']['CreateInvite']();
 }
 
+export function DeleteEmoji(arg1) {
+  return window['go']['main']['App']['DeleteEmoji'](arg1);
+}
+
 export function DeleteMessage(arg1) {
   return window['go']['main']['App']['DeleteMessage'](arg1);
 }
@@ -94,6 +98,10 @@ export function GetConnectionSecurity() {
   return window['go']['main']['App']['GetConnectionSecurity']();
 }
 
+export function GetEmojis() {
+  return window['go']['main']['App']['GetEmojis']();
+}
+
 export function GetFileLink(arg1) {
   return window['go']['main']['App']['GetFileLink'](arg1);
 }
@@ -138,6 +146,10 @@ export function GetServers() {
   return window['go']['main']['App']['GetServers']();
 }
 
+export function GetSystemIdleSeconds() {
+  return window['go']['main']['App']['GetSystemIdleSeconds']();
+}
+
 export function GetUsername() {
   return window['go']['main']['App']['GetUsername']();
 }
@@ -180,6 +192,14 @@ export function LeaveVoiceChannel() {
 
 export function ListAccounts() {
   return window['go']['main']['App']['ListAccounts']();
+}
+
+export function MoveBoard(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MoveBoard'](arg1, arg2, arg3);
+}
+
+export function MoveRooms(arg1) {
+  return window['go']['main']['App']['MoveRooms'](arg1);
 }
 
 export function OpenAttachmentExternally(arg1, arg2) {
@@ -322,8 +342,16 @@ export function UnlockAccount(arg1) {
   return window['go']['main']['App']['UnlockAccount'](arg1);
 }
 
+export function UpdateEmoji(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateEmoji'](arg1, arg2, arg3);
+}
+
 export function UpdateServer(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateServer'](arg1, arg2, arg3, arg4);
+}
+
+export function UploadEmojiFiles() {
+  return window['go']['main']['App']['UploadEmojiFiles']();
 }
 
 export function UploadFile(arg1) {
