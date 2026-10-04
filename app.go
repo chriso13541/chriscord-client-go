@@ -853,6 +853,7 @@ type serverMsg struct {
 	Channels      map[string][]string `json:"channels"`
 	Reconnecting  map[string][]string `json:"reconnecting"` // voice_state: dropped mid-call, expected back
 	MuteStates    map[string]MuteState `json:"mute_states"` // voice_state: everyone's current mute/deafen
+	VideoOn       []string            `json:"video_on"`    // voice_state: who has their camera on
 	SDP           string              `json:"sdp"`
 	Candidate     string              `json:"candidate"`
 	SDPMid        string              `json:"sdp_mid"`
@@ -884,7 +885,7 @@ type historyEvent struct {
 type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"` }
 type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }
 type typingEvent struct { Username string `json:"username"`; Typing bool `json:"typing"` }
-type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"` }
+type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"`; VideoOn []string `json:"video_on"` }
 
 // MuteState is one person's mute/deafen in a voice_state update.
 type MuteState struct {
@@ -1067,7 +1068,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "rooms_updated":
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
-			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels, Reconnecting: msg.Reconnecting, MuteStates: msg.MuteStates})
+			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels, Reconnecting: msg.Reconnecting, MuteStates: msg.MuteStates, VideoOn: msg.VideoOn})
 		case "voice_answer":
 			a.handleVoiceAnswer(msg.SDP)
 		case "voice_ice":

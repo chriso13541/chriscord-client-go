@@ -54,6 +54,7 @@ type VoiceSession struct {
 	speakerName string
 	pc          *webrtc.PeerConnection
 	localTrack  *webrtc.TrackLocalStaticSample
+	videoTrack  *webrtc.TrackLocalStaticSample // this app's camera, see video.go
 	encoder     *opus.Encoder
 
 	captureStream   *portaudio.Stream
@@ -326,6 +327,10 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 		deafened:    &a.voiceDeafened,
 	}
 
+	// The camera's send-only section — last, after every audio section
+	// (the server maps the audio ones by position). See video.go.
+	session.addVideoSender()
+
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
 			return
@@ -348,7 +353,11 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 	})
 
 	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		log.Printf("voice: OnTrack fired, track id=%s", track.ID())
+		log.Printf("voice: OnTrack fired, track id=%s kind=%s", track.ID(), track.Kind())
+		if track.Kind() == webrtc.RTPCodecTypeVideo {
+			session.handleRemoteVideo(track)
+			return
+		}
 		session.handleRemoteTrack(track)
 	})
 
