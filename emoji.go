@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,20 +38,22 @@ func (a *App) GetEmojis() ([]CustomEmoji, error) {
 	return list, nil
 }
 
-// EmojiUploadResult is one file's outcome from UploadEmojiFiles.
-type EmojiUploadResult struct {
-	File  string `json:"file"`
-	Name  string `json:"name"`
-	Error string `json:"error"`
+// EmojiFile is an image picked to become an emoji: where it is, a
+// suggested name (from the file name, made unique), and a preview the
+// "Add Emoji" window shows while you pick names.
+type EmojiFile struct {
+	Path    string `json:"path"`
+	File    string `json:"file"`
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	Preview string `json:"preview"`
 }
 
-const maxEmojiBytes = 512 << 10
-
-// UploadEmojiFiles opens a file dialog (several files allowed) and adds
-// each picked image as an emoji named after its file — cleaned up to
-// letters, numbers and underscores, with _2, _3… added if the name is
-// taken. Rename them afterwards if needed. Cancelling returns nothing.
-func (a *App) UploadEmojiFiles() ([]EmojiUploadResult, error) {
+// PickEmojiFiles opens a file dialog (several files allowed) and returns
+// the picked images with suggested names; nothing is uploaded yet.
+// `pending` are names already chosen for other files waiting to upload,
+// so suggestions don't clash with them either.
+func (a *App) PickEmojiFiles(pending []string) ([]EmojiFile, error) {
 	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Choose emoji images",
 		Filters: []runtime.FileFilter{{DisplayName: "Images (PNG, JPEG, GIF, WebP)", Pattern: "*.png;*.jpg;*.jpeg;*.gif;*.webp"}},
@@ -59,6 +62,9 @@ func (a *App) UploadEmojiFiles() ([]EmojiUploadResult, error) {
 		return nil, err
 	}
 	taken := map[string]bool{}
+	for _, n := range pending {
+		taken[strings.ToLower(n)] = true
+	}
 	if list, err := a.GetEmojis(); err == nil {
 		for _, e := range list {
 			if !e.Hidden {
@@ -66,26 +72,35 @@ func (a *App) UploadEmojiFiles() ([]EmojiUploadResult, error) {
 			}
 		}
 	}
-	var results []EmojiUploadResult
+	var out []EmojiFile
 	for _, p := range paths {
-		res := EmojiUploadResult{File: filepath.Base(p)}
 		data, err := os.ReadFile(p)
-		switch {
-		case err != nil:
-			res.Error = err.Error()
-		case len(data) > maxEmojiBytes:
-			res.Error = "bigger than 512 KB"
-		default:
-			res.Name = freeEmojiName(emojiNameFromFile(p), taken)
-			if _, err := a.uploadEmoji(res.Name, data); err != nil {
-				res.Error = err.Error()
-			} else {
-				taken[strings.ToLower(res.Name)] = true
-			}
+		if err != nil {
+			continue
 		}
-		results = append(results, res)
+		mime := pfpMime(data)
+		switch mime {
+		case "image/png", "image/jpeg", "image/gif", "image/webp":
+		default:
+			continue // not an image the server takes
+		}
+		name := freeEmojiName(emojiNameFromFile(p), taken)
+		taken[strings.ToLower(name)] = true
+		out = append(out, EmojiFile{
+			Path: p, File: filepath.Base(p), Name: name, Size: int64(len(data)),
+			Preview: "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data),
+		})
 	}
-	return results, nil
+	return out, nil
+}
+
+// UploadEmojiFile uploads one picked image as an emoji called `name`.
+func (a *App) UploadEmojiFile(path, name string) (*CustomEmoji, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return a.uploadEmoji(name, data)
 }
 
 // emojiNameFromFile turns "Party Parrot (2).gif" into "Party_Parrot_2".

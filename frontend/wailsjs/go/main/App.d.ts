@@ -114,6 +114,8 @@ export function PickBackgroundImage():Promise<string>;
 
 export function PickBanner():Promise<string>;
 
+export function PickEmojiFiles(arg1:Array<string>):Promise<Array<main.EmojiFile>>;
+
 export function PickFiles():Promise<Array<string>>;
 
 export function PickPfp():Promise<string>;
@@ -176,7 +178,7 @@ export function UpdateEmoji(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<main.SavedServer>>;
 
-export function UploadEmojiFiles():Promise<Array<main.EmojiUploadResult>>;
+export function UploadEmojiFile(arg1:string,arg2:string):Promise<main.CustomEmoji>;
 
 export function UploadFile(arg1:string):Promise<main.UploadResult>;
 

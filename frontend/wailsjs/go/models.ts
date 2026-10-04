@@ -196,20 +196,24 @@ export namespace main {
 	        this.created_by = source["created_by"];
 	    }
 	}
-	export class EmojiUploadResult {
+	export class EmojiFile {
+	    path: string;
 	    file: string;
 	    name: string;
-	    error: string;
+	    size: number;
+	    preview: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new EmojiUploadResult(source);
+	        return new EmojiFile(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
 	        this.file = source["file"];
 	        this.name = source["name"];
-	        this.error = source["error"];
+	        this.size = source["size"];
+	        this.preview = source["preview"];
 	    }
 	}
 	export class InviteInfo {

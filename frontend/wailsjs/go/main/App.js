@@ -226,6 +226,10 @@ export function PickBanner() {
   return window['go']['main']['App']['PickBanner']();
 }
 
+export function PickEmojiFiles(arg1) {
+  return window['go']['main']['App']['PickEmojiFiles'](arg1);
+}
+
 export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }
@@ -350,8 +354,8 @@ export function UpdateServer(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateServer'](arg1, arg2, arg3, arg4);
 }
 
-export function UploadEmojiFiles() {
-  return window['go']['main']['App']['UploadEmojiFiles']();
+export function UploadEmojiFile(arg1, arg2) {
+  return window['go']['main']['App']['UploadEmojiFile'](arg1, arg2);
 }
 
 export function UploadFile(arg1) {

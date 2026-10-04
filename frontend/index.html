@@ -607,6 +607,17 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
 .em-row .btn { padding:4px 10px; font-size:.8rem; }
 .em-row .em-del.confirm { color:var(--red); }
 .em-empty { padding:24px; text-align:center; color:var(--text-muted); font-size:.88rem; }
+.em-row .em-edit { display:inline-flex; border:none; background:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:4px; }
+.em-row .em-edit:hover { color:var(--text-strong); background:var(--bg-light); }
+.em-row .em-edit .ic { width:16px; height:16px; }
+.em-row.flash { animation:em-flash 1.2s ease-out; }
+@keyframes em-flash { from { background:var(--accent-dim); } to { background:transparent; } }
+.em-row .em-name.bad { border-color:var(--red); }
+.em-row .em-err { font-size:.75rem; color:var(--red); max-width:150px; }
+.em-row .em-size { font-size:.75rem; color:var(--text-muted); white-space:nowrap; }
+.ep-grid .ep-add { display:flex; align-items:center; justify-content:center; color:var(--text-muted); border:1px dashed var(--border); }
+.ep-grid .ep-add:hover { color:var(--text-strong); border-color:var(--accent); }
+.ep-grid .ep-add .ic { width:22px; height:22px; }
 
 .ep-empty { padding:40px 10px; text-align:center; color:var(--text-muted); font-size:.85rem; }
 .ep-foot { display:flex; align-items:center; gap:10px; padding:8px 12px; border-top:1px solid var(--border); background:var(--bg-dark); min-height:44px; box-sizing:border-box; position:relative; z-index:2; }
@@ -1109,10 +1120,25 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div class="error-msg hidden" id="em-error" style="white-space:pre-line"></div>
     <div class="em-top">
       <button class="btn btn-primary" id="em-upload">Upload emoji</button>
-      <span class="hint">PNG, JPEG, GIF or WebP, up to 512 KB each — pick several at once. Each is named after its file; click a name to change it.</span>
+      <span class="hint">PNG, JPEG, GIF or WebP, any size — pick several at once. Click a name (or the pencil) to rename it.</span>
     </div>
     <div class="em-list" id="em-list"></div>
     <div class="modal-actions"><button class="btn btn-ghost" id="em-close">Close</button></div>
+  </div>
+</div>
+
+<!-- Add emoji: name the picked images, then upload -->
+<div class="modal-overlay hidden" id="modal-emoji-add">
+  <div class="modal emoji-manage">
+    <h2>Add Emoji</h2>
+    <div class="error-msg hidden" id="ea-error" style="white-space:pre-line"></div>
+    <div class="em-top"><span class="hint">Give each one a name — that's what you type between colons, like :party_parrot:. Letters, numbers and _ only, 2–32 characters.</span></div>
+    <div class="em-list" id="ea-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="ea-more" style="margin-right:auto">+ Choose more…</button>
+      <button class="btn btn-ghost" id="ea-cancel">Cancel</button>
+      <button class="btn btn-primary" id="ea-add">Add</button>
+    </div>
   </div>
 </div>
 
@@ -2053,7 +2079,10 @@ const CUSTOM_TOKEN_ESC_RE=/&lt;(a?):([A-Za-z0-9_]{2,32}):([0-9a-fA-F-]{36})&gt;/
 let CUSTOM_BY_ID=new Map(),CUSTOM_BY_NAME=new Map(); // id → emoji; lowercase name → visible emoji
 const customSrc=id=>`/cc-emoji/${id}`;
 const customToken=c=>`<${c.animated?'a':''}:${c.name}:${c.id}>`;
-function customEmojiImg(c){return `<img class="emoji custom" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" title=":${esc(c.name)}:" draggable="false">`;}
+// Animated ones get .emoji-anim: they play a few times, then rest until
+// hovered (see ANIMATION LIMIT — initEmojiAnimationLimit).
+const animCls=c=>c.animated?' emoji-anim':'';
+function customEmojiImg(c){return `<img class="emoji custom${animCls(c)}" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" title=":${esc(c.name)}:" draggable="false">`;}
 function customTokenHTML(name,id){const c=CUSTOM_BY_ID.get(id.toLowerCase());return c?customEmojiImg(c):`:${name}:`;}
 function visibleCustomEmojis(){return [...CUSTOM_BY_ID.values()].filter(c=>!c.hidden);}
 // ":name:" → token, for each visible custom emoji name you typed.
@@ -3484,9 +3513,10 @@ function sbShowLine(el,bottom=false,into=false){
   if(sbDropInto){sbDropInto.classList.remove('sb-drop-into');sbDropInto=null;}
   if(!el){sbDropLine.classList.add('hidden');return;}
   if(into){sbDropLine.classList.add('hidden');el.classList.add('sb-drop-into');sbDropInto=el;return;}
-  const r=el.getBoundingClientRect();
-  sbDropLine.style.left=r.left+'px';sbDropLine.style.width=r.width+'px';
-  sbDropLine.style.top=((bottom?r.bottom:r.top)-1)+'px';
+  // Screen px → CSS px, so it lines up at any Ctrl +/- zoom.
+  const r=el.getBoundingClientRect(),z=uiScale();
+  sbDropLine.style.left=r.left/z+'px';sbDropLine.style.width=r.width/z+'px';
+  sbDropLine.style.top=((bottom?r.bottom:r.top)/z-1)+'px';
   sbDropLine.classList.remove('hidden');
 }
 function sbFindTarget(x,y){
@@ -5488,7 +5518,7 @@ const expandedReactions=new Set(); // message ids whose bar is expanded
 function reactionEmojiHTML(emoji){
   if(emoji.startsWith('c:')){
     const c=CUSTOM_BY_ID.get(emoji.slice(2).toLowerCase());
-    return c?`<img class="emoji custom" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" draggable="false">`:`<span class="r-text">?</span>`;
+    return c?`<img class="emoji custom${animCls(c)}" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" draggable="false">`:`<span class="r-text">?</span>`;
   }
   const e=EMOJI_BY_CHAR.get(emoji.replace(/\uFE0F/g,''));
   return e?`<img class="emoji" src="${emojiSrc(e[0])}" alt="${e[1]}" draggable="false">`:`<span class="r-text">${esc(emoji)}</span>`;
@@ -5587,8 +5617,10 @@ function emojiButton(e){
   return `<button type="button" data-hex="${e[0]}" title=":${e[2]}:"><img src="${emojiSrc(e[0])}" alt="${e[1]}" loading="lazy" draggable="false"></button>`;
 }
 function customButton(c){
-  return `<button type="button" data-hex="c:${esc(c.id)}" title=":${esc(c.name)}:"><img src="${customSrc(c.id)}" alt=":${esc(c.name)}:" loading="lazy" draggable="false"></button>`;
+  return `<button type="button" data-hex="c:${esc(c.id)}" title=":${esc(c.name)}:"><img class="${animCls(c).trim()}" src="${customSrc(c.id)}" alt=":${esc(c.name)}:" loading="lazy" draggable="false"></button>`;
 }
+// The picker's "Add emoji" tile (Manage Emoji only).
+const addEmojiTile=()=>`<button type="button" class="ep-add" title="Add emoji">${icon('add')}</button>`;
 function emojiKeyButton(h){
   return h.startsWith('c:')?customButton(CUSTOM_BY_ID.get(h.slice(2).toLowerCase())):emojiButton(EMOJI_BY_HEX.get(h));
 }
@@ -5614,7 +5646,8 @@ function buildEmojiPicker(){
     const recent=getRecentEmoji();
     const customs=visibleCustomEmojis(),manage=can(PERM.EMOJI);
     const serverSec=(customs.length||manage)?`<div class="ep-section" data-sec="server"><div class="ep-section-title">${esc(state.serverName||'Server')}${manage?'<button type="button" class="ep-manage">Manage</button>':''}</div>`+
-      (customs.length?`<div class="ep-grid">${customs.map(customButton).join('')}</div>`:'<div class="ep-none">No custom emoji yet.</div>')+'</div>':'';
+      ((customs.length||manage)?`<div class="ep-grid">${customs.map(customButton).join('')}${manage?addEmojiTile():''}</div>`:'')+
+      (!customs.length?`<div class="ep-none">${manage?'No custom emoji yet \u2014 add some with the + above.':'No custom emoji yet.'}</div>`:'')+'</div>':'';
     const railBtn=p.querySelector('.ep-rail-server');
     railBtn.style.display=serverSec?'':'none';
     railBtn.innerHTML=customs.length?`<img src="${customSrc(customs[0].id)}" alt="" style="object-fit:contain">`:icon('add_reaction');
@@ -5652,6 +5685,7 @@ function buildEmojiPicker(){
   const prevImg=p.querySelector('.ep-prev'),prevName=p.querySelector('.ep-name');
   main.addEventListener('mouseover',e=>{
     const b=e.target.closest('.ep-grid button');if(!b)return;
+    if(b.classList.contains('ep-add')){prevImg.style.visibility='hidden';prevName.textContent='Add a custom emoji';return;}
     if(b.dataset.hex.startsWith('c:')){
       const c=CUSTOM_BY_ID.get(b.dataset.hex.slice(2).toLowerCase());if(!c)return;
       prevImg.src=customSrc(c.id);prevImg.style.visibility='visible';prevName.textContent=`:${c.name}:`;return;
@@ -5661,7 +5695,24 @@ function buildEmojiPicker(){
   });
   main.addEventListener('click',e=>{
     if(e.target.closest('.ep-manage')){closeEmojiPicker();openEmojiManager();return;}
+    if(e.target.closest('.ep-add')){closeEmojiPicker();startAddEmoji();return;}
     const b=e.target.closest('.ep-grid button');if(b)pickEmoji(b.dataset.hex,e.shiftKey);
+  });
+  // Right-click a server emoji to rename, hide or delete it.
+  main.addEventListener('contextmenu',e=>{
+    const b=e.target.closest('.ep-grid button[data-hex^="c:"]');
+    if(!b||!can(PERM.EMOJI))return;
+    e.preventDefault();
+    const c=CUSTOM_BY_ID.get(b.dataset.hex.slice(2).toLowerCase());if(!c)return;
+    showContextMenu([
+      {label:'Rename',icon:'edit',action:()=>{closeEmojiPicker();openEmojiManager(c.id);}},
+      {label:'Hide from picker',action:async()=>{
+        try{await window.go.main.App.UpdateEmoji(c.id,c.name,true);toast(`:${c.name}: is hidden \u2014 old messages still show it.`);}catch(err){toast(String(err),true);}
+        loadCustomEmojis();
+      }},
+      '-',
+      {label:'Manage emoji\u2026',icon:'settings',action:()=>{closeEmojiPicker();openEmojiManager();}},
+    ],e.clientX,e.clientY);
   });
   p.querySelectorAll('.ep-credit a').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
   p.renderAll=renderAll;p.updateRail=updateRail;
@@ -5750,11 +5801,16 @@ function initEmojiPicker(){
 // takes one out of the picker without breaking old messages; Delete is
 // for good (asks once more). Hidden ones — e.g. emoji imported from other
 // Discord servers — are listed separately.
-function openEmojiManager(){
+// focusId: start renaming that emoji.
+function openEmojiManager(focusId){
   if(!can(PERM.EMOJI))return;
   document.getElementById('em-error').classList.add('hidden');
   document.getElementById('modal-emoji').classList.remove('hidden');
   renderEmojiManager();
+  if(focusId){
+    const row=document.querySelector(`#em-list .em-row[data-id="${CSS.escape(focusId)}"]`);
+    if(row){row.scrollIntoView({block:'center'});row.classList.add('flash');const inp=row.querySelector('.em-name');inp.focus();inp.select();}
+  }
   loadCustomEmojis();
 }
 function closeEmojiManager(){document.getElementById('modal-emoji').classList.add('hidden');}
@@ -5769,6 +5825,7 @@ function renderEmojiManager(){
   const row=c=>`<div class="em-row" data-id="${esc(c.id)}">
     <img src="${customSrc(c.id)}" alt="">
     <input class="em-name" value="${esc(c.name)}" maxlength="32" spellcheck="false" title="Click to rename">
+    <button class="em-edit" type="button" title="Rename">${icon('edit')}</button>
     ${c.created_by?`<span class="em-by" title="Uploaded by ${esc(c.created_by)}">${esc(c.created_by)}</span>`:''}
     <button class="btn btn-ghost em-hide" type="button">${c.hidden?'Show':'Hide'}</button>
     <button class="btn btn-ghost em-del" type="button" title="Delete">${icon('delete')}</button></div>`;
@@ -5782,16 +5839,7 @@ function initEmojiManager(){
   document.getElementById('em-close').addEventListener('click',closeEmojiManager);
   modal.addEventListener('click',e=>{if(e.target===modal)closeEmojiManager();});
   modal.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.target.classList.contains('em-name')){e.stopPropagation();closeEmojiManager();}});
-  document.getElementById('em-upload').addEventListener('click',async()=>{
-    emojiManagerError('');
-    let results;
-    try{results=await window.go.main.App.UploadEmojiFiles()||[];}catch(err){emojiManagerError('Upload failed: '+err);return;}
-    const failed=results.filter(r=>r.error);
-    if(failed.length)emojiManagerError(failed.map(r=>`${r.file}: ${r.error}`).join('\n'));
-    const ok=results.length-failed.length;
-    if(ok)toast(`Added ${ok} emoji.`);
-    loadCustomEmojis();
-  });
+  document.getElementById('em-upload').addEventListener('click',()=>{emojiManagerError('');startAddEmoji();});
   const save=async input=>{
     const id=input.closest('.em-row').dataset.id,c=CUSTOM_BY_ID.get(id.toLowerCase());
     const name=input.value.trim();
@@ -5811,6 +5859,7 @@ function initEmojiManager(){
     const rowEl=e.target.closest('.em-row');if(!rowEl)return;
     const c=CUSTOM_BY_ID.get(rowEl.dataset.id.toLowerCase());if(!c)return;
     const hideBtn=e.target.closest('.em-hide'),delBtn=e.target.closest('.em-del');
+    if(e.target.closest('.em-edit')){const inp=rowEl.querySelector('.em-name');inp.focus();inp.select();return;}
     if(hideBtn){
       try{await window.go.main.App.UpdateEmoji(c.id,c.name,!c.hidden);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
       loadCustomEmojis();
@@ -5823,6 +5872,98 @@ function initEmojiManager(){
       try{await window.go.main.App.DeleteEmoji(c.id);emojiManagerError('');}catch(err){emojiManagerError(String(err));}
       loadCustomEmojis();
     }
+  });
+}
+
+// ── ADD EMOJI ────────────────────────────────────────────────────
+// Pick images (several at once), see them with a suggested name each
+// (from the file name), fix the names, then Add. Each name is checked as
+// you type: the format, and not already used by another emoji (visible
+// ones) or another file in the list. Failed uploads stay in the list with
+// the reason, so you can fix the name and press Add again.
+const addEmoji={items:[]}; // {path,file,name,size,preview,error}
+const fmtSize=n=>n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(0)} KB`:`${(n/1048576).toFixed(1)} MB`;
+async function startAddEmoji(){
+  if(!can(PERM.EMOJI)){toast('You don\u2019t have permission to manage emoji on this server',true);return;}
+  let files;
+  try{files=await window.go.main.App.PickEmojiFiles(addEmoji.items.map(i=>i.name))||[];}
+  catch(err){toast('Couldn\u2019t open those files: '+err,true);return;}
+  if(!files.length&&!addEmoji.items.length)return;
+  addEmoji.items.push(...files.map(f=>({...f,error:''})));
+  document.getElementById('ea-error').classList.add('hidden');
+  document.getElementById('modal-emoji-add').classList.remove('hidden');
+  renderAddEmoji();
+  document.querySelector('#ea-list .em-name')?.focus();
+}
+function addEmojiNameProblem(item){
+  const n=item.name.trim();
+  if(!/^[A-Za-z0-9_]{2,32}$/.test(n))return 'Letters, numbers and _ only, 2\u201332 characters';
+  if(CUSTOM_BY_NAME.has(n.toLowerCase()))return `There\u2019s already a :${n}:`;
+  if(addEmoji.items.some(o=>o!==item&&o.name.trim().toLowerCase()===n.toLowerCase()))return 'Two files have this name';
+  return '';
+}
+function renderAddEmoji(){
+  const list=document.getElementById('ea-list');
+  if(!addEmoji.items.length){closeAddEmoji();return;}
+  list.innerHTML=addEmoji.items.map((it,i)=>{
+    const prob=it.error||addEmojiNameProblem(it);
+    return `<div class="em-row" data-i="${i}">
+      <img src="${it.preview}" alt="" title="${esc(it.file)}">
+      <input class="em-name${prob?' bad':''}" value="${esc(it.name)}" maxlength="32" spellcheck="false">
+      ${prob?`<span class="em-err">${esc(prob)}</span>`:`<span class="em-size" title="${esc(it.file)}">${fmtSize(it.size)}</span>`}
+      <button class="btn btn-ghost ea-remove" type="button" title="Don\u2019t add this one">${icon('close')}</button></div>`;
+  }).join('');
+}
+function closeAddEmoji(){
+  addEmoji.items=[];
+  document.getElementById('modal-emoji-add').classList.add('hidden');
+}
+function initAddEmoji(){
+  const modal=document.getElementById('modal-emoji-add'),list=document.getElementById('ea-list');
+  document.getElementById('ea-cancel').addEventListener('click',closeAddEmoji);
+  document.getElementById('ea-more').addEventListener('click',startAddEmoji);
+  modal.addEventListener('click',e=>{if(e.target===modal)closeAddEmoji();});
+  modal.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();closeAddEmoji();}});
+  list.addEventListener('input',e=>{
+    if(!e.target.classList.contains('em-name'))return;
+    const row=e.target.closest('.em-row'),it=addEmoji.items[+row.dataset.i];
+    it.name=e.target.value;it.error='';
+    // Re-check every row (a rename can clear or cause a clash elsewhere),
+    // without re-rendering the box you're typing in.
+    list.querySelectorAll('.em-row').forEach(r=>{
+      const item=addEmoji.items[+r.dataset.i],prob=addEmojiNameProblem(item);
+      r.querySelector('.em-name').classList.toggle('bad',!!prob);
+      const tail=r.querySelector('.em-err,.em-size');
+      tail.className=prob?'em-err':'em-size';
+      tail.textContent=prob||fmtSize(item.size);
+    });
+  });
+  list.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.classList.contains('em-name')){e.preventDefault();document.getElementById('ea-add').click();}});
+  list.addEventListener('click',e=>{
+    const rm=e.target.closest('.ea-remove');if(!rm)return;
+    addEmoji.items.splice(+rm.closest('.em-row').dataset.i,1);renderAddEmoji();
+  });
+  const addBtn=document.getElementById('ea-add');
+  addBtn.addEventListener('click',async()=>{
+    const bad=addEmoji.items.filter(it=>addEmojiNameProblem(it));
+    if(bad.length){
+      const err=document.getElementById('ea-error');err.textContent='Fix the names marked in red first.';err.classList.remove('hidden');
+      renderAddEmoji();return;
+    }
+    document.getElementById('ea-error').classList.add('hidden');
+    addBtn.disabled=true;addBtn.textContent='Adding\u2026';
+    let added=0;
+    for(const it of [...addEmoji.items]){
+      try{
+        const c=await window.go.main.App.UploadEmojiFile(it.path,it.name.trim());
+        added++;addEmoji.items.splice(addEmoji.items.indexOf(it),1);
+        if(c)CUSTOM_BY_NAME.set(c.name.toLowerCase(),c); // so later names in this batch see it as taken
+      }catch(err){it.error=String(err).replace(/^Error: /,'');}
+    }
+    addBtn.disabled=false;addBtn.textContent='Add';
+    if(added)toast(`Added ${added} emoji.`);
+    loadCustomEmojis();
+    renderAddEmoji(); // closes when everything went up
   });
 }
 
@@ -6539,7 +6680,20 @@ function animationLoopMs(b){
   }catch{return 0;}
   return total;
 }
-async function animatedInfo(url){
+// Custom emoji (/cc-emoji/<id>) never change and can be on screen dozens
+// of times, so each one's file and still frame are worked out only once.
+const emojiAnimInfo=new Map(),emojiStill=new Map();
+function animatedInfo(url){
+  if(!url.startsWith('/cc-emoji/'))return readAnimatedInfo(url);
+  if(!emojiAnimInfo.has(url))emojiAnimInfo.set(url,readAnimatedInfo(url).catch(()=>null));
+  return emojiAnimInfo.get(url);
+}
+function stillFrameFor(url,blob){
+  if(!url.startsWith('/cc-emoji/'))return stillFrame(blob);
+  if(!emojiStill.has(url))emojiStill.set(url,stillFrame(blob).catch(e=>{emojiStill.delete(url);throw e;}));
+  return emojiStill.get(url);
+}
+async function readAnimatedInfo(url){
   const blob=await (await fetch(url)).blob();
   const loopMs=animationLoopMs(new Uint8Array(await blob.arrayBuffer()));
   return loopMs?{blob,loopMs}:null;
@@ -6567,7 +6721,7 @@ async function limitAnimationOn(srcUrl,show,hoverEl){
   const pause=async()=>{
     timer=null;
     if(hovered){arm();return;} // still being looked at — keep going
-    try{still=still||await stillFrame(info.blob);}catch{return;}
+    try{still=still||await stillFrameFor(srcUrl,info.blob);}catch{return;}
     if(!hoverEl.isConnected)return;
     show(still);hoverEl.classList.add('anim-paused');
     if(playing!==srcUrl){URL.revokeObjectURL(playing);playing=srcUrl;}
@@ -6592,6 +6746,21 @@ async function limitAnimationOn(srcUrl,show,hoverEl){
   arm();
 }
 function limitAnimation(img,url){limitAnimationOn(url,u=>{img.src=u;},img);}
+// Animated custom emoji anywhere in the app (messages, replies, reactions,
+// the picker, the emoji windows) get the same limit as soon as they appear.
+function initEmojiAnimationLimit(){
+  const apply=root=>{
+    const imgs=root.matches?.('img.emoji-anim')?[root]:[...(root.querySelectorAll?.('img.emoji-anim:not([data-anim])')||[])];
+    for(const img of imgs){
+      if(img.dataset.anim)continue;
+      img.dataset.anim='1';
+      limitAnimation(img,img.getAttribute('src'));
+    }
+  };
+  new MutationObserver(muts=>{for(const m of muts)for(const n of m.addedNodes)if(n.nodeType===1)apply(n);})
+    .observe(document.body,{childList:true,subtree:true});
+  apply(document.body);
+}
 function limitBannerAnimation(header,url){
   const img=document.getElementById('sidebar-banner-img');
   limitAnimationOn(url,u=>{if(serverBannerURL===url)img.src=u;},header);
@@ -7306,6 +7475,8 @@ function init(){
   initPresence();
   initSidebarDrag();
   initEmojiManager();
+  initAddEmoji();
+  initEmojiAnimationLimit();
   initEmojiPicker();
   initVoiceUserMenu();
   initAudioSettingsUI();
