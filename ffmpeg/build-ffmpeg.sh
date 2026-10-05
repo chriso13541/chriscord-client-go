@@ -21,10 +21,24 @@
 # (RTX 30-series and newer, RX 6000+, Intel Arc/11th gen+). About
 # 12–17 MB instead of ~165 MB for a full build.
 #
-# Needs: a C compiler, make, nasm, pkg-config, curl; for Windows also
-# mingw-w64 (Debian/Ubuntu: sudo apt install build-essential nasm pkg-config curl mingw-w64).
-# Run it in WSL/Linux (also for the Windows build — it cross-compiles).
-# Building inside /mnt/c is slow; point WORK somewhere on the Linux side:
+# It also captures, for chriscord's native webcam and screen sharing
+# (../capture.go): webcams through DirectShow (Windows) / V4L2 (Linux), and
+# screens through Windows Graphics Capture (gfxcapture: a monitor or a
+# single window, kept on the graphics card start to finish — scaled and
+# converted there with scale_d3d11 and fed straight to NVENC / Media
+# Foundation) with Desktop Duplication (ddagrab) as a fallback, or X11
+# (xcbgrab) on Linux. Output is raw H.264 on a pipe.
+#
+# Needs: a C and C++ compiler, make, nasm, pkg-config, curl.
+#   Windows build from WSL/Linux (cross-compiles):
+#     sudo apt install build-essential nasm pkg-config curl mingw-w64
+#   Windows build from MSYS2 (in the "MSYS2 UCRT64" shell) — use this if the
+#   WSL build reports gfxcapture as missing (WSL's mingw-w64 may be too old
+#   for the Windows Graphics Capture headers; MSYS2's is always current):
+#     pacman -S --needed make curl mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-pkgconf
+#   Linux build:
+#     sudo apt install build-essential nasm pkg-config curl libxcb1-dev libxcb-shm0-dev libxcb-xfixes0-dev libxcb-shape0-dev
+# From WSL, building inside /mnt/c is slow; point WORK at the Linux side:
 #   WORK=~/ffmpeg-build-windows sh ffmpeg/build-ffmpeg.sh windows
 # After changing any version below, delete the WORK folder first: sources
 # and installed headers are reused if they're already there.
@@ -38,7 +52,7 @@ set -eu
 TARGET=${1:-}
 case "$TARGET" in windows|linux) ;; *) echo "usage: $0 windows|linux" >&2; exit 2 ;; esac
 
-FFMPEG_VER=n8.1          # FFmpeg release tag
+FFMPEG_VER=n8.1.3        # FFmpeg release tag
 X264_REF=stable          # x264 branch
 NVHDR_REF=n12.1.14.0     # nv-codec-headers (NVENC) tag. This sets the OLDEST NVIDIA driver
                          # NVENC will work with: 12.1 needs 531.61+ (Windows) / 530.41+ (Linux);
@@ -59,19 +73,32 @@ get "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/refs/tags/$FFMPEG_VER" ffm
 get "https://codeload.github.com/mirror/x264/tar.gz/refs/heads/$X264_REF" x264-src
 get "https://codeload.github.com/FFmpeg/nv-codec-headers/tar.gz/refs/tags/$NVHDR_REF" nvhdr-src
 
-if [ "$TARGET" = windows ]; then
+case "$(uname -s)" in MINGW*|MSYS*|UCRT*|CLANG*) NATIVE_WIN=1 ;; *) NATIVE_WIN=0 ;; esac
+if [ "$TARGET" = windows ] && [ "$NATIVE_WIN" = 1 ]; then
+  # MSYS2: building on Windows for Windows — no cross-compiling.
+  CROSS=""
+  X264_HOST=""
+  FF_TARGET=""
+elif [ "$TARGET" = windows ]; then
   CROSS=x86_64-w64-mingw32-
   X264_HOST="--host=x86_64-w64-mingw32 --cross-prefix=$CROSS"
   FF_TARGET="--arch=x86_64 --target-os=mingw32 --cross-prefix=$CROSS"
+fi
+if [ "$TARGET" = windows ]; then
   HW_ENC="h264_nvenc,h264_mf"
   EXE=ffmpeg.exe
-  EXTRA_LIBS="-static -static-libgcc"
+  EXTRA_LIBS="-static -static-libgcc -static-libstdc++"
+  # Capture: webcams (DirectShow), screens/windows (Windows Graphics
+  # Capture, Desktop Duplication fallback), GPU scaling/conversion.
+  CAPTURE="--enable-indev=dshow --enable-filter=gfxcapture,ddagrab,scale_d3d11,hwupload,hwmap"
 else
   X264_HOST=""
   FF_TARGET=""
   HW_ENC="h264_nvenc"
   EXE=ffmpeg
   EXTRA_LIBS=""
+  # Capture: webcams (V4L2), X11 screens (also XWayland windows).
+  CAPTURE="--enable-indev=v4l2,xcbgrab --enable-libxcb --enable-libxcb-shm --enable-libxcb-xfixes --enable-libxcb-shape --enable-filter=hwupload"
 fi
 
 echo "== nv-codec-headers"
@@ -90,12 +117,13 @@ PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure $FF_TARGET \
   --enable-hwaccel=h264_nvdec,hevc_nvdec,vp9_nvdec,av1_nvdec,mpeg2_nvdec,vc1_nvdec \
   --disable-everything --disable-autodetect --disable-doc --disable-debug --disable-network \
   --disable-ffplay --disable-ffprobe --enable-small \
+  $CAPTURE \
   $( [ "$TARGET" = windows ] && echo --enable-mediafoundation --enable-d3d11va \
        --enable-hwaccel=h264_d3d11va,h264_d3d11va2,hevc_d3d11va,hevc_d3d11va2,vp9_d3d11va,vp9_d3d11va2,av1_d3d11va,av1_d3d11va2,mpeg2_d3d11va,mpeg2_d3d11va2,vc1_d3d11va,vc1_d3d11va2 ) \
   --enable-protocol=file,pipe \
   --enable-demuxer=matroska,mov,avi,mpegts,mpegps,flv,asf,ogg,wav,mp3,aac,ac3,eac3,dts,m4v,h264,hevc,ivf,obu \
-  --enable-muxer=mp4,webm,null \
-  --enable-decoder=wrapped_avframe,h264,hevc,av1,mpeg1video,mpeg2video,mpeg4,msmpeg4v3,vc1,wmv3,vp8,vp9,mjpeg,theora,aac,aac_latm,ac3,eac3,dca,truehd,mlp,mp1,mp2,mp3,flac,alac,opus,vorbis,wmav2,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be \
+  --enable-muxer=mp4,webm,null,h264,flv \
+  --enable-decoder=wrapped_avframe,rawvideo,h264,hevc,av1,mpeg1video,mpeg2video,mpeg4,msmpeg4v3,vc1,wmv3,vp8,vp9,mjpeg,theora,aac,aac_latm,ac3,eac3,dca,truehd,mlp,mp1,mp2,mp3,flac,alac,opus,vorbis,wmav2,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be \
   --enable-encoder=libx264,$HW_ENC,aac \
   --enable-parser=h264,hevc,mpegvideo,mpeg4video,vc1,vp8,vp9,av1,aac,ac3,mpegaudio,dca,flac,opus,vorbis,mlp \
   --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,aac_adtstoasc,vp9_superframe,extract_extradata \
@@ -104,6 +132,27 @@ PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure $FF_TARGET \
     echo "FFmpeg's configure failed. Last lines of $WORK/configure.log"
     echo "(full details: $WORK/ffmpeg-src/ffbuild/config.log):"; tail -15 "$WORK/configure.log"; exit 1; }
 make -j"$JOBS" >/dev/null
+# What chriscord's capture will be able to use.
+have() { grep -q "^$1=yes" ffbuild/config.mak && echo yes || echo NO; }
+echo
+echo "== capture support in this build"
+if [ "$TARGET" = windows ]; then
+  echo "  webcams (dshow):                         $(have CONFIG_DSHOW_INDEV)"
+  echo "  screens/windows on the GPU (gfxcapture): $(have CONFIG_GFXCAPTURE_FILTER)"
+  echo "  screens fallback (ddagrab):              $(have CONFIG_DDAGRAB_FILTER)"
+  echo "  GPU scaling (scale_d3d11):               $(have CONFIG_SCALE_D3D11_FILTER)"
+  echo "  NVIDIA / Media Foundation encoders:      $(have CONFIG_H264_NVENC_ENCODER) / $(have CONFIG_H264_MF_ENCODER)"
+  if ! grep -q "^CONFIG_GFXCAPTURE_FILTER=yes" ffbuild/config.mak; then
+    echo
+    echo "  NOTE: gfxcapture is missing — this compiler's Windows headers are too old"
+    echo "  for Windows Graphics Capture. Screen sharing will fall back to whole-monitor"
+    echo "  ddagrab. For window capture, build under MSYS2 instead (see the top of this file)."
+  fi
+else
+  echo "  webcams (v4l2):          $(have CONFIG_V4L2_INDEV)"
+  echo "  X11 screens (xcbgrab):   $(have CONFIG_XCBGRAB_INDEV)"
+  echo "  NVIDIA encoder:          $(have CONFIG_H264_NVENC_ENCODER)"
+fi
 cd ..
 
 ${CROSS:-}strip -o "$WORK/$EXE" "ffmpeg-src/$EXE"

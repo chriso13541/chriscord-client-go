@@ -239,7 +239,7 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile .vs-name .vs-av { width:18px; height:18px; font-size:.65rem; }
 /* Settings → Video */
 .settings-sub { margin:28px 0 0; padding-top:18px; border-top:1px solid var(--border); font-size:1rem; color:var(--text-strong); }
-#settings-cam-select, #settings-cam-res, #settings-cam-fps { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
+#settings-cam-select, #settings-cam-res, #settings-cam-fps, #settings-cam-enc { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
 #settings-cam-select:disabled, #settings-cam-res:disabled, #settings-cam-fps:disabled { opacity:.5; }
 .cam-row { display:grid; grid-template-columns:2fr 1fr; gap:12px; }
 #cam-preview { position:relative; margin-top:12px; width:100%; max-width:420px; aspect-ratio:16/9; border-radius:8px; overflow:hidden; background:var(--bg-darkest); border:1px solid var(--border); }
@@ -247,6 +247,7 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #cam-preview.live video { display:block; }
 #cam-preview .cam-preview-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--text-muted); font-size:.82rem; }
 #cam-preview.live .cam-preview-empty { display:none; }
+#cam-preview video.cam-native-preview { display:block; position:absolute; inset:0; }
 #cam-preview .cam-preview-empty .ic { width:32px; height:32px; }
 .cam-btns { display:flex; gap:8px; flex-wrap:wrap; }
 .cam-btns .settings-secondary-btn { display:inline-flex; align-items:center; gap:6px; }
@@ -1643,6 +1644,13 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="cam-btns">
         <button id="settings-cam-test-btn" class="settings-secondary-btn" type="button"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg> Test Camera</button>
         <button id="settings-cam-recheck" class="settings-secondary-btn" type="button" title="Look again at what this camera supports (e.g. after a driver update)">Re-check camera</button>
+      </div>
+      <label class="check-row"><input type="checkbox" id="cam-native"> Capture natively (outside the app&rsquo;s web view &mdash; much lighter)</label>
+      <p class="settings-hint" id="cam-native-hint" style="margin-top:-4px"></p>
+      <div id="cam-enc-row">
+        <label class="settings-label" for="settings-cam-enc">Encoder</label>
+        <select id="settings-cam-enc"><option value="auto">Auto</option></select>
+        <p class="settings-hint" id="cam-enc-hint" style="margin-top:4px"></p>
       </div>
       <label class="check-row"><input type="checkbox" id="cam-selfview"> Show my own camera in calls</label>
       <label class="check-row"><input type="checkbox" id="cam-stats"> Show video stats on camera tiles</label>
@@ -6431,12 +6439,33 @@ const modeLabel=m=>{
 const stopStream=s=>s?.getTracks().forEach(t=>t.stop());
 const camKey=id=>'camModes:'+id;
 
+// ── Native capture ──
+// When the bundled FFmpeg can capture (NativeCaptureInfo), the camera is
+// captured and encoded OUTSIDE the web view — DirectShow/V4L2 in, the
+// graphics card's H.264 encoder out, straight into the call (capture.go)
+// — which is much lighter than doing it in the page. Your own preview is
+// then your encoded stream, decoded here like anyone else's. Settings can
+// turn it off ("Capture natively"), and the page path below is used when
+// it's off or unavailable. Camera lists and modes come from the driver in
+// native mode (no probing needed: it reports exactly what it supports).
+const native={available:false,encoder:'',label:'',reason:''};
+const SELF='\u0000self'; // the preview decoder's key in vRemote
+const useNative=()=>native.available&&localStorage.getItem('camNative')!=='0';
+const camDevKey=()=>useNative()?'camDeviceN':'camDevice';
+async function loadNativeCapture(){
+  try{Object.assign(native,await window.go.main.App.NativeCaptureInfo()||{});native.label=native.encoderLabel||'';}catch{}
+}
+
 // Until camera access has been allowed, the system lists each camera with
 // a blank name AND a blank id ("Camera 1") — and a blank id can't be
 // opened. (Allowing the microphone, which Settings asks for, doesn't count:
 // it's per kind.) So when that's the case, ask for camera access once,
 // close it straight away, and list again to get the real ids and names.
 async function listCameras({unlock=true}={}){
+  if(useNative()){
+    const cams=await window.go.main.App.ListCameras().catch(err=>{throw new Error(String(err));});
+    return (cams||[]).map(c=>({deviceId:c.id,label:c.name}));
+  }
   const list=async()=>{try{return (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');}catch{return [];}};
   let cams=await list();
   if(unlock&&cams.some(c=>!c.deviceId||!c.label)&&navigator.mediaDevices?.getUserMedia){
@@ -6460,12 +6489,18 @@ function camErrorText(err){
 // The camera to use: the saved one if it's still connected, else the first.
 async function pickCamera(){
   const cams=await listCameras();
-  const saved=localStorage.getItem('camDevice')||'';
+  const saved=localStorage.getItem(camDevKey())||'';
   return cams.find(c=>saved&&c.deviceId===saved)||cams[0]||null;
 }
 // Which sizes (and the best frame rate at each) this camera really has.
 // onProgress(done,total) for the settings page; cached per camera.
 async function probeCameraModes(deviceId,{force=false,onProgress}={}){
+  if(useNative()){
+    // The driver says exactly what it supports: no need to try sizes.
+    const modes=await window.go.main.App.CameraModes(deviceId).catch(err=>{throw new Error(String(err));});
+    localStorage.setItem(camKey(deviceId),JSON.stringify({modes:modes||[],at:Date.now()}));
+    return modes||[];
+  }
   if(!force){try{const c=JSON.parse(localStorage.getItem(camKey(deviceId))||'null');if(c?.modes?.length)return c.modes;}catch{}}
   const gum=v=>navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:deviceId},...v}});
   // Its largest size first, to skip asking for anything bigger.
@@ -6556,13 +6591,39 @@ const codecLabel=cfg=>!cfg?'':cfg.codec.startsWith('avc1')?(cfg.hardwareAccelera
 async function toggleCamera(){
   if(cam.on||cam.starting){const was=cam.on;stopCamera();if(was)playSound('webcam_stop');return;}
   if(!inMyCall()){toast('Join a voice channel to turn on your camera',true);return;}
-  if(!camSupported()){toast('Cameras aren\u2019t supported in this version of the app\u2019s web view',true);return;}
+  if(!camSupported()&&!useNative()){toast('Cameras aren\u2019t supported in this version of the app\u2019s web view',true);return;}
   cam.starting=true;updateCameraButton();
   try{await startCamera();playSound('webcam_start');}
   catch(err){toast('Camera: '+(err?.message||err),true);stopCamera(true);}
   finally{cam.starting=false;updateCameraButton();}
 }
+// Opens the camera in FFmpeg. send: into the call; preview: frames back
+// here for your own view.
+async function startNativeCamera({send,preview}){
+  const device=await pickCamera();
+  if(!device)throw new Error('No camera found');
+  const modes=await probeCameraModes(device.deviceId);
+  const mode=chooseMode(modes);
+  if(!mode)throw new Error('Couldn\u2019t find a size this camera supports');
+  const native_=modes.find(m=>m.w===mode.w&&m.h===mode.h);
+  const label=await window.go.main.App.StartCamera({id:device.deviceId,w:mode.w,h:mode.h,fps:mode.fps,modeFps:native_.fps,format:native_.format||'',send,preview,
+      encoder:localStorage.getItem('camEncoder')||'auto'})
+    .catch(err=>{throw new Error(String(err).replace(/^Error: /,''));});
+  return {...mode,label};
+}
 async function startCamera(){
+  // Native capture needs the call's track to be H.264 (it always is
+  // unless this app's page couldn't do H.264 when the call was joined).
+  if(useNative()&&((await window.go.main.App.VideoSendCodec().catch(()=>''))||'h264')==='h264'){
+    const mode=await startNativeCamera({send:true,preview:localStorage.getItem('selfView')!=='0'});
+    if(!inMyCall()){window.go.main.App.StopCamera();throw new Error('You left the call');}
+    Object.assign(cam,{native:true,stream:null,mode,fps:mode.fps,codecLabel:mode.label||native.label,on:true,actualFps:0});
+    await window.go.main.App.SetVideoEnabled(true).catch(()=>{});
+    cam.announcedAt=Date.now();
+    renderVideoStage();renderSidebar();
+    return;
+  }
+  cam.native=false;
   const device=await pickCamera();
   if(!device)throw new Error('No camera found');
   const modes=await probeCameraModes(device.deviceId);
@@ -6649,6 +6710,11 @@ function onCamChunk(chunk){
 function stopCamera(quiet){
   const was=cam.on;
   cam.on=false;cam.starting=false;
+  if(cam.native){
+    cam.native=false;
+    window.go.main.App.StopCamera().catch(()=>{});
+    dropRemoteVideo(SELF);
+  }
   try{cam.reader?.cancel();}catch{}
   clearInterval(cam.timer);
   try{if(cam.encoder&&cam.encoder.state!=='closed')cam.encoder.close();}catch{}
@@ -6709,6 +6775,7 @@ function configureDecoder(user,r,codec){
   r.decoder.configure({codec:codec==='h264'?'avc1.640034':'vp8',optimizeForLatency:true,hardwareAcceleration:'no-preference'});
 }
 function askKeyframe(user,r){
+  if(user===SELF)return; // our own stream has a keyframe every 2 s anyway
   const now=Date.now();
   if(now-r.lastKeyReq<1000)return;
   r.lastKeyReq=now;
@@ -6721,8 +6788,13 @@ function dropRemoteVideo(user){
   try{r.writer?.close();}catch{}
   try{r.gen?.stop();}catch{}
 }
-function onVideoFrame(f){
-  if(!f?.user||!state.voiceVideo.has(f.user)||!inMyCall())return;
+// Your own camera's encoded frames (native capture), for your preview.
+function onSelfPreview(f){
+  if(!f?.data||!((cam.on&&cam.native)||camPreview.native))return;
+  onVideoFrame({...f,user:SELF,codec:'h264'},true);
+}
+function onVideoFrame(f,self){
+  if(!self&&(!f?.user||!state.voiceVideo.has(f.user)||!inMyCall()))return;
   const r=remoteVideo(f.user);if(!r)return;
   const codec=f.codec||'vp8';
   r.stats.recv++;r.stats.bytes+=f.data.length*3/4;if(f.key)r.stats.keys++;r.stats.codec=codec;
@@ -6743,7 +6815,7 @@ function onVideoFrame(f){
 // rate, encode time and bitrate; for others, what arrives vs what's
 // decoded and shown. (A camera delivering fewer fps than chosen usually
 // means it's slowing itself down for low light.)
-const vStats={self:null};
+const vStats={self:null,native:null};
 function newVideoStats(){return {camIn:0,sent:0,bytes:0,keys:0,dropBusy:0,dropPace:0,encMs:0,encN:0,ipcMs:0,ipcN:0,encStart:new Map(),recv:0,decoded:0,dropShow:0,dropWait:0,codec:''};}
 function resetCounts(st){Object.assign(st,{camIn:0,sent:0,bytes:0,keys:0,dropBusy:0,dropPace:0,encMs:0,encN:0,ipcMs:0,ipcN:0,recv:0,decoded:0,dropShow:0,dropWait:0});}
 function renderVideoStats(){
@@ -6753,7 +6825,12 @@ function renderVideoStats(){
     if(!on){box?.remove();return;}
     if(!box){box=document.createElement('div');box.className='vs-stats';tile.appendChild(box);}
     const u=tile.dataset.user;let lines;
-    if(u===state.username){
+    if(u===state.username&&cam.native){
+      const n=vStats.native;if(!cam.on||!n){box.textContent='';return;}
+      lines=[`${cam.mode?.w}\u00d7${cam.mode?.h} \u00b7 ${cam.codecLabel||''}`,
+        `sent ${Math.round(n.fps)} fps (target ${cam.fps}) \u00b7 ${Math.round(n.kbps)} kbps`,
+        `captured and encoded outside the web view`];
+    }else if(u===state.username){
       const st=vStats.self;if(!st||!cam.on){box.textContent='';return;}
       const enc=st.encN?(st.encMs/st.encN).toFixed(1):'\u2013',ipc=st.ipcN?(st.ipcMs/st.ipcN).toFixed(1):'\u2013';
       lines=[`${cam.mode?.w}\u00d7${cam.mode?.h} \u00b7 ${cam.codecLabel||''}`,
@@ -6784,7 +6861,7 @@ function renderVideoStage(){
   const board=inMyCall()?state.voiceHere:null;
   const users=board?(state.voiceChannels[board]||[]).filter(u=>u===state.username?cam.on:state.voiceVideo.has(u)):[];
   // Decoders for people no longer showing a camera to us.
-  for(const u of [...vRemote.keys()])if(!users.includes(u))dropRemoteVideo(u);
+  for(const u of [...vRemote.keys()])if(u!==SELF&&!users.includes(u))dropRemoteVideo(u);
   stage.classList.toggle('hidden',!users.length);
   if(!users.length){grid.innerHTML='';vsFocus=null;return;}
   if(vsFocus&&!users.includes(vsFocus))vsFocus=null;
@@ -6805,7 +6882,14 @@ function renderVideoStage(){
       // less video for the graphics card to draw every frame.
       const show=localStorage.getItem('selfView')!=='0';
       let v=tile.querySelector('video');
-      if(show){
+      if(show&&cam.native){
+        tile.querySelector('.vs-selfoff')?.remove();
+        const r=remoteVideo(SELF);
+        if(r&&r.el.parentElement!==tile){
+          tile.querySelectorAll('video,canvas').forEach(el=>{if(el!==r.el)el.remove();});
+          tile.prepend(r.el);if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});
+        }
+      }else if(show){
         tile.querySelector('.vs-selfoff')?.remove();
         if(!v){v=document.createElement('video');v.muted=true;v.playsInline=true;v.autoplay=true;v.disablePictureInPicture=true;tile.prepend(v);}
         if(v.srcObject!==cam.stream){v.srcObject=cam.stream;v.play().catch(()=>{});}
@@ -6925,7 +7009,8 @@ const camPreview={stream:null};
 async function populateCameraSettings({force=false}={}){
   const sel=document.getElementById('settings-cam-select'),hint=document.getElementById('cam-status');
   const resSel=document.getElementById('settings-cam-res'),fpsSel=document.getElementById('settings-cam-fps');
-  if(!camSupported()){
+  renderNativeHint();
+  if(!camSupported()&&!useNative()){
     sel.innerHTML='<option>Not available</option>';sel.disabled=resSel.disabled=fpsSel.disabled=true;
     document.getElementById('settings-cam-test-btn').disabled=true;
     hint.textContent='Cameras aren\u2019t supported in this version of the app\u2019s web view.';
@@ -6953,7 +7038,7 @@ async function populateCameraSettings({force=false}={}){
   resSel.value=`${chosen.w}x${chosen.h}`;
   fillFps(modes,chosen.fps);
   resSel.disabled=fpsSel.disabled=false;
-  const how=camCodec.send==='h264'?(camCodec.hw?'H.264 on your graphics card':camCodec.hw===false?'H.264 (software)':'H.264'):'VP8 (software)';
+  const how=useNative()?native.label:camCodec.send==='h264'?(camCodec.hw?'H.264 on your graphics card':camCodec.hw===false?'H.264 (software)':'H.264'):'VP8 (software)';
   hint.textContent=`${modes.length} size${modes.length===1?'':'s'} supported by this camera · video is sent as ${how}.`;
 }
 function fillFps(modes,want){
@@ -6979,7 +7064,10 @@ async function applyCameraSetting(){
   const res=document.getElementById('settings-cam-res').value.replace('x','\u00d7'),fps=document.getElementById('settings-cam-fps').value;
   const desc=`${res} at ${fps} fps`;
   const hadPreview=!!camPreview.stream,wasOn=cam.on;
-  if(!hadPreview&&!wasOn){settingsSaved(`Saved \u2014 your camera will use ${desc}`);return;}
+  if(!hadPreview&&!wasOn){
+    const enc=useNative()?(encChoices||[]).find(c=>c.id===(localStorage.getItem('camEncoder')||'auto'))?.label:'';
+    settingsSaved(`Saved \u2014 your camera will use ${desc}${enc?` \u00b7 ${enc}`:''}`);return;
+  }
   settingsSaved(wasOn?'Restarting your camera\u2026':'Applying\u2026','busy');
   stopCameraPreview(true);
   if(wasOn)stopCamera(true);
@@ -6998,6 +7086,19 @@ async function applyCameraSetting(){
 }
 async function startCameraPreview(){
   stopCameraPreview(true);
+  if(useNative()){
+    const btn=document.getElementById('settings-cam-test-btn'),box=document.getElementById('cam-preview');
+    if(cam.on&&cam.native){toast('Your camera is already on in the call \u2014 your own tile shows what everyone sees',true);return;}
+    try{await startNativeCamera({send:false,preview:true});}
+    catch(err){toast('Couldn\u2019t start the camera preview: '+(err?.message||err),true);return;}
+    camPreview.native=true;camPreview.stream={getTracks:()=>[]}; // "running"
+    const r=remoteVideo(SELF);
+    box.querySelector('video').style.display='none';
+    if(r){box.appendChild(r.el);r.el.classList.add('cam-native-preview');if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});}
+    box.classList.add('live');
+    btn.innerHTML=`${icon('videocam_off')} Stop Preview`;
+    return;
+  }
   const id=document.getElementById('settings-cam-select').value;
   const m=chooseMode(cachedModes());
   const btn=document.getElementById('settings-cam-test-btn'),box=document.getElementById('cam-preview');
@@ -7011,20 +7112,72 @@ async function startCameraPreview(){
   btn.innerHTML=`${icon('videocam_off')} Stop Preview`;
 }
 function stopCameraPreview(keepLabel){
+  if(camPreview.native){
+    camPreview.native=false;
+    if(!(cam.on&&cam.native)){window.go.main.App.StopCamera().catch(()=>{});dropRemoteVideo(SELF);}
+    document.querySelectorAll('#cam-preview .cam-native-preview').forEach(el=>el.remove());
+    const v=document.querySelector('#cam-preview > video');if(v)v.style.display='';
+    camPreview.stream=null;
+  }
   stopStream(camPreview.stream);camPreview.stream=null;
   const box=document.getElementById('cam-preview');if(!box)return;
   box.querySelector('video').srcObject=null;box.classList.remove('live');
   if(!keepLabel)document.getElementById('settings-cam-test-btn').innerHTML=`${icon('videocam')} Test Camera`;
 }
+function renderNativeHint(){
+  const box=document.getElementById('cam-native'),hint=document.getElementById('cam-native-hint');
+  box.checked=useNative();box.disabled=!native.available;
+  hint.textContent=native.available?'Captures and encodes your camera outside the app\u2019s web view.':`Not available: ${native.reason||'checking\u2026'}`;
+  document.getElementById('cam-enc-row').classList.toggle('hidden',!useNative());
+  if(useNative())fillEncoderMenu();
+}
+// Settings → Voice & Video → Encoder (native capture): Auto, or a specific
+// encoder. Ones that don't work on this computer are listed but greyed
+// out, with the reason.
+let encChoices=null;
+async function fillEncoderMenu(){
+  const sel=document.getElementById('settings-cam-enc'),hint=document.getElementById('cam-enc-hint');
+  if(!encChoices){sel.disabled=true;hint.textContent='Checking which encoders work here\u2026';}
+  try{encChoices=await window.go.main.App.CaptureEncoders();}catch{encChoices=encChoices||[];}
+  const saved=localStorage.getItem('camEncoder')||'auto';
+  sel.innerHTML=encChoices.map(c=>`<option value="${esc(c.id)}"${c.available?'':' disabled'} title="${esc(c.reason||'')}">${esc(c.label)}${c.available?'':' \u2014 not available'}</option>`).join('');
+  const ok=encChoices.find(c=>c.id===saved&&c.available);
+  sel.value=ok?saved:'auto';
+  sel.disabled=false;
+  const off=encChoices.filter(c=>!c.available);
+  hint.textContent=off.length?off.map(c=>`${c.label}: ${c.reason}`).join(' \u00b7 '):'Auto uses NVIDIA NVENC if you have it, then hardware H.264, then the CPU.';
+}
 function initCameraSettings(){
+  const nat=document.getElementById('cam-native');
+  loadNativeCapture().then(renderNativeHint);
+  document.getElementById('settings-cam-enc').addEventListener('change',e=>{
+    localStorage.setItem('camEncoder',e.target.value);
+    applyCameraSetting();
+  });
+  nat.addEventListener('change',async()=>{
+    localStorage.setItem('camNative',nat.checked?'1':'0');
+    stopCameraPreview();
+    await populateCameraSettings();
+    applyCameraSetting();
+  });
+  window.runtime.EventsOn('camera:preview',onSelfPreview);
+  window.runtime.EventsOn('camera:stats',s=>{vStats.native=s;});
+  window.runtime.EventsOn('camera:stopped',reason=>{
+    if(cam.on&&cam.native){toast(reason||'Your camera stopped',true);stopCamera();playSound('webcam_stop');}
+    else if(camPreview.native){toast(reason||'The camera preview stopped',true);stopCameraPreview();}
+  });
   const self=document.getElementById('cam-selfview'),stats=document.getElementById('cam-stats');
   self.checked=localStorage.getItem('selfView')!=='0';
   stats.checked=localStorage.getItem('videoStats')==='1';
-  self.addEventListener('change',()=>{localStorage.setItem('selfView',self.checked?'1':'0');renderVideoStage();});
+  self.addEventListener('change',()=>{
+    localStorage.setItem('selfView',self.checked?'1':'0');
+    if(cam.on&&cam.native){window.go.main.App.SetCameraOutputs(true,self.checked);if(!self.checked)dropRemoteVideo(SELF);}
+    renderVideoStage();
+  });
   stats.addEventListener('change',()=>{localStorage.setItem('videoStats',stats.checked?'1':'0');renderVideoStats();});
   const sel=document.getElementById('settings-cam-select'),resSel=document.getElementById('settings-cam-res'),fpsSel=document.getElementById('settings-cam-fps');
   sel.addEventListener('change',async()=>{
-    localStorage.setItem('camDevice',sel.value);
+    localStorage.setItem(camDevKey(),sel.value);
     const hadPreview=!!camPreview.stream;
     stopCameraPreview();
     await populateCameraSettings();
@@ -7540,7 +7693,7 @@ function initSettingsFeedback(){
     const t=e.target;
     if(!t.matches('input,select,textarea'))return;
     if(t.closest('#profile-editor,#appearance-editor,#settings-tab-profile'))return;
-    if(t.matches('#settings-cam-select,#settings-cam-res,#settings-cam-fps'))return;
+    if(t.matches('#settings-cam-select,#settings-cam-res,#settings-cam-fps,#settings-cam-enc'))return;
     if(t.type==='file'||t.type==='text'||t.type==='search')return;
     settingsSaved();
   });
@@ -8504,6 +8657,7 @@ function initVideoConvert(){
     settingsSaved('Checking your graphics card\u2026','busy');
     try{
       convInfo=await window.go.main.App.RecheckGPUEncoder();renderPerfSettings();
+      encChoices=null;if(useNative())fillEncoderMenu();
       if(convInfo?.gpuEncoder)settingsSaved('Graphics card encoder works');
       else settingsSaved('Graphics card encoder still unavailable','fail');
     }catch(err){settingsSaved('Check failed: '+err,'fail');}

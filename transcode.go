@@ -396,6 +396,9 @@ func (a *App) RecheckGPUEncoder() map[string]interface{} {
 	encoderMu.Lock()
 	encoderChecked = false
 	encoderMu.Unlock()
+	encTestMu.Lock()
+	encTestRes = map[string]string{}
+	encTestMu.Unlock()
 	gpuListOnce = sync.Once{}
 	return a.VideoConversionInfo()
 }

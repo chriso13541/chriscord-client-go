@@ -68,6 +68,66 @@ export namespace main {
 	        this.is_private = source["is_private"];
 	    }
 	}
+	export class CameraDevice {
+	    id: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CameraDevice(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	    }
+	}
+	export class CameraMode {
+	    w: number;
+	    h: number;
+	    fps: number;
+	    format: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CameraMode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.w = source["w"];
+	        this.h = source["h"];
+	        this.fps = source["fps"];
+	        this.format = source["format"];
+	    }
+	}
+	export class CameraStart {
+	    id: string;
+	    w: number;
+	    h: number;
+	    fps: number;
+	    modeFps: number;
+	    format: string;
+	    send: boolean;
+	    preview: boolean;
+	    encoder: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CameraStart(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.w = source["w"];
+	        this.h = source["h"];
+	        this.fps = source["fps"];
+	        this.modeFps = source["modeFps"];
+	        this.format = source["format"];
+	        this.send = source["send"];
+	        this.preview = source["preview"];
+	        this.encoder = source["encoder"];
+	    }
+	}
 	export class ReplyPreview {
 	    id: string;
 	    username: string;
@@ -214,6 +274,24 @@ export namespace main {
 	        this.name = source["name"];
 	        this.size = source["size"];
 	        this.preview = source["preview"];
+	    }
+	}
+	export class EncoderChoice {
+	    id: string;
+	    label: string;
+	    available: boolean;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EncoderChoice(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.available = source["available"];
+	        this.reason = source["reason"];
 	    }
 	}
 	export class InviteInfo {
