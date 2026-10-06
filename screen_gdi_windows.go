@@ -25,7 +25,11 @@ import (
 // every second: when a copy takes longer than a frame's time, the last
 // picture is sent again to catch up, keeping the timing (and the sound
 // lined up with it) true.
-func gdiWindowFeed(hwnd uintptr, w, h, fps int) screenFeed {
+//
+// Each fresh picture is also offered to tee — the smaller version of the
+// share, when one is being sent (screen_low.go), takes its frames from
+// here rather than copying the window a second time.
+func gdiWindowFeed(hwnd uintptr, w, h, fps int, tee *frameTee) screenFeed {
 	return func(out io.Writer, stop <-chan struct{}) error {
 		// GDI device contexts belong to the thread that made them.
 		runtime.LockOSThread()
@@ -75,6 +79,7 @@ func gdiWindowFeed(hwnd uintptr, w, h, fps int) screenFeed {
 				} // GDICAP_HIDDEN (minimised): keep sending the last picture
 				spent += time.Since(t0)
 				copies++
+				tee.publish(frame)
 			} else {
 				repeats++
 			}

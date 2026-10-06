@@ -869,6 +869,8 @@ type serverMsg struct {
 	Emoji         string              `json:"emoji"`
 	On            bool                `json:"on"`
 	By            string              `json:"by"`
+	Height        int                 `json:"height"` // voice_screen_low: the smaller version wanted (0: none)
+	FPS           int                 `json:"fps"`
 }
 
 // VoiceStatusEntry is one participant's mute/deafen status, as sent in a
@@ -1076,6 +1078,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.handleVoiceICE(msg.Candidate, msg.SDPMid, msg.SDPMLineIndex)
 		case "voice_renegotiate":
 			a.handleVoiceRenegotiate(msg.SDP)
+		case "voice_screen_low":
+			a.setScreenLowWanted(msg.Height, msg.FPS)
 		case "voice_speaking":
 			runtime.EventsEmit(a.ctx, "voice:peer_speaking", voiceSpeakingEvent{BoardID: msg.BoardID, Username: msg.Username, Speaking: msg.Speaking})
 		case "voice_mute_state":

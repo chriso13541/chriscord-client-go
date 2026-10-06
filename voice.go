@@ -76,17 +76,18 @@ type voiceRemoteSource struct {
 // without a rewrite, since the actual capture/encode/decode/mix pipeline
 // here doesn't care how many times a negotiation happens over its life.
 type VoiceSession struct {
-	ctx         context.Context
-	app         *App // back-reference so the capture loop can signal speaking state to the server
-	boardID     string
-	micName     string
-	speakerName string
-	pc          *webrtc.PeerConnection
-	localTrack  *webrtc.TrackLocalStaticSample
-	videoTrack  *webrtc.TrackLocalStaticSample // this app's camera, see video.go
-	screenOut   *rtpOut                        // this app's screen share (screen.go), sent with capture timestamps (avsync.go)
-	soundOut    *rtpOut                        // its sound
-	encoder     *opus.Encoder
+	ctx          context.Context
+	app          *App // back-reference so the capture loop can signal speaking state to the server
+	boardID      string
+	micName      string
+	speakerName  string
+	pc           *webrtc.PeerConnection
+	localTrack   *webrtc.TrackLocalStaticSample
+	videoTrack   *webrtc.TrackLocalStaticSample // this app's camera, see video.go
+	screenOut    *rtpOut                        // this app's screen share (screen.go), sent with capture timestamps (avsync.go)
+	soundOut     *rtpOut                        // its sound
+	screenLowOut *rtpOut                        // its smaller version, when someone asks for one (screen_low.go)
+	encoder      *opus.Encoder
 
 	captureStream *portaudio.Stream
 	captureBuf    []int16

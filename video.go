@@ -145,6 +145,22 @@ func (s *VoiceSession) addVideoSender() {
 		return
 	}
 	s.soundOut = newRTPOut(sound, false)
+
+	// The smaller version of the screen share (screen_low.go), last of all.
+	// It only carries packets when the server asks for one; a server that
+	// doesn't know about it never does.
+	low, err := webrtc.NewTrackLocalStaticRTP(h264Capability(), "screenlow", "chriscord-screenlow")
+	if err != nil {
+		log.Printf("screen: smaller version's track: %v", err)
+		return
+	}
+	ltr, err := s.pc.AddTransceiverFromTrack(low, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly})
+	if err != nil {
+		log.Printf("screen: add smaller version's transceiver: %v", err)
+		return
+	}
+	s.screenLowOut = newRTPOut(low, true)
+	go readKeyframeRequests(ltr.Sender(), func() { s.app.screenLowKeyframeRequested(s.screenLowOut) })
 }
 
 // readKeyframeRequests calls onKey (at most every 300 ms) when the server
@@ -245,6 +261,13 @@ func (a *App) SetScreenShareEnabled(on bool) error {
 	if session == nil {
 		return fmt.Errorf("not in a call")
 	}
+	if !on {
+		// The server forgets who wanted a smaller version when a share
+		// ends; the next one starts without until asked again.
+		screenLowMu.Lock()
+		screenLowWant = screenLowSize{}
+		screenLowMu.Unlock()
+	}
 	return a.sendVoiceJSON(map[string]interface{}{"type": "voice_screen", "board_id": session.boardID, "screen": on})
 }
 
@@ -257,7 +280,12 @@ func (a *App) WatchScreen(user string, watch bool) error {
 	if session == nil {
 		return fmt.Errorf("not in a call")
 	}
-	return a.sendVoiceJSON(map[string]interface{}{"type": "voice_watch", "board_id": session.boardID, "target": user, "watch": watch})
+	msg := map[string]interface{}{"type": "voice_watch", "board_id": session.boardID, "target": user, "watch": watch}
+	// The most this app wants to receive (Settings → Screen Sharing).
+	if l := currentViewLimit(); l.height > 0 {
+		msg["height"], msg["fps"] = l.height, l.fps
+	}
+	return a.sendVoiceJSON(msg)
 }
 
 func (a *App) sendVoiceJSON(v interface{}) error {
@@ -300,6 +328,12 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 	builder := samplebuilder.New(512, depacketizer, 90000)
 	var once sync.Once
 	var unwrap tsUnwrap
+	// A screen's frames go to the page from its first keyframe: a new
+	// section (switching between someone's full and smaller version) starts
+	// with whatever was in flight, and the page's decoder can't start from
+	// that. Asked for again every second until one comes.
+	waitKey := kind == "screen"
+	keyAsked := time.Now()
 	for {
 		select {
 		case <-s.stopped:
@@ -318,6 +352,16 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 			}
 			if len(sample.Data) == 0 {
 				continue
+			}
+			if waitKey {
+				if !isKey(sample.Data) {
+					if time.Since(keyAsked) > time.Second {
+						keyAsked = time.Now()
+						go s.app.RequestScreenKeyframe(user)
+					}
+					continue
+				}
+				waitKey = false
 			}
 			once.Do(func() { log.Printf("video: first %s frame from %s", kind, user) })
 			capMs := 0.0

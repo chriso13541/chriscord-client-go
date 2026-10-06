@@ -13,7 +13,7 @@ func screenShareUnavailable() string {
 }
 func screenWindowsSupported() bool             { return false }
 func listShareSources() ([]ShareSource, error) { return nil, errors.New(screenShareUnavailable()) }
-func screenInput(ScreenStart) ([]string, int, int, screenFeed, error) {
+func screenInput(ScreenStart, *frameTee) ([]string, int, int, screenFeed, error) {
 	return nil, 0, 0, nil, errors.New(screenShareUnavailable())
 }
 

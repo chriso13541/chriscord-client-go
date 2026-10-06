@@ -363,8 +363,9 @@ func gdiWindowsSupported() bool {
 }
 
 // screenInput: the FFmpeg input for a share, and — for a window copied
-// here rather than by FFmpeg — what feeds it frames through its stdin.
-func screenInput(o ScreenStart) ([]string, int, int, screenFeed, error) {
+// here rather than by FFmpeg — what feeds it frames through its stdin
+// (offering each one to tee as well).
+func screenInput(o ScreenStart, tee *frameTee) ([]string, int, int, screenFeed, error) {
 	kind, handle, err := parseShareID(o.ID)
 	if err != nil {
 		return nil, 0, 0, nil, err
@@ -384,7 +385,7 @@ func screenInput(o ScreenStart) ([]string, int, int, screenFeed, error) {
 		w, h := shareSize(sw, sh, o.Height)
 		log.Printf("screen: Windows build %d; sharing window %d without the yellow border (PrintWindow copy)", windowsBuild(), hwnd)
 		return []string{"-f", "rawvideo", "-pixel_format", "bgra", "-video_size", fmt.Sprintf("%dx%d", w, h),
-			"-framerate", strconv.Itoa(o.FPS), "-i", "pipe:0"}, w, h, gdiWindowFeed(hwnd, w, h, o.FPS), nil
+			"-framerate", strconv.Itoa(o.FPS), "-i", "pipe:0"}, w, h, gdiWindowFeed(hwnd, w, h, o.FPS, tee), nil
 	}
 	args, w, h, err := screenInputArgs(o)
 	return args, w, h, nil, err

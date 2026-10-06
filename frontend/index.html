@@ -998,7 +998,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .settings-tab-pane h2 { font-size:1.3rem; margin-bottom:20px; }
 .settings-label { display:block; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); margin:18px 0 6px; }
 .settings-label:first-of-type { margin-top:0; }
-#settings-mic-select, #settings-speaker-select { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
+.ss-view-row { display:flex; gap:12px; } .ss-view-row > div { flex:1; } .ss-view-row.off { opacity:.5; pointer-events:none; }
+#ss-view-res, #ss-view-fps, #settings-mic-select, #settings-speaker-select { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
 .settings-hint { margin-top:20px; font-size:.8rem; color:var(--text-muted); line-height:1.5; }
 #pfp-current-display { display:flex; align-items:center; gap:16px; margin-bottom:8px; }
 #pfp-current-circle { width:80px; height:80px; border-radius:50%; background-size:cover; background-position:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:700; color:#fff; }
@@ -1676,8 +1677,15 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
     <div id="settings-tab-screenshare" class="settings-tab-pane">
       <h2>Screen Sharing</h2>
-      <label class="check-row"><input type="checkbox" id="ss-hide-border"> Hide the yellow border around what I'm sharing</label>
-      <p class="settings-hint" style="margin-top:0">Windows normally outlines whatever is being captured in yellow. With this on, whole screens are captured a different way (Desktop Duplication) that never shows it. For a single application window, Windows 11 hides it; on Windows 10 the window is copied the way Discord and Chrome do it instead (games running in exclusive fullscreen may show as black that way — share the whole screen for those).</p>
+      <h3 class="settings-sub" style="margin-top:0">Watching streams</h3>
+      <label class="check-row"><input type="checkbox" id="ss-override"> Override stream native settings</label>
+      <p class="settings-hint" style="margin-top:0">Receive other people's streams at no more than the size and frame rate below, instead of whatever they're sharing at — less for this computer to download and decode. Their app sends a second, smaller version just for the people who ask for one.</p>
+      <div class="ss-view-row">
+        <div><label class="settings-label" for="ss-view-res">Resolution</label>
+          <select id="ss-view-res"><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option></select></div>
+        <div><label class="settings-label" for="ss-view-fps">Frame rate</label>
+          <select id="ss-view-fps"><option value="60">60 fps</option><option value="30">30 fps</option><option value="15">15 fps</option></select></div>
+      </div>
     </div>
 
     <div id="settings-tab-voice" class="settings-tab-pane">
@@ -1689,6 +1697,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
       <label class="settings-label" for="input-gain">Input Volume</label>
       <div class="slider-row"><input type="range" id="input-gain" min="0" max="200" step="1"><span class="slider-val" id="input-gain-val">100%</span></div>
+      <label class="check-row"><input type="checkbox" id="auto-gain"> Automatically adjust my volume</label>
+      <p class="settings-hint" style="margin-top:0">Brings your voice to a steady, normal loudness for everyone else, however quiet your microphone is. Turn off to send exactly what Input Volume gives.</p>
       <label class="settings-label" for="output-volume">Output Volume</label>
       <div class="slider-row"><input type="range" id="output-volume" min="0" max="200" step="1"><span class="slider-val" id="output-volume-val">100%</span></div>
 
@@ -5751,7 +5761,7 @@ function initProfileEditor(){
 // Input/output volume, input sensitivity (auto or a manual threshold in
 // dBFS) and per-user volume/mute. Saved in localStorage and pushed to the
 // Go side, which applies them to every audio frame (audio.go).
-const AUDIO_DEFAULTS={inputGain:1,outputVolume:1,autoSensitivity:true,thresholdDB:-50};
+const AUDIO_DEFAULTS={inputGain:1,outputVolume:1,autoSensitivity:true,thresholdDB:-50,autoGain:true};
 function loadAudioSettings(){
   try{return {...AUDIO_DEFAULTS,...JSON.parse(localStorage.getItem('audioSettings')||'{}')};}catch{return {...AUDIO_DEFAULTS};}
 }
@@ -5761,7 +5771,7 @@ function getUserAudio(user){return {volume:1,muted:false,...(userAudio[user]||{}
 function pushAudioSettings(){
   localStorage.setItem('audioSettings',JSON.stringify(audioSettings));
   const a=audioSettings;
-  window.go?.main?.App?.SetAudioSettings(a.inputGain,a.outputVolume,a.autoSensitivity,a.thresholdDB)?.catch?.(()=>{});
+  window.go?.main?.App?.SetAudioSettings(a.inputGain,a.outputVolume,a.autoSensitivity,a.thresholdDB,a.autoGain!==false)?.catch?.(()=>{});
 }
 function setUserAudio(user,patch){
   const next={...getUserAudio(user),...patch};
@@ -5803,8 +5813,10 @@ function initAudioSettingsUI(){
     vol.value=String(Math.round(audioSettings.outputVolume*100));
     document.getElementById('input-gain-val').textContent=gain.value+'%';
     document.getElementById('output-volume-val').textContent=vol.value+'%';
+    document.getElementById('auto-gain').checked=audioSettings.autoGain!==false;
     renderSensitivity();
   };
+  document.getElementById('auto-gain').addEventListener('change',e=>{audioSettings.autoGain=e.target.checked;sync();pushAudioSettings();});
   gain.addEventListener('input',()=>{audioSettings.inputGain=+gain.value/100;sync();pushAudioSettings();});
   vol.addEventListener('input',()=>{audioSettings.outputVolume=+vol.value/100;sync();pushAudioSettings();});
   document.getElementById('sens-auto').addEventListener('change',e=>{audioSettings.autoSensitivity=e.target.checked;sync();pushAudioSettings();});
@@ -7294,7 +7306,7 @@ async function startScreenShare(src){
   try{
     scr.audio='';
     const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,audio,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,
-      hideBorder:localStorage.getItem('screenHideBorder')==='1'});
+      hideBorder:true});
     Object.assign(scr,{on:true,source:src,height,fps,label});
     dropRemoteVideo(SELF_SCR); // a switched share starts its preview afresh
     if(!was){
@@ -7411,18 +7423,23 @@ function screenTileAction(act,tile){
 }
 function initScreenShare(){
   window.runtime.EventsOn('stream:audiolag',e=>{if(e?.user)streamAudioLag.set(e.user,e.ms);});
-  // Settings → Screen Sharing. A share that's running restarts with it.
-  const hb=document.getElementById('ss-hide-border');
-  hb.checked=localStorage.getItem('screenHideBorder')==='1';
-  hb.addEventListener('change',async()=>{
-    localStorage.setItem('screenHideBorder',hb.checked?'1':'0');
+  // Settings → Screen Sharing: watching streams at a lower size/frame rate
+  // than they're shared at. Screens being watched switch over straight away.
+  const ov=document.getElementById('ss-override'),vr=document.getElementById('ss-view-res'),vf=document.getElementById('ss-view-fps');
+  ov.checked=localStorage.getItem('screenViewOverride')==='1';
+  vr.value=localStorage.getItem('screenViewRes')||'720';
+  vf.value=localStorage.getItem('screenViewFps')||'30';
+  const applyView=async(changed)=>{
+    document.querySelector('.ss-view-row').classList.toggle('off',!ov.checked);
+    try{await window.go.main.App.SetScreenViewLimit(ov.checked?+vr.value:0,ov.checked?+vf.value:0);}catch{}
+    if(!changed)return;
+    localStorage.setItem('screenViewOverride',ov.checked?'1':'0');
+    localStorage.setItem('screenViewRes',vr.value);localStorage.setItem('screenViewFps',vf.value);
     settingsSaved();
-    if(!scr.on||!scr.source)return;
-    try{
-      scr.label=await window.go.main.App.StartScreenShare({id:scr.source.id,height:scr.height,fps:scr.fps,audio:scr.audio==='on',
-        encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,hideBorder:hb.checked});
-    }catch(err){toast('Screen share: '+String(err?.message||err).replace(/^Error: /,''),true);stopScreenShare();}
-  });
+    for(const u of screenWatch)window.go.main.App.WatchScreen(u,true).catch(()=>{});
+  };
+  for(const el of [ov,vr,vf])el.addEventListener('change',()=>applyView(true));
+  applyView(false);
   document.getElementById('voice-screen-btn').addEventListener('click',toggleScreenShare);
   document.getElementById('sp-cancel').addEventListener('click',closeScreenPicker);
   document.getElementById('modal-screen').addEventListener('click',e=>{if(e.target.id==='modal-screen')closeScreenPicker();});

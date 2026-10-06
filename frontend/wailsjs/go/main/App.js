@@ -358,8 +358,8 @@ export function SendTyping(arg1) {
   return window['go']['main']['App']['SendTyping'](arg1);
 }
 
-export function SetAudioSettings(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['SetAudioSettings'](arg1, arg2, arg3, arg4);
+export function SetAudioSettings(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetAudioSettings'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SetCameraOutputs(arg1, arg2) {
@@ -384,6 +384,10 @@ export function SetScreenPreview(arg1) {
 
 export function SetScreenShareEnabled(arg1) {
   return window['go']['main']['App']['SetScreenShareEnabled'](arg1);
+}
+
+export function SetScreenViewLimit(arg1, arg2) {
+  return window['go']['main']['App']['SetScreenViewLimit'](arg1, arg2);
 }
 
 export function SetStreamVideoLag(arg1, arg2) {

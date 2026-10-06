@@ -33,6 +33,16 @@ const (
 	// cutting out on every syllable break.
 	vadHangoverFrames = 15
 	maxGain           = 2.0 // sliders go to 200%
+
+	// Automatic gain: brings speech to a steady loudness for everyone else,
+	// the way Discord's voice processing does — most microphones deliver
+	// speech well below it (around −30 dBFS), which is why people had to be
+	// turned up to 160–200%.
+	agcTargetDB  = -18.0 // speech level aimed for (frame RMS, dBFS)
+	agcMaxBoost  = 24.0  // at most this much louder…
+	agcMaxCut    = -10.0 // … or quieter
+	agcUpPerSec  = 6.0   // how fast the gain may rise (dB per second)…
+	agcDownPerFr = 1.0   // … and fall (dB per 20 ms frame: loud speech is pulled in quickly)
 )
 
 type userAudio struct {
@@ -46,11 +56,12 @@ type audioSettings struct {
 	outputVolume    float64
 	autoSensitivity bool
 	thresholdDB     float64
+	autoGain        bool
 	users           map[string]userAudio
 }
 
 var audioCfg = &audioSettings{
-	inputGain: 1, outputVolume: 1, autoSensitivity: true, thresholdDB: defaultThresholdDB,
+	inputGain: 1, outputVolume: 1, autoSensitivity: true, thresholdDB: defaultThresholdDB, autoGain: true,
 	users: map[string]userAudio{},
 }
 
@@ -61,12 +72,13 @@ var levelMeterOn atomic.Bool
 func clampF(v, lo, hi float64) float64 { return math.Max(lo, math.Min(hi, v)) }
 
 // SetAudioSettings applies the voice settings page's values.
-func (a *App) SetAudioSettings(inputGain, outputVolume float64, autoSensitivity bool, thresholdDB float64) {
+func (a *App) SetAudioSettings(inputGain, outputVolume float64, autoSensitivity bool, thresholdDB float64, autoGain bool) {
 	audioCfg.mu.Lock()
 	audioCfg.inputGain = clampF(inputGain, 0, maxGain)
 	audioCfg.outputVolume = clampF(outputVolume, 0, maxGain)
 	audioCfg.autoSensitivity = autoSensitivity
 	audioCfg.thresholdDB = clampF(thresholdDB, minThresholdDB, maxThresholdDB)
+	audioCfg.autoGain = autoGain
 	audioCfg.mu.Unlock()
 }
 
@@ -116,10 +128,10 @@ func streamVideoLag(user string) (float64, bool) {
 // SetLevelMeter turns live mic level events (voice:level) on or off.
 func (a *App) SetLevelMeter(on bool) { levelMeterOn.Store(on) }
 
-func (s *audioSettings) input() (gain float64, auto bool, threshold float64) {
+func (s *audioSettings) input() (gain float64, auto bool, threshold float64, autoGain bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.inputGain, s.autoSensitivity, s.thresholdDB
+	return s.inputGain, s.autoSensitivity, s.thresholdDB, s.autoGain
 }
 
 // playbackGain is the multiplier for one participant's audio: their own
@@ -165,14 +177,18 @@ type voiceActivity struct {
 	quiet      int
 	noiseFloor float64 // dBFS, tracked for automatic sensitivity
 	frames     int
+	agc        autoGain
 }
 
 func newVoiceActivity() *voiceActivity { return &voiceActivity{noiseFloor: -60} }
 
 // process applies input gain to buf in place and runs detection on the
-// result. changed reports whether open flipped on this frame.
+// result; frames that will be sent then get automatic gain (if on). The
+// level reported (for the meter and the sensitivity) is before automatic
+// gain, so the threshold keeps meaning the same thing. changed reports
+// whether open flipped on this frame.
 func (v *voiceActivity) process(buf []int16) (open, changed bool, level, threshold float64) {
-	gain, auto, manual := audioCfg.input()
+	gain, auto, manual, autoGain := audioCfg.input()
 	applyGain(buf, gain)
 	level = levelDB(buf)
 	threshold = manual
@@ -196,7 +212,63 @@ func (v *voiceActivity) process(buf []int16) (open, changed bool, level, thresho
 			v.open = false
 		}
 	}
+	if autoGain && v.open {
+		v.agc.process(buf, level, level >= threshold)
+	}
 	return v.open, v.open != was, level, threshold
+}
+
+// autoGain follows how loud your speech is and turns it up (or down) to
+// agcTargetDB, slowly enough that it's never heard pumping, with a soft
+// limiter so a shout or a laugh doesn't clip.
+type autoGain struct {
+	have     bool
+	speechDB float64 // running estimate of your speech level, before this gain
+	gainDB   float64
+}
+
+// process applies the gain to one frame. level is its loudness before
+// this gain; speech says the frame is above the sensitivity threshold
+// (frames in the gap between words are let through but don't teach it).
+func (g *autoGain) process(buf []int16, level float64, speech bool) {
+	if speech && level > -70 {
+		if !g.have {
+			g.have, g.speechDB = true, level
+			g.gainDB = clampF(agcTargetDB-level, agcMaxCut, agcMaxBoost) * 0.5 // start halfway
+		} else if level > g.speechDB {
+			g.speechDB += (level - g.speechDB) * 0.08
+		} else {
+			g.speechDB += (level - g.speechDB) * 0.02
+		}
+	}
+	if g.have {
+		want := clampF(agcTargetDB-g.speechDB, agcMaxCut, agcMaxBoost)
+		up := agcUpPerSec * voiceFrameMs / 1000
+		switch {
+		case want > g.gainDB+up:
+			g.gainDB += up
+		case want < g.gainDB-agcDownPerFr:
+			g.gainDB -= agcDownPerFr
+		default:
+			g.gainDB = want
+		}
+	}
+	mul := math.Pow(10, g.gainDB/20)
+	for i, v := range buf {
+		buf[i] = int16(softLimit(float64(v)*mul/32768) * 32767)
+	}
+}
+
+// softLimit: unchanged up to −3 dBFS, then rounded off smoothly towards
+// full scale instead of clipping.
+func softLimit(x float64) float64 {
+	const knee = 0.7
+	ax := math.Abs(x)
+	if ax <= knee {
+		return x
+	}
+	y := knee + (1-knee)*math.Tanh((ax-knee)/(1-knee))
+	return math.Copysign(y, x)
 }
 
 // reset closes the gate (used when muting), reporting whether it was open.

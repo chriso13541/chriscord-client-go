@@ -57,7 +57,7 @@ type ScreenStart struct {
 	Encoder    string `json:"encoder"`    // as for the camera
 	Preview    bool   `json:"preview"`    // frames back to the page as screen:preview
 	Audio      bool   `json:"audio"`      // share its sound too
-	HideBorder bool   `json:"hideBorder"` // no yellow capture border (whole screens use Desktop Duplication)
+	HideBorder bool   `json:"hideBorder"` // no yellow capture border — always set by StartScreenShare; false only for its fallback
 }
 
 var (
@@ -150,6 +150,10 @@ func shareSize(w, h, height int) (int, int) {
 // already running). It returns the label of the encoder in use once the
 // first frame is out, or why it couldn't start.
 func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
+	// Always without the yellow capture border where Windows allows it
+	// (Desktop Duplication for screens, a PrintWindow copy for windows on
+	// Windows 10, the borderless setting on Windows 11).
+	opts.HideBorder = true
 	label, err := a.startScreen(opts)
 	if err != nil && opts.HideBorder {
 		// The border-free way (Desktop Duplication for a screen, GDI for a
@@ -177,7 +181,8 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	input, w, h, feed, err := screenInput(opts)
+	tee := newFrameTee()
+	input, w, h, feed, err := screenInput(opts, tee)
 	if err != nil {
 		return "", err
 	}
@@ -223,7 +228,10 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("couldn't start FFmpeg: %w", err)
 	}
-	c := &nativeCamera{kind: "screen", cmd: cmd, done: make(chan struct{}), clock: newShareClock()}
+	c := &nativeCamera{kind: "screen", cmd: cmd, done: make(chan struct{}), clock: newShareClock(), opts: opts, w: w, h: h}
+	if feed != nil {
+		c.tee = tee // a window copied here: the smaller version shares its frames
+	}
 	c.send.Store(true)
 	c.preview.Store(opts.Preview)
 	first := make(chan struct{}, 1)
@@ -263,6 +271,7 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 		if c.stopped.Load() {
 			return
 		}
+		a.stopScreenLow()
 		reason := screenReason(stderr.String(), readErr, waitErr)
 		if feed != nil {
 			if err := feedReason(time.Second); err != nil {
@@ -291,6 +300,15 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 		a.StopScreenShare()
 		return "", errors.New("screen sharing didn't start within 10 seconds")
 	}
+	// What it's being shared at, so the server knows who wants less (and a
+	// smaller version, if one's already wanted).
+	a.voiceMu.Lock()
+	session := a.voice
+	a.voiceMu.Unlock()
+	if session != nil {
+		_ = a.sendVoiceJSON(map[string]interface{}{"type": "voice_screen_native", "board_id": session.boardID, "height": h, "fps": opts.FPS})
+	}
+	go a.restartScreenLow()
 	if opts.Audio {
 		select {
 		case <-c.done: // FFmpeg already gave up after its first frame
@@ -420,6 +438,7 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 
 // StopScreenShare stops sharing (no-op if not sharing).
 func (a *App) StopScreenShare() {
+	a.stopScreenLow()
 	screenMu.Lock()
 	c := activeScreen
 	activeScreen = nil

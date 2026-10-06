@@ -91,6 +91,13 @@ type nativeCamera struct {
 	// Screens only: capture times for the picture and sound (avsync.go).
 	clock *shareClock
 
+	// Screens only: what was asked for and the size being sent, and — for a
+	// window copied by this app — where its frames can be shared from
+	// (the smaller version, screen_low.go).
+	opts ScreenStart
+	w, h int
+	tee  *frameTee
+
 	// Screens only: the sound being shared with it (screen.go).
 	audioMu     sync.Mutex
 	audioStopCh chan struct{}
@@ -628,17 +635,21 @@ func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct
 			a.voiceMu.Unlock()
 			var trk *webrtc.TrackLocalStaticSample
 			var out *rtpOut
+			screen := c.kind == "screen" || c.kind == "screenlow"
 			if session != nil {
 				trk, out = session.videoTrack, session.screenOut
+				if c.kind == "screenlow" {
+					out = session.screenLowOut
+				}
 			}
 			switch {
-			case c.kind == "screen" && out == nil, c.kind != "screen" && trk == nil:
+			case screen && out == nil, !screen && trk == nil:
 				why = "not in a call"
-			case c.kind != "screen" && !strings.EqualFold(trk.Codec().MimeType, webrtc.MimeTypeH264):
+			case !screen && !strings.EqualFold(trk.Codec().MimeType, webrtc.MimeTypeH264):
 				why = "this call's video is " + trk.Codec().MimeType + ", not H.264 — rejoin the call"
 			default:
 				var err error
-				if c.kind == "screen" {
+				if screen {
 					// Stamped with its capture time, for keeping the sound in step.
 					c.gopMu.Lock()
 					err = out.write(au, rtpTS(c.clock.videoCapture(ts), 90000))

@@ -180,7 +180,7 @@ export function SendMessage(arg1:string,arg2:string,arg3:Array<main.Attachment>,
 
 export function SendTyping(arg1:boolean):Promise<void>;
 
-export function SetAudioSettings(arg1:number,arg2:number,arg3:boolean,arg4:number):Promise<void>;
+export function SetAudioSettings(arg1:number,arg2:number,arg3:boolean,arg4:number,arg5:boolean):Promise<void>;
 
 export function SetCameraOutputs(arg1:boolean,arg2:boolean):Promise<void>;
 
@@ -193,6 +193,8 @@ export function SetPresence(arg1:string):Promise<void>;
 export function SetScreenPreview(arg1:boolean):Promise<void>;
 
 export function SetScreenShareEnabled(arg1:boolean):Promise<void>;
+
+export function SetScreenViewLimit(arg1:number,arg2:number):Promise<void>;
 
 export function SetStreamVideoLag(arg1:string,arg2:number):Promise<void>;
 
