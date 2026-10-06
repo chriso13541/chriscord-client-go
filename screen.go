@@ -267,20 +267,29 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 	out := make([]byte, 4000)
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()
+	var captured, sent, skipped int
+	lastLog := time.Now()
 	for {
 		select {
 		case <-stop:
+			log.Printf("screen: sound stopped (%d frames sent)", sent)
 			return
 		case <-tick.C:
+		}
+		if time.Since(lastLog) >= 5*time.Second {
+			log.Printf("screen: sound — last 5 s: %d ms captured, %d ms sent, %d ms skipped", captured*20, sent*20, skipped*20)
+			captured, sent, skipped, lastLog = 0, 0, 0, time.Now()
 		}
 		// Fallen far behind (e.g. a moment outside a call): skip to now.
 		for systemAudioAvailable() > frame*10 {
 			readSystemAudio(f)
+			skipped++
 		}
 		for systemAudioAvailable() >= frame {
 			if readSystemAudio(f) < frame {
 				break
 			}
+			captured++
 			for i, v := range f {
 				pcm[i] = int16(clampF(float64(v), -1, 1) * 32767)
 			}
@@ -294,7 +303,11 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 			if session == nil || session.screenAudioTrack == nil || !c.send.Load() {
 				continue
 			}
-			_ = session.screenAudioTrack.WriteSample(media.Sample{Data: append([]byte(nil), out[:n]...), Duration: 20 * time.Millisecond})
+			if err := session.screenAudioTrack.WriteSample(media.Sample{Data: append([]byte(nil), out[:n]...), Duration: 20 * time.Millisecond}); err != nil {
+				log.Printf("screen: sending sound failed: %v", err)
+			} else {
+				sent++
+			}
 		}
 	}
 }

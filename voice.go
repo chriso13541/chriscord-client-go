@@ -13,10 +13,12 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gordonklaus/portaudio"
-	"github.com/hraban/opus"
 	"github.com/gorilla/websocket"
+	"github.com/hraban/opus"
+	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -36,8 +38,8 @@ type voiceRemoteSource struct {
 	username string // whose audio this is — for per-user volume/mute ("screen:<name>" for a stream's sound)
 	stereo   bool   // a screen share's sound (buf is interleaved L/R); voices are mono
 	decoder  *opus.Decoder
-	mu      sync.Mutex
-	buf     []int16
+	mu       sync.Mutex
+	buf      []int16
 }
 
 // VoiceSession owns everything for one active voice-channel connection. A
@@ -48,19 +50,19 @@ type voiceRemoteSource struct {
 // without a rewrite, since the actual capture/encode/decode/mix pipeline
 // here doesn't care how many times a negotiation happens over its life.
 type VoiceSession struct {
-	ctx         context.Context
-	app         *App // back-reference so the capture loop can signal speaking state to the server
-	boardID     string
-	micName     string
-	speakerName string
-	pc          *webrtc.PeerConnection
-	localTrack  *webrtc.TrackLocalStaticSample
-	videoTrack  *webrtc.TrackLocalStaticSample // this app's camera, see video.go
-	screenTrack *webrtc.TrackLocalStaticSample // this app's screen share, see screen.go
+	ctx              context.Context
+	app              *App // back-reference so the capture loop can signal speaking state to the server
+	boardID          string
+	micName          string
+	speakerName      string
+	pc               *webrtc.PeerConnection
+	localTrack       *webrtc.TrackLocalStaticSample
+	videoTrack       *webrtc.TrackLocalStaticSample // this app's camera, see video.go
+	screenTrack      *webrtc.TrackLocalStaticSample // this app's screen share, see screen.go
 	screenAudioTrack *webrtc.TrackLocalStaticSample // its sound
-	encoder     *opus.Encoder
+	encoder          *opus.Encoder
 
-	captureStream   *portaudio.Stream
+	captureStream *portaudio.Stream
 	captureBuf    []int16
 	vad           *voiceActivity // only touched from within the capture goroutine — no mutex needed
 	// Points at the App's own voiceMuted flag, not an owned value — a
@@ -154,6 +156,21 @@ func (a *App) JoinVoiceChannel(boardID, micName, speakerName string, knownOthers
 		return fmt.Errorf("failed to start voice session: %w", err)
 	}
 	return nil
+}
+
+// ReconnectVoice rebuilds this call's connection to the server in place —
+// for when it failed (the page calls this on "failed"). Same channel, same
+// devices, mute/deafen untouched; the server treats the fresh offer as a
+// refresh, so everyone else's connections aren't disturbed, and a camera or
+// screen share that's running carries straight on into the new connection.
+func (a *App) ReconnectVoice(knownOthers []string) error {
+	a.voiceMu.Lock()
+	session := a.voice
+	a.voiceMu.Unlock()
+	if session == nil {
+		return fmt.Errorf("not in a call")
+	}
+	return a.startVoiceSession(session.boardID, session.micName, session.speakerName, knownOthers, "connection failed, reconnecting")
 }
 
 func (a *App) LeaveVoiceChannel() error {
@@ -288,7 +305,7 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 		return fmt.Errorf("local track: %w", err)
 	}
 
-	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{
+	pc, err := newVoicePeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	})
 	if err != nil {
@@ -352,7 +369,11 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 	})
 
 	pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+		log.Printf("voice: connection %s", s)
 		wailsruntime.EventsEmit(a.ctx, "voice:connectionState", s.String())
+	})
+	pc.OnICEConnectionStateChange(func(s webrtc.ICEConnectionState) {
+		log.Printf("voice: ICE %s", s)
 	})
 
 	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
@@ -1026,4 +1047,23 @@ func mixInto(dst *int16, v float64) {
 		sum = -32768
 	}
 	*dst = int16(sum)
+}
+
+// newVoicePeerConnection is webrtc.NewPeerConnection (same codecs and
+// interceptors) with quicker ICE timeouts: a connection that stops working
+// is reported "failed" after about 10 s instead of 30, so the page can
+// rebuild it (ReconnectVoice) before anyone's left talking to nobody.
+func newVoicePeerConnection(cfg webrtc.Configuration) (*webrtc.PeerConnection, error) {
+	m := &webrtc.MediaEngine{}
+	if err := m.RegisterDefaultCodecs(); err != nil {
+		return nil, err
+	}
+	reg := &interceptor.Registry{}
+	if err := webrtc.RegisterDefaultInterceptors(m, reg); err != nil {
+		return nil, err
+	}
+	var se webrtc.SettingEngine
+	se.SetICETimeouts(4*time.Second, 6*time.Second, 2*time.Second) // disconnected, failed, keepalive
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(reg), webrtc.WithSettingEngine(se))
+	return api.NewPeerConnection(cfg)
 }

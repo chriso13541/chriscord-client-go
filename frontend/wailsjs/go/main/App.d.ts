@@ -150,6 +150,8 @@ export function ReadImageFiles(arg1:Array<string>):Promise<Array<main.EmojiFile>
 
 export function RecheckGPUEncoder():Promise<Record<string, any>>;
 
+export function ReconnectVoice(arg1:Array<string>):Promise<void>;
+
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
 export function ReorderServers(arg1:Array<string>):Promise<Array<main.SavedServer>>;

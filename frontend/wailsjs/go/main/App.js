@@ -298,6 +298,10 @@ export function RecheckGPUEncoder() {
   return window['go']['main']['App']['RecheckGPUEncoder']();
 }
 
+export function ReconnectVoice(arg1) {
+  return window['go']['main']['App']['ReconnectVoice'](arg1);
+}
+
 export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
 }

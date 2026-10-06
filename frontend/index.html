@@ -9225,11 +9225,32 @@ function init(){
     delete state.userPfps[e.username];
     document.querySelectorAll(`[data-pfp-user="${CSS.escape(e.username)}"]`).forEach(el=>applyUserAvatar(el,e.username));
   });
+  // The call's own connection (separate from the server connection). If it
+  // fails while the server is still reachable, rebuild it automatically —
+  // a few tries, a little apart — rather than leaving you silent until you
+  // rejoin by hand. Your camera, screen share and mute carry over.
+  let voiceRetries=0,voiceRetryTimer=null;
   window.runtime.EventsOn('voice:connectionState',connState=>{
-    if(connState==='failed'||connState==='disconnected'){
-      if(state.wsConnected)playSound('error'); // (a full server drop plays it from ws:disconnected)
-      toast('Voice connection '+connState+' — you may need to rejoin.',true);
+    if(connState==='connected'){
+      if(voiceRetries)toast('Voice reconnected.');
+      voiceRetries=0;clearTimeout(voiceRetryTimer);voiceRetryTimer=null;return;
     }
+    if(connState!=='failed')return;
+    if(!state.wsConnected||!inMyCall())return; // a full server drop is handled by the rejoin logic
+    if(voiceRetries>=3){
+      playSound('error');
+      toast('Voice connection failed — try leaving and rejoining the call.',true);
+      return;
+    }
+    if(voiceRetryTimer)return;
+    voiceRetries++;
+    toast('Voice connection lost — reconnecting\u2026',true);
+    voiceRetryTimer=setTimeout(()=>{
+      voiceRetryTimer=null;
+      if(!state.wsConnected||!inMyCall())return;
+      const others=(state.voiceChannels[state.voiceHere]||[]).filter(u=>u!==state.username);
+      window.go.main.App.ReconnectVoice(others).catch(err=>toast('Couldn\u2019t reconnect voice: '+err,true));
+    },voiceRetries===1?300:2000);
   });
   window.runtime.EventsOn('ws:disconnected',()=>{if(state.wsConnected){
     const inCall=rememberVoiceForRejoin(); // before the voice list is cleared
