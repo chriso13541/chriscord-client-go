@@ -6836,7 +6836,7 @@ function remoteVideo(user){
   if(r)return r;
   if(!decodeSupported())return null;
   r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null,errs:0,unsupported:false,stats:newVideoStats(),
-    lagUser:isScrKey(user)?user.slice(1):null,lags:[]}; // screens: how far behind capture the picture shows (for the sound's sync)
+    lagUser:isScrKey(user)?user.slice(1):null,lags:[],queue:[]}; // screens: how far behind capture the picture shows, and frames waiting for their moment
   const markLive=()=>{if(!r.live){r.live=true;r.el.closest('.vs-tile')?.classList.add('live');}};
   if(window.MediaStreamTrackGenerator){
     // Decoded frames go straight into a video track that a <video> plays:
@@ -6876,6 +6876,9 @@ function configureDecoder(user,r,codec){
       // clock, as µs): how long ago that was, give or take one refresh,
       // is how late the picture is — the sound is held back to match.
       if(r.lagUser&&frame.timestamp>0&&r.lags.length<240)r.lags.push(Date.now()-frame.timestamp/1000+16);
+      // A watched screen with sound plays to the sound's clock: each frame
+      // waits for its moment (see showDueFrames).
+      if(r.lagUser&&frame.timestamp>0&&streamAudioLag.has(r.lagUser)){r.queue.push(frame);showDue(r);return;}
       r.write(frame);
     },
     error:e=>{
@@ -6920,6 +6923,8 @@ function dropRemoteVideo(user){
   const r=vRemote.get(user);if(!r)return;
   vRemote.delete(user);
   if(r.lagUser)window.go.main.App.SetStreamVideoLag(r.lagUser,0).catch(()=>{});
+  for(const f of r.queue||[])try{f.close();}catch{}
+  r.queue=[];
   try{if(r.decoder&&r.decoder.state!=='closed')r.decoder.close();}catch{}
   try{r.writer?.close();}catch{}
   try{r.gen?.stop();}catch{}
@@ -7004,16 +7009,40 @@ function renderVideoStats(){
   });
 }
 setInterval(renderVideoStats,1000);
-// Once a second, each watched screen's picture lag (the middle of the last
-// second's frames) goes to Go, which plays that stream's sound at the same
-// lag (avsync.go).
+// A/V sync for watched screens (avsync.go). The sound is the master clock:
+// Go plays it a steady amount behind capture and says how much
+// ("stream:audiolag"); each decoded frame is shown when the sound reaches
+// its capture time, and frames that arrive too late for that are dropped —
+// a skipped frame is far less noticeable than choppy sound. Once a second
+// the page tells Go how late frames are being decoded (most of them, the
+// 80th percentile), so the sound's delay leaves the picture time to keep up.
+const streamAudioLag=new Map(); // sharer → ms behind capture the sound is heard
 setInterval(()=>{
   for(const r of vRemote.values()){
     if(!r.lagUser||!r.lags.length)continue;
-    const l=r.lags.sort((a,b)=>a-b)[r.lags.length>>1];r.lags=[];
+    const sorted=r.lags.sort((a,b)=>a-b),l=sorted[Math.floor(sorted.length*0.8)];r.lags=[];
     window.go.main.App.SetStreamVideoLag(r.lagUser,l).catch(()=>{});
   }
+  // Streams whose sound stopped (or never had any) show frames as they come.
+  for(const [u] of streamAudioLag)if(![...vRemote.values()].some(r=>r.lagUser===u))streamAudioLag.delete(u);
 },1000);
+function showDue(r){
+  const q=r.queue;if(!q||!q.length)return;
+  const lag=streamAudioLag.get(r.lagUser);
+  if(lag==null){q.splice(0).forEach(f=>r.write(f));return;} // no sound to follow
+  // The newest frame that's due; anything older that's also due missed its
+  // moment and is dropped. Only a few are ever held (the decoder needs its
+  // frames back), so a long wait shows the oldest early instead.
+  const now=Date.now();
+  let i=-1;
+  while(i+1<q.length&&q[i+1].timestamp/1000+lag<=now)i++;
+  if(i<0&&q.length>6)i=0;
+  if(i<0)return;
+  const due=q.splice(0,i+1),show=due.pop();
+  for(const f of due){r.stats.dropShow++;try{f.close();}catch{}}
+  r.write(show);
+}
+(function tick(){for(const r of vRemote.values())showDue(r);requestAnimationFrame(tick);})();
 
 // ── The video area above the messages ──
 // Shown while you're in a call where someone (you included) has a camera
@@ -7381,6 +7410,7 @@ function screenTileAction(act,tile){
   }
 }
 function initScreenShare(){
+  window.runtime.EventsOn('stream:audiolag',e=>{if(e?.user)streamAudioLag.set(e.user,e.ms);});
   // Settings → Screen Sharing. A share that's running restarts with it.
   const hb=document.getElementById('ss-hide-border');
   hb.checked=localStorage.getItem('screenHideBorder')==='1';

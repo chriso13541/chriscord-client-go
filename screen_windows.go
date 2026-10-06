@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -11,7 +12,9 @@ import (
 	"image/jpeg"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -392,12 +395,11 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 			// Desktop Duplication never draws a border: used for a whole
 			// screen when the border should be hidden (or WGC is missing).
 			if f["ddagrab"] && (o.HideBorder || !f["gfxcapture"]) {
-				if d, ok := dxgiOutputFor(handle); ok {
-					log.Printf("screen: %s is output %d of adapter %d (vendor 0x%04x)", o.ID, d.output, d.adapter, d.vendor)
-					return []string{"-init_hw_device", d.ffmpegDevice("dda"), "-filter_hw_device", "dda",
+				if adapter, output, ok := ddaFind(handle, m.w, m.h); ok {
+					return []string{"-init_hw_device", fmt.Sprintf("d3d11va=dda:%d", adapter), "-filter_hw_device", "dda",
 						"-filter_complex", fmt.Sprintf(
 							"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",
-							d.output, o.FPS, w, h)}, w, h, nil
+							output, o.FPS, w, h)}, w, h, nil
 				}
 				if !f["gfxcapture"] {
 					// Couldn't map it: outputs counted left to right, which
@@ -468,4 +470,71 @@ func isWindows11() bool {
 	v.size = uint32(unsafe.Sizeof(v))
 	r, _, _ := syscall.NewLazyDLL("ntdll.dll").NewProc("RtlGetVersion").Call(uintptr(unsafe.Pointer(&v)))
 	return r == 0 && v.major >= 10 && v.build >= 22000
+}
+
+// Where Desktop Duplication finds each monitor, as FFmpeg sees it: found by
+// trying (ddaFind), then remembered.
+var (
+	ddaMu    sync.Mutex
+	ddaCache = map[uint64][2]int{}
+	reDDAOut = regexp.MustCompile(`Opened dxgi output (\d+) with dimensions (\d+)x(\d+)`)
+)
+
+// ddaFind: which graphics adapter and output FFmpeg's ddagrab must use to
+// capture this monitor. It can't simply be worked out here: Windows numbers
+// the adapters, and even says which one a laptop's screens belong to,
+// differently for each program (by its graphics preference). So FFmpeg is
+// asked directly — each adapter's outputs are opened in turn, briefly, and
+// the one with this monitor's size is it (where this app's own view of it,
+// dxgiOutputFor, is tried first and breaks any tie).
+func ddaFind(hmonitor uint64, w, h int) (adapter, output int, ok bool) {
+	ddaMu.Lock()
+	defer ddaMu.Unlock()
+	if v, ok := ddaCache[hmonitor]; ok {
+		return v[0], v[1], true
+	}
+	probe := func(a, o int) (opened bool, more bool, adapterExists bool) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, findFFmpeg(), "-hide_banner", "-nostdin", "-v", "verbose",
+			"-init_hw_device", fmt.Sprintf("d3d11va=p:%d", a), "-filter_hw_device", "p",
+			"-filter_complex", fmt.Sprintf("ddagrab=output_idx=%d:framerate=5,hwdownload,format=bgra", o),
+			"-frames:v", "1", "-f", "null", "-")
+		captureProcAttr(cmd)
+		out, _ := cmd.CombinedOutput()
+		text := string(out)
+		adapterExists = strings.Contains(text, "Using device")
+		if m := reDDAOut.FindStringSubmatch(text); m != nil {
+			gw, _ := strconv.Atoi(m[2])
+			gh, _ := strconv.Atoi(m[3])
+			return gw == w && gh == h, true, adapterExists
+		}
+		return false, !strings.Contains(text, "Failed to enumerate DXGI output"), adapterExists
+	}
+	found := func(a, o int) (int, int, bool) {
+		log.Printf("screen: Desktop Duplication: monitor %d is output %d of FFmpeg's adapter %d", hmonitor, o, a)
+		ddaCache[hmonitor] = [2]int{a, o}
+		return a, o, true
+	}
+	if d, ok := dxgiOutputFor(hmonitor); ok {
+		if opened, _, _ := probe(d.adapter, d.output); opened {
+			return found(d.adapter, d.output)
+		}
+	}
+	for a := 0; a < 4; a++ {
+		for o := 0; o < 6; o++ {
+			opened, more, exists := probe(a, o)
+			if !exists {
+				log.Printf("screen: Desktop Duplication: no monitor of %dx%d found", w, h)
+				return 0, 0, false
+			}
+			if opened {
+				return found(a, o)
+			}
+			if !more {
+				break
+			}
+		}
+	}
+	return 0, 0, false
 }

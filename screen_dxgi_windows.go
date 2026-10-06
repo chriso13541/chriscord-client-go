@@ -7,8 +7,6 @@ package main
 */
 import "C"
 
-import "fmt"
-
 // dxgiOutput is where Desktop Duplication (ddagrab) finds a monitor.
 type dxgiOutput struct {
 	adapter    int    // index in THIS process's adapter list
@@ -25,15 +23,4 @@ func dxgiOutputFor(hmonitor uint64) (dxgiOutput, bool) {
 		return dxgiOutput{}, false
 	}
 	return dxgiOutput{int(a), int(o), uint32(vendor), int(same)}, true
-}
-
-// ffmpegDevice: the -init_hw_device value for that adapter. By vendor when
-// that's unambiguous — adapter numbering can differ between processes
-// (Windows reorders them per app by its graphics preference, so on a
-// laptop chriscord and FFmpeg may not agree which is "0") — else by index.
-func (d dxgiOutput) ffmpegDevice(name string) string {
-	if d.vendor != 0 && d.sameVendor == 1 {
-		return fmt.Sprintf("d3d11va=%s:,vendor_id=0x%04x", name, d.vendor)
-	}
-	return fmt.Sprintf("d3d11va=%s:%d", name, d.adapter)
 }

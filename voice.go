@@ -43,10 +43,13 @@ type voiceRemoteSource struct {
 
 	// Stream sound only (avsync.go): whose share it is, and the capture
 	// time (sharer's clock, ms) of the first sample still in buf.
-	sharer  string
-	headCap float64
-	unwrap  tsUnwrap
-	frac    float64 // position between samples when playing faster/slower
+	sharer   string
+	headCap  float64
+	unwrap   tsUnwrap
+	frac     float64   // position between samples when playing faster/slower
+	delay    float64   // how far behind capture the sound plays (ms), see syncRate
+	offSince time.Time // when the wanted delay started differing from delay
+	heardLag float64   // what the delay actually is right now (reported to the page)
 }
 
 // VoiceSession owns everything for one active voice-channel connection. A
@@ -751,6 +754,7 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 		}
 		started <- nil
 		streamOut := make([]float64, voiceFrameSize*2)
+		lagTick := 0
 
 		for {
 			select {
@@ -772,6 +776,11 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 					// A stream's sound: read a little faster or slower than
 					// real time to stay in step with the picture (avsync.go).
 					n := r.readStretched(streamOut, outLatencyMs)
+					if lagTick%25 == 0 && r.heardLag > 0 {
+						// The page shows the picture this far behind capture
+						// too, so it lines up with what's being heard.
+						wailsruntime.EventsEmit(s.ctx, "stream:audiolag", map[string]interface{}{"user": r.sharer, "ms": r.heardLag})
+					}
 					if !deafened && g > 0 {
 						for i := 0; i < n; i++ {
 							l, rr := streamOut[2*i]*g, streamOut[2*i+1]*g
@@ -807,6 +816,7 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				r.mu.Unlock()
 			}
 			s.remotesMu.Unlock()
+			lagTick++
 			if err := stream.Write(); err != nil {
 				return
 			}
@@ -1098,13 +1108,14 @@ func newVoicePeerConnection(cfg webrtc.Configuration) (*webrtc.PeerConnection, e
 }
 
 // syncRate decides how fast to play a stream's queued sound (call with
-// r.mu held). The page says how long after capture the picture is
-// showing (SetStreamVideoLag); the sound aims to be that old as it plays.
-// Small differences are made up gradually — played up to 6% faster when
-// it's fallen behind, slower when it's ahead, which is hard to hear —
-// rather than by skipping or pausing (which is what sounded jittery).
-// Only a big gap (just started, or a long hiccup) waits or jumps.
-// Without a figure from the page yet, it plays as it comes.
+// r.mu held). The sound is the master clock: it plays steadily at a fixed
+// delay behind capture, and the page times the picture to it (dropping
+// frames that miss their moment) — see avsync.go. The delay is chosen to
+// leave the picture enough time to arrive and decode (from the page's
+// measurements, SetStreamVideoLag), and only changes when that settles
+// somewhere clearly different for a few seconds — never chasing one slow
+// frame. Changes, and the slow drift between two computers' sound clocks,
+// are absorbed by playing up to 3% faster or slower for a moment.
 func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold bool) {
 	trim := func(max int) {
 		if len(r.buf) > max {
@@ -1114,19 +1125,36 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 			r.headCap += float64(drop/2) / 48
 		}
 	}
-	lag, ok := streamVideoLag(r.sharer)
-	if !ok {
-		trim(voiceFrameSize * 15 * 2) // at most 300 ms queued
-		return 1, false
+	trim(48000 * 2 * 2) // never more than 2 s queued
+
+	// The delay to aim for.
+	want := 120.0 // no picture figure yet: enough to ride out network jitter
+	if vl, ok := streamVideoLag(r.sharer); ok {
+		want = vl + 20
 	}
-	trim(48000 * 2 * 2) // never more than 2 s
+	want = math.Max(80, math.Min(800, want))
+	now := time.Now()
+	switch {
+	case r.delay == 0:
+		r.delay = want
+	case math.Abs(want-r.delay) > 60:
+		if r.offSince.IsZero() {
+			r.offSince = now
+		} else if now.Sub(r.offSince) > 3*time.Second {
+			r.delay, r.offSince = want, time.Time{}
+		}
+	default:
+		r.offSince = time.Time{}
+	}
 	if len(r.buf) == 0 {
 		return 1, false
 	}
-	target := lag - outLatencyMs // how old it should be as it leaves the mixer
-	diff := nowWallMs() - r.headCap - target
+	// How old what's played now will be when it's heard, against the aim.
+	heard := nowWallMs() - r.headCap + outLatencyMs
+	r.heardLag = heard
+	diff := heard - r.delay
 	switch {
-	case diff > 400: // far behind: jump to where it should be
+	case diff > 400: // far behind (a long hiccup): jump to where it should be
 		drop := int(diff*48) * 2
 		if drop > len(r.buf) {
 			drop = len(r.buf)
@@ -1134,13 +1162,14 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 		drop -= drop % 2
 		r.buf = r.buf[drop:]
 		r.headCap += float64(drop/2) / 48
+		r.heardLag = r.delay
 		return 1, false
-	case diff < -150: // far ahead (just started): wait for the picture
+	case diff < -150: // far ahead (just started): wait until it's due
 		return 1, true
-	case diff > 12:
-		return 1 + math.Min(0.06, diff/2000), false
-	case diff < -12:
-		return 1 - math.Min(0.06, -diff/2000), false
+	case diff > 25:
+		return 1.03, false
+	case diff < -25:
+		return 0.97, false
 	}
 	return 1, false
 }
