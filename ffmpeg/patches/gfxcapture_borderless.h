@@ -1,7 +1,14 @@
 /*
- * chriscord: lets FFmpeg's gfxcapture actually hide the yellow capture
- * border (display_border=0) on Windows 11.
+ * chriscord's additions to FFmpeg's gfxcapture (Windows Graphics Capture):
  *
+ *  1. cc_request_borderless: lets display_border=0 actually hide the yellow
+ *     capture border on Windows 11.
+ *  2. cc_follow_cursor: shows the mouse pointer in the capture only while
+ *     it's actually showing on screen — a video player that hides it during
+ *     playback hides it from the stream too. (Windows Graphics Capture draws
+ *     it regardless; Desktop Duplication, ddagrab, already follows it.)
+ *
+ * About 1:
  * Windows only honours IsBorderRequired = false once the capturing program
  * has asked for it with GraphicsCaptureAccess.RequestAccessAsync(Borderless);
  * otherwise the setting "succeeds" and is ignored. FFmpeg 9.0 doesn't ask,
@@ -80,6 +87,35 @@ static void cc_request_borderless(AVFilterContext *avctx, C *ctx)
     if (op)
         op->Release();
     statics->Release();
+}
+
+/* About 2: called before each frame is fetched (on the capture thread).
+ * Checks the pointer at most every 50 ms and switches the session's own
+ * cursor drawing on or off to match. */
+template <typename S>
+static void cc_follow_cursor(AVFilterContext *avctx, S &session)
+{
+    static int shown_last = -1;
+    static int64_t checked = 0;
+    int64_t now = av_gettime_relative();
+    if (now - checked < 50000)
+        return;
+    checked = now;
+
+    CURSORINFO ci;
+    memset(&ci, 0, sizeof(ci));
+    ci.cbSize = sizeof(ci);
+    int shown = 1;
+    if (GetCursorInfo(&ci))
+        shown = (ci.flags & CURSOR_SHOWING) && ci.hCursor;
+    if (shown == shown_last)
+        return;
+
+    Microsoft::WRL::ComPtr<ABI::Windows::Graphics::Capture::IGraphicsCaptureSession2> session2;
+    if (SUCCEEDED(session.As(&session2)) && SUCCEEDED(session2->put_IsCursorCaptureEnabled(shown ? 1 : 0))) {
+        av_log(avctx, AV_LOG_VERBOSE, "Mouse pointer %s\n", shown ? "shown" : "hidden");
+        shown_last = shown;
+    }
 }
 
 #endif

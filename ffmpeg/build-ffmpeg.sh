@@ -140,16 +140,20 @@ fi
 echo "== ffmpeg"
 cd ffmpeg-src
 if [ "$TARGET" = windows ]; then
-  # Let gfxcapture really hide the yellow border on Windows 11 (see the
-  # comment in patches/gfxcapture_borderless.h). Safe to run again.
+  # chriscord's additions to gfxcapture (see patches/gfxcapture_borderless.h):
+  # really hiding the yellow border on Windows 11, and following whether the
+  # mouse pointer is showing. Each step is skipped if already done.
   cp "$HERE/patches/gfxcapture_borderless.h" libavfilter/
   F=libavfilter/vsrc_gfxcapture_winrt.cpp
-  if ! grep -q cc_request_borderless "$F"; then
+  grep -q '"gfxcapture_borderless.h"' "$F" || \
     sed -i 's|^#include <cinttypes>$|#include "gfxcapture_borderless.h"\n&|' "$F"
+  grep -q 'cc_request_borderless(avctx' "$F" || \
     sed -i 's|^\( *\)if (SUCCEEDED(wgctx->capture_session.As(&session3))) {$|\1if (!cctx->display_border)\n\1    cc_request_borderless(avctx, ctx);\n&|' "$F"
-    grep -q 'cc_request_borderless(avctx' "$F" && grep -q '"gfxcapture_borderless.h"' "$F" \
-      || { echo "couldn't patch $F for border-free capture (FFmpeg changed?)" >&2; exit 1; }
-  fi
+  grep -q 'cc_follow_cursor(avctx' "$F" || \
+    sed -i 's|^\( *\)CHECK_HR_RET(wgctx->frame_pool->TryGetNextFrame(&capture_frame));$|\1if (cctx->capture_cursor)\n\1    cc_follow_cursor(avctx, wgctx->capture_session);\n&|' "$F"
+  for want in '"gfxcapture_borderless.h"' 'cc_request_borderless(avctx' 'cc_follow_cursor(avctx'; do
+    grep -q "$want" "$F" || { echo "couldn't patch $F ($want) — FFmpeg changed?" >&2; exit 1; }
+  done
 fi
 PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure $FF_TARGET \
   --prefix="$PREFIX" --pkg-config=pkg-config --pkg-config-flags=--static \
