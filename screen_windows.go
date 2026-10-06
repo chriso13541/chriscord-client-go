@@ -408,7 +408,9 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 						"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",
 						i, o.FPS, w, h)}, w, h, nil
 				}
-				log.Printf("screen: couldn't find %s for Desktop Duplication; using Windows Graphics Capture", o.ID)
+				if o.HideBorder {
+					return nil, 0, 0, errors.New("Desktop Duplication couldn’t capture this screen (the tries are in the log)")
+				}
 			}
 			return []string{"-filter_complex", fmt.Sprintf(
 				"gfxcapture=hmonitor=%d:max_framerate=%d:capture_cursor=1:display_border=%d:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
@@ -428,14 +430,8 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 	}
 	sw, sh, _ := windowSize(hwnd)
 	w, h := shareSize(sw, sh, o.Height)
-	// Windows 10 can't hide Windows Graphics Capture's border, so a
-	// border-free window is copied the older way (GDI, like Discord's
-	// classic capture). Some apps drawn by the graphics card (browsers,
-	// games) can come out black that way.
-	if o.HideBorder && !isWindows11() && strings.Contains(ffmpegInputs()["gdigrab"], "D") {
-		return []string{"-f", "gdigrab", "-framerate", strconv.Itoa(o.FPS), "-draw_mouse", "1",
-			"-i", "title=" + windowText(hwnd), "-vf", fmt.Sprintf("scale=%d:%d", w, h)}, w, h, nil
-	}
+	// (On Windows 10 the border can't be hidden for a single window: the
+	// older GDI copy that avoids it shows most modern apps as black.)
 	return []string{"-filter_complex", fmt.Sprintf(
 		"gfxcapture=hwnd=%d:max_framerate=%d:capture_cursor=1:display_border=%d:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
 		handle, o.FPS, border, w, h)}, w, h, nil
@@ -504,6 +500,23 @@ func ddaFind(hmonitor uint64, w, h int) (adapter, output int, ok bool) {
 		out, _ := cmd.CombinedOutput()
 		text := string(out)
 		adapterExists = strings.Contains(text, "Using device")
+		// One line per try in the log: which card, and what happened.
+		dev, what := "", ""
+		for _, line := range strings.Split(text, "\n") {
+			line = strings.TrimSpace(line)
+			if i := strings.Index(line, "Using device"); i >= 0 && dev == "" {
+				dev = line[i+len("Using device "):]
+			}
+			low := strings.ToLower(line)
+			if what == "" && (strings.Contains(low, "opened dxgi output") || strings.Contains(low, "failed") ||
+				strings.Contains(low, "error") || strings.Contains(low, "denied") || strings.Contains(low, "not supported")) {
+				if j := strings.Index(line, "] "); strings.HasPrefix(line, "[") && j > 0 {
+					line = line[j+2:]
+				}
+				what = line
+			}
+		}
+		log.Printf("screen: Desktop Duplication try: adapter %d output %d (%s): %s", a, o, dev, what)
 		if m := reDDAOut.FindStringSubmatch(text); m != nil {
 			gw, _ := strconv.Atoi(m[2])
 			gh, _ := strconv.Atoi(m[3])
