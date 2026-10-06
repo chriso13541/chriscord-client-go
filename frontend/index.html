@@ -6854,7 +6854,8 @@ function renderVideoStats(){
     if(u===state.username&&cam.native){
       const n=vStats.native;if(!cam.on||!n){box.textContent='';return;}
       lines=[`${cam.mode?.w}\u00d7${cam.mode?.h} \u00b7 ${cam.codecLabel||''}`,
-        `sent ${Math.round(n.fps)} fps (target ${cam.fps}) \u00b7 ${Math.round(n.kbps)} kbps`,
+        `sent ${Math.round(n.fps)} fps (target ${cam.fps}) \u00b7 captured ${Math.round(n.captured??n.fps)} \u00b7 ${Math.round(n.kbps)} kbps`,
+        ...(n.problem?[`NOT SENDING: ${n.problem}`]:[]),
         `captured and encoded outside the web view`];
     }else if(u===state.username){
       const st=vStats.self;if(!st||!cam.on){box.textContent='';return;}

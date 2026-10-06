@@ -71,6 +71,11 @@ func videoCapability() webrtc.RTPCodecCapability {
 	videoCodecMu.Lock()
 	c := videoCodec
 	videoCodecMu.Unlock()
+	// Native capture (capture.go) always sends H.264, whatever the page
+	// could encode itself: never give the call a track it can't fill.
+	if c == "vp8" && nativeCaptureUsable() {
+		c = "h264"
+	}
 	if c == "vp8" {
 		return webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8, ClockRate: 90000}
 	}

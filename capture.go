@@ -100,6 +100,15 @@ func (a *App) NativeCaptureInfo() map[string]interface{} {
 	return map[string]interface{}{"available": true, "encoder": enc, "encoderLabel": encoderLabel(enc)}
 }
 
+// nativeCaptureUsable: FFmpeg can capture a camera here and write FLV.
+func nativeCaptureUsable() bool {
+	if findFFmpeg() == "" {
+		return false
+	}
+	have := ffmpegInputs()
+	return strings.Contains(have[cameraInputFormat()], "D") && strings.Contains(have["flv"], "E")
+}
+
 var (
 	ffInputsOnce sync.Once
 	ffInputs     map[string]string // format name → its flags ("D" read, "E" write)
@@ -494,7 +503,9 @@ func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct
 	}
 	var sps, pps [][]byte
 	nalLen := 4
-	lastTS, frames, bytes := uint32(0), 0, 0
+	lastTS, frames, sent, bytes := uint32(0), 0, 0, 0
+	var lastSession *VoiceSession
+	lastWhy := ""
 	statT := time.Now()
 	sentFirst := false
 	tag := make([]byte, 11)
@@ -537,25 +548,45 @@ func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct
 			default:
 			}
 		}
+		// Into the call — and if a frame can't go, say why (in the stats and
+		// the log) rather than counting it as sent.
+		why := ""
 		if c.send.Load() {
 			a.voiceMu.Lock()
 			session := a.voice
 			a.voiceMu.Unlock()
-			if session != nil && session.videoTrack != nil &&
-				strings.EqualFold(session.videoTrack.Codec().MimeType, webrtc.MimeTypeH264) {
-				session.videoTrack.WriteSample(media.Sample{Data: au, Duration: dur})
+			switch {
+			case session == nil || session.videoTrack == nil:
+				why = "not in a call"
+			case !strings.EqualFold(session.videoTrack.Codec().MimeType, webrtc.MimeTypeH264):
+				why = "this call's video is " + session.videoTrack.Codec().MimeType + ", not H.264 — rejoin the call"
+			default:
+				if err := session.videoTrack.WriteSample(media.Sample{Data: au, Duration: dur}); err != nil {
+					why = "writing to the call failed: " + err.Error()
+				} else {
+					sent++
+					bytes += len(au)
+					if session != lastSession {
+						lastSession = session
+						log.Printf("camera: sending into the call (%s)", session.boardID)
+					}
+				}
 			}
+			if why != "" && why != lastWhy {
+				log.Printf("camera: frames NOT reaching the call: %s", why)
+			}
+			lastWhy = why
 		}
 		if c.preview.Load() {
 			wailsruntime.EventsEmit(a.ctx, "camera:preview", previewFrame{Key: key, Data: base64.StdEncoding.EncodeToString(au)})
 		}
 		frames++
-		bytes += len(au)
 		if el := time.Since(statT); el >= time.Second {
 			wailsruntime.EventsEmit(a.ctx, "camera:stats", map[string]interface{}{
-				"fps": float64(frames) / el.Seconds(), "kbps": float64(bytes*8) / 1000 / el.Seconds(),
+				"captured": float64(frames) / el.Seconds(), "fps": float64(sent) / el.Seconds(),
+				"kbps": float64(bytes*8) / 1000 / el.Seconds(), "problem": why,
 			})
-			frames, bytes, statT = 0, 0, time.Now()
+			frames, sent, bytes, statT = 0, 0, 0, time.Now()
 		}
 	}
 }
