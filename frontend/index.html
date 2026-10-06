@@ -216,6 +216,10 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #video-stage.collapsed .vs-resize { display:none; }
 #video-stage .vs-head { display:flex; align-items:center; gap:6px; font-size:.78rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; }
 #video-stage .vs-head .ic { width:16px; height:16px; }
+#video-stage .vs-callmode { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:2px; border-radius:4px; display:inline-flex; }
+#video-stage .vs-callmode:hover { color:var(--text-strong); background:var(--bg-light); }
+#video-stage .vs-callmode .ic { width:18px; height:18px; }
+#video-stage .vs-callmode + .vs-collapse { margin-left:2px; }
 #video-stage .vs-collapse { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:2px; border-radius:4px; display:inline-flex; }
 #video-stage .vs-collapse:hover { color:var(--text-strong); background:var(--bg-light); }
 #video-stage .vs-collapse .ic { width:20px; height:20px; transition:transform .15s; }
@@ -354,6 +358,28 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #mute-mentions-btn.muted { color:var(--red); }
 .header-icon-btn:disabled { opacity:.35; cursor:default; }
 .header-icon-btn .ic { width:20px; height:20px; }
+/* Call view: the call takes the whole area; chat, its box and the member
+   list step aside until you switch back. */
+#call-mode-btn { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
+#call-mode-btn:hover { background:var(--bg-light); color:var(--text); }
+#call-mode-btn .ic { width:20px; height:20px; }
+#call-mode-btn:not(.hidden) + #mute-mentions-btn { margin-left:2px; }
+#chat-header .call-title { display:none; }
+#chat-header .call-title::before { content:none; }
+body.call-mode #chat-header > :not(#call-mode-btn):not(.call-title) { display:none; }
+body.call-mode #chat-header .call-title { display:flex; align-items:center; gap:6px; }
+body.call-mode #chat-header .call-title .ic { width:20px; height:20px; color:var(--text-muted); }
+body.call-mode #call-mode-btn { color:var(--accent); }
+body.call-mode #messages-area, body.call-mode #input-area, body.call-mode #members-panel, body.call-mode #drop-overlay { display:none !important; }
+body.call-mode #video-stage { flex:1; height:auto; max-height:none; border-bottom:none; padding:10px 14px 14px; }
+body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse { display:none; }
+/* A call member with no camera on: their picture on a tile of their colour. */
+.vs-tile.avatar { cursor:pointer; }
+.vs-tile.avatar::before { content:''; position:absolute; inset:0; background:rgba(0,0,0,.28); }
+.vs-tile.avatar .vs-pfp { position:absolute; left:50%; top:50%; height:42%; width:auto; aspect-ratio:1; transform:translate(-50%,-50%); font-size:2.2rem; box-shadow:0 2px 12px rgba(0,0,0,.35); }
+.vs-tile .vs-flags { display:inline-flex; gap:3px; color:#f47373; }
+.vs-tile .vs-flags:empty { display:none; }
+.vs-tile .vs-flags .ic { width:15px; height:15px; }
 #toggle-members-btn { margin-left:4px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
 #toggle-members-btn:hover { background:var(--bg-light); color:var(--text); }
 #toggle-members-btn.active { color:var(--accent); }
@@ -1189,7 +1215,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-notifications_off" viewBox="0 -960 960 960"><path d="M160-200v-80h80v-280q0-33 8.5-65t25.5-61l60 60q-7 16-10.5 32.5T320-560v280h248L56-792l56-56 736 736-56 56-146-144H160Zm560-154-80-80v-126q0-66-47-113t-113-47q-26 0-50 8t-44 24l-58-58q20-16 43-28t49-18v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v206Zm-276-50Zm36 324q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm33-481Z"/></symbol>
   <symbol id="ic-pause" viewBox="0 -960 960 960"><path d="M520-200v-560h240v560H520Zm-320 0v-560h240v560H200Zm400-80h80v-400h-80v400Zm-320 0h80v-400h-80v400Zm0-400v400-400Zm320 0v400-400Z"/></symbol>
   <symbol id="ic-fullscreen" viewBox="0 -960 960 960"><path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/></symbol>
-  <symbol id="ic-fullscreen_exit" viewBox="0 -960 960 960"><path d="M240-120v-120H120v-80h200v200h-80Zm400 0v-200h200v80H720v120h-80ZM120-640v-80h120v-120h80v200H120Zm520 0v-200h80v120h120v80H640Z"/></symbol>
+  <symbol id="ic-grid_view" viewBox="0 -960 960 960"><path fill-rule="evenodd" d="M120-840h320v320H120Zm80 80v160h160v-160Zm320-80h320v320H520Zm80 80v160h160v-160ZM120-440h320v320H120Zm80 80v160h160v-160Zm320-80h320v320H520Zm80 80v160h160v-160Z"/></symbol><symbol id="ic-fullscreen_exit" viewBox="0 -960 960 960"><path d="M240-120v-120H120v-80h200v200h-80Zm400 0v-200h200v80H720v120h-80ZM120-640v-80h120v-120h80v200H120Zm520 0v-200h80v120h120v80H640Z"/></symbol>
   <symbol id="ic-devices" viewBox="0 -960 960 960"><path d="M80-160v-120h80v-440q0-33 23.5-56.5T240-800h600v80H240v440h240v120H80Zm520 0q-17 0-28.5-11.5T560-200v-400q0-17 11.5-28.5T600-640h240q17 0 28.5 11.5T880-600v400q0 17-11.5 28.5T840-160H600Zm40-120h160v-280H640v280Zm0 0h160-160Z"/></symbol>
   <symbol id="ic-person_remove" viewBox="0 -960 960 960"><path d="M640-520v-80h240v80H640Zm-280 40q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
   <symbol id="ic-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
@@ -1423,6 +1449,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <div id="main-column">
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
+      <span class="board-title call-title" id="call-mode-title"></span>
+      <button id="call-mode-btn" class="hidden" type="button" title="Switch to the call view"><svg class="ic" aria-hidden="true"><use href="#ic-grid_view"/></svg><span>Call</span></button>
       <button id="mute-mentions-btn" class="header-icon-btn" title="Mute @mention sounds on this server" disabled><svg class="ic" aria-hidden="true"><use href="#ic-notifications"/></svg></button>
       <button id="toggle-pins-btn" class="header-icon-btn" title="Pinned messages" disabled><svg class="ic" aria-hidden="true"><use href="#ic-keep"/></svg></button>
       <button id="toggle-members-btn" title="Toggle member list"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg> Members</button>
@@ -1437,7 +1465,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div id="chat-main">
         <div id="drop-overlay" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-folder_open"/></svg> Drop files to attach</div>
         <div id="video-stage" class="hidden">
-          <div class="vs-head"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg><span class="vs-count"></span><span class="vs-who"></span><button class="vs-collapse" type="button" title="Hide cameras"><svg class="ic" aria-hidden="true"><use href="#ic-expand_less"/></svg></button></div>
+          <div class="vs-head"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg><span class="vs-count"></span><span class="vs-who"></span><button class="vs-callmode" type="button" title="Call view — hide the chat"><svg class="ic" aria-hidden="true"><use href="#ic-fullscreen"/></svg></button><button class="vs-collapse" type="button" title="Hide cameras"><svg class="ic" aria-hidden="true"><use href="#ic-expand_less"/></svg></button></div>
           <div class="vs-grid"></div>
           <div class="vs-resize" title="Drag to resize"></div>
         </div>
@@ -7064,35 +7092,61 @@ let vsFocus=null;
 function renderVideoStage(){
   const stage=document.getElementById('video-stage'),grid=stage.querySelector('.vs-grid');
   const board=inMyCall()?state.voiceHere:null;
+  if(callMode&&!board)setCallMode(false,true); // left the call: back to the chat
   const members=board?(state.voiceChannels[board]||[]):[];
-  // Screens first (they're what people gather round), then cameras.
+  const camOn=u=>u===state.username?cam.on:state.voiceVideo.has(u);
+  // Screens first (they're what people gather round), then cameras — and
+  // in the call view, everyone else in the call too, as their picture.
   const entries=[
-    ...members.filter(u=>u===state.username?scr.on:state.voiceScreens.has(u)).map(u=>({id:scrKey(u),user:u,screen:true})),
-    ...members.filter(u=>u===state.username?cam.on:state.voiceVideo.has(u)).map(u=>({id:u,user:u,screen:false})),
+    ...members.filter(u=>u===state.username?scr.on:state.voiceScreens.has(u)).map(u=>({id:scrKey(u),user:u,screen:true,kind:'screen'})),
+    ...members.filter(u=>callMode||camOn(u)).map(u=>({id:u,user:u,screen:false,kind:camOn(u)?'cam':'avatar'})),
   ];
   const users=entries.map(e=>e.id);
+  const pictures=entries.filter(e=>e.kind!=='avatar').map(e=>e.id);
   // Decoders for pictures no longer showing to us.
   for(const k of [...vRemote.keys()]){
     if(k===SELF)continue;
     if(k===SELF_SCR){if(!(scr.on&&scr.preview))dropRemoteVideo(k);continue;}
-    if(!users.includes(k)||(isScrKey(k)&&!screenWatch.has(k.slice(1))))dropRemoteVideo(k);
+    if(!pictures.includes(k)||(isScrKey(k)&&!screenWatch.has(k.slice(1))))dropRemoteVideo(k);
   }
+  updateCallModeUI();
   stage.classList.toggle('hidden',!users.length);
   if(!users.length){grid.innerHTML='';vsFocus=null;return;}
   if(vsFocus&&!users.includes(vsFocus))vsFocus=null;
-  stage.querySelector('.vs-count').textContent=entries.some(e=>e.screen)?'Video \u2014':'Cameras \u2014';
+  stage.querySelector('.vs-count').textContent=callMode?'Call \u2014':entries.some(e=>e.screen)?'Video \u2014':'Cameras \u2014';
   stage.querySelector('.vs-who').textContent=[...new Set(entries.map(e=>e.user))].map(u=>u===state.username?`${u} (you)`:u).join(', ');
   const keep=new Set(users);
   grid.querySelectorAll('.vs-tile').forEach(t=>{if(!keep.has(t.dataset.user))t.remove();});
-  for(const {id,user:u,screen} of entries){
+  for(const {id,user:u,screen,kind} of entries){
     let tile=grid.querySelector(`.vs-tile[data-user="${CSS.escape(id)}"]`);
+    // Camera turned on or off: their tile is made afresh for the other kind.
+    if(tile&&tile.dataset.kind!==kind){tile.remove();tile=null;}
     if(!tile){
       tile=document.createElement('div');tile.className='vs-tile'+(u===state.username&&!screen?' me':'')+(screen?' screen':'');tile.dataset.user=id;
-      tile.innerHTML=`<div class="vs-name"><span>${esc(u===state.username?`${u} (you)`:u)}</span>${screen?'<span class="vs-live">LIVE</span>':''}</div>`;
+      tile.dataset.kind=kind;
+      tile.innerHTML=`<div class="vs-name"><span>${esc(u===state.username?`${u} (you)`:u)}</span>${screen?'<span class="vs-live">LIVE</span>':'<span class="vs-flags"></span>'}</div>`;
       vsAvatar(tile,u);
+      if(kind==='avatar'){
+        tile.classList.add('avatar','live');
+        tile.style.backgroundColor=avatarColour(u);
+        tile.insertAdjacentHTML('afterbegin',`<span class="voice-occupant-avatar vs-pfp" data-pfp-user="${esc(u)}" style="background-color:${avatarColour(u)}">${esc(u[0].toUpperCase())}</span>`);
+        applyUserAvatar(tile.querySelector('.vs-pfp'),u);
+      }
       grid.appendChild(tile);
     }
     if(screen){renderScreenTile(tile,u);tile.classList.toggle('focus',vsFocus===id);continue;}
+    // Muted / deafened, on their name.
+    const ms=state.voiceMuteStatus?.[`${board}:${u}`];
+    const flags=tile.querySelector('.vs-flags');
+    if(flags){
+      const html=ms?.deafened?icon('headset_off'):ms?.muted?icon('mic_off'):'';
+      if(flags.innerHTML!==html)flags.innerHTML=html;
+    }
+    if(kind==='avatar'){
+      tile.classList.toggle('focus',vsFocus===u);
+      tile.classList.toggle('speaking',!!state.voiceSpeaking?.[`${board}:${u}`]);
+      continue;
+    }
     if(u===state.username){
       // Your own preview can be turned off (Settings → Voice & Video): one
       // less video for the graphics card to draw every frame.
@@ -7124,6 +7178,12 @@ function renderVideoStage(){
     tile.classList.toggle('speaking',!!state.voiceSpeaking?.[`${board}:${u}`]);
   }
   grid.classList.toggle('has-focus',!!vsFocus);
+  // Keep the tiles in call order (a tile remade for a camera turning on or
+  // off would otherwise jump to the end) — moved only when out of order,
+  // since moving a playing video can pause it.
+  const order=entries.map(e=>e.id),now=[...grid.querySelectorAll(':scope > .vs-tile')].map(t=>t.dataset.user);
+  if(order.join('\n')!==now.join('\n'))
+    for(const id of order){const t=grid.querySelector(`:scope > .vs-tile[data-user="${CSS.escape(id)}"]`);if(t)grid.appendChild(t);}
   // The focused one first.
   if(vsFocus){const f=grid.querySelector('.vs-tile.focus');if(f&&grid.firstChild!==f)grid.prepend(f);}
   layoutVideoStage();
@@ -7170,6 +7230,49 @@ function layoutVideoStage(){
     for(const t of tiles){t.style.width=Math.floor(b.tw)+'px';t.style.height=Math.floor(b.tw/ar)+'px';}
   }
 }
+// ── Call view ──
+// Switches the main area between the chat (with the call's cameras and
+// streams above it, as usual) and a view of just the call: a tile for
+// everyone in it — their camera if it's on, their picture if not — with
+// the messages, message box and member list out of the way. Offered while
+// you're in a call (the button in the top bar, or the full-screen button
+// on the cameras); leaving the call goes back to the chat.
+let callMode=false;
+function setCallMode(on,quiet){
+  on=!!on&&inMyCall();
+  if(on===callMode){updateCallModeUI();return;}
+  callMode=on;
+  document.body.classList.toggle('call-mode',on);
+  const stage=document.getElementById('video-stage');
+  if(on&&stage.classList.contains('collapsed')){
+    stage.classList.remove('collapsed');stage.querySelector('.vs-collapse').title='Hide cameras';
+  }
+  updateCallModeUI();
+  if(!quiet)renderVideoStage();
+  requestAnimationFrame(layoutVideoStage);
+}
+function voiceBoardName(id){
+  for(const list of Object.values(state.boardsByRoom||{})){
+    const b=(list||[]).find(b=>b.id===id);
+    if(b)return b.name;
+  }
+  return id||'';
+}
+function updateCallModeUI(){
+  const btn=document.getElementById('call-mode-btn');if(!btn)return;
+  const inCall=inMyCall();
+  btn.classList.toggle('hidden',!inCall);
+  btn.title=callMode?'Back to the chat':'Switch to the call view';
+  btn.innerHTML=callMode?`${icon('chat_bubble')}<span>Chat</span>`:`${icon('grid_view')}<span>Call</span>`;
+  const t=document.getElementById('call-mode-title');
+  const name=inCall?voiceBoardName(state.voiceHere):'';
+  if(t.dataset.name!==name){t.dataset.name=name;t.innerHTML=`${icon('volume_up')}<span>${esc(name)}</span>`;}
+  const fs=document.querySelector('#video-stage .vs-callmode');
+  if(fs){
+    fs.title=callMode?'Back to the chat':'Call view — hide the chat';
+    fs.innerHTML=icon(callMode?'fullscreen_exit':'fullscreen');
+  }
+}
 function initVideo(){
   const stage=document.getElementById('video-stage'),grid=stage.querySelector('.vs-grid');
   grid.addEventListener('click',e=>{
@@ -7201,6 +7304,8 @@ function initVideo(){
     };
     window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
   });
+  stage.querySelector('.vs-callmode').addEventListener('click',()=>setCallMode(!callMode));
+  document.getElementById('call-mode-btn').addEventListener('click',()=>setCallMode(!callMode));
   stage.querySelector('.vs-collapse').addEventListener('click',()=>{
     stage.classList.toggle('collapsed');
     requestAnimationFrame(layoutVideoStage);
@@ -9298,7 +9403,7 @@ function init(){
   });
   window.runtime.EventsOn('voice:peer_mute_state',e=>{
     state.voiceMuteStatus[`${e.board_id}:${e.username}`]={muted:e.muted,deafened:e.deafened};
-    renderSidebar();
+    renderSidebar();renderVideoStage();
   });
   window.runtime.EventsOn('voice:status_snapshot',e=>{
     for(const s of (e.statuses||[])){
