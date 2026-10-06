@@ -82,6 +82,32 @@ func (a *App) SetUserAudio(username string, volume float64, muted bool) {
 	audioCfg.mu.Unlock()
 }
 
+// SetStreamVideoLag is reported by the page while you watch someone's
+// screen: how long after capture its picture reaches your screen, as
+// (this computer's wall-clock ms) − (capture time on the sharer's clock).
+// The stream's sound is held back to the same lag (avsync.go).
+func (a *App) SetStreamVideoLag(user string, lagMs float64) {
+	streamLagMu.Lock()
+	if lagMs <= 0 {
+		delete(streamLag, user)
+	} else {
+		streamLag[user] = lagMs
+	}
+	streamLagMu.Unlock()
+}
+
+var (
+	streamLagMu sync.Mutex
+	streamLag   = map[string]float64{} // sharer → picture lag (see SetStreamVideoLag)
+)
+
+func streamVideoLag(user string) (float64, bool) {
+	streamLagMu.Lock()
+	defer streamLagMu.Unlock()
+	v, ok := streamLag[user]
+	return v, ok
+}
+
 // SetLevelMeter turns live mic level events (voice:level) on or off.
 func (a *App) SetLevelMeter(on bool) { levelMeterOn.Store(on) }
 

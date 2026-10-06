@@ -1495,6 +1495,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div class="settings-tab active" data-tab="profile">Profile</div>
     <div class="settings-tab" data-tab="appearance">Appearance</div>
     <div class="settings-tab" data-tab="voice">Voice &amp; Video</div>
+    <div class="settings-tab" data-tab="screenshare">Screen Sharing</div>
     <div class="settings-tab" data-tab="performance">Performance</div>
   </div>
   <div id="settings-content">
@@ -1671,6 +1672,12 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <p class="settings-hint pf-gpu-problem hidden" id="pf-gpu-problem"></p>
         <button class="settings-secondary-btn" type="button" id="pf-gpu-recheck" style="margin-top:4px">Check again</button>
       </div>
+    </div>
+
+    <div id="settings-tab-screenshare" class="settings-tab-pane">
+      <h2>Screen Sharing</h2>
+      <label class="check-row"><input type="checkbox" id="ss-hide-border"> Hide the yellow border around what I'm sharing</label>
+      <p class="settings-hint" style="margin-top:0">Windows normally outlines whatever is being captured in yellow. With this on, whole screens are captured a different way (Desktop Duplication) that never shows it. For a single application window, Windows 11 hides it; Windows 10 always shows it.</p>
     </div>
 
     <div id="settings-tab-voice" class="settings-tab-pane">
@@ -6828,7 +6835,8 @@ function remoteVideo(user){
   let r=vRemote.get(user);
   if(r)return r;
   if(!decodeSupported())return null;
-  r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null,errs:0,unsupported:false,stats:newVideoStats()};
+  r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null,errs:0,unsupported:false,stats:newVideoStats(),
+    lagUser:isScrKey(user)?user.slice(1):null,lags:[]}; // screens: how far behind capture the picture shows (for the sound's sync)
   const markLive=()=>{if(!r.live){r.live=true;r.el.closest('.vs-tile')?.classList.add('live');}};
   if(window.MediaStreamTrackGenerator){
     // Decoded frames go straight into a video track that a <video> plays:
@@ -6862,7 +6870,14 @@ function configureDecoder(user,r,codec){
   r.codec=codec;r.needKey=true;
   const cfg={codec:codec==='h264'?'avc1.640034':'vp8',optimizeForLatency:true,hardwareAcceleration:'no-preference'};
   r.decoder=new VideoDecoder({
-    output:frame=>{r.errs=0;r.write(frame);},
+    output:frame=>{
+      r.errs=0;
+      // A screen's frames carry their capture time (ms on the sharer's
+      // clock, as µs): how long ago that was, give or take one refresh,
+      // is how late the picture is — the sound is held back to match.
+      if(r.lagUser&&frame.timestamp>0&&r.lags.length<240)r.lags.push(Date.now()-frame.timestamp/1000+16);
+      r.write(frame);
+    },
     error:e=>{
       console.warn('video: decoder error for',user,e);
       if(vRemote.get(user)!==r)return;
@@ -6904,6 +6919,7 @@ function askKeyframe(user,r){
 function dropRemoteVideo(user){
   const r=vRemote.get(user);if(!r)return;
   vRemote.delete(user);
+  if(r.lagUser)window.go.main.App.SetStreamVideoLag(r.lagUser,0).catch(()=>{});
   try{if(r.decoder&&r.decoder.state!=='closed')r.decoder.close();}catch{}
   try{r.writer?.close();}catch{}
   try{r.gen?.stop();}catch{}
@@ -6932,7 +6948,8 @@ function onVideoFrame(f,self){
   if(r.needKey&&!f.key){r.stats.dropWait++;askKeyframe(key,r);return;}
   if(r.decoder.decodeQueueSize>6){r.stats.dropBusy++;r.needKey=true;askKeyframe(key,r);return;} // fallen behind: skip to the next keyframe
   try{
-    r.decoder.decode(new EncodedVideoChunk({type:f.key?'key':'delta',timestamp:(r.ts+=33333),data:b64ToBytes(f.data)}));
+    const ts=f.cap>0?Math.round(f.cap*1000):(r.ts+=33333); // screens: their capture time
+    r.decoder.decode(new EncodedVideoChunk({type:f.key?'key':'delta',timestamp:ts,data:b64ToBytes(f.data)}));
     r.needKey=false;
   }catch(err){r.needKey=true;askKeyframe(key,r);}
 }
@@ -6987,6 +7004,16 @@ function renderVideoStats(){
   });
 }
 setInterval(renderVideoStats,1000);
+// Once a second, each watched screen's picture lag (the middle of the last
+// second's frames) goes to Go, which plays that stream's sound at the same
+// lag (avsync.go).
+setInterval(()=>{
+  for(const r of vRemote.values()){
+    if(!r.lagUser||!r.lags.length)continue;
+    const l=r.lags.sort((a,b)=>a-b)[r.lags.length>>1];r.lags=[];
+    window.go.main.App.SetStreamVideoLag(r.lagUser,l).catch(()=>{});
+  }
+},1000);
 
 // ── The video area above the messages ──
 // Shown while you're in a call where someone (you included) has a camera
@@ -7237,7 +7264,8 @@ async function startScreenShare(src){
   scr.starting=true;updateScreenButton();
   try{
     scr.audio='';
-    const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,audio,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview});
+    const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,audio,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,
+      hideBorder:localStorage.getItem('screenHideBorder')==='1'});
     Object.assign(scr,{on:true,source:src,height,fps,label});
     dropRemoteVideo(SELF_SCR); // a switched share starts its preview afresh
     if(!was){
@@ -7353,6 +7381,18 @@ function screenTileAction(act,tile){
   }
 }
 function initScreenShare(){
+  // Settings → Screen Sharing. A share that's running restarts with it.
+  const hb=document.getElementById('ss-hide-border');
+  hb.checked=localStorage.getItem('screenHideBorder')==='1';
+  hb.addEventListener('change',async()=>{
+    localStorage.setItem('screenHideBorder',hb.checked?'1':'0');
+    settingsSaved();
+    if(!scr.on||!scr.source)return;
+    try{
+      scr.label=await window.go.main.App.StartScreenShare({id:scr.source.id,height:scr.height,fps:scr.fps,audio:scr.audio==='on',
+        encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,hideBorder:hb.checked});
+    }catch(err){toast('Screen share: '+String(err?.message||err).replace(/^Error: /,''),true);stopScreenShare();}
+  });
   document.getElementById('voice-screen-btn').addEventListener('click',toggleScreenShare);
   document.getElementById('sp-cancel').addEventListener('click',closeScreenPicker);
   document.getElementById('modal-screen').addEventListener('click',e=>{if(e.target.id==='modal-screen')closeScreenPicker();});

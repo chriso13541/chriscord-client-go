@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -11,8 +12,6 @@ import (
 	"time"
 
 	"github.com/hraban/opus"
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/pkg/media"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -38,19 +37,20 @@ type ShareSource struct {
 	W       int    `json:"w"`    // its size in pixels right now
 	H       int    `json:"h"`
 	Primary bool   `json:"primary"`
-	Index   int    `json:"index"`  // screens: 0-based, left to right
-	Thumb   string `json:"thumb"`  // data: URL (JPEG), "" if it couldn't be captured
-	Note    string `json:"note"`   // e.g. "Minimised"
+	Index   int    `json:"index"` // screens: 0-based, left to right
+	Thumb   string `json:"thumb"` // data: URL (JPEG), "" if it couldn't be captured
+	Note    string `json:"note"`  // e.g. "Minimised"
 }
 
 // ScreenStart is what the page asks for.
 type ScreenStart struct {
-	ID      string `json:"id"`
-	Height  int    `json:"height"` // 0 = full size
-	FPS     int    `json:"fps"`
-	Encoder string `json:"encoder"` // as for the camera
-	Preview bool   `json:"preview"` // frames back to the page as screen:preview
-	Audio   bool   `json:"audio"`   // share its sound too
+	ID         string `json:"id"`
+	Height     int    `json:"height"` // 0 = full size
+	FPS        int    `json:"fps"`
+	Encoder    string `json:"encoder"`    // as for the camera
+	Preview    bool   `json:"preview"`    // frames back to the page as screen:preview
+	Audio      bool   `json:"audio"`      // share its sound too
+	HideBorder bool   `json:"hideBorder"` // no yellow capture border (whole screens use Desktop Duplication)
 }
 
 var (
@@ -184,7 +184,7 @@ func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("couldn't start FFmpeg: %w", err)
 	}
-	c := &nativeCamera{kind: "screen", cmd: cmd, done: make(chan struct{})}
+	c := &nativeCamera{kind: "screen", cmd: cmd, done: make(chan struct{}), clock: newShareClock()}
 	c.send.Store(true)
 	c.preview.Store(opts.Preview)
 	first := make(chan struct{}, 1)
@@ -269,6 +269,10 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 	defer tick.Stop()
 	var captured, sent, skipped int
 	lastLog := time.Now()
+	// Capture time of the next frame, on the share's clock (avsync.go):
+	// counted on 20 ms at a time from an anchor, re-anchored if it drifts
+	// from what the buffer level says.
+	capMs, anchored := 0.0, false
 	for {
 		select {
 		case <-stop:
@@ -290,6 +294,14 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 				break
 			}
 			captured++
+			// This frame ended about as long ago as what's still queued behind
+			// it (plus Windows' own ~10 ms), so it started 20 ms before that.
+			est := c.clock.nowMs() - 10 - float64(systemAudioAvailable())/48 - 20
+			if !anchored || math.Abs(est-capMs) > 60 {
+				capMs, anchored = est, true
+			}
+			frameCap := capMs
+			capMs += 20
 			for i, v := range f {
 				pcm[i] = int16(clampF(float64(v), -1, 1) * 32767)
 			}
@@ -300,10 +312,10 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 			a.voiceMu.Lock()
 			session := a.voice
 			a.voiceMu.Unlock()
-			if session == nil || session.screenAudioTrack == nil || !c.send.Load() {
+			if session == nil || session.soundOut == nil || !c.send.Load() {
 				continue
 			}
-			if err := session.screenAudioTrack.WriteSample(media.Sample{Data: append([]byte(nil), out[:n]...), Duration: 20 * time.Millisecond}); err != nil {
+			if err := session.soundOut.write(append([]byte(nil), out[:n]...), rtpTS(frameCap, 48000)); err != nil {
 				log.Printf("screen: sending sound failed: %v", err)
 			} else {
 				sent++
@@ -343,12 +355,12 @@ func (a *App) SetScreenPreview(on bool) {
 }
 
 // screenKeyframeRequested: a viewer needs a picture to start from.
-func (a *App) screenKeyframeRequested(trk *webrtc.TrackLocalStaticSample) {
+func (a *App) screenKeyframeRequested(out *rtpOut) {
 	screenMu.Lock()
 	c := activeScreen
 	screenMu.Unlock()
 	if c != nil {
-		c.resendIfIdle(trk)
+		c.resendIfIdle(out)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -375,22 +376,39 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 		return nil, 0, 0, err
 	}
 	f := ffmpegFilters()
+	// Windows Graphics Capture draws a yellow border round what's being
+	// captured unless told not to — and some Windows versions insist on it.
+	border := 1
+	if o.HideBorder {
+		border = 0
+	}
 	if kind == "screen" {
 		for i, m := range listMonitors() {
 			if uint64(m.handle) != handle {
 				continue
 			}
 			w, h := shareSize(m.w, m.h, o.Height)
-			if f["gfxcapture"] {
-				return []string{"-filter_complex", fmt.Sprintf(
-					"gfxcapture=hmonitor=%d:max_framerate=%d:capture_cursor=1:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
-					handle, o.FPS, w, h)}, w, h, nil
+			// Desktop Duplication never draws a border: used for a whole
+			// screen when the border should be hidden (or WGC is missing).
+			if f["ddagrab"] && (o.HideBorder || !f["gfxcapture"]) {
+				if adapter, output, ok := dxgiOutputFor(handle); ok {
+					return []string{"-init_hw_device", fmt.Sprintf("d3d11va=dda:%d", adapter), "-filter_hw_device", "dda",
+						"-filter_complex", fmt.Sprintf(
+							"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",
+							output, o.FPS, w, h)}, w, h, nil
+				}
+				if !f["gfxcapture"] {
+					// Couldn't map it: outputs counted left to right, which
+					// matches most single-graphics-card setups.
+					return []string{"-filter_complex", fmt.Sprintf(
+						"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",
+						i, o.FPS, w, h)}, w, h, nil
+				}
+				log.Printf("screen: couldn't find %s for Desktop Duplication; using Windows Graphics Capture", o.ID)
 			}
-			// Older FFmpeg: Desktop Duplication (outputs counted left to right,
-			// which matches most setups).
 			return []string{"-filter_complex", fmt.Sprintf(
-				"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",
-				i, o.FPS, w, h)}, w, h, nil
+				"gfxcapture=hmonitor=%d:max_framerate=%d:capture_cursor=1:display_border=%d:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
+				handle, o.FPS, border, w, h)}, w, h, nil
 		}
 		return nil, 0, 0, errors.New("that screen isn't connected any more")
 	}
@@ -407,8 +425,8 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 	sw, sh, _ := windowSize(hwnd)
 	w, h := shareSize(sw, sh, o.Height)
 	return []string{"-filter_complex", fmt.Sprintf(
-		"gfxcapture=hwnd=%d:max_framerate=%d:capture_cursor=1:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
-		handle, o.FPS, w, h)}, w, h, nil
+		"gfxcapture=hwnd=%d:max_framerate=%d:capture_cursor=1:display_border=%d:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
+		handle, o.FPS, border, w, h)}, w, h, nil
 }
 
 // screenAudioTarget: whose sound goes with this share — for a whole screen,

@@ -194,6 +194,8 @@ export function SetScreenPreview(arg1:boolean):Promise<void>;
 
 export function SetScreenShareEnabled(arg1:boolean):Promise<void>;
 
+export function SetStreamVideoLag(arg1:string,arg2:number):Promise<void>;
+
 export function SetTranscodeSettings(arg1:number,arg2:boolean,arg3:boolean):Promise<void>;
 
 export function SetUserAudio(arg1:string,arg2:number,arg3:boolean):Promise<void>;

@@ -386,6 +386,10 @@ export function SetScreenShareEnabled(arg1) {
   return window['go']['main']['App']['SetScreenShareEnabled'](arg1);
 }
 
+export function SetStreamVideoLag(arg1, arg2) {
+  return window['go']['main']['App']['SetStreamVideoLag'](arg1, arg2);
+}
+
 export function SetTranscodeSettings(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetTranscodeSettings'](arg1, arg2, arg3);
 }

@@ -391,6 +391,7 @@ export namespace main {
 	    encoder: string;
 	    preview: boolean;
 	    audio: boolean;
+	    hideBorder: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ScreenStart(source);
@@ -404,6 +405,7 @@ export namespace main {
 	        this.encoder = source["encoder"];
 	        this.preview = source["preview"];
 	        this.audio = source["audio"];
+	        this.hideBorder = source["hideBorder"];
 	    }
 	}
 	export class SearchResult {

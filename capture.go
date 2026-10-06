@@ -84,9 +84,12 @@ type nativeCamera struct {
 	// starts watching a screen that isn't changing (no new frames to wait
 	// for) can be sent a picture straight away — see resendIfIdle.
 	gopMu       sync.Mutex
-	gop         []media.Sample
+	gop         [][]byte
 	gopBytes    int
 	lastFrameAt time.Time
+
+	// Screens only: capture times for the picture and sound (avsync.go).
+	clock *shareClock
 
 	// Screens only: the sound being shared with it (screen.go).
 	audioMu     sync.Mutex
@@ -110,41 +113,35 @@ func (c *nativeCamera) stopAudio() {
 	}
 }
 
-// track: the call track this capture feeds.
-func (c *nativeCamera) track(s *VoiceSession) *webrtc.TrackLocalStaticSample {
-	if c.kind == "screen" {
-		return s.screenTrack
-	}
-	return s.videoTrack
-}
-
 // remember keeps a screen's current group of pictures (keyframe onwards).
-func (c *nativeCamera) remember(sample media.Sample, key bool) {
+func (c *nativeCamera) remember(au []byte, key bool) {
 	if key {
 		c.gop, c.gopBytes = c.gop[:0], 0
 	} else if len(c.gop) == 0 {
 		return // nothing to build on until the next keyframe
 	}
-	if len(c.gop) >= 600 || c.gopBytes+len(sample.Data) > 24<<20 {
+	if len(c.gop) >= 600 || c.gopBytes+len(au) > 24<<20 {
 		c.gop, c.gopBytes = c.gop[:0], 0 // too long to replay — wait for the next keyframe
 		return
 	}
-	c.gop = append(c.gop, sample)
-	c.gopBytes += len(sample.Data)
+	c.gop = append(c.gop, au)
+	c.gopBytes += len(au)
 	c.lastFrameAt = time.Now()
 }
 
 // resendIfIdle: a viewer asked for a keyframe while the screen hasn't
 // changed for a moment (so no new frames, and no new keyframe, are on
 // the way) — send the current picture again from its keyframe.
-func (c *nativeCamera) resendIfIdle(trk *webrtc.TrackLocalStaticSample) {
+func (c *nativeCamera) resendIfIdle(out *rtpOut) {
 	c.gopMu.Lock()
 	defer c.gopMu.Unlock()
-	if len(c.gop) == 0 || time.Since(c.lastFrameAt) < 700*time.Millisecond {
+	if len(c.gop) == 0 || time.Since(c.lastFrameAt) < 700*time.Millisecond || c.clock == nil {
 		return
 	}
-	for _, s := range c.gop {
-		if trk.WriteSample(s) != nil {
+	// Stamped as now (1 ms apart, so each stays its own frame).
+	base := c.clock.nowMs() - screenVideoPipelineMs
+	for i, au := range c.gop {
+		if out.write(au, rtpTS(base+float64(i), 90000)) != nil {
 			return
 		}
 	}
@@ -628,24 +625,25 @@ func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct
 			session := a.voice
 			a.voiceMu.Unlock()
 			var trk *webrtc.TrackLocalStaticSample
+			var out *rtpOut
 			if session != nil {
-				trk = c.track(session)
+				trk, out = session.videoTrack, session.screenOut
 			}
 			switch {
-			case trk == nil:
+			case c.kind == "screen" && out == nil, c.kind != "screen" && trk == nil:
 				why = "not in a call"
-			case !strings.EqualFold(trk.Codec().MimeType, webrtc.MimeTypeH264):
+			case c.kind != "screen" && !strings.EqualFold(trk.Codec().MimeType, webrtc.MimeTypeH264):
 				why = "this call's video is " + trk.Codec().MimeType + ", not H.264 — rejoin the call"
 			default:
-				sample := media.Sample{Data: au, Duration: dur}
 				var err error
 				if c.kind == "screen" {
+					// Stamped with its capture time, for keeping the sound in step.
 					c.gopMu.Lock()
-					err = trk.WriteSample(sample)
-					c.remember(sample, key)
+					err = out.write(au, rtpTS(c.clock.videoCapture(ts), 90000))
+					c.remember(au, key)
 					c.gopMu.Unlock()
 				} else {
-					err = trk.WriteSample(sample)
+					err = trk.WriteSample(media.Sample{Data: au, Duration: dur})
 				}
 				if err != nil {
 					why = "writing to the call failed: " + err.Error()

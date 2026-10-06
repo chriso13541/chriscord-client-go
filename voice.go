@@ -40,6 +40,12 @@ type voiceRemoteSource struct {
 	decoder  *opus.Decoder
 	mu       sync.Mutex
 	buf      []int16
+
+	// Stream sound only (avsync.go): whose share it is, and the capture
+	// time (sharer's clock, ms) of the first sample still in buf.
+	sharer  string
+	headCap float64
+	unwrap  tsUnwrap
 }
 
 // VoiceSession owns everything for one active voice-channel connection. A
@@ -50,17 +56,17 @@ type voiceRemoteSource struct {
 // without a rewrite, since the actual capture/encode/decode/mix pipeline
 // here doesn't care how many times a negotiation happens over its life.
 type VoiceSession struct {
-	ctx              context.Context
-	app              *App // back-reference so the capture loop can signal speaking state to the server
-	boardID          string
-	micName          string
-	speakerName      string
-	pc               *webrtc.PeerConnection
-	localTrack       *webrtc.TrackLocalStaticSample
-	videoTrack       *webrtc.TrackLocalStaticSample // this app's camera, see video.go
-	screenTrack      *webrtc.TrackLocalStaticSample // this app's screen share, see screen.go
-	screenAudioTrack *webrtc.TrackLocalStaticSample // its sound
-	encoder          *opus.Encoder
+	ctx         context.Context
+	app         *App // back-reference so the capture loop can signal speaking state to the server
+	boardID     string
+	micName     string
+	speakerName string
+	pc          *webrtc.PeerConnection
+	localTrack  *webrtc.TrackLocalStaticSample
+	videoTrack  *webrtc.TrackLocalStaticSample // this app's camera, see video.go
+	screenOut   *rtpOut                        // this app's screen share (screen.go), sent with capture timestamps (avsync.go)
+	soundOut    *rtpOut                        // its sound
+	encoder     *opus.Encoder
 
 	captureStream *portaudio.Stream
 	captureBuf    []int16
@@ -737,6 +743,11 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			return
 		}
 		s.playStream = stream
+		// How long after being written a sample is actually heard.
+		outLatencyMs := 20.0
+		if info := stream.Info(); info != nil && info.OutputLatency > 0 {
+			outLatencyMs = float64(info.OutputLatency) / float64(time.Millisecond)
+		}
 		started <- nil
 
 		for {
@@ -755,17 +766,17 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			for _, r := range s.remotes {
 				r.mu.Lock()
 				inCh := 1
+				hold := false
 				if r.stereo {
 					inCh = 2
-					// A stream's sound shouldn't drift behind its picture:
-					// keep at most 300 ms queued.
-					if max := voiceFrameSize * 15 * inCh; len(r.buf) > max {
-						r.buf = r.buf[len(r.buf)-max:]
-					}
+					hold = r.syncToPicture(outLatencyMs)
 				}
 				n := len(r.buf) / inCh
 				if n > voiceFrameSize {
 					n = voiceFrameSize
+				}
+				if hold {
+					n = 0 // not old enough yet: the picture hasn't caught up
 				}
 				// Per-user volume/mute (set from the right-click menu)
 				// times overall output volume; 0 means skip them.
@@ -787,6 +798,9 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 					}
 				}
 				r.buf = r.buf[n*inCh:]
+				if r.stereo {
+					r.headCap += float64(n) / 48
+				}
 				r.mu.Unlock()
 			}
 			s.remotesMu.Unlock()
@@ -815,13 +829,15 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 	if err != nil {
 		return
 	}
-	source := &voiceRemoteSource{username: name, decoder: decoder, stereo: stereo}
+	source := &voiceRemoteSource{username: name, decoder: decoder, stereo: stereo, sharer: strings.TrimPrefix(name, "screen:")}
+	// Keyed per track (a new share by the same person arrives as a new one).
+	key := fmt.Sprintf("%s#%d", track.ID(), track.SSRC())
 	s.remotesMu.Lock()
-	s.remotes[track.ID()] = source
+	s.remotes[key] = source
 	s.remotesMu.Unlock()
 	defer func() {
 		s.remotesMu.Lock()
-		delete(s.remotes, track.ID())
+		delete(s.remotes, key)
 		s.remotesMu.Unlock()
 	}()
 
@@ -841,6 +857,16 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 			continue
 		}
 		source.mu.Lock()
+		if stereo {
+			// Where this packet sits on the sharer's clock; if it doesn't
+			// follow on from what's queued (a gap, a new share), the queue's
+			// timeline restarts from it.
+			capMs := source.unwrap.ms(packet.Timestamp, 48000)
+			queued := float64(len(source.buf)/2) / 48
+			if len(source.buf) == 0 || math.Abs(source.headCap+queued-capMs) > 60 {
+				source.headCap = capMs - queued
+			}
+		}
 		source.buf = append(source.buf, pcm[:n*channels]...)
 		source.mu.Unlock()
 	}
@@ -1066,4 +1092,45 @@ func newVoicePeerConnection(cfg webrtc.Configuration) (*webrtc.PeerConnection, e
 	se.SetICETimeouts(4*time.Second, 6*time.Second, 2*time.Second) // disconnected, failed, keepalive
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(reg), webrtc.WithSettingEngine(se))
 	return api.NewPeerConnection(cfg)
+}
+
+// syncToPicture lines a stream's queued sound up with its picture (call
+// with r.mu held): the page says how long after capture the picture is
+// showing (SetStreamVideoLag), and the sound is played at that same age —
+// held back while it's younger, skipped forward if it's fallen well
+// behind. Without a figure from the page yet, it plays as it comes (kept
+// to at most 300 ms queued). Returns true to hold it this round.
+func (r *voiceRemoteSource) syncToPicture(outLatencyMs float64) bool {
+	lag, ok := streamVideoLag(r.sharer)
+	if !ok {
+		if max := voiceFrameSize * 15 * 2; len(r.buf) > max {
+			drop := len(r.buf) - max
+			r.buf = r.buf[drop:]
+			r.headCap += float64(drop/2) / 48
+		}
+		return false
+	}
+	if max := 48000 * 2 * 2; len(r.buf) > max { // never more than 2 s
+		drop := len(r.buf) - max
+		r.buf = r.buf[drop:]
+		r.headCap += float64(drop/2) / 48
+	}
+	if len(r.buf) == 0 {
+		return false
+	}
+	target := lag - outLatencyMs // how old it should be as it leaves the mixer
+	age := nowWallMs() - r.headCap
+	switch {
+	case age < target-15:
+		return true
+	case age > target+80:
+		drop := int((age-target)*48) * 2
+		if drop > len(r.buf) {
+			drop = len(r.buf)
+		}
+		drop -= drop % 2
+		r.buf = r.buf[drop:]
+		r.headCap += float64(drop/2) / 48
+	}
+	return false
 }

@@ -44,11 +44,12 @@ import (
 
 // videoFrameEvent is one whole encoded frame from someone else's camera.
 type videoFrameEvent struct {
-	User  string `json:"user"`
-	Kind  string `json:"kind"` // "camera" or "screen"
-	Codec string `json:"codec"` // "h264" (Annex B) or "vp8"
-	Key   bool   `json:"key"`
-	Data  string `json:"data"` // base64 frame
+	User  string  `json:"user"`
+	Kind  string  `json:"kind"`  // "camera" or "screen"
+	Codec string  `json:"codec"` // "h264" (Annex B) or "vp8"
+	Key   bool    `json:"key"`
+	Cap   float64 `json:"cap,omitempty"` // screens: capture time on the sharer's clock, ms (avsync.go)
+	Data  string  `json:"data"`          // base64 frame
 }
 
 // The codec this app sends its camera in, as chosen by the page.
@@ -114,7 +115,7 @@ func (s *VoiceSession) addVideoSender() {
 	// The screen share's own send-only section, right after the camera's
 	// (always H.264: only native capture shares screens). The server tells
 	// it apart from the camera by its track id, "screen".
-	screen, err := webrtc.NewTrackLocalStaticSample(h264Capability(), "screen", "chriscord-screen")
+	screen, err := webrtc.NewTrackLocalStaticRTP(h264Capability(), "screen", "chriscord-screen")
 	if err != nil {
 		log.Printf("screen: local track: %v", err)
 		return
@@ -124,14 +125,14 @@ func (s *VoiceSession) addVideoSender() {
 		log.Printf("screen: add transceiver: %v", err)
 		return
 	}
-	s.screenTrack = screen
-	go readKeyframeRequests(str.Sender(), func() { s.app.screenKeyframeRequested(screen) })
+	s.screenOut = newRTPOut(screen, true)
+	go readKeyframeRequests(str.Sender(), func() { s.app.screenKeyframeRequested(s.screenOut) })
 
 	// And its sound: stereo Opus, its own send-only audio section after the
 	// video ones (the server maps only the earlier audio sections by
 	// position, so this one at the end doesn't disturb that). Named
 	// "screenaudio"; it only carries packets while a share has sound.
-	sound, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{
+	sound, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{
 		MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2,
 		SDPFmtpLine: "minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1",
 	}, "screenaudio", "chriscord-screen")
@@ -143,7 +144,7 @@ func (s *VoiceSession) addVideoSender() {
 		log.Printf("screen: add sound transceiver: %v", err)
 		return
 	}
-	s.screenAudioTrack = sound
+	s.soundOut = newRTPOut(sound, false)
 }
 
 // readKeyframeRequests calls onKey (at most every 300 ms) when the server
@@ -298,6 +299,7 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 	}
 	builder := samplebuilder.New(512, depacketizer, 90000)
 	var once sync.Once
+	var unwrap tsUnwrap
 	for {
 		select {
 		case <-s.stopped:
@@ -318,10 +320,15 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 				continue
 			}
 			once.Do(func() { log.Printf("video: first %s frame from %s", kind, user) })
+			capMs := 0.0
+			if kind == "screen" {
+				capMs = unwrap.ms(sample.PacketTimestamp, 90000)
+			}
 			wailsruntime.EventsEmit(s.ctx, "video:frame", videoFrameEvent{
 				User:  user,
 				Kind:  kind,
 				Codec: codec,
+				Cap:   capMs,
 				Key:   isKey(sample.Data),
 				Data:  base64.StdEncoding.EncodeToString(sample.Data),
 			})
