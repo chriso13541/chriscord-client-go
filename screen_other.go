@@ -13,8 +13,8 @@ func screenShareUnavailable() string {
 }
 func screenWindowsSupported() bool             { return false }
 func listShareSources() ([]ShareSource, error) { return nil, errors.New(screenShareUnavailable()) }
-func screenInputArgs(ScreenStart) ([]string, int, int, error) {
-	return nil, 0, 0, errors.New(screenShareUnavailable())
+func screenInput(ScreenStart) ([]string, int, int, screenFeed, error) {
+	return nil, 0, 0, nil, errors.New(screenShareUnavailable())
 }
 
 func screenAudioTarget(string) (uint32, bool, error) {

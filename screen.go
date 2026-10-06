@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os/exec"
@@ -41,6 +42,12 @@ type ShareSource struct {
 	Thumb   string `json:"thumb"` // data: URL (JPEG), "" if it couldn't be captured
 	Note    string `json:"note"`  // e.g. "Minimised"
 }
+
+// screenFeed writes raw frames into FFmpeg's stdin until stop is closed or
+// FFmpeg stops reading — for captures made in this app rather than by
+// FFmpeg (a window on Windows 10, see screen_gdi_windows.go). Returning an
+// error ends the share with that reason.
+type screenFeed func(out io.Writer, stop <-chan struct{}) error
 
 // ScreenStart is what the page asks for.
 type ScreenStart struct {
@@ -170,11 +177,14 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	input, w, h, err := screenInputArgs(opts)
+	input, w, h, feed, err := screenInput(opts)
 	if err != nil {
 		return "", err
 	}
-	args := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+	args := []string{"-hide_banner", "-loglevel", "error"}
+	if feed == nil {
+		args = append(args, "-nostdin")
+	}
 	if enc == "h264_nvenc" && strings.Contains(strings.Join(input, " "), "-init_hw_device") {
 		// With a D3D11 device set up for Desktop Duplication, FFmpeg would
 		// hand that to NVENC too — and on a laptop it's the Intel chip's,
@@ -202,6 +212,12 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	var stdin io.WriteCloser
+	if feed != nil {
+		if stdin, err = cmd.StdinPipe(); err != nil {
+			return "", err
+		}
+	}
 	var stderr strings.Builder
 	cmd.Stderr = &limitedWriter{w: &stderr, n: 8192}
 	if err := cmd.Start(); err != nil {
@@ -216,6 +232,29 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	screenMu.Unlock()
 	log.Printf("screen: sharing %s at %dx%d@%d with %s", opts.ID, w, h, opts.FPS, enc)
 
+	// Frames made here go into FFmpeg; when that stops (the window closed,
+	// say), FFmpeg's input ends and so does the share.
+	feedDone := make(chan struct{})
+	var feedErr error // set before feedDone closes
+	feedReason := func(wait time.Duration) error {
+		select {
+		case <-feedDone:
+			return feedErr
+		case <-time.After(wait):
+			return nil
+		}
+	}
+	if feed != nil {
+		go func() {
+			feedErr = feed(stdin, c.done)
+			stdin.Close()
+			if feedErr != nil {
+				log.Printf("screen: window copy stopped: %v", feedErr)
+			}
+			close(feedDone)
+		}()
+	}
+
 	go func() {
 		defer close(c.done)
 		readErr := a.pumpFLV(c, stdout, opts.FPS, first)
@@ -225,6 +264,11 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 			return
 		}
 		reason := screenReason(stderr.String(), readErr, waitErr)
+		if feed != nil {
+			if err := feedReason(time.Second); err != nil {
+				reason = "Screen sharing stopped: " + err.Error()
+			}
+		}
 		log.Printf("screen: sharing ended: %s (%s)", reason, strings.TrimSpace(stderr.String()))
 		screenMu.Lock()
 		if activeScreen == c {
@@ -237,6 +281,11 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	select {
 	case <-first:
 	case <-c.done:
+		if feed != nil {
+			if err := feedReason(0); err != nil {
+				return "", err
+			}
+		}
 		return "", errors.New(screenReason(stderr.String(), nil, nil))
 	case <-time.After(10 * time.Second):
 		a.StopScreenShare()

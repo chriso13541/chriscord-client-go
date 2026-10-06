@@ -1,0 +1,95 @@
+//go:build windows
+
+package main
+
+/*
+#cgo LDFLAGS: -lgdi32 -luser32
+#include "screen_gdi_windows.h"
+*/
+import "C"
+
+import (
+	"errors"
+	"io"
+	"log"
+	"runtime"
+	"time"
+	"unsafe"
+)
+
+// gdiWindowFeed: frames of one window, copied without Windows Graphics
+// Capture (so with no yellow border on Windows 10 — screen_gdi_windows.c),
+// written to FFmpeg as raw BGRA at a steady fps.
+//
+// FFmpeg times raw frames by counting them, so exactly fps frames go out
+// every second: when a copy takes longer than a frame's time, the last
+// picture is sent again to catch up, keeping the timing (and the sound
+// lined up with it) true.
+func gdiWindowFeed(hwnd uintptr, w, h, fps int) screenFeed {
+	return func(out io.Writer, stop <-chan struct{}) error {
+		// GDI device contexts belong to the thread that made them.
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		c := C.gdicap_open(C.ulonglong(hwnd), C.int(w), C.int(h))
+		if c == nil {
+			return errors.New("couldn't set up copying that window")
+		}
+		defer C.gdicap_close(c)
+		frame := unsafe.Slice((*byte)(C.gdicap_bits(c)), w*h*4)
+
+		interval := time.Second / time.Duration(fps)
+		timer := time.NewTimer(time.Hour)
+		defer timer.Stop()
+		start := time.Now()
+		fails, copies, repeats := 0, 0, 0
+		var spent time.Duration
+		statT := start
+		for i := 0; ; i++ {
+			due := start.Add(time.Duration(i) * interval)
+			if d := time.Until(due); d > 0 {
+				timer.Reset(d)
+				select {
+				case <-stop:
+					return nil
+				case <-timer.C:
+				}
+			} else {
+				select {
+				case <-stop:
+					return nil
+				default:
+				}
+			}
+			if time.Since(due) < interval { // on time: a fresh picture
+				t0 := time.Now()
+				switch C.gdicap_frame(c, 1) {
+				case C.GDICAP_OK:
+					fails = 0
+				case C.GDICAP_GONE:
+					return errors.New("the window you were sharing was closed")
+				case C.GDICAP_FAIL:
+					fails++
+					if i == 0 || fails >= 3*fps {
+						return errors.New("Windows wouldn't copy that window")
+					}
+				} // GDICAP_HIDDEN (minimised): keep sending the last picture
+				spent += time.Since(t0)
+				copies++
+			} else {
+				repeats++
+			}
+			if _, err := out.Write(frame); err != nil {
+				return nil // FFmpeg has stopped
+			}
+			if el := time.Since(statT); el >= 30*time.Second {
+				avg := time.Duration(0)
+				if copies > 0 {
+					avg = spent / time.Duration(copies)
+				}
+				log.Printf("screen: window copy: %d fresh, %d repeated in %.0fs (%.1f ms per copy)",
+					copies, repeats, el.Seconds(), float64(avg)/float64(time.Millisecond))
+				copies, repeats, spent, statT = 0, 0, 0, time.Now()
+			}
+		}
+	}
+}

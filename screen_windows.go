@@ -26,7 +26,9 @@ import (
 
 // Screen sharing on Windows: monitors and windows are listed here with the
 // Win32 API (and a small GDI snapshot of each for the picker); the capture
-// itself is FFmpeg's gfxcapture (Windows Graphics Capture).
+// itself is FFmpeg's gfxcapture (Windows Graphics Capture), Desktop
+// Duplication (ddagrab) for border-free screens, and for border-free
+// windows on Windows 10 a PrintWindow copy made here (screen_gdi_windows.c).
 
 // (user32 and kernel32 are declared in idle_windows.go.)
 var (
@@ -352,7 +354,41 @@ func listShareSources() ([]ShareSource, error) {
 	return out, nil
 }
 
-func screenWindowsSupported() bool { return ffmpegFilters()["gfxcapture"] }
+func screenWindowsSupported() bool { return ffmpegFilters()["gfxcapture"] || gdiWindowsSupported() }
+
+// gdiWindowsSupported: windows can be shared the border-free Windows 10 way
+// (screen_gdi_windows.c) — FFmpeg only has to read raw frames from a pipe.
+func gdiWindowsSupported() bool {
+	return !isWindows11() && strings.Contains(ffmpegInputs()["rawvideo"], "D")
+}
+
+// screenInput: the FFmpeg input for a share, and — for a window copied
+// here rather than by FFmpeg — what feeds it frames through its stdin.
+func screenInput(o ScreenStart) ([]string, int, int, screenFeed, error) {
+	kind, handle, err := parseShareID(o.ID)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	// A single window on Windows 10 (where Windows Graphics Capture always
+	// draws the yellow border): copied the way Chrome/Discord do, when the
+	// border should be hidden — or when this FFmpeg has no gfxcapture.
+	if kind == "window" && gdiWindowsSupported() && (o.HideBorder || !ffmpegFilters()["gfxcapture"]) {
+		hwnd := uintptr(handle)
+		if ok, _, _ := pIsWindow.Call(hwnd); ok == 0 {
+			return nil, 0, 0, nil, errors.New("that window has been closed")
+		}
+		if m, _, _ := pIsIconic.Call(hwnd); m != 0 {
+			return nil, 0, 0, nil, errors.New("that window is minimised — restore it, then share it")
+		}
+		sw, sh, _ := windowSize(hwnd)
+		w, h := shareSize(sw, sh, o.Height)
+		log.Printf("screen: Windows build %d; sharing window %d without the yellow border (PrintWindow copy)", windowsBuild(), hwnd)
+		return []string{"-f", "rawvideo", "-pixel_format", "bgra", "-video_size", fmt.Sprintf("%dx%d", w, h),
+			"-framerate", strconv.Itoa(o.FPS), "-i", "pipe:0"}, w, h, gdiWindowFeed(hwnd, w, h, o.FPS), nil
+	}
+	args, w, h, err := screenInputArgs(o)
+	return args, w, h, nil, err
+}
 
 func screenShareUnavailable() string {
 	if findFFmpeg() == "" {
@@ -432,7 +468,7 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 		return nil, 0, 0, errors.New("that screen isn't connected any more")
 	}
 	if !f["gfxcapture"] {
-		return nil, 0, 0, errors.New("sharing a single window needs an FFmpeg built with gfxcapture — rebuild it under MSYS2 with ffmpeg/build-ffmpeg.sh")
+		return nil, 0, 0, errors.New("sharing a single window needs an FFmpeg built with gfxcapture (or, on Windows 10, the rawvideo reader) — rebuild it with ffmpeg/build-ffmpeg.sh")
 	}
 	hwnd := uintptr(handle)
 	if ok, _, _ := pIsWindow.Call(hwnd); ok == 0 {
@@ -442,12 +478,11 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 		return nil, 0, 0, errors.New("that window is minimised — restore it, then share it")
 	}
 	if o.HideBorder && !isWindows11() {
-		log.Printf("screen: this version of Windows always draws the yellow border round a shared window (only Windows 11 lets it be hidden)")
+		log.Printf("screen: this FFmpeg can't read raw frames (rebuild it with ffmpeg/build-ffmpeg.sh), so the window is shared with Windows Graphics Capture — which on Windows 10 always draws the yellow border")
 	}
 	sw, sh, _ := windowSize(hwnd)
 	w, h := shareSize(sw, sh, o.Height)
-	// (On Windows 10 the border can't be hidden for a single window: the
-	// older GDI copy that avoids it shows most modern apps as black.)
+	// (On Windows 10 a border-free window is copied by screenInput instead.)
 	return []string{"-filter_complex", fmt.Sprintf(
 		"gfxcapture=hwnd=%d:max_framerate=%d:capture_cursor=1:display_border=%d:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
 		handle, o.FPS, border, w, h)}, w, h, nil

@@ -93,9 +93,11 @@ if [ "$TARGET" = windows ]; then
   EXE=ffmpeg.exe
   EXTRA_LIBS="-static -static-libgcc -static-libstdc++"
   # Capture: webcams (DirectShow), screens/windows (Windows Graphics
-  # Capture; Desktop Duplication for border-free screens; GDI for
-  # border-free windows on Windows 10), GPU scaling/conversion.
-  CAPTURE="--enable-indev=dshow,gdigrab --enable-filter=gfxcapture,ddagrab,scale_d3d11,hwupload,hwmap"
+  # Capture; Desktop Duplication for border-free screens), GPU
+  # scaling/conversion. Border-free windows on Windows 10 are copied by
+  # chriscord itself (screen_gdi_windows.c) and handed over as raw frames:
+  # the rawvideo reader.
+  CAPTURE="--enable-indev=dshow --enable-demuxer=rawvideo --enable-filter=gfxcapture,ddagrab,scale_d3d11,hwupload,hwmap"
   # Intel Quick Sync (always the Intel chip, unlike Media Foundation):
   # libvpl, built below as a static library, when cmake is available.
   command -v cmake >/dev/null 2>&1 && WANT_VPL=1 || WANT_VPL=0
@@ -186,7 +188,7 @@ if [ "$TARGET" = windows ]; then
   echo "  webcams (dshow):                         $(have CONFIG_DSHOW_INDEV)"
   echo "  screens/windows on the GPU (gfxcapture): $(have CONFIG_GFXCAPTURE_FILTER)"
   echo "  screens without a border (ddagrab):      $(have CONFIG_DDAGRAB_FILTER)"
-  echo "  windows without a border, Win10 (gdigrab): $(have CONFIG_GDIGRAB_INDEV)"
+  echo "  windows without a border, Win10 (rawvideo): $(have CONFIG_RAWVIDEO_DEMUXER)"
   echo "  GPU scaling (scale_d3d11):               $(have CONFIG_SCALE_D3D11_FILTER)"
   echo "  NVIDIA / Media Foundation encoders:      $(have CONFIG_H264_NVENC_ENCODER) / $(have CONFIG_H264_MF_ENCODER)"
   echo "  Intel Quick Sync (h264_qsv):             $(have CONFIG_H264_QSV_ENCODER)"
