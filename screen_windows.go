@@ -396,6 +396,18 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 			// screen when the border should be hidden (or WGC is missing).
 			if f["ddagrab"] && (o.HideBorder || !f["gfxcapture"]) {
 				if adapter, output, ok := ddaFind(handle, m.w, m.h); ok {
+					if adapter == 0 {
+						// The default graphics adapter: ddagrab makes its own
+						// device there. No device set up up front means
+						// NVENC isn't handed it either, so no CUDA device is
+						// needed to steer it — and on a laptop, setting CUDA
+						// up first moves FFmpeg onto the NVIDIA card, where
+						// the Intel-driven screen can't be duplicated
+						// ("Selected output not supported").
+						return []string{"-filter_complex", fmt.Sprintf(
+							"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",
+							output, o.FPS, w, h)}, w, h, nil
+					}
 					return []string{"-init_hw_device", fmt.Sprintf("d3d11va=dda:%d", adapter), "-filter_hw_device", "dda",
 						"-filter_complex", fmt.Sprintf(
 							"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",

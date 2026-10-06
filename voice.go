@@ -56,6 +56,16 @@ type voiceRemoteSource struct {
 	arrMin        float64
 	arrWinMin     float64
 	arrWinStarted time.Time
+
+	// Packet order, and smoothing over breaks in the sound.
+	seqHave bool
+	lastSeq uint16
+	fadeIn  bool // the next samples played start a fresh run: fade them in
+
+	// What happened over the last few seconds, for the log (logStats).
+	stAt                                     time.Time
+	stPkts, stLost, stLate                   int
+	stUnder, stJumps, stHeld, stFast, stSlow int
 }
 
 // VoiceSession owns everything for one active voice-channel connection. A
@@ -848,7 +858,7 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 	if err != nil {
 		return
 	}
-	source := &voiceRemoteSource{username: name, decoder: decoder, stereo: stereo, sharer: strings.TrimPrefix(name, "screen:")}
+	source := &voiceRemoteSource{username: name, decoder: decoder, stereo: stereo, sharer: strings.TrimPrefix(name, "screen:"), fadeIn: true}
 	// Keyed per track (a new share by the same person arrives as a new one).
 	key := fmt.Sprintf("%s#%d", track.ID(), track.SSRC())
 	s.remotesMu.Lock()
@@ -870,6 +880,37 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 		packet, _, err := track.ReadRTP()
 		if err != nil {
 			return
+		}
+		if stereo {
+			// A stream's sound: packets that arrive after a later one are
+			// dropped (appended out of order they'd crackle), and a few
+			// missing ones are filled in by Opus' loss concealment rather
+			// than leaving a click-shaped hole.
+			source.mu.Lock()
+			source.stPkts++
+			lost := 0
+			if source.seqHave {
+				d := int16(packet.SequenceNumber - source.lastSeq)
+				if d <= 0 {
+					source.stLate++
+					source.mu.Unlock()
+					continue
+				}
+				lost = int(d) - 1
+			}
+			source.seqHave, source.lastSeq = true, packet.SequenceNumber
+			source.stLost += lost
+			source.mu.Unlock()
+			if lost > 0 && lost <= 5 {
+				plc := make([]int16, voiceFrameSize*2)
+				for i := 0; i < lost; i++ {
+					if decoder.DecodePLC(plc) == nil {
+						source.mu.Lock()
+						source.buf = append(source.buf, plc...)
+						source.mu.Unlock()
+					}
+				}
+			}
 		}
 		n, err := decoder.Decode(packet.Payload, pcm)
 		if err != nil {
@@ -1141,7 +1182,7 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 	if !r.arrHave {
 		return 1, false // nothing has arrived yet
 	}
-	want := r.arrMin + 60 // the sound itself: when it arrives, plus a cushion for network jitter
+	want := r.arrMin + 100 // the sound itself: when it arrives, plus a cushion for network jitter
 	if vl, ok := streamVideoLag(r.sharer); ok {
 		want = math.Max(want, vl+20) // late enough for the picture to keep up
 	}
@@ -1176,13 +1217,25 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 		r.buf = r.buf[drop:]
 		r.headCap += float64(drop/2) / 48
 		r.heardLag = r.delay
+		r.stJumps++
+		r.fadeIn = true
 		return 1, false
 	case diff < -150: // far ahead (just started): wait until it's due
+		r.stHeld++
+		r.fadeIn = true
 		return 1, true
-	case diff > 25:
-		return 1.03, false
-	case diff < -25:
-		return 0.97, false
+	case diff > 120: // well off: catch up at 2.5% (just audible, briefly)
+		r.stFast++
+		return 1.025, false
+	case diff < -120:
+		r.stSlow++
+		return 0.975, false
+	case diff > 15: // a little off: ease back at up to 1% (not audible)
+		r.stFast++
+		return 1 + math.Min(diff, 100)/10000, false
+	case diff < -15:
+		r.stSlow++
+		return 1 + math.Max(diff, -100)/10000, false
 	}
 	return 1, false
 }
@@ -1191,6 +1244,7 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 // from r.buf at the rate syncRate picks, interpolating between samples,
 // and returns how many frames it wrote (fewer if it ran short).
 func (r *voiceRemoteSource) readStretched(out []float64, outLatencyMs float64) int {
+	r.logStats()
 	rate, hold := r.syncRate(outLatencyMs)
 	if hold {
 		return 0
@@ -1219,7 +1273,46 @@ func (r *voiceRemoteSource) readStretched(out []float64, outLatencyMs float64) i
 		r.frac = 0
 	}
 	r.headCap += float64(used) / 48
+	// Smooth the edges of every break so they don't click: fade in after
+	// a pause or a jump, fade out when the queue runs dry mid-frame.
+	if r.fadeIn && n > 0 {
+		k := min(n, 96)
+		for i := 0; i < k; i++ {
+			g := float64(i) / float64(k)
+			out[2*i] *= g
+			out[2*i+1] *= g
+		}
+		r.fadeIn = false
+	}
+	if n < voiceFrameSize {
+		r.stUnder++
+		k := min(n, 96)
+		for i := 0; i < k; i++ {
+			g := float64(i) / float64(k)
+			out[2*(n-1-i)] *= g
+			out[2*(n-1-i)+1] *= g
+		}
+		r.fadeIn = true
+	}
 	return n
+}
+
+// logStats writes a line about this stream's sound every 5 seconds, so
+// crackles can be traced: packets lost or out of order on the way, the
+// queue running dry, or the timing corrections. Call with r.mu held.
+func (r *voiceRemoteSource) logStats() {
+	if r.stAt.IsZero() {
+		r.stAt = time.Now()
+		return
+	}
+	if time.Since(r.stAt) < 5*time.Second {
+		return
+	}
+	queued := float64(len(r.buf)/2) / 48
+	log.Printf("stream sound from %s — last 5 s: %d packets, %d lost (filled in), %d out of order, %d run-dry, %d jumps, %d frames held, %d faster / %d slower; delay %.0f ms over arrival, %.0f ms queued",
+		r.sharer, r.stPkts, r.stLost, r.stLate, r.stUnder, r.stJumps, r.stHeld, r.stFast, r.stSlow, r.delay-r.arrMin, queued)
+	r.stAt = time.Now()
+	r.stPkts, r.stLost, r.stLate, r.stUnder, r.stJumps, r.stHeld, r.stFast, r.stSlow = 0, 0, 0, 0, 0, 0, 0, 0
 }
 
 // noteArrival tracks how soon after capture this stream's sound arrives:
