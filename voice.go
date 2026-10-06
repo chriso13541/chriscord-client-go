@@ -274,8 +274,9 @@ func (a *App) IsMuted() bool {
 	return a.voiceMuted.Load()
 }
 
-// ToggleDeafen flips whether incoming audio from everyone else is being
-// played, and returns the new deafened state. Deafening also mutes, and
+// ToggleDeafen flips whether the other people's voices are being played,
+// and returns the new deafened state. Streams being watched keep their
+// sound (they have their own volume and mute). Deafening also mutes, and
 // undeafening also unmutes — a clean, symmetric toggle rather than
 // leaving mute as a separate thing to manage after undeafening. Purely
 // client-side, same as mute: deafened audio is still received and
@@ -797,7 +798,10 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 						// too, so it lines up with what's being heard.
 						wailsruntime.EventsEmit(s.ctx, "stream:audiolag", map[string]interface{}{"user": r.sharer, "ms": r.heardLag})
 					}
-					if !deafened && g > 0 {
+					// Not silenced by deafening: deafen is for the call's
+					// voices; a stream you're watching keeps its sound (its
+					// own volume/mute is on the stream).
+					if g > 0 {
 						for i := 0; i < n; i++ {
 							l, rr := streamOut[2*i]*g, streamOut[2*i+1]*g
 							if outCh == 2 {
@@ -836,6 +840,9 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			if err := stream.Write(); err != nil {
 				return
 			}
+			// Kept briefly while sharing sound, so it can be taken back out
+			// if it turns up in the share (echo.go).
+			echoRef.push(s.playBuf, outCh)
 		}
 	}()
 	return <-started

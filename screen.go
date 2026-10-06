@@ -339,6 +339,11 @@ func (a *App) startScreenAudio(c *nativeCamera, id string) {
 // frames) into the call's screen-sound track until stop is closed.
 func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 	defer stopSystemAudio()
+	// This app's own sound (the call) is kept out of the recording by
+	// Windows; if some of it gets in anyway, it's taken back out (echo.go).
+	echoRef.enable()
+	defer echoRef.disable()
+	echo := newEchoCanceller(echoRef)
 	enc, err := opus.NewEncoder(48000, 2, opus.AppAudio)
 	if err != nil {
 		log.Printf("screen: sound encoder: %v", err)
@@ -371,7 +376,11 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 		// Fallen far behind (e.g. a moment outside a call): skip to now.
 		for systemAudioAvailable() > frame*10 {
 			readSystemAudio(f)
+			echo.skip(frame)
 			skipped++
+		}
+		if systemAudioAvailable() == 0 {
+			echo.catchUp() // nothing recorded for a while: keep its count on time
 		}
 		for systemAudioAvailable() >= frame {
 			if readSystemAudio(f) < frame {
@@ -386,6 +395,7 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 			}
 			frameCap := capMs
 			capMs += 20
+			echo.process(f)
 			for i, v := range f {
 				pcm[i] = int16(clampF(float64(v), -1, 1) * 32767)
 			}
