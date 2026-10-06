@@ -486,6 +486,7 @@ var (
 func ddaFind(hmonitor uint64, w, h int) (adapter, output int, ok bool) {
 	ddaMu.Lock()
 	defer ddaMu.Unlock()
+	ffmpegDPIAware()
 	if v, ok := ddaCache[hmonitor]; ok {
 		return v[0], v[1], true
 	}
@@ -494,8 +495,8 @@ func ddaFind(hmonitor uint64, w, h int) (adapter, output int, ok bool) {
 		defer cancel()
 		cmd := exec.CommandContext(ctx, findFFmpeg(), "-hide_banner", "-nostdin", "-v", "verbose",
 			"-init_hw_device", fmt.Sprintf("d3d11va=p:%d", a), "-filter_hw_device", "p",
-			"-filter_complex", fmt.Sprintf("ddagrab=output_idx=%d:framerate=5,hwdownload,format=bgra", o),
-			"-frames:v", "1", "-f", "null", "-")
+			"-filter_complex", fmt.Sprintf("ddagrab=output_idx=%d:framerate=5,hwdownload,format=bgra,scale,format=yuv420p", o),
+			"-frames:v", "1", "-c:v", "libx264", "-preset", "ultrafast", "-f", "null", "-")
 		captureProcAttr(cmd)
 		out, _ := cmd.CombinedOutput()
 		text := string(out)
@@ -520,6 +521,9 @@ func ddaFind(hmonitor uint64, w, h int) (adapter, output int, ok bool) {
 		if m := reDDAOut.FindStringSubmatch(text); m != nil {
 			gw, _ := strconv.Atoi(m[2])
 			gh, _ := strconv.Atoi(m[3])
+			if gw != w && gw*h == gh*w {
+				log.Printf("screen: Desktop Duplication: FFmpeg sees this screen scaled to %dx%d (Windows display scaling) — not used, it would only capture part of it", gw, gh)
+			}
 			return gw == w && gh == h, true, adapterExists
 		}
 		return false, !strings.Contains(text, "Failed to enumerate DXGI output"), adapterExists
@@ -550,4 +554,76 @@ func ddaFind(hmonitor uint64, w, h int) (adapter, output int, ok bool) {
 		}
 	}
 	return 0, 0, false
+}
+
+// ffmpegDPIAware makes Windows give FFmpeg the screen's real size.
+//
+// With display scaling on (125% on a 1920x1080 laptop screen, say), Windows
+// tells programs that don't declare themselves "DPI aware" a shrunken size
+// (1536x864) — and Desktop Duplication in such a program captures only that
+// much of the screen, the top-left part. FFmpeg doesn't declare it, so this
+// sets the same switch as its Properties → Compatibility → "Change high DPI
+// settings" → "Override high DPI scaling behaviour: Application", for this
+// user and this FFmpeg only. Takes effect for FFmpeg runs started after it.
+var ffmpegDPIOnce sync.Once
+
+func ffmpegDPIAware() {
+	ffmpegDPIOnce.Do(func() {
+		exe := findFFmpeg()
+		if exe == "" {
+			return
+		}
+		if abs, err := filepath.Abs(exe); err == nil {
+			exe = abs
+		}
+		advapi := syscall.NewLazyDLL("advapi32.dll")
+		create := advapi.NewProc("RegCreateKeyExW")
+		query := advapi.NewProc("RegQueryValueExW")
+		set := advapi.NewProc("RegSetValueExW")
+		closeKey := advapi.NewProc("RegCloseKey")
+		const (
+			hkcu     = 0x80000001
+			keyRW    = 0x20019 | 0x20006 // KEY_READ | KEY_WRITE
+			regSZ    = 1
+			errOK    = 0
+			wantFlag = "HIGHDPIAWARE"
+		)
+		sub, _ := syscall.UTF16PtrFromString(`Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers`)
+		var key syscall.Handle
+		if r, _, _ := create.Call(hkcu, uintptr(unsafe.Pointer(sub)), 0, 0, 0, keyRW, 0,
+			uintptr(unsafe.Pointer(&key)), 0); r != errOK {
+			log.Printf("screen: couldn't open the compatibility settings to make FFmpeg DPI aware (%d)", r)
+			return
+		}
+		defer closeKey.Call(uintptr(key))
+		name, _ := syscall.UTF16PtrFromString(exe)
+
+		cur := ""
+		buf := make([]uint16, 512)
+		size := uint32(len(buf) * 2)
+		var typ uint32
+		if r, _, _ := query.Call(uintptr(key), uintptr(unsafe.Pointer(name)), 0,
+			uintptr(unsafe.Pointer(&typ)), uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size))); r == errOK && typ == regSZ {
+			cur = syscall.UTF16ToString(buf)
+		}
+		for _, f := range strings.Fields(cur) {
+			if strings.EqualFold(f, wantFlag) {
+				return // already set
+			}
+		}
+		val := "~ " + wantFlag
+		if f := strings.Fields(cur); len(f) > 0 {
+			if f[0] == "~" {
+				f = f[1:]
+			}
+			val = "~ " + strings.Join(append(f, wantFlag), " ")
+		}
+		data, _ := syscall.UTF16FromString(val)
+		if r, _, _ := set.Call(uintptr(key), uintptr(unsafe.Pointer(name)), 0, regSZ,
+			uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)*2)); r != errOK {
+			log.Printf("screen: couldn't make FFmpeg DPI aware (%d)", r)
+			return
+		}
+		log.Printf("screen: marked %s as DPI aware (%s), so it sees screens at their real size", exe, val)
+	})
 }

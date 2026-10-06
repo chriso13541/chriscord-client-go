@@ -50,6 +50,12 @@ type voiceRemoteSource struct {
 	delay    float64   // how far behind capture the sound plays (ms), see syncRate
 	offSince time.Time // when the wanted delay started differing from delay
 	heardLag float64   // what the delay actually is right now (reported to the page)
+	// How soon after capture the sound arrives here (the least seen over
+	// the last few seconds), same clock terms as the delays.
+	arrHave       bool
+	arrMin        float64
+	arrWinMin     float64
+	arrWinStarted time.Time
 }
 
 // VoiceSession owns everything for one active voice-channel connection. A
@@ -875,6 +881,7 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 			// follow on from what's queued (a gap, a new share), the queue's
 			// timeline restarts from it.
 			capMs := source.unwrap.ms(packet.Timestamp, 48000)
+			source.noteArrival(nowWallMs() - capMs)
 			queued := float64(len(source.buf)/2) / 48
 			if len(source.buf) == 0 || math.Abs(source.headCap+queued-capMs) > 60 {
 				source.headCap = capMs - queued
@@ -1127,16 +1134,22 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 	}
 	trim(48000 * 2 * 2) // never more than 2 s queued
 
-	// The delay to aim for.
-	want := 120.0 // no picture figure yet: enough to ride out network jitter
-	if vl, ok := streamVideoLag(r.sharer); ok {
-		want = vl + 20
+	// The delay to aim for. All of these are "this computer's clock minus
+	// the sharer's capture time", so they include the (unknown) difference
+	// between the two clocks — which is fine, as long as everything is
+	// compared in those same terms.
+	if !r.arrHave {
+		return 1, false // nothing has arrived yet
 	}
-	want = math.Max(80, math.Min(800, want))
+	want := r.arrMin + 60 // the sound itself: when it arrives, plus a cushion for network jitter
+	if vl, ok := streamVideoLag(r.sharer); ok {
+		want = math.Max(want, vl+20) // late enough for the picture to keep up
+	}
+	want = math.Min(want, r.arrMin+1000) // but never more than a second behind
 	now := time.Now()
 	switch {
-	case r.delay == 0:
-		r.delay = want
+	case r.delay == 0, math.Abs(want-r.delay) > 1500: // first figure, or a whole new timeline
+		r.delay, r.offSince = want, time.Time{}
 	case math.Abs(want-r.delay) > 60:
 		if r.offSince.IsZero() {
 			r.offSince = now
@@ -1207,4 +1220,24 @@ func (r *voiceRemoteSource) readStretched(out []float64, outLatencyMs float64) i
 	}
 	r.headCap += float64(used) / 48
 	return n
+}
+
+// noteArrival tracks how soon after capture this stream's sound arrives:
+// the smallest figure over 5-second windows (the network's best case;
+// jitter only ever adds to it). Call with r.mu held.
+func (r *voiceRemoteSource) noteArrival(lag float64) {
+	now := time.Now()
+	if !r.arrHave {
+		r.arrHave, r.arrMin, r.arrWinMin, r.arrWinStarted = true, lag, lag, now
+		return
+	}
+	if lag < r.arrWinMin {
+		r.arrWinMin = lag
+	}
+	if lag < r.arrMin {
+		r.arrMin = lag
+	}
+	if now.Sub(r.arrWinStarted) > 5*time.Second {
+		r.arrMin, r.arrWinMin, r.arrWinStarted = r.arrWinMin, lag, now
+	}
 }
