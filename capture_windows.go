@@ -63,7 +63,9 @@ func listCameraModes(id string) ([]CameraMode, error) {
 }
 
 func cameraInputArgs(o CameraStart) []string {
-	args := []string{"-f", "dshow", "-rtbufsize", "64M",
+	// A small capture buffer: enough to ride out a hiccup (about 8 frames of
+	// uncompressed 720p), without holding 64 MB in memory for nothing.
+	args := []string{"-f", "dshow", "-rtbufsize", "16M",
 		"-video_size", strconv.Itoa(o.W) + "x" + strconv.Itoa(o.H), "-framerate", strconv.Itoa(o.ModeFPS)}
 	if o.Format == "mjpeg" || o.Format == "h264" {
 		args = append(args, "-vcodec", o.Format)

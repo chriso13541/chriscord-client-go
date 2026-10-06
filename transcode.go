@@ -318,7 +318,7 @@ func ffmpegEncoders() map[string]bool {
 		return nil
 	}
 	have := map[string]bool{}
-	for _, enc := range []string{"h264_nvenc", "h264_mf", "libx264"} {
+	for _, enc := range []string{"h264_nvenc", "h264_mf", "h264_qsv", "libx264"} {
 		have[enc] = strings.Contains(string(out), " "+enc+" ")
 	}
 	return have
@@ -381,11 +381,15 @@ func explainEncoderError(enc, msg string) string {
 			return "The NVIDIA encoder refused to start — usually too many programs are recording/streaming with it at once. Close OBS/ShadowPlay and check again."
 		}
 	}
+	if isCrash(msg) {
+		name := map[string]string{"h264_nvenc": "NVIDIA NVENC", "h264_mf": "Windows Media Foundation", "h264_qsv": "Intel Quick Sync"}[enc]
+		return name + " crashed inside the graphics driver. This is usually a driver issue on laptops with two graphics chips — updating the Intel/AMD graphics driver often fixes it; \"Check again\" in Settings → Performance retries."
+	}
 	first := strings.SplitN(strings.TrimSpace(msg), "\n", 2)[0]
 	if len(first) > 160 {
 		first = first[:160] + "…"
 	}
-	name := map[string]string{"h264_nvenc": "NVIDIA NVENC", "h264_mf": "Windows Media Foundation"}[enc]
+	name := map[string]string{"h264_nvenc": "NVIDIA NVENC", "h264_mf": "Windows Media Foundation", "h264_qsv": "Intel Quick Sync"}[enc]
 	return name + " didn't work: " + first
 }
 
@@ -396,9 +400,7 @@ func (a *App) RecheckGPUEncoder() map[string]interface{} {
 	encoderMu.Lock()
 	encoderChecked = false
 	encoderMu.Unlock()
-	encTestMu.Lock()
-	encTestRes = map[string]string{}
-	encTestMu.Unlock()
+	resetEncoderTests()
 	gpuListOnce = sync.Once{}
 	return a.VideoConversionInfo()
 }

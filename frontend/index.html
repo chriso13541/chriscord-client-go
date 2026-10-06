@@ -7124,12 +7124,14 @@ function stopCameraPreview(keepLabel){
   box.querySelector('video').srcObject=null;box.classList.remove('live');
   if(!keepLabel)document.getElementById('settings-cam-test-btn').innerHTML=`${icon('videocam')} Test Camera`;
 }
-function renderNativeHint(){
+// fill: also check the encoders (only when the settings page is open —
+// at startup that would start several test encodes for nothing).
+function renderNativeHint(fill=true){
   const box=document.getElementById('cam-native'),hint=document.getElementById('cam-native-hint');
   box.checked=useNative();box.disabled=!native.available;
   hint.textContent=native.available?'Captures and encodes your camera outside the app\u2019s web view.':`Not available: ${native.reason||'checking\u2026'}`;
   document.getElementById('cam-enc-row').classList.toggle('hidden',!useNative());
-  if(useNative())fillEncoderMenu();
+  if(useNative()&&fill)fillEncoderMenu();
 }
 // Settings → Voice & Video → Encoder (native capture): Auto, or a specific
 // encoder. Ones that don't work on this computer are listed but greyed
@@ -7139,17 +7141,18 @@ async function fillEncoderMenu(){
   const sel=document.getElementById('settings-cam-enc'),hint=document.getElementById('cam-enc-hint');
   if(!encChoices){sel.disabled=true;hint.textContent='Checking which encoders work here\u2026';}
   try{encChoices=await window.go.main.App.CaptureEncoders();}catch{encChoices=encChoices||[];}
+  if(localStorage.getItem('camEncoder')==='quicksync')localStorage.setItem('camEncoder','hardware'); // now part of Hardware H.264
   const saved=localStorage.getItem('camEncoder')||'auto';
   sel.innerHTML=encChoices.map(c=>`<option value="${esc(c.id)}"${c.available?'':' disabled'} title="${esc(c.reason||'')}">${esc(c.label)}${c.available?'':' \u2014 not available'}</option>`).join('');
   const ok=encChoices.find(c=>c.id===saved&&c.available);
   sel.value=ok?saved:'auto';
   sel.disabled=false;
   const off=encChoices.filter(c=>!c.available);
-  hint.textContent=off.length?off.map(c=>`${c.label}: ${c.reason}`).join(' \u00b7 '):'Auto uses NVIDIA NVENC if you have it, then hardware H.264, then the CPU.';
+  hint.textContent=off.length?off.map(c=>`${c.label}: ${c.reason}`).join(' \u00b7 '):'Auto uses NVIDIA NVENC if you have it, then hardware H.264, then the CPU. Hardware H.264 uses Intel Quick Sync when there\u2019s an Intel chip (on a laptop with Intel and NVIDIA graphics, that\u2019s always the Intel one), otherwise Windows\u2019 own hardware encoder.';
 }
 function initCameraSettings(){
   const nat=document.getElementById('cam-native');
-  loadNativeCapture().then(renderNativeHint);
+  loadNativeCapture().then(()=>renderNativeHint(false));
   document.getElementById('settings-cam-enc').addEventListener('change',e=>{
     localStorage.setItem('camEncoder',e.target.value);
     applyCameraSetting();

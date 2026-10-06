@@ -133,11 +133,15 @@ func ffmpegInputs() map[string]string {
 	return ffInputs
 }
 
-// captureEncoder: the graphics card's H.264 encoder if one works here,
-// else x264 on the CPU (fast settings).
+// captureEncoder: Auto's pick — NVIDIA NVENC, then the hardware H.264
+// encoder (Intel Quick Sync, else Media Foundation), then x264 on the CPU.
 func captureEncoder() string {
-	if hw, _ := hardwareEncoder(); hw != "" {
-		return hw
+	testEncoders("h264_nvenc", "h264_qsv", "h264_mf") // in parallel
+	if encoderWorks("h264_nvenc") == "" {
+		return "h264_nvenc"
+	}
+	if enc, _ := hardwareH264(); enc != "" {
+		return enc
 	}
 	return "libx264"
 }
@@ -148,6 +152,8 @@ func encoderLabel(enc string) string {
 		return "H.264 on your NVIDIA graphics card (native)"
 	case "h264_mf":
 		return "H.264 on your graphics card (native)"
+	case "h264_qsv":
+		return "H.264 on Intel Quick Sync (native)"
 	}
 	return "H.264 on the CPU (native)"
 }
@@ -160,47 +166,97 @@ type EncoderChoice struct {
 	Reason    string `json:"reason"` // why not, when it isn't
 }
 
-// The camera encoder choices and the FFmpeg encoder each one means.
-var encoderChoices = []struct{ id, enc, label string }{
-	{"hardware", "h264_mf", "Hardware H.264 (Media Foundation \u2014 Intel, AMD or NVIDIA)"},
-	{"nvenc", "h264_nvenc", "NVIDIA NVENC"},
-	{"software", "libx264", "Software H.264 (CPU)"},
+// hardwareH264 is the "Hardware H.264" choice: Intel Quick Sync where
+// there's an Intel chip (it always uses the Intel chip, even on a laptop
+// that also has an NVIDIA card), otherwise Windows' Media Foundation
+// encoder (AMD, NVIDIA — Windows picks the chip). Returns the encoder, or
+// why neither works.
+func hardwareH264() (string, string) {
+	if cameraInputFormat() != "dshow" {
+		return "", "Windows only for now"
+	}
+	q, m := encoderWorks("h264_qsv"), encoderWorks("h264_mf")
+	switch {
+	case q == "":
+		return "h264_qsv", ""
+	case m == "":
+		return "h264_mf", ""
+	}
+	return "", m
+}
+
+// One check per encoder: a single short live-settings encode, remembered
+// until "Check again" in Settings → Performance. Different encoders are
+// checked at the same time, so the menu fills in quickly.
+type encTest struct {
+	once sync.Once
+	why  string // "" = works
 }
 
 var (
-	encTestMu  sync.Mutex
-	encTestRes = map[string]string{} // FFmpeg encoder → "" (works) or why not
+	encTestMu sync.Mutex
+	encTests  = map[string]*encTest{}
 )
 
-// encoderWorks tries a short live-settings encode once per encoder (the
-// answer is remembered until "Check again" in Settings → Performance).
+func resetEncoderTests() {
+	encTestMu.Lock()
+	encTests = map[string]*encTest{}
+	encTestMu.Unlock()
+}
+
 func encoderWorks(enc string) string {
 	encTestMu.Lock()
-	defer encTestMu.Unlock()
-	if r, ok := encTestRes[enc]; ok {
-		return r
+	t := encTests[enc]
+	if t == nil {
+		t = &encTest{}
+		encTests[enc] = t
 	}
-	var why string
-	if have := ffmpegEncoders(); have != nil && !have[enc] {
-		why = "this FFmpeg wasn't built with it"
-	} else if enc == "h264_mf" && cameraInputFormat() != "dshow" {
-		why = "only on Windows"
-	} else if msg := testEncode(enc, encoderArgsLive(enc, 1_000_000, 30, false)[2:]); msg != "" {
-		why = explainEncoderError(enc, msg)
+	encTestMu.Unlock()
+	t.once.Do(func() {
+		switch {
+		case func() bool { have := ffmpegEncoders(); return have != nil && !have[enc] }():
+			t.why = "this FFmpeg wasn't built with it"
+		case (enc == "h264_mf" || enc == "h264_qsv") && cameraInputFormat() != "dshow":
+			t.why = "only on Windows"
+		default:
+			if msg := testEncode(enc, encoderArgsLive(enc, 1_000_000, 30, false)[2:]); msg != "" {
+				t.why = explainEncoderError(enc, msg)
+			}
+		}
+	})
+	return t.why
+}
+
+// testEncoders checks several encoders at once (each still only once).
+func testEncoders(encs ...string) {
+	var wg sync.WaitGroup
+	for _, e := range encs {
+		wg.Add(1)
+		go func(e string) { defer wg.Done(); encoderWorks(e) }(e)
 	}
-	encTestRes[enc] = why
-	return why
+	wg.Wait()
 }
 
 // CaptureEncoders lists the encoder choices for the camera, with which
-// ones work on this computer. Auto picks NVENC, then hardware H.264, then
-// the CPU.
+// ones work on this computer.
 func (a *App) CaptureEncoders() []EncoderChoice {
+	testEncoders("h264_nvenc", "h264_qsv", "h264_mf", "libx264")
 	out := []EncoderChoice{{ID: "auto", Label: "Auto \u2014 " + strings.TrimSuffix(encoderLabel(captureEncoder()), " (native)"), Available: true}}
-	for _, c := range encoderChoices {
-		if c.id == "hardware" && cameraInputFormat() != "dshow" {
-			continue // Media Foundation is Windows-only
+	if cameraInputFormat() == "dshow" {
+		enc, why := hardwareH264()
+		label := "Hardware H.264"
+		switch enc {
+		case "h264_qsv":
+			label += " (Intel Quick Sync)"
+		case "h264_mf":
+			label += " (Media Foundation)"
 		}
+		out = append(out, EncoderChoice{ID: "hardware", Label: label, Available: enc != "", Reason: why})
+	}
+	for _, c := range []struct{ id, enc, label string }{
+		{"nvenc", "h264_nvenc", "NVIDIA NVENC"},
+		{"software", "libx264", "Software H.264 (CPU)"},
+	} {
 		why := encoderWorks(c.enc)
 		out = append(out, EncoderChoice{ID: c.id, Label: c.label, Available: why == "", Reason: why})
 	}
@@ -209,13 +265,19 @@ func (a *App) CaptureEncoders() []EncoderChoice {
 
 // resolveEncoder turns a choice into the FFmpeg encoder to use.
 func resolveEncoder(choice string) (string, error) {
-	for _, c := range encoderChoices {
-		if c.id == choice {
-			if why := encoderWorks(c.enc); why != "" {
-				return "", fmt.Errorf("%s isn't available: %s", c.label, why)
-			}
-			return c.enc, nil
+	switch choice {
+	case "hardware", "quicksync": // ("quicksync": a choice saved by the previous version)
+		enc, why := hardwareH264()
+		if enc == "" {
+			return "", fmt.Errorf("hardware H.264 isn't available: %s", why)
 		}
+		return enc, nil
+	case "nvenc", "software":
+		enc := map[string]string{"nvenc": "h264_nvenc", "software": "libx264"}[choice]
+		if why := encoderWorks(enc); why != "" {
+			return "", fmt.Errorf("%s isn't available: %s", map[string]string{"nvenc": "NVIDIA NVENC", "software": "Software H.264"}[choice], why)
+		}
+		return enc, nil
 	}
 	return captureEncoder(), nil // "auto" or anything unknown
 }
@@ -289,13 +351,24 @@ func encoderArgsLive(enc string, bitrate, fps int, screen bool) []string {
 		return []string{"-c:v", "h264_nvenc", "-preset", "p2", "-tune", "ull", "-zerolatency", "1", "-delay", "0",
 			"-rc", "cbr", "-b:v", b, "-maxrate", b, "-bufsize", half, "-profile:v", "baseline",
 			"-g", gop, "-bf", "0", "-forced-idr", "1", "-pix_fmt", "nv12"}
+	case "h264_qsv":
+		// Quick Sync tuned for live video: fastest preset, no look-ahead,
+		// one frame in flight, rate control that keeps each frame's size
+		// even (no bursts that arrive late).
+		return []string{"-c:v", "h264_qsv", "-preset", "veryfast", "-look_ahead", "0", "-async_depth", "1",
+			"-low_delay_brc", "1", "-b:v", b, "-maxrate", b, "-bufsize", half, "-profile:v", "baseline",
+			"-g", gop, "-bf", "0", "-pix_fmt", "nv12"}
 	case "h264_mf":
 		scenario := "video_conference"
 		if screen {
 			scenario = "display_remoting"
 		}
-		return []string{"-c:v", "h264_mf", "-hw_encoding", "1", "-scenario", scenario, "-rate_control", "cbr",
-			"-b:v", b, "-g", gop, "-bf", "0", "-pix_fmt", "nv12"} // (no profile option for MF: it uses its own default)
+		// "-flags +low_delay" switches the Media Foundation encoder to its
+		// low-latency mode; without it some (Intel Quick Sync especially)
+		// hold several frames back, which shows up as a delayed picture.
+		args := []string{"-c:v", "h264_mf", "-hw_encoding", "1", "-flags", "+low_delay"}
+		return append(args, "-scenario", scenario, "-rate_control", "cbr",
+			"-b:v", b, "-g", gop, "-bf", "0", "-pix_fmt", "nv12") // (no profile option for MF: it uses its own default)
 	}
 	return []string{"-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-profile:v", "baseline",
 		"-b:v", b, "-maxrate", b, "-bufsize", half, "-g", gop, "-bf", "0", "-pix_fmt", "yuv420p"}
@@ -612,3 +685,11 @@ var (
 	reDevDshow  = regexp.MustCompile(`"([^"]+)" \(video\)`)
 	reAltDshow  = regexp.MustCompile(`Alternative name "([^"]+)"`)
 )
+
+// isCrash: FFmpeg died rather than reporting an error — on Windows an
+// access violation (0xc0000005), which comes from inside a driver.
+func isCrash(msg string) bool {
+	low := strings.ToLower(msg)
+	return strings.Contains(low, "0xc0000005") || strings.Contains(low, "3221225477") ||
+		strings.Contains(low, "access violation") || strings.Contains(low, "segmentation fault")
+}

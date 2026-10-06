@@ -35,7 +35,10 @@
 #   Windows build from MSYS2 (in the "MSYS2 UCRT64" shell) — use this if the
 #   WSL build reports gfxcapture as missing (WSL's mingw-w64 may be too old
 #   for the Windows Graphics Capture headers; MSYS2's is always current):
-#     pacman -S --needed make curl mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-pkgconf
+#     pacman -S --needed make curl mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-cmake
+#   (cmake builds Intel's libvpl here, statically, for Intel Quick Sync —
+#   h264_qsv. MSYS2's own libvpl package is a DLL only, which a static
+#   ffmpeg.exe can't use. Without cmake, Quick Sync is simply left out.)
 #   Linux build:
 #     sudo apt install build-essential nasm pkg-config curl libxcb1-dev libxcb-shm0-dev libxcb-xfixes0-dev libxcb-shape0-dev
 # From WSL, building inside /mnt/c is slow; point WORK at the Linux side:
@@ -54,6 +57,7 @@ case "$TARGET" in windows|linux) ;; *) echo "usage: $0 windows|linux" >&2; exit 
 
 FFMPEG_VER=n8.1.3        # FFmpeg release tag
 X264_REF=stable          # x264 branch
+VPL_REF=v2.17.0          # Intel libvpl (Quick Sync) tag, Windows only
 NVHDR_REF=n12.1.14.0     # nv-codec-headers (NVENC) tag. This sets the OLDEST NVIDIA driver
                          # NVENC will work with: 12.1 needs 531.61+ (Windows) / 530.41+ (Linux);
                          # 13.0 would need 570+. FFmpeg 8 still accepts 12.1.
@@ -91,6 +95,9 @@ if [ "$TARGET" = windows ]; then
   # Capture: webcams (DirectShow), screens/windows (Windows Graphics
   # Capture, Desktop Duplication fallback), GPU scaling/conversion.
   CAPTURE="--enable-indev=dshow --enable-filter=gfxcapture,ddagrab,scale_d3d11,hwupload,hwmap"
+  # Intel Quick Sync (always the Intel chip, unlike Media Foundation):
+  # libvpl, built below as a static library, when cmake is available.
+  command -v cmake >/dev/null 2>&1 && WANT_VPL=1 || WANT_VPL=0
 else
   X264_HOST=""
   FF_TARGET=""
@@ -106,6 +113,28 @@ make -C nvhdr-src PREFIX="$PREFIX" install >/dev/null
 
 echo "== x264"
 (cd x264-src && ./configure --prefix="$PREFIX" $X264_HOST --enable-static --enable-pic --disable-cli --disable-opencl >/dev/null && make -j"$JOBS" >/dev/null && make install >/dev/null)
+
+if [ "${WANT_VPL:-0}" = 1 ]; then
+  echo "== libvpl (Intel Quick Sync)"
+  get "https://codeload.github.com/intel/libvpl/tar.gz/refs/tags/$VPL_REF" libvpl-src
+  # libvpl's "#if _MSC_VER < 1400" (meant for ancient Visual Studio) is also
+  # true for GCC, where _MSC_VER isn't defined, and its wcscpy_s macro then
+  # breaks current MinGW headers. MinGW has the real wcscpy_s: skip it.
+  sed -i 's/^#if _MSC_VER < 1400$/#if defined(_MSC_VER) \&\& _MSC_VER < 1400/' libvpl-src/libvpl/src/windows/mfx_dispatcher_defs.h
+  if [ -n "${CROSS:-}" ]; then VPL_CROSS="-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${CROSS}gcc -DCMAKE_CXX_COMPILER=${CROSS}g++ -DCMAKE_RC_COMPILER=${CROSS}windres"; else VPL_CROSS=""; fi
+  if cmake -S libvpl-src -B libvpl-build -G "Unix Makefiles" $VPL_CROSS \
+       -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_INSTALL_LIBDIR=lib \
+       -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DINSTALL_EXAMPLES=OFF \
+       -DBUILD_EXPERIMENTAL=OFF >"$WORK/libvpl.log" 2>&1 \
+     && cmake --build libvpl-build -j"$JOBS" >>"$WORK/libvpl.log" 2>&1 \
+     && cmake --install libvpl-build >>"$WORK/libvpl.log" 2>&1; then
+    HW_ENC="$HW_ENC,h264_qsv"
+    # libvpl's dispatcher is C++: link the C++ runtime (statically, see EXTRA_LIBS).
+    CAPTURE="$CAPTURE --enable-libvpl --extra-libs=-lstdc++"
+  else
+    echo "  libvpl didn't build (see $WORK/libvpl.log) — leaving Intel Quick Sync out"
+  fi
+fi
 
 echo "== ffmpeg"
 cd ffmpeg-src
@@ -142,6 +171,7 @@ if [ "$TARGET" = windows ]; then
   echo "  screens fallback (ddagrab):              $(have CONFIG_DDAGRAB_FILTER)"
   echo "  GPU scaling (scale_d3d11):               $(have CONFIG_SCALE_D3D11_FILTER)"
   echo "  NVIDIA / Media Foundation encoders:      $(have CONFIG_H264_NVENC_ENCODER) / $(have CONFIG_H264_MF_ENCODER)"
+  echo "  Intel Quick Sync (h264_qsv):             $(have CONFIG_H264_QSV_ENCODER)"
   if ! grep -q "^CONFIG_GFXCAPTURE_FILTER=yes" ffbuild/config.mak; then
     echo
     echo "  NOTE: gfxcapture is missing — this compiler's Windows headers are too old"
