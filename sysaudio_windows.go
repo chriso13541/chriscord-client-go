@@ -3,21 +3,18 @@
 package main
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/third_party/miniaudio
 #cgo LDFLAGS: -lole32
 #include "sysaudio_windows.h"
 */
 import "C"
 
-import (
-	"errors"
-	"strings"
-)
+import "errors"
 
 // The computer's sound for a screen share, through WASAPI process loopback
-// (sysaudio_windows.c): exclude=true records everything except the given
-// process (this app — so the call isn't sent back to itself), false only
-// that process and what it started (one shared application).
+// (sysaudio_windows.c — plain Win32, no extra libraries): exclude=true
+// records everything except the given process (this app — so the call isn't
+// sent back to itself), false only that process and what it started (one
+// shared application).
 
 func startSystemAudio(pid uint32, exclude bool) error {
 	var msg [256]C.char
@@ -26,11 +23,7 @@ func startSystemAudio(pid uint32, exclude bool) error {
 		ex = 1
 	}
 	if C.sa_start(C.uint(pid), ex, &msg[0], C.int(len(msg))) != 0 {
-		reason := C.GoString(&msg[0])
-		if strings.Contains(strings.ToLower(reason), "not supported") || strings.Contains(strings.ToLower(reason), "invalid") {
-			return errors.New("this version of Windows can't capture one app's sound separately — Windows 10 (21H2) or Windows 11 is needed (" + reason + ")")
-		}
-		return errors.New(reason)
+		return errors.New(C.GoString(&msg[0]))
 	}
 	return nil
 }
