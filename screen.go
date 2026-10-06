@@ -143,6 +143,22 @@ func shareSize(w, h, height int) (int, int) {
 // already running). It returns the label of the encoder in use once the
 // first frame is out, or why it couldn't start.
 func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
+	label, err := a.startScreen(opts)
+	if err != nil && opts.HideBorder {
+		// The border-free way (Desktop Duplication for a screen, GDI for a
+		// window on Windows 10) didn't work on this computer: share with
+		// Windows Graphics Capture instead, and say so.
+		log.Printf("screen: border-free capture failed (%v); trying Windows Graphics Capture", err)
+		opts.HideBorder = false
+		if label, err2 := a.startScreen(opts); err2 == nil {
+			wailsruntime.EventsEmit(a.ctx, "screen:notice", "Couldn’t hide the yellow border on this computer ("+err.Error()+"), so it’s showing.")
+			return label, nil
+		}
+	}
+	return label, err
+}
+
+func (a *App) startScreen(opts ScreenStart) (string, error) {
 	a.StopScreenShare()
 	if reason := screenShareUnavailable(); reason != "" {
 		return "", errors.New(reason)
@@ -159,6 +175,13 @@ func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
 		return "", err
 	}
 	args := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+	if enc == "h264_nvenc" && strings.Contains(strings.Join(input, " "), "-init_hw_device") {
+		// With a D3D11 device set up for Desktop Duplication, FFmpeg would
+		// hand that to NVENC too — and on a laptop it's the Intel chip's,
+		// which NVENC can't use. A CUDA device (NVENC's first choice) keeps
+		// it on the NVIDIA card.
+		args = append(args, "-init_hw_device", "cuda=enc")
+	}
 	args = append(args, input...)
 	args = append(args, "-an")
 	encArgs := encoderArgsLive(enc, screenBitrate(w, h, opts.FPS), opts.FPS, true)
@@ -220,7 +243,11 @@ func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
 		return "", errors.New("screen sharing didn't start within 10 seconds")
 	}
 	if opts.Audio {
-		a.startScreenAudio(c, opts.ID)
+		select {
+		case <-c.done: // FFmpeg already gave up after its first frame
+		default:
+			a.startScreenAudio(c, opts.ID)
+		}
 	}
 	return encoderLabel(enc), nil
 }
@@ -239,11 +266,19 @@ func (a *App) startScreenAudio(c *nativeCamera, id string) {
 		wailsruntime.EventsEmit(a.ctx, "screen:audio", map[string]interface{}{"ok": false, "reason": err.Error()})
 		return
 	}
-	log.Printf("screen: sharing sound (pid %d, exclude=%v)", pid, exclude)
 	stop, done := make(chan struct{}), make(chan struct{})
 	c.audioMu.Lock()
+	if c.audioOff {
+		// The share ended (or failed) while the sound was starting: don't
+		// leave it capturing.
+		c.audioMu.Unlock()
+		stopSystemAudio()
+		log.Printf("screen: share ended before its sound started; sound not shared")
+		return
+	}
 	c.audioStopCh, c.audioDone = stop, done
 	c.audioMu.Unlock()
+	log.Printf("screen: sharing sound (pid %d, exclude=%v)", pid, exclude)
 	go func() {
 		defer close(done)
 		a.runScreenAudio(c, stop)
@@ -373,12 +408,31 @@ func screenReason(stderr string, errs ...error) string {
 	case strings.Contains(low, "no matching") || strings.Contains(low, "not found"):
 		return "That screen or window isn't available any more"
 	}
-	lines := strings.Split(strings.TrimSpace(stderr), "\n")
-	if last := strings.TrimSpace(lines[len(lines)-1]); last != "" {
-		if len(last) > 160 {
-			last = last[:160] + "…"
+	// The first line that says what actually went wrong — FFmpeg follows it
+	// with knock-on lines ("Task finished…", "Nothing was written…").
+	var pick string
+	for _, line := range strings.Split(strings.TrimSpace(stderr), "\n") {
+		line = strings.TrimSpace(line)
+		low := strings.ToLower(line)
+		if line == "" || strings.Contains(low, "nothing was written") || strings.Contains(low, "terminating thread") ||
+			strings.Contains(low, "task finished") || strings.Contains(low, "could not open encoder before eof") ||
+			strings.Contains(low, "error sending frames to consumers") {
+			if pick == "" && line != "" {
+				pick = line // only if there's nothing better
+			}
+			continue
 		}
-		return "Screen sharing stopped: " + last
+		pick = line
+		break
+	}
+	if pick != "" {
+		if i := strings.Index(pick, "] "); strings.HasPrefix(pick, "[") && i > 0 {
+			pick = pick[i+2:] // drop FFmpeg's "[component @ address]" prefix
+		}
+		if len(pick) > 160 {
+			pick = pick[:160] + "…"
+		}
+		return "Screen sharing stopped: " + pick
 	}
 	for _, e := range errs {
 		if e != nil && e.Error() != "EOF" {

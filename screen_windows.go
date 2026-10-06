@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -391,11 +392,12 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 			// Desktop Duplication never draws a border: used for a whole
 			// screen when the border should be hidden (or WGC is missing).
 			if f["ddagrab"] && (o.HideBorder || !f["gfxcapture"]) {
-				if adapter, output, ok := dxgiOutputFor(handle); ok {
-					return []string{"-init_hw_device", fmt.Sprintf("d3d11va=dda:%d", adapter), "-filter_hw_device", "dda",
+				if d, ok := dxgiOutputFor(handle); ok {
+					log.Printf("screen: %s is output %d of adapter %d (vendor 0x%04x)", o.ID, d.output, d.adapter, d.vendor)
+					return []string{"-init_hw_device", d.ffmpegDevice("dda"), "-filter_hw_device", "dda",
 						"-filter_complex", fmt.Sprintf(
 							"ddagrab=output_idx=%d:framerate=%d:draw_mouse=1,hwdownload,format=bgra,scale=%d:%d",
-							output, o.FPS, w, h)}, w, h, nil
+							d.output, o.FPS, w, h)}, w, h, nil
 				}
 				if !f["gfxcapture"] {
 					// Couldn't map it: outputs counted left to right, which
@@ -424,6 +426,14 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 	}
 	sw, sh, _ := windowSize(hwnd)
 	w, h := shareSize(sw, sh, o.Height)
+	// Windows 10 can't hide Windows Graphics Capture's border, so a
+	// border-free window is copied the older way (GDI, like Discord's
+	// classic capture). Some apps drawn by the graphics card (browsers,
+	// games) can come out black that way.
+	if o.HideBorder && !isWindows11() && strings.Contains(ffmpegInputs()["gdigrab"], "D") {
+		return []string{"-f", "gdigrab", "-framerate", strconv.Itoa(o.FPS), "-draw_mouse", "1",
+			"-i", "title=" + windowText(hwnd), "-vf", fmt.Sprintf("scale=%d:%d", w, h)}, w, h, nil
+	}
 	return []string{"-filter_complex", fmt.Sprintf(
 		"gfxcapture=hwnd=%d:max_framerate=%d:capture_cursor=1:display_border=%d:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
 		handle, o.FPS, border, w, h)}, w, h, nil
@@ -445,4 +455,17 @@ func screenAudioTarget(id string) (pid uint32, exclude bool, err error) {
 		return 0, false, errors.New("couldn't tell which program owns that window")
 	}
 	return p, false, nil
+}
+
+// isWindows11: build 22000 or later — where Windows Graphics Capture can
+// leave out its yellow border.
+func isWindows11() bool {
+	type osVersionInfo struct {
+		size, major, minor, build, platform uint32
+		csd                                 [128]uint16
+	}
+	v := osVersionInfo{}
+	v.size = uint32(unsafe.Sizeof(v))
+	r, _, _ := syscall.NewLazyDLL("ntdll.dll").NewProc("RtlGetVersion").Call(uintptr(unsafe.Pointer(&v)))
+	return r == 0 && v.major >= 10 && v.build >= 22000
 }

@@ -11,8 +11,8 @@ import "errors"
 func screenShareUnavailable() string {
 	return "Sharing your screen from Linux isn't available yet — you can still watch other people's"
 }
-func screenWindowsSupported() bool                 { return false }
-func listShareSources() ([]ShareSource, error)    { return nil, errors.New(screenShareUnavailable()) }
+func screenWindowsSupported() bool             { return false }
+func listShareSources() ([]ShareSource, error) { return nil, errors.New(screenShareUnavailable()) }
 func screenInputArgs(ScreenStart) ([]string, int, int, error) {
 	return nil, 0, 0, errors.New(screenShareUnavailable())
 }

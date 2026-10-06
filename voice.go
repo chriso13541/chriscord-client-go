@@ -46,6 +46,7 @@ type voiceRemoteSource struct {
 	sharer  string
 	headCap float64
 	unwrap  tsUnwrap
+	frac    float64 // position between samples when playing faster/slower
 }
 
 // VoiceSession owns everything for one active voice-channel connection. A
@@ -749,6 +750,7 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			outLatencyMs = float64(info.OutputLatency) / float64(time.Millisecond)
 		}
 		started <- nil
+		streamOut := make([]float64, voiceFrameSize*2)
 
 		for {
 			select {
@@ -765,42 +767,43 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			s.remotesMu.Lock()
 			for _, r := range s.remotes {
 				r.mu.Lock()
-				inCh := 1
-				hold := false
+				g := audioCfg.playbackGain(r.username)
 				if r.stereo {
-					inCh = 2
-					hold = r.syncToPicture(outLatencyMs)
+					// A stream's sound: read a little faster or slower than
+					// real time to stay in step with the picture (avsync.go).
+					n := r.readStretched(streamOut, outLatencyMs)
+					if !deafened && g > 0 {
+						for i := 0; i < n; i++ {
+							l, rr := streamOut[2*i]*g, streamOut[2*i+1]*g
+							if outCh == 2 {
+								mixInto(&s.playBuf[2*i], l)
+								mixInto(&s.playBuf[2*i+1], rr)
+							} else {
+								mixInto(&s.playBuf[i], (l+rr)/2)
+							}
+						}
+					}
+					r.mu.Unlock()
+					continue
 				}
-				n := len(r.buf) / inCh
+				n := len(r.buf)
 				if n > voiceFrameSize {
 					n = voiceFrameSize
 				}
-				if hold {
-					n = 0 // not old enough yet: the picture hasn't caught up
-				}
 				// Per-user volume/mute (set from the right-click menu)
 				// times overall output volume; 0 means skip them.
-				if g := audioCfg.playbackGain(r.username); !deafened && g > 0 {
+				if !deafened && g > 0 {
 					for i := 0; i < n; i++ {
-						var l, rr float64
-						if inCh == 2 {
-							l, rr = float64(r.buf[2*i])*g, float64(r.buf[2*i+1])*g
-						} else {
-							l = float64(r.buf[i]) * g
-							rr = l
-						}
+						v := float64(r.buf[i]) * g
 						if outCh == 2 {
-							mixInto(&s.playBuf[2*i], l)
-							mixInto(&s.playBuf[2*i+1], rr)
+							mixInto(&s.playBuf[2*i], v)
+							mixInto(&s.playBuf[2*i+1], v)
 						} else {
-							mixInto(&s.playBuf[i], (l+rr)/2)
+							mixInto(&s.playBuf[i], v)
 						}
 					}
 				}
-				r.buf = r.buf[n*inCh:]
-				if r.stereo {
-					r.headCap += float64(n) / 48
-				}
+				r.buf = r.buf[n:]
 				r.mu.Unlock()
 			}
 			s.remotesMu.Unlock()
@@ -1094,43 +1097,85 @@ func newVoicePeerConnection(cfg webrtc.Configuration) (*webrtc.PeerConnection, e
 	return api.NewPeerConnection(cfg)
 }
 
-// syncToPicture lines a stream's queued sound up with its picture (call
-// with r.mu held): the page says how long after capture the picture is
-// showing (SetStreamVideoLag), and the sound is played at that same age —
-// held back while it's younger, skipped forward if it's fallen well
-// behind. Without a figure from the page yet, it plays as it comes (kept
-// to at most 300 ms queued). Returns true to hold it this round.
-func (r *voiceRemoteSource) syncToPicture(outLatencyMs float64) bool {
-	lag, ok := streamVideoLag(r.sharer)
-	if !ok {
-		if max := voiceFrameSize * 15 * 2; len(r.buf) > max {
+// syncRate decides how fast to play a stream's queued sound (call with
+// r.mu held). The page says how long after capture the picture is
+// showing (SetStreamVideoLag); the sound aims to be that old as it plays.
+// Small differences are made up gradually — played up to 6% faster when
+// it's fallen behind, slower when it's ahead, which is hard to hear —
+// rather than by skipping or pausing (which is what sounded jittery).
+// Only a big gap (just started, or a long hiccup) waits or jumps.
+// Without a figure from the page yet, it plays as it comes.
+func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold bool) {
+	trim := func(max int) {
+		if len(r.buf) > max {
 			drop := len(r.buf) - max
+			drop -= drop % 2
 			r.buf = r.buf[drop:]
 			r.headCap += float64(drop/2) / 48
 		}
-		return false
 	}
-	if max := 48000 * 2 * 2; len(r.buf) > max { // never more than 2 s
-		drop := len(r.buf) - max
-		r.buf = r.buf[drop:]
-		r.headCap += float64(drop/2) / 48
+	lag, ok := streamVideoLag(r.sharer)
+	if !ok {
+		trim(voiceFrameSize * 15 * 2) // at most 300 ms queued
+		return 1, false
 	}
+	trim(48000 * 2 * 2) // never more than 2 s
 	if len(r.buf) == 0 {
-		return false
+		return 1, false
 	}
 	target := lag - outLatencyMs // how old it should be as it leaves the mixer
-	age := nowWallMs() - r.headCap
+	diff := nowWallMs() - r.headCap - target
 	switch {
-	case age < target-15:
-		return true
-	case age > target+80:
-		drop := int((age-target)*48) * 2
+	case diff > 400: // far behind: jump to where it should be
+		drop := int(diff*48) * 2
 		if drop > len(r.buf) {
 			drop = len(r.buf)
 		}
 		drop -= drop % 2
 		r.buf = r.buf[drop:]
 		r.headCap += float64(drop/2) / 48
+		return 1, false
+	case diff < -150: // far ahead (just started): wait for the picture
+		return 1, true
+	case diff > 12:
+		return 1 + math.Min(0.06, diff/2000), false
+	case diff < -12:
+		return 1 - math.Min(0.06, -diff/2000), false
 	}
-	return false
+	return 1, false
+}
+
+// readStretched fills out (interleaved stereo, one 20 ms output frame)
+// from r.buf at the rate syncRate picks, interpolating between samples,
+// and returns how many frames it wrote (fewer if it ran short).
+func (r *voiceRemoteSource) readStretched(out []float64, outLatencyMs float64) int {
+	rate, hold := r.syncRate(outLatencyMs)
+	if hold {
+		return 0
+	}
+	avail := len(r.buf) / 2
+	pos := r.frac
+	n := 0
+	for n < voiceFrameSize {
+		i := int(pos)
+		if i+1 >= avail {
+			break
+		}
+		t := pos - float64(i)
+		out[2*n] = float64(r.buf[2*i])*(1-t) + float64(r.buf[2*i+2])*t
+		out[2*n+1] = float64(r.buf[2*i+1])*(1-t) + float64(r.buf[2*i+3])*t
+		n++
+		pos += rate
+	}
+	used := int(pos)
+	if used > avail {
+		used = avail
+	}
+	r.buf = r.buf[used*2:]
+	r.frac = pos - float64(used)
+	if r.frac < 0 {
+		r.frac = 0
+	}
+	r.headCap += float64(used) / 48
+	return n
 }

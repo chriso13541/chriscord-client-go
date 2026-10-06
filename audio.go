@@ -88,10 +88,15 @@ func (a *App) SetUserAudio(username string, volume float64, muted bool) {
 // The stream's sound is held back to the same lag (avsync.go).
 func (a *App) SetStreamVideoLag(user string, lagMs float64) {
 	streamLagMu.Lock()
-	if lagMs <= 0 {
+	old, had := streamLag[user]
+	switch {
+	case lagMs <= 0:
 		delete(streamLag, user)
-	} else {
-		streamLag[user] = lagMs
+	case !had || math.Abs(lagMs-old) > 500:
+		streamLag[user] = lagMs // first figure, or a real jump: take it
+	default:
+		// Smoothed, so one slow second doesn't yank the sound around.
+		streamLag[user] = old*0.75 + lagMs*0.25
 	}
 	streamLagMu.Unlock()
 }

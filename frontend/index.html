@@ -1677,7 +1677,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div id="settings-tab-screenshare" class="settings-tab-pane">
       <h2>Screen Sharing</h2>
       <label class="check-row"><input type="checkbox" id="ss-hide-border"> Hide the yellow border around what I'm sharing</label>
-      <p class="settings-hint" style="margin-top:0">Windows normally outlines whatever is being captured in yellow. With this on, whole screens are captured a different way (Desktop Duplication) that never shows it. For a single application window, Windows 11 hides it; Windows 10 always shows it.</p>
+      <p class="settings-hint" style="margin-top:0">Windows normally outlines whatever is being captured in yellow. With this on, whole screens are captured a different way (Desktop Duplication) that never shows it. A single application window: Windows 11 simply hides it; on Windows 10 the window is copied the older way instead, where a few apps drawn by the graphics card (some browsers and games) can come out black — turn this off for those.</p>
     </div>
 
     <div id="settings-tab-voice" class="settings-tab-pane">
@@ -7421,6 +7421,7 @@ function initScreenShare(){
     if(!r?.ok)toast('Sharing without sound: '+(r?.reason||'it couldn’t be captured'),true);
     renderVideoStage();
   });
+  window.runtime.EventsOn('screen:notice',msg=>toast(msg,true));
   window.runtime.EventsOn('screen:stopped',reason=>{
     if(!scr.on)return;
     toast(reason||'Your screen share stopped',true);stopScreenShare();playSound('webcam_stop');

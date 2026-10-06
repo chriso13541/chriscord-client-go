@@ -95,11 +95,13 @@ type nativeCamera struct {
 	audioMu     sync.Mutex
 	audioStopCh chan struct{}
 	audioDone   chan struct{}
+	audioOff    bool // stopped for good: no sound may start after this
 }
 
 // stopAudio stops a screen share's sound, if it has any (safe to repeat).
 func (c *nativeCamera) stopAudio() {
 	c.audioMu.Lock()
+	c.audioOff = true
 	stop, done := c.audioStopCh, c.audioDone
 	c.audioStopCh, c.audioDone = nil, nil
 	c.audioMu.Unlock()
