@@ -386,6 +386,7 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 	if o.HideBorder {
 		border = 0
 	}
+	log.Printf("screen: Windows build %d; hide border: %v", windowsBuild(), o.HideBorder)
 	if kind == "screen" {
 		for i, m := range listMonitors() {
 			if uint64(m.handle) != handle {
@@ -440,6 +441,9 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 	if m, _, _ := pIsIconic.Call(hwnd); m != 0 {
 		return nil, 0, 0, errors.New("that window is minimised — restore it, then share it")
 	}
+	if o.HideBorder && !isWindows11() {
+		log.Printf("screen: this version of Windows always draws the yellow border round a shared window (only Windows 11 lets it be hidden)")
+	}
 	sw, sh, _ := windowSize(hwnd)
 	w, h := shareSize(sw, sh, o.Height)
 	// (On Windows 10 the border can't be hidden for a single window: the
@@ -469,7 +473,11 @@ func screenAudioTarget(id string) (pid uint32, exclude bool, err error) {
 
 // isWindows11: build 22000 or later — where Windows Graphics Capture can
 // leave out its yellow border.
-func isWindows11() bool {
+func isWindows11() bool { return windowsBuild() >= 22000 }
+
+// windowsBuild: Windows' build number (19045 is Windows 10 22H2; 22000 and
+// up are Windows 11).
+func windowsBuild() uint32 {
 	type osVersionInfo struct {
 		size, major, minor, build, platform uint32
 		csd                                 [128]uint16
@@ -477,7 +485,10 @@ func isWindows11() bool {
 	v := osVersionInfo{}
 	v.size = uint32(unsafe.Sizeof(v))
 	r, _, _ := syscall.NewLazyDLL("ntdll.dll").NewProc("RtlGetVersion").Call(uintptr(unsafe.Pointer(&v)))
-	return r == 0 && v.major >= 10 && v.build >= 22000
+	if r != 0 || v.major < 10 {
+		return 0
+	}
+	return v.build
 }
 
 // Where Desktop Duplication finds each monitor, as FFmpeg sees it: found by

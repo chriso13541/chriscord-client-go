@@ -1182,7 +1182,11 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 	if !r.arrHave {
 		return 1, false // nothing has arrived yet
 	}
-	want := r.arrMin + 100 // the sound itself: when it arrives, plus a cushion for network jitter
+	// The sound itself: when it arrives, plus a cushion for network jitter,
+	// plus the sound card's own delay (heard, below, includes it too —
+	// leaving it out here kept the sound permanently "late", always
+	// hurrying, and running the queue dry).
+	want := r.arrMin + 100 + outLatencyMs
 	if vl, ok := streamVideoLag(r.sharer); ok {
 		want = math.Max(want, vl+20) // late enough for the picture to keep up
 	}
@@ -1207,6 +1211,11 @@ func (r *voiceRemoteSource) syncRate(outLatencyMs float64) (rate float64, hold b
 	heard := nowWallMs() - r.headCap + outLatencyMs
 	r.heardLag = heard
 	diff := heard - r.delay
+	if diff > 0 && len(r.buf)/2 < 48*40 {
+		// Running late, but the queue is nearly empty already: hurrying
+		// would only make it run dry. Let the delay settle instead.
+		return 1, false
+	}
 	switch {
 	case diff > 400: // far behind (a long hiccup): jump to where it should be
 		drop := int(diff*48) * 2
@@ -1309,8 +1318,8 @@ func (r *voiceRemoteSource) logStats() {
 		return
 	}
 	queued := float64(len(r.buf)/2) / 48
-	log.Printf("stream sound from %s — last 5 s: %d packets, %d lost (filled in), %d out of order, %d run-dry, %d jumps, %d frames held, %d faster / %d slower; delay %.0f ms over arrival, %.0f ms queued",
-		r.sharer, r.stPkts, r.stLost, r.stLate, r.stUnder, r.stJumps, r.stHeld, r.stFast, r.stSlow, r.delay-r.arrMin, queued)
+	log.Printf("stream sound from %s — last 5 s: %d packets, %d lost (filled in), %d out of order, %d run-dry, %d jumps, %d frames held, %d faster / %d slower; delay %.0f ms over arrival, heard %.0f ms over arrival, %.0f ms queued",
+		r.sharer, r.stPkts, r.stLost, r.stLate, r.stUnder, r.stJumps, r.stHeld, r.stFast, r.stSlow, r.delay-r.arrMin, r.heardLag-r.arrMin, queued)
 	r.stAt = time.Now()
 	r.stPkts, r.stLost, r.stLate, r.stUnder, r.stJumps, r.stHeld, r.stFast, r.stSlow = 0, 0, 0, 0, 0, 0, 0, 0
 }

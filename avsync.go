@@ -141,4 +141,4 @@ func (u *tsUnwrap) ms(ts uint32, clockRate float64) float64 {
 
 // nowWallMs: this computer's wall clock in ms (the page uses Date.now(),
 // the same clock).
-func nowWallMs() float64 { return float64(time.Now().UnixNano()) / 1e6 }
+var nowWallMs = func() float64 { return float64(time.Now().UnixNano()) / 1e6 }
