@@ -384,6 +384,26 @@ export namespace main {
 	        this.custom_name = source["custom_name"];
 	    }
 	}
+	export class ScreenStart {
+	    id: string;
+	    height: number;
+	    fps: number;
+	    encoder: string;
+	    preview: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScreenStart(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.height = source["height"];
+	        this.fps = source["fps"];
+	        this.encoder = source["encoder"];
+	        this.preview = source["preview"];
+	    }
+	}
 	export class SearchResult {
 	    id: string;
 	    board_id: string;
@@ -503,6 +523,36 @@ export namespace main {
 		}
 	}
 	
+	export class ShareSource {
+	    id: string;
+	    kind: string;
+	    name: string;
+	    app: string;
+	    w: number;
+	    h: number;
+	    primary: boolean;
+	    index: number;
+	    thumb: string;
+	    note: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ShareSource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.app = source["app"];
+	        this.w = source["w"];
+	        this.h = source["h"];
+	        this.primary = source["primary"];
+	        this.index = source["index"];
+	        this.thumb = source["thumb"];
+	        this.note = source["note"];
+	    }
+	}
 	export class Sticker {
 	    id: string;
 	    name: string;

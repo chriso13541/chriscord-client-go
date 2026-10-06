@@ -45,6 +45,7 @@ import (
 // videoFrameEvent is one whole encoded frame from someone else's camera.
 type videoFrameEvent struct {
 	User  string `json:"user"`
+	Kind  string `json:"kind"` // "camera" or "screen"
 	Codec string `json:"codec"` // "h264" (Annex B) or "vp8"
 	Key   bool   `json:"key"`
 	Data  string `json:"data"` // base64 frame
@@ -79,8 +80,12 @@ func videoCapability() webrtc.RTPCodecCapability {
 	if c == "vp8" {
 		return webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8, ClockRate: 90000}
 	}
-	// Constrained Baseline (no B-frames — right for live video), the one
-	// every WebRTC stack and hardware encoder agrees on.
+	return h264Capability()
+}
+
+// h264Capability: Constrained Baseline (no B-frames — right for live
+// video), the one every WebRTC stack and hardware encoder agrees on.
+func h264Capability() webrtc.RTPCodecCapability {
 	return webrtc.RTPCodecCapability{
 		MimeType:    webrtc.MimeTypeH264,
 		ClockRate:   90000,
@@ -104,24 +109,44 @@ func (s *VoiceSession) addVideoSender() {
 	s.videoTrack = track
 	// Keyframe requests from the server (a viewer starting or recovering)
 	// arrive as RTCP on this sender; the page's encoder makes one.
-	go func(sender *webrtc.RTPSender) {
-		var last time.Time
-		for {
-			pkts, _, err := sender.ReadRTCP()
-			if err != nil {
-				return
-			}
-			for _, p := range pkts {
-				switch p.(type) {
-				case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
-					if time.Since(last) > 300*time.Millisecond {
-						last = time.Now()
-						wailsruntime.EventsEmit(s.ctx, "video:keyframe")
-					}
+	go readKeyframeRequests(tr.Sender(), func() { wailsruntime.EventsEmit(s.ctx, "video:keyframe") })
+
+	// The screen share's own send-only section, right after the camera's
+	// (always H.264: only native capture shares screens). The server tells
+	// it apart from the camera by its track id, "screen".
+	screen, err := webrtc.NewTrackLocalStaticSample(h264Capability(), "screen", "chriscord-screen")
+	if err != nil {
+		log.Printf("screen: local track: %v", err)
+		return
+	}
+	str, err := s.pc.AddTransceiverFromTrack(screen, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly})
+	if err != nil {
+		log.Printf("screen: add transceiver: %v", err)
+		return
+	}
+	s.screenTrack = screen
+	go readKeyframeRequests(str.Sender(), func() { s.app.screenKeyframeRequested(screen) })
+}
+
+// readKeyframeRequests calls onKey (at most every 300 ms) when the server
+// passes on a viewer's keyframe request for this sender.
+func readKeyframeRequests(sender *webrtc.RTPSender, onKey func()) {
+	var last time.Time
+	for {
+		pkts, _, err := sender.ReadRTCP()
+		if err != nil {
+			return
+		}
+		for _, p := range pkts {
+			switch p.(type) {
+			case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
+				if time.Since(last) > 300*time.Millisecond {
+					last = time.Now()
+					onKey()
 				}
 			}
 		}
-	}(tr.Sender())
+	}
 }
 
 // PushVideoFrame sends one encoded frame from the page's camera encoder
@@ -182,6 +207,40 @@ func (a *App) RequestVideoKeyframe(user string) error {
 	return a.sendVoiceJSON(map[string]interface{}{"type": "voice_keyframe", "board_id": session.boardID, "target": user})
 }
 
+// RequestScreenKeyframe: the same for someone's screen share.
+func (a *App) RequestScreenKeyframe(user string) error {
+	a.voiceMu.Lock()
+	session := a.voice
+	a.voiceMu.Unlock()
+	if session == nil {
+		return fmt.Errorf("not in a call")
+	}
+	return a.sendVoiceJSON(map[string]interface{}{"type": "voice_keyframe", "board_id": session.boardID, "target": user, "kind": "screen"})
+}
+
+// SetScreenShareEnabled tells everyone whether this app is sharing its screen.
+func (a *App) SetScreenShareEnabled(on bool) error {
+	a.voiceMu.Lock()
+	session := a.voice
+	a.voiceMu.Unlock()
+	if session == nil {
+		return fmt.Errorf("not in a call")
+	}
+	return a.sendVoiceJSON(map[string]interface{}{"type": "voice_screen", "board_id": session.boardID, "screen": on})
+}
+
+// WatchScreen starts (or stops) receiving someone's screen share — screens
+// are only sent to people who click to watch them.
+func (a *App) WatchScreen(user string, watch bool) error {
+	a.voiceMu.Lock()
+	session := a.voice
+	a.voiceMu.Unlock()
+	if session == nil {
+		return fmt.Errorf("not in a call")
+	}
+	return a.sendVoiceJSON(map[string]interface{}{"type": "voice_watch", "board_id": session.boardID, "target": user, "watch": watch})
+}
+
 func (a *App) sendVoiceJSON(v interface{}) error {
 	msg, err := json.Marshal(v)
 	if err != nil {
@@ -200,6 +259,10 @@ func (a *App) sendVoiceJSON(v interface{}) error {
 // server names these tracks "video-<username>".
 func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 	user := strings.TrimPrefix(track.ID(), "video-")
+	kind := "camera"
+	if strings.HasPrefix(track.ID(), "screen-") { // someone's screen share
+		user, kind = strings.TrimPrefix(track.ID(), "screen-"), "screen"
+	}
 	codec := "vp8"
 	var depacketizer rtp.Depacketizer = &codecs.VP8Packet{}
 	isKey := func(f []byte) bool { return f[0]&0x01 == 0 } // VP8 frame tag: bit 0 clear = keyframe
@@ -208,9 +271,13 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 		depacketizer = &codecs.H264Packet{} // gives Annex B, which the page's decoder takes
 		isKey = h264HasKeyframe
 	}
-	log.Printf("video: receiving %s's camera (%s)", user, codec)
+	log.Printf("video: receiving %s's %s (%s)", user, kind, codec)
 	// The picture can only start from a keyframe.
-	go s.app.RequestVideoKeyframe(user)
+	if kind == "screen" {
+		go s.app.RequestScreenKeyframe(user)
+	} else {
+		go s.app.RequestVideoKeyframe(user)
+	}
 	builder := samplebuilder.New(512, depacketizer, 90000)
 	var once sync.Once
 	for {
@@ -232,9 +299,10 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 			if len(sample.Data) == 0 {
 				continue
 			}
-			once.Do(func() { log.Printf("video: first frame from %s", user) })
+			once.Do(func() { log.Printf("video: first %s frame from %s", kind, user) })
 			wailsruntime.EventsEmit(s.ctx, "video:frame", videoFrameEvent{
 				User:  user,
+				Kind:  kind,
 				Codec: codec,
 				Key:   isKey(sample.Data),
 				Data:  base64.StdEncoding.EncodeToString(sample.Data),

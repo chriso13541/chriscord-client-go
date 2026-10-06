@@ -110,6 +110,8 @@ export function ListAccounts():Promise<Array<main.AccountSummary>>;
 
 export function ListCameras():Promise<Array<main.CameraDevice>>;
 
+export function ListShareSources():Promise<Array<main.ShareSource>>;
+
 export function MoveBoard(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function MoveRooms(arg1:Array<string>):Promise<void>;
@@ -152,6 +154,8 @@ export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
 export function ReorderServers(arg1:Array<string>):Promise<Array<main.SavedServer>>;
 
+export function RequestScreenKeyframe(arg1:string):Promise<void>;
+
 export function RequestVideoKeyframe(arg1:string):Promise<void>;
 
 export function ResolveServerAddress(arg1:string):Promise<string>;
@@ -163,6 +167,8 @@ export function SaveClientSettings(arg1:string):Promise<void>;
 export function SaveProfile(arg1:string,arg2:string):Promise<void>;
 
 export function SaveProfilePicture(arg1:string):Promise<void>;
+
+export function ScreenShareInfo():Promise<Record<string, any>>;
 
 export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;
 
@@ -182,6 +188,10 @@ export function SetMessagePinned(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetPresence(arg1:string):Promise<void>;
 
+export function SetScreenPreview(arg1:boolean):Promise<void>;
+
+export function SetScreenShareEnabled(arg1:boolean):Promise<void>;
+
 export function SetTranscodeSettings(arg1:number,arg2:boolean,arg3:boolean):Promise<void>;
 
 export function SetUserAudio(arg1:string,arg2:number,arg3:boolean):Promise<void>;
@@ -194,9 +204,13 @@ export function StartCamera(arg1:main.CameraStart):Promise<string>;
 
 export function StartMicTest(arg1:string,arg2:string):Promise<void>;
 
+export function StartScreenShare(arg1:main.ScreenStart):Promise<string>;
+
 export function StopCamera():Promise<void>;
 
 export function StopMicTest():Promise<void>;
+
+export function StopScreenShare():Promise<void>;
 
 export function SubscribeBoard(arg1:string):Promise<void>;
 
@@ -229,3 +243,5 @@ export function UploadStickerFile(arg1:string,arg2:string,arg3:string):Promise<m
 export function VideoConversionInfo():Promise<Record<string, any>>;
 
 export function VideoSendCodec():Promise<string>;
+
+export function WatchScreen(arg1:string,arg2:boolean):Promise<void>;

@@ -55,6 +55,7 @@ type VoiceSession struct {
 	pc          *webrtc.PeerConnection
 	localTrack  *webrtc.TrackLocalStaticSample
 	videoTrack  *webrtc.TrackLocalStaticSample // this app's camera, see video.go
+	screenTrack *webrtc.TrackLocalStaticSample // this app's screen share, see screen.go
 	encoder     *opus.Encoder
 
 	captureStream   *portaudio.Stream

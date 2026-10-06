@@ -237,6 +237,43 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile .vs-unsup { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; text-align:center; color:rgba(255,255,255,.7); font-size:.82rem; }
 .vs-tile:fullscreen { border-radius:0; cursor:default; width:100% !important; height:100% !important; }
 .vs-tile .vs-name .vs-av { width:18px; height:18px; font-size:.65rem; }
+/* Screen shares: click to watch */
+#voice-connected-bar #voice-screen-btn.on { color:var(--green); }
+#voice-connected-bar.elsewhere #voice-screen-btn { display:none; }
+.vs-live { background:#e5383b; color:#fff; font-size:.62rem; font-weight:800; letter-spacing:.04em; padding:1px 5px; border-radius:3px; }
+.vs-tile.idle::after { display:none; }
+.vs-tile .vs-watch, .vs-tile .vs-scrself { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:12px; text-align:center; color:rgba(255,255,255,.85); font-size:.85rem; font-weight:600; background:radial-gradient(circle at 50% 40%, #232a36, #0b0d11); }
+.vs-tile .vs-watch .ic, .vs-tile .vs-scrself > .ic { width:30px; height:30px; opacity:.85; }
+.vs-tile .vs-watch small, .vs-tile .vs-scrself small { font-weight:400; font-size:.75rem; color:rgba(255,255,255,.55); }
+.vs-tile .vs-btns { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+.vs-tile .vs-btn { border:none; border-radius:6px; padding:6px 12px; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; background:rgba(255,255,255,.14); color:#fff; }
+.vs-tile .vs-btn:hover { background:rgba(255,255,255,.24); }
+.vs-tile .vs-btn.primary { background:var(--accent); }
+.vs-tile .vs-btn.primary:hover { filter:brightness(1.1); }
+.vs-tile .vs-btn.danger { background:#c9302c; }
+.vs-tile .vs-stopwatch { position:absolute; top:6px; left:6px; z-index:2; opacity:0; transition:opacity .15s; }
+.vs-tile:hover .vs-stopwatch { opacity:1; }
+.vs-tile .vs-scrself.has-preview { inset:auto 8px 8px auto; background:none; padding:0; z-index:2; }
+.vs-tile .vs-scrself.has-preview > :not(.vs-btns) { display:none; }
+.voice-occupant-status .vs-live { font-size:.55rem; padding:0 4px; margin-left:2px; }
+/* Screen picker */
+.modal.screen-pick { width:760px; max-width:95vw; }
+.screen-pick .em-tabs { align-items:center; }
+.screen-pick .sp-refresh { margin-left:auto; display:inline-flex !important; padding:6px !important; }
+.sp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; max-height:52vh; overflow-y:auto; padding:2px; }
+.sp-item { display:flex; flex-direction:column; gap:6px; padding:8px; border-radius:8px; border:2px solid transparent; background:var(--bg-darkest); color:var(--text); text-align:left; cursor:pointer; font:inherit; min-width:0; }
+.sp-item:hover { background:var(--bg-light); }
+.sp-item.sel { border-color:var(--accent); }
+.sp-thumb { aspect-ratio:16/9; border-radius:5px; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden; color:var(--text-muted); }
+.sp-thumb img { width:100%; height:100%; object-fit:contain; display:block; }
+.sp-thumb .ic { width:34px; height:34px; opacity:.6; }
+.sp-label { display:flex; flex-direction:column; min-width:0; }
+.sp-label span { font-weight:700; font-size:.85rem; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sp-label small { font-size:.75rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sp-empty { grid-column:1/-1; padding:30px 10px; text-align:center; color:var(--text-muted); font-size:.9rem; }
+.sp-quality { display:flex; gap:14px; align-items:flex-end; margin-top:14px; flex-wrap:wrap; }
+.sp-quality select { padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; min-width:150px; }
+.sp-quality .hint { flex:1; min-width:160px; font-size:.75rem; color:var(--text-muted); }
 /* Settings → Video */
 .settings-sub { margin:28px 0 0; padding-top:18px; border-top:1px solid var(--border); font-size:1rem; color:var(--text-strong); }
 #settings-cam-select, #settings-cam-res, #settings-cam-fps, #settings-cam-enc { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
@@ -1106,6 +1143,9 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-sync" viewBox="0 -960 960 960"><path d="M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z"/></symbol>
   <symbol id="ic-expand_less" viewBox="0 -960 960 960"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></symbol>
   <symbol id="ic-videocam" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h480q33 0 56.5 23.5T720-720v180l160-160v440L720-420v180q0 33-23.5 56.5T640-160H160Zm0-80h480v-480H160v480Zm0 0v-480 480Z"/></symbol>
+  <symbol id="ic-screen_share" viewBox="0 -960 960 960"><path d="M320-400h80v-80q0-17 11.5-28.5T440-520h80v80l120-120-120-120v80h-80q-50 0-85 35t-35 85v80ZM160-240q-33 0-56.5-23.5T80-320v-440q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v440q0 33-23.5 56.5T800-240H160Zm0-80h640v-440H160v440Zm0 0v-440 440ZM40-120v-80h880v80H40Z"/></symbol>
+  <symbol id="ic-stop_screen_share" viewBox="0 -960 960 960"><path d="M160-240q-33 0-56.5-23.5T80-320v-440q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v440q0 33-23.5 56.5T800-240H160Zm0-80h640v-440H160v440Zm0 0v-440 440ZM40-120v-80h880v80H40Z"/><path d="M380-640 580-440M580-640 380-440" fill="none" stroke="currentColor" stroke-width="64" stroke-linecap="round"/></symbol>
+  <symbol id="ic-refresh" viewBox="0 -960 960 960"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></symbol>
   <symbol id="ic-videocam_off" viewBox="0 -960 960 960"><path d="M880-260 720-420v67l-80-80v-287H353l-80-80h367q33 0 56.5 23.5T720-720v180l160-160v440ZM822-26 26-822l56-56L878-82l-56 56ZM498-575ZM382-464ZM160-800l80 80h-80v480h480v-80l80 80q0 33-23.5 56.5T640-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Z"/></symbol>
   <symbol id="ic-sticker" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v373L507-120H200Zm280-80v-160q0-50 35-85t85-35h160v-280H200v560h280Zm80-23 217-217H600q-17 0-28.5 11.5T560-400v177ZM360-520q-25 0-42.5-17.5T300-580q0-25 17.5-42.5T360-640q25 0 42.5 17.5T420-580q0 25-17.5 42.5T360-520Zm240 0q-25 0-42.5-17.5T540-580q0-25 17.5-42.5T600-640q25 0 42.5 17.5T660-580q0 25-17.5 42.5T600-520Z"/></symbol>
   <symbol id="ic-mood" viewBox="0 -960 960 960"><path d="M620-520q25 0 42.5-17.5T680-580q0-25-17.5-42.5T620-640q-25 0-42.5 17.5T560-580q0 25 17.5 42.5T620-520Zm-280 0q25 0 42.5-17.5T400-580q0-25-17.5-42.5T340-640q-25 0-42.5 17.5T280-580q0 25 17.5 42.5T340-520Zm140 260q68 0 123.5-38.5T684-400H276q25 63 80.5 101.5T480-260Zm0 180q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></symbol>
@@ -1244,6 +1284,21 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   </div>
 </div>
 
+<!-- Screen share picker: a whole screen, or one application's window -->
+<div class="modal-overlay hidden" id="modal-screen">
+  <div class="modal screen-pick">
+    <h2>Share your screen</h2>
+    <div class="em-tabs" id="sp-tabs"><button type="button" data-tab="screen">Screens</button><button type="button" data-tab="window">Applications</button><button type="button" class="sp-refresh" id="sp-refresh" title="Refresh"><svg class="ic" aria-hidden="true"><use href="#ic-refresh"/></svg></button></div>
+    <div class="sp-grid" id="sp-grid"></div>
+    <div class="sp-quality">
+      <div><label class="settings-label" for="sp-res">Resolution</label><select id="sp-res"><option value="0">Source</option><option value="1440">1440p</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option></select></div>
+      <div><label class="settings-label" for="sp-fps">Frame Rate</label><select id="sp-fps"><option value="5">5 fps</option><option value="15">15 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></div>
+      <span class="hint" id="sp-hint"></span>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="sp-cancel">Cancel</button><button class="btn btn-primary" id="sp-go" disabled>Go Live</button></div>
+  </div>
+</div>
+
 <!-- Server emoji & sticker manager (Manage Emoji & Stickers permission) -->
 <div class="modal-overlay hidden" id="modal-emoji">
   <div class="modal emoji-manage">
@@ -1338,6 +1393,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
       <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
       <button id="voice-video-btn" class="voice-bar-btn" title="Turn on camera"><svg class="ic" aria-hidden="true"><use href="#ic-videocam_off"/></svg></button>
+      <button id="voice-screen-btn" class="voice-bar-btn" title="Share your screen"><svg class="ic" aria-hidden="true"><use href="#ic-screen_share"/></svg></button>
       <button id="voice-leave-btn" class="voice-bar-btn" title="Disconnect from voice"><svg class="ic" aria-hidden="true"><use href="#ic-call_end"/></svg></button>
       <button id="voice-switch-btn" class="voice-bar-btn voice-switch" title="Move the call to this device">Join here</button>
     </div>
@@ -2731,6 +2787,7 @@ async function rejoinVoiceAfterReconnect(){
     else if(r.muted)setMuteButtonState(await window.go.main.App.ToggleMute());
     playSound('join'); // you never left the list, so the snapshot itself won't play it
     if(r.camera&&!cam.on&&!cam.starting)restoreCameraAfterRejoin();
+    resendScreenWatches(); // streams you were watching (the server forgot when you dropped)
   }catch(err){
     playSound('error');
     toast('Couldn\u2019t rejoin the voice channel: '+err,true);
@@ -3184,7 +3241,8 @@ function renderSidebar(){
               // Muted: the crossed-out mic. Deafened (which is also muted):
               // the mic and, to its right, the crossed-out headset.
               ((status.muted||status.deafened)?icon('mic_off','off'):'')+(status.deafened?icon('headset_off','off'):'')+
-              (state.voiceVideo?.has(user)||(user===state.username&&cam.on&&state.voiceHere===board.id)?`<span title="Camera on" style="display:inline-flex">${icon('videocam','cam')}</span>`:'');
+              (state.voiceVideo?.has(user)||(user===state.username&&cam.on&&state.voiceHere===board.id)?`<span title="Camera on" style="display:inline-flex">${icon('videocam','cam')}</span>`:'')+
+              (state.voiceScreens?.has(user)||(user===state.username&&scr.on&&state.voiceHere===board.id)?`<span class="vs-live" title="Sharing their screen">LIVE</span>`:'');
             row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
             list.appendChild(row);
             applyUserAvatar(row.querySelector('.voice-occupant-avatar'),user);
@@ -3268,6 +3326,8 @@ function updateVoiceConnectedBar(){
   const boardId=state.voiceHere&&(state.voiceChannels[state.voiceHere]||[]).includes(state.username)?state.voiceHere:null;
   if(!boardId){
     bar.classList.add('hidden');setMuteButtonState(false);setDeafenButtonState(false);
+    if(scr.on||scr.starting)stopScreenShare(true); // likewise a screen share
+    screenWatch.clear();
     if(cam.on||cam.starting)stopCamera(true); // left the call: the camera goes off with it
     else renderVideoStage();
     return;
@@ -6433,8 +6493,15 @@ const decodeSupported=()=>!!window.VideoDecoder;
 const CAM_SIZES=[[3840,2160],[2560,1440],[1920,1080],[1600,1200],[1600,900],[1280,960],[1280,720],[1024,768],[960,720],[960,540],[848,480],[800,600],[640,480],[640,360],[424,240],[352,288],[320,240],[320,180],[176,144],[160,120]];
 const CAM_FPS=[5,10,15,24,25,30,48,50,60];
 const cam={on:false,starting:false,stream:null,encoder:null,reader:null,timer:null,forceKey:false,lastKeyAt:0,lastFrameAt:0,inflight:0,mode:null,fps:30,announcedAt:0};
-const vRemote=new Map(); // username → {decoder,canvas,ctx,needKey,lastKeyReq,ts}
+const vRemote=new Map(); // username (or scrKey(username) for a screen) → {decoder,canvas,ctx,needKey,lastKeyReq,ts}
 state.voiceVideo=new Set();
+// Screen sharing (see "Screen sharing" below).
+const scr={on:false,starting:false,source:null,height:0,fps:30,label:'',preview:false,announcedAt:0};
+const SELF_SCR='\u0000selfscreen'; // your own share's preview decoder
+const scrKey=u=>'\u0002'+u;        // someone's screen: its tile and decoder
+const isScrKey=k=>typeof k==='string'&&k.charCodeAt(0)===2;
+const screenWatch=new Set();        // whose screens you're watching
+state.voiceScreens=new Set();
 
 const modeLabel=m=>{
   const names={2160:'4K',1440:'1440p',1080:'1080p',720:'720p',480:'480p',360:'360p',240:'240p'};
@@ -6813,15 +6880,17 @@ function showDecodeUnsupported(user,codec){
     ?`This computer can\u2019t decode ${name} video yet. Install GStreamer\u2019s decoders \u2014 Debian/Ubuntu: sudo apt install gstreamer1.0-libav gstreamer1.0-plugins-bad \u2014 then restart chriscord.`
     :`This computer can\u2019t decode ${name} video.`;
   console.warn('video:',msg);
-  const tile=user===SELF?document.querySelector(`#video-stage .vs-tile[data-user="${CSS.escape(state.username)}"]`):document.querySelector(`#video-stage .vs-tile[data-user="${CSS.escape(user)}"]`);
+  const id=user===SELF?state.username:user===SELF_SCR?scrKey(state.username):user;
+  const tile=document.querySelector(`#video-stage .vs-tile[data-user="${CSS.escape(id)}"]`);
   if(tile&&!tile.querySelector('.vs-unsup')){tile.insertAdjacentHTML('afterbegin',`<div class="vs-unsup">${esc(msg)}</div>`);tile.classList.add('live');}
 }
 function askKeyframe(user,r){
-  if(user===SELF)return; // our own stream has a keyframe every 2 s anyway
+  if(user===SELF||user===SELF_SCR)return; // our own stream has a keyframe every 2 s anyway
   const now=Date.now();
   if(now-r.lastKeyReq<1000)return;
   r.lastKeyReq=now;
-  window.go.main.App.RequestVideoKeyframe(user).catch(()=>{});
+  if(isScrKey(user))window.go.main.App.RequestScreenKeyframe(user.slice(1)).catch(()=>{});
+  else window.go.main.App.RequestVideoKeyframe(user).catch(()=>{});
 }
 function dropRemoteVideo(user){
   const r=vRemote.get(user);if(!r)return;
@@ -6836,18 +6905,27 @@ function onSelfPreview(f){
   onVideoFrame({...f,user:SELF,codec:'h264'},true);
 }
 function onVideoFrame(f,self){
-  if(!self&&(!f?.user||!state.voiceVideo.has(f.user)||!inMyCall()))return;
-  const r=remoteVideo(f.user);if(!r)return;
+  let key=f?.user;
+  if(!self){
+    if(!f?.user||!inMyCall())return;
+    if(f.kind==='screen'){
+      // Only screens you've chosen to watch (the server only sends those
+      // anyway; this drops the odd frame still in flight after you stop).
+      if(!state.voiceScreens.has(f.user)||!screenWatch.has(f.user))return;
+      key=scrKey(f.user);
+    }else if(!state.voiceVideo.has(f.user))return;
+  }
+  const r=remoteVideo(key);if(!r)return;
   const codec=f.codec||'vp8';
   r.stats.recv++;r.stats.bytes+=f.data.length*3/4;if(f.key)r.stats.keys++;r.stats.codec=codec;
-  if(r.codec!==codec||!r.decoder||r.decoder.state==='closed')configureDecoder(f.user,r,codec);
+  if(r.codec!==codec||!r.decoder||r.decoder.state==='closed')configureDecoder(key,r,codec);
   if(r.decoder.state!=='configured')return;
-  if(r.needKey&&!f.key){r.stats.dropWait++;askKeyframe(f.user,r);return;}
-  if(r.decoder.decodeQueueSize>6){r.stats.dropBusy++;r.needKey=true;askKeyframe(f.user,r);return;} // fallen behind: skip to the next keyframe
+  if(r.needKey&&!f.key){r.stats.dropWait++;askKeyframe(key,r);return;}
+  if(r.decoder.decodeQueueSize>6){r.stats.dropBusy++;r.needKey=true;askKeyframe(key,r);return;} // fallen behind: skip to the next keyframe
   try{
     r.decoder.decode(new EncodedVideoChunk({type:f.key?'key':'delta',timestamp:(r.ts+=33333),data:b64ToBytes(f.data)}));
     r.needKey=false;
-  }catch(err){r.needKey=true;askKeyframe(f.user,r);}
+  }catch(err){r.needKey=true;askKeyframe(key,r);}
 }
 
 // ── Video stats (Settings → Voice & Video → "Show video stats") ──
@@ -6857,7 +6935,7 @@ function onVideoFrame(f,self){
 // rate, encode time and bitrate; for others, what arrives vs what's
 // decoded and shown. (A camera delivering fewer fps than chosen usually
 // means it's slowing itself down for low light.)
-const vStats={self:null,native:null};
+const vStats={self:null,native:null,screen:null};
 function newVideoStats(){return {camIn:0,sent:0,bytes:0,keys:0,dropBusy:0,dropPace:0,encMs:0,encN:0,ipcMs:0,ipcN:0,encStart:new Map(),recv:0,decoded:0,dropShow:0,dropWait:0,codec:''};}
 function resetCounts(st){Object.assign(st,{camIn:0,sent:0,bytes:0,keys:0,dropBusy:0,dropPace:0,encMs:0,encN:0,ipcMs:0,ipcN:0,recv:0,decoded:0,dropShow:0,dropWait:0});}
 function renderVideoStats(){
@@ -6867,7 +6945,14 @@ function renderVideoStats(){
     if(!on){box?.remove();return;}
     if(!box){box=document.createElement('div');box.className='vs-stats';tile.appendChild(box);}
     const u=tile.dataset.user;let lines;
-    if(u===state.username&&cam.native){
+    if(u===scrKey(state.username)){
+      const n=vStats.screen;if(!scr.on||!n){box.textContent='';return;}
+      lines=[`${scr.source?.name||'Screen'} \u00b7 ${scr.height?scr.height+'p':'source size'} \u00b7 ${scr.label||''}`,
+        `sent ${Math.round(n.fps)} fps (up to ${scr.fps}) \u00b7 ${Math.round(n.kbps)} kbps`,
+        ...(n.problem?[`NOT SENDING: ${n.problem}`]:[]),
+        `a still screen sends fewer frames \u2014 that\u2019s normal`];
+    }else if(isScrKey(u)&&!vRemote.get(u)){box.textContent='';return;}
+    else if(u===state.username&&cam.native){
       const n=vStats.native;if(!cam.on||!n){box.textContent='';return;}
       lines=[`${cam.mode?.w}\u00d7${cam.mode?.h} \u00b7 ${cam.codecLabel||''}`,
         `sent ${Math.round(n.fps)} fps (target ${cam.fps}) \u00b7 captured ${Math.round(n.captured??n.fps)} \u00b7 ${Math.round(n.kbps)} kbps`,
@@ -6902,24 +6987,35 @@ let vsFocus=null;
 function renderVideoStage(){
   const stage=document.getElementById('video-stage'),grid=stage.querySelector('.vs-grid');
   const board=inMyCall()?state.voiceHere:null;
-  const users=board?(state.voiceChannels[board]||[]).filter(u=>u===state.username?cam.on:state.voiceVideo.has(u)):[];
-  // Decoders for people no longer showing a camera to us.
-  for(const u of [...vRemote.keys()])if(u!==SELF&&!users.includes(u))dropRemoteVideo(u);
+  const members=board?(state.voiceChannels[board]||[]):[];
+  // Screens first (they're what people gather round), then cameras.
+  const entries=[
+    ...members.filter(u=>u===state.username?scr.on:state.voiceScreens.has(u)).map(u=>({id:scrKey(u),user:u,screen:true})),
+    ...members.filter(u=>u===state.username?cam.on:state.voiceVideo.has(u)).map(u=>({id:u,user:u,screen:false})),
+  ];
+  const users=entries.map(e=>e.id);
+  // Decoders for pictures no longer showing to us.
+  for(const k of [...vRemote.keys()]){
+    if(k===SELF)continue;
+    if(k===SELF_SCR){if(!(scr.on&&scr.preview))dropRemoteVideo(k);continue;}
+    if(!users.includes(k)||(isScrKey(k)&&!screenWatch.has(k.slice(1))))dropRemoteVideo(k);
+  }
   stage.classList.toggle('hidden',!users.length);
   if(!users.length){grid.innerHTML='';vsFocus=null;return;}
   if(vsFocus&&!users.includes(vsFocus))vsFocus=null;
-  stage.querySelector('.vs-count').textContent='Cameras \u2014';
-  stage.querySelector('.vs-who').textContent=users.map(u=>u===state.username?`${u} (you)`:u).join(', ');
+  stage.querySelector('.vs-count').textContent=entries.some(e=>e.screen)?'Video \u2014':'Cameras \u2014';
+  stage.querySelector('.vs-who').textContent=[...new Set(entries.map(e=>e.user))].map(u=>u===state.username?`${u} (you)`:u).join(', ');
   const keep=new Set(users);
   grid.querySelectorAll('.vs-tile').forEach(t=>{if(!keep.has(t.dataset.user))t.remove();});
-  for(const u of users){
-    let tile=grid.querySelector(`.vs-tile[data-user="${CSS.escape(u)}"]`);
+  for(const {id,user:u,screen} of entries){
+    let tile=grid.querySelector(`.vs-tile[data-user="${CSS.escape(id)}"]`);
     if(!tile){
-      tile=document.createElement('div');tile.className='vs-tile'+(u===state.username?' me':'');tile.dataset.user=u;
-      tile.innerHTML=`<div class="vs-name"><span>${esc(u===state.username?`${u} (you)`:u)}</span></div>`;
+      tile=document.createElement('div');tile.className='vs-tile'+(u===state.username&&!screen?' me':'')+(screen?' screen':'');tile.dataset.user=id;
+      tile.innerHTML=`<div class="vs-name"><span>${esc(u===state.username?`${u} (you)`:u)}</span>${screen?'<span class="vs-live">LIVE</span>':''}</div>`;
       vsAvatar(tile,u);
       grid.appendChild(tile);
     }
+    if(screen){renderScreenTile(tile,u);tile.classList.toggle('focus',vsFocus===id);continue;}
     if(u===state.username){
       // Your own preview can be turned off (Settings → Voice & Video): one
       // less video for the graphics card to draw every frame.
@@ -7001,10 +7097,12 @@ function initVideo(){
   const stage=document.getElementById('video-stage'),grid=stage.querySelector('.vs-grid');
   grid.addEventListener('click',e=>{
     const t=e.target.closest('.vs-tile');if(!t)return;
+    const b=e.target.closest('[data-act]');
+    if(b){screenTileAction(b.dataset.act,t);return;}
     vsFocus=vsFocus===t.dataset.user?null:t.dataset.user;renderVideoStage();
   });
   grid.addEventListener('dblclick',e=>{
-    const t=e.target.closest('.vs-tile');if(!t)return;
+    const t=e.target.closest('.vs-tile');if(!t||e.target.closest('[data-act]'))return;
     document.fullscreenElement===t?document.exitFullscreen():t.requestFullscreen?.().catch(()=>{});
   });
   new ResizeObserver(()=>layoutVideoStage()).observe(grid);
@@ -7032,6 +7130,7 @@ function initVideo(){
     stage.querySelector('.vs-collapse').title=stage.classList.contains('collapsed')?'Show cameras':'Hide cameras';
   });
   document.getElementById('voice-video-btn').addEventListener('click',toggleCamera);
+  initScreenShare();
   window.runtime.EventsOn('video:frame',onVideoFrame);
   window.runtime.EventsOn('video:keyframe',()=>{cam.forceKey=true;});
   updateCameraButton();
@@ -7046,6 +7145,203 @@ function onVideoState(list){
     cam.announcedAt=Date.now();window.go.main.App.SetVideoEnabled(true).catch(()=>{});
   }
   renderVideoStage();
+}
+
+// ── Screen sharing ──
+// The share button opens a picker — whole screens on one tab, single
+// application windows on the other — with the size and frame rate to
+// send. Capture and encoding happen in Go with the bundled FFmpeg
+// (screen.go), like the native camera. Other people's shares show as a
+// tile with a Watch button: nothing is sent to you until you click it.
+const spState={tab:'screen',sources:[],sel:null,loading:false};
+function updateScreenButton(){
+  const btn=document.getElementById('voice-screen-btn');if(!btn)return;
+  const on=scr.on||scr.starting;
+  btn.classList.toggle('on',on);
+  btn.innerHTML=icon(on?'stop_screen_share':'screen_share');
+  btn.title=btn.dataset.tip=scr.starting?'Starting screen share…':on?'Stop sharing your screen':'Share your screen';
+}
+async function toggleScreenShare(){
+  if(scr.on||scr.starting){stopScreenShare();playSound('webcam_stop');return;}
+  openScreenPicker();
+}
+async function openScreenPicker(){
+  if(!inMyCall()){toast('Join a voice channel to share your screen',true);return;}
+  const info=await window.go.main.App.ScreenShareInfo().catch(err=>({available:false,reason:String(err)}));
+  if(!info?.available){toast(info?.reason||'Screen sharing isn’t available here',true);return;}
+  document.querySelector('#sp-tabs [data-tab="window"]').classList.toggle('hidden',!info.windows);
+  if(!info.windows)spState.tab='screen';
+  const res=document.getElementById('sp-res'),fps=document.getElementById('sp-fps');
+  res.value=localStorage.getItem('screenRes')||'1080';if(!res.value)res.value='1080';
+  fps.value=localStorage.getItem('screenFps')||'30';if(!fps.value)fps.value='30';
+  spState.sel=scr.on?scr.source?.id||null:null;
+  document.getElementById('sp-go').textContent=scr.on?'Switch':'Go Live';
+  updateScreenHint();
+  document.getElementById('modal-screen').classList.remove('hidden');
+  loadShareSources();
+}
+function closeScreenPicker(){document.getElementById('modal-screen').classList.add('hidden');}
+async function loadShareSources(){
+  const grid=document.getElementById('sp-grid');
+  spState.loading=true;
+  if(!spState.sources.length)grid.innerHTML='<div class="sp-empty">Looking for screens and windows…</div>';
+  try{spState.sources=await window.go.main.App.ListShareSources()||[];}
+  catch(err){spState.sources=[];grid.innerHTML=`<div class="sp-empty">${esc(String(err).replace(/^Error: /,''))}</div>`;spState.loading=false;return;}
+  spState.loading=false;
+  renderSharePicker();
+}
+function renderSharePicker(){
+  document.querySelectorAll('#sp-tabs [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===spState.tab));
+  const grid=document.getElementById('sp-grid');
+  const list=spState.sources.filter(s=>s.kind===spState.tab);
+  if(!list.length){
+    grid.innerHTML=`<div class="sp-empty">${spState.tab==='screen'?'No screens found':'No application windows to share — open the app you want, then refresh'}</div>`;
+  }else{
+    grid.innerHTML=list.map(s=>{
+      const detail=s.kind==='screen'?`${s.w}×${s.h}${s.primary?' · Main screen':''}`:[s.app,s.note].filter(Boolean).join(' · ');
+      const thumb=s.thumb?`<img src="${esc(s.thumb)}" alt="">`:icon('screen_share');
+      return `<button type="button" class="sp-item${spState.sel===s.id?' sel':''}" data-id="${esc(s.id)}" title="${esc(s.name)}"><div class="sp-thumb">${thumb}</div><div class="sp-label"><span>${esc(s.name)}</span><small>${esc(detail)}</small></div></button>`;
+    }).join('');
+  }
+  document.getElementById('sp-go').disabled=!spState.sources.some(s=>s.id===spState.sel);
+}
+function updateScreenHint(){
+  const h=+document.getElementById('sp-res').value,f=+document.getElementById('sp-fps').value;
+  document.getElementById('sp-hint').textContent=
+    (f>=60?'60 fps is smooth for games and video, and takes more upload. ':f<=15?'Fine for slides and documents. ':'')+
+    (h===0?'Source sends at your screen’s full size.':'Scaled down on your graphics card — never scaled up.');
+}
+async function startScreenShare(src){
+  if(!src)return;
+  const height=+document.getElementById('sp-res').value,fps=+document.getElementById('sp-fps').value;
+  localStorage.setItem('screenRes',String(height));localStorage.setItem('screenFps',String(fps));
+  closeScreenPicker();
+  if(!inMyCall()){toast('Join a voice channel to share your screen',true);return;}
+  const was=scr.on;
+  scr.starting=true;updateScreenButton();
+  try{
+    const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview});
+    Object.assign(scr,{on:true,source:src,height,fps,label});
+    dropRemoteVideo(SELF_SCR); // a switched share starts its preview afresh
+    if(!was){
+      scr.announcedAt=Date.now();
+      await window.go.main.App.SetScreenShareEnabled(true).catch(()=>{});
+      playSound('webcam_start');
+    }
+  }catch(err){
+    toast('Screen share: '+String(err?.message||err).replace(/^Error: /,''),true);
+    if(was){scr.starting=false;stopScreenShare();} // the old one was stopped to make way
+  }finally{
+    scr.starting=false;updateScreenButton();renderVideoStage();renderSidebar();
+  }
+}
+function stopScreenShare(quiet){
+  const was=scr.on;
+  Object.assign(scr,{on:false,starting:false,source:null});
+  window.go.main.App.StopScreenShare().catch(()=>{});
+  dropRemoteVideo(SELF_SCR);
+  if(was&&!quiet)window.go.main.App.SetScreenShareEnabled(false).catch(()=>{});
+  updateScreenButton();renderVideoStage();renderSidebar();
+}
+// From voice:state — who's sharing. Watching ends when their share does,
+// and ours is re-announced if the server lost track (a rejoin).
+function onScreenState(list){
+  state.voiceScreens=new Set(list||[]);
+  for(const u of [...screenWatch])if(!state.voiceScreens.has(u)){screenWatch.delete(u);dropRemoteVideo(scrKey(u));}
+  if(scr.on&&inMyCall()&&!state.voiceScreens.has(state.username)&&Date.now()-scr.announcedAt>3000){
+    scr.announcedAt=Date.now();window.go.main.App.SetScreenShareEnabled(true).catch(()=>{});
+  }
+}
+function watchScreen(user,on){
+  if(on)screenWatch.add(user);else{screenWatch.delete(user);dropRemoteVideo(scrKey(user));}
+  window.go.main.App.WatchScreen(user,on).catch(err=>toast('Couldn’t '+(on?'watch':'stop watching')+': '+err,true));
+  if(on)vsFocus=scrKey(user); // a stream you open gets the big spot
+  else if(vsFocus===scrKey(user))vsFocus=null;
+  renderVideoStage();
+}
+function resendScreenWatches(){
+  for(const u of screenWatch)window.go.main.App.WatchScreen(u,true).catch(()=>{});
+}
+// One screen tile: yours (what you're sharing, with a preview if you want
+// one), or someone else's — a Watch button until you watch it.
+function renderScreenTile(tile,u){
+  tile.classList.remove('speaking');
+  if(u===state.username){
+    tile.classList.add('live');tile.classList.remove('idle');
+    if(scr.preview){
+      const r=remoteVideo(SELF_SCR);
+      if(r&&r.el.parentElement!==tile){tile.prepend(r.el);if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});}
+    }else tile.querySelectorAll('video,canvas').forEach(el=>el.remove());
+    let o=tile.querySelector('.vs-scrself');
+    if(!o){o=document.createElement('div');o.className='vs-scrself';tile.appendChild(o);}
+    const what=scr.source?.name||'your screen';
+    const sig=`${what}|${scr.height}|${scr.fps}|${scr.preview}`;
+    if(o.dataset.sig!==sig){
+      o.dataset.sig=sig;
+      o.classList.toggle('has-preview',scr.preview);
+      o.innerHTML=`${icon('screen_share')}<span>You’re sharing ${esc(what)}</span><small>${scr.height?scr.height+'p':'Full size'} · ${scr.fps} fps — only people who click Watch receive it</small>
+        <div class="vs-btns"><button class="vs-btn" data-act="scr-preview" type="button">${scr.preview?'Hide preview':'Show preview'}</button><button class="vs-btn" data-act="scr-change" type="button">Change</button><button class="vs-btn danger" data-act="scr-stop" type="button">Stop sharing</button></div>`;
+    }
+    return;
+  }
+  tile.querySelector('.vs-scrself')?.remove();
+  if(screenWatch.has(u)){
+    tile.classList.remove('idle');
+    tile.querySelector('.vs-watch')?.remove();
+    const r=remoteVideo(scrKey(u));
+    if(!r){if(!tile.querySelector('.vs-unsup'))tile.insertAdjacentHTML('afterbegin','<div class="vs-unsup">Video can’t be shown in this version of the app’s web view</div>');}
+    else if(r.el.parentElement!==tile){tile.prepend(r.el);if(r.live)tile.classList.add('live');if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});}
+    if(r&&r.unsupported&&!tile.querySelector('.vs-unsup')){r.unsupported=false;showDecodeUnsupported(scrKey(u),r.codec||'h264');}
+    if(!tile.querySelector('.vs-stopwatch'))tile.insertAdjacentHTML('beforeend','<button class="vs-btn vs-stopwatch" data-act="unwatch" type="button">Stop watching</button>');
+  }else{
+    tile.classList.add('idle');tile.classList.remove('live');
+    tile.querySelectorAll('video,canvas,.vs-stopwatch,.vs-unsup').forEach(el=>el.remove());
+    if(!tile.querySelector('.vs-watch'))tile.insertAdjacentHTML('afterbegin',`<div class="vs-watch">${icon('screen_share')}<span>${esc(u)} is sharing their screen</span><div class="vs-btns"><button class="vs-btn primary" data-act="watch" type="button">Watch Stream</button></div></div>`);
+  }
+}
+function screenTileAction(act,tile){
+  const id=tile.dataset.user,u=isScrKey(id)?id.slice(1):id;
+  switch(act){
+    case 'watch':watchScreen(u,true);break;
+    case 'unwatch':watchScreen(u,false);break;
+    case 'scr-stop':stopScreenShare();playSound('webcam_stop');break;
+    case 'scr-change':openScreenPicker();break;
+    case 'scr-preview':
+      scr.preview=!scr.preview;
+      window.go.main.App.SetScreenPreview(scr.preview).catch(()=>{});
+      if(!scr.preview)dropRemoteVideo(SELF_SCR);
+      renderVideoStage();break;
+  }
+}
+function initScreenShare(){
+  document.getElementById('voice-screen-btn').addEventListener('click',toggleScreenShare);
+  document.getElementById('sp-cancel').addEventListener('click',closeScreenPicker);
+  document.getElementById('modal-screen').addEventListener('click',e=>{if(e.target.id==='modal-screen')closeScreenPicker();});
+  document.getElementById('sp-refresh').addEventListener('click',loadShareSources);
+  document.getElementById('sp-tabs').addEventListener('click',e=>{
+    const b=e.target.closest('[data-tab]');if(!b)return;
+    spState.tab=b.dataset.tab;renderSharePicker();
+  });
+  const grid=document.getElementById('sp-grid');
+  grid.addEventListener('click',e=>{
+    const it=e.target.closest('.sp-item');if(!it)return;
+    spState.sel=it.dataset.id;renderSharePicker();
+  });
+  grid.addEventListener('dblclick',e=>{
+    const it=e.target.closest('.sp-item');if(!it)return;
+    startScreenShare(spState.sources.find(s=>s.id===it.dataset.id));
+  });
+  document.getElementById('sp-go').addEventListener('click',()=>startScreenShare(spState.sources.find(s=>s.id===spState.sel)));
+  document.getElementById('sp-res').addEventListener('change',updateScreenHint);
+  document.getElementById('sp-fps').addEventListener('change',updateScreenHint);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('modal-screen').classList.contains('hidden'))closeScreenPicker();});
+  window.runtime.EventsOn('screen:preview',f=>{if(f?.data&&scr.on&&scr.preview)onVideoFrame({...f,user:SELF_SCR,codec:'h264'},true);});
+  window.runtime.EventsOn('screen:stats',st=>{vStats.screen=st;});
+  window.runtime.EventsOn('screen:stopped',reason=>{
+    if(!scr.on)return;
+    toast(reason||'Your screen share stopped',true);stopScreenShare();playSound('webcam_stop');
+  });
+  updateScreenButton();
 }
 
 // ── Settings → Voice & Video → Video ──
@@ -8841,6 +9137,7 @@ function init(){
     voiceSoundsFor(state.voiceChannels,next,state.voiceReconnecting,payload?.reconnecting||{});
     state.voiceChannels=next;
     state.voiceReconnecting=payload?.reconnecting||{};
+    onScreenState(payload?.screen_on);
     onVideoState(payload?.video_on);
     voiceSnapshotWaiters.splice(0).forEach(w=>w());
     renderSidebar();

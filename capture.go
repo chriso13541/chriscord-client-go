@@ -70,12 +70,63 @@ type CameraStart struct {
 	Encoder string `json:"encoder"` // "auto" (default), "hardware", "nvenc" or "software"
 }
 
+// nativeCamera is one running FFmpeg capture — a camera, or (kind
+// "screen") a screen share; both are pumped the same way (pumpFLV).
 type nativeCamera struct {
+	kind    string // "camera" or "screen"
 	cmd     *exec.Cmd
 	send    atomic.Bool
 	preview atomic.Bool
 	stopped atomic.Bool
 	done    chan struct{}
+
+	// Screens only: the frames since the last keyframe, so a viewer who
+	// starts watching a screen that isn't changing (no new frames to wait
+	// for) can be sent a picture straight away — see resendIfIdle.
+	gopMu       sync.Mutex
+	gop         []media.Sample
+	gopBytes    int
+	lastFrameAt time.Time
+}
+
+// track: the call track this capture feeds.
+func (c *nativeCamera) track(s *VoiceSession) *webrtc.TrackLocalStaticSample {
+	if c.kind == "screen" {
+		return s.screenTrack
+	}
+	return s.videoTrack
+}
+
+// remember keeps a screen's current group of pictures (keyframe onwards).
+func (c *nativeCamera) remember(sample media.Sample, key bool) {
+	if key {
+		c.gop, c.gopBytes = c.gop[:0], 0
+	} else if len(c.gop) == 0 {
+		return // nothing to build on until the next keyframe
+	}
+	if len(c.gop) >= 600 || c.gopBytes+len(sample.Data) > 24<<20 {
+		c.gop, c.gopBytes = c.gop[:0], 0 // too long to replay — wait for the next keyframe
+		return
+	}
+	c.gop = append(c.gop, sample)
+	c.gopBytes += len(sample.Data)
+	c.lastFrameAt = time.Now()
+}
+
+// resendIfIdle: a viewer asked for a keyframe while the screen hasn't
+// changed for a moment (so no new frames, and no new keyframe, are on
+// the way) — send the current picture again from its keyframe.
+func (c *nativeCamera) resendIfIdle(trk *webrtc.TrackLocalStaticSample) {
+	c.gopMu.Lock()
+	defer c.gopMu.Unlock()
+	if len(c.gop) == 0 || time.Since(c.lastFrameAt) < 700*time.Millisecond {
+		return
+	}
+	for _, s := range c.gop {
+		if trk.WriteSample(s) != nil {
+			return
+		}
+	}
 }
 
 var (
@@ -419,7 +470,7 @@ func (a *App) StartCamera(opts CameraStart) (string, error) {
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("couldn't start FFmpeg: %w", err)
 	}
-	c := &nativeCamera{cmd: cmd, done: make(chan struct{})}
+	c := &nativeCamera{kind: "camera", cmd: cmd, done: make(chan struct{})}
 	c.send.Store(opts.Send)
 	c.preview.Store(opts.Preview)
 	first := make(chan struct{}, 1)
@@ -555,34 +606,48 @@ func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct
 			a.voiceMu.Lock()
 			session := a.voice
 			a.voiceMu.Unlock()
+			var trk *webrtc.TrackLocalStaticSample
+			if session != nil {
+				trk = c.track(session)
+			}
 			switch {
-			case session == nil || session.videoTrack == nil:
+			case trk == nil:
 				why = "not in a call"
-			case !strings.EqualFold(session.videoTrack.Codec().MimeType, webrtc.MimeTypeH264):
-				why = "this call's video is " + session.videoTrack.Codec().MimeType + ", not H.264 — rejoin the call"
+			case !strings.EqualFold(trk.Codec().MimeType, webrtc.MimeTypeH264):
+				why = "this call's video is " + trk.Codec().MimeType + ", not H.264 — rejoin the call"
 			default:
-				if err := session.videoTrack.WriteSample(media.Sample{Data: au, Duration: dur}); err != nil {
+				sample := media.Sample{Data: au, Duration: dur}
+				var err error
+				if c.kind == "screen" {
+					c.gopMu.Lock()
+					err = trk.WriteSample(sample)
+					c.remember(sample, key)
+					c.gopMu.Unlock()
+				} else {
+					err = trk.WriteSample(sample)
+				}
+				if err != nil {
 					why = "writing to the call failed: " + err.Error()
 				} else {
 					sent++
 					bytes += len(au)
 					if session != lastSession {
 						lastSession = session
-						log.Printf("camera: sending into the call (%s)", session.boardID)
+						log.Printf("%s: sending into the call (%s)", c.kind, session.boardID)
 					}
 				}
 			}
 			if why != "" && why != lastWhy {
-				log.Printf("camera: frames NOT reaching the call: %s", why)
+				log.Printf("%s: frames NOT reaching the call: %s", c.kind, why)
 			}
 			lastWhy = why
 		}
 		if c.preview.Load() {
-			wailsruntime.EventsEmit(a.ctx, "camera:preview", previewFrame{Key: key, Data: base64.StdEncoding.EncodeToString(au)})
+			wailsruntime.EventsEmit(a.ctx, c.kind+":preview", previewFrame{Key: key, Data: base64.StdEncoding.EncodeToString(au)})
 		}
 		frames++
 		if el := time.Since(statT); el >= time.Second {
-			wailsruntime.EventsEmit(a.ctx, "camera:stats", map[string]interface{}{
+			wailsruntime.EventsEmit(a.ctx, c.kind+":stats", map[string]interface{}{
 				"captured": float64(frames) / el.Seconds(), "fps": float64(sent) / el.Seconds(),
 				"kbps": float64(bytes*8) / 1000 / el.Seconds(), "problem": why,
 			})

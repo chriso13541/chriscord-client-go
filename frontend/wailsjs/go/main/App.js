@@ -218,6 +218,10 @@ export function ListCameras() {
   return window['go']['main']['App']['ListCameras']();
 }
 
+export function ListShareSources() {
+  return window['go']['main']['App']['ListShareSources']();
+}
+
 export function MoveBoard(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveBoard'](arg1, arg2, arg3);
 }
@@ -302,6 +306,10 @@ export function ReorderServers(arg1) {
   return window['go']['main']['App']['ReorderServers'](arg1);
 }
 
+export function RequestScreenKeyframe(arg1) {
+  return window['go']['main']['App']['RequestScreenKeyframe'](arg1);
+}
+
 export function RequestVideoKeyframe(arg1) {
   return window['go']['main']['App']['RequestVideoKeyframe'](arg1);
 }
@@ -324,6 +332,10 @@ export function SaveProfile(arg1, arg2) {
 
 export function SaveProfilePicture(arg1) {
   return window['go']['main']['App']['SaveProfilePicture'](arg1);
+}
+
+export function ScreenShareInfo() {
+  return window['go']['main']['App']['ScreenShareInfo']();
 }
 
 export function SearchServer(arg1) {
@@ -362,6 +374,14 @@ export function SetPresence(arg1) {
   return window['go']['main']['App']['SetPresence'](arg1);
 }
 
+export function SetScreenPreview(arg1) {
+  return window['go']['main']['App']['SetScreenPreview'](arg1);
+}
+
+export function SetScreenShareEnabled(arg1) {
+  return window['go']['main']['App']['SetScreenShareEnabled'](arg1);
+}
+
 export function SetTranscodeSettings(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetTranscodeSettings'](arg1, arg2, arg3);
 }
@@ -386,12 +406,20 @@ export function StartMicTest(arg1, arg2) {
   return window['go']['main']['App']['StartMicTest'](arg1, arg2);
 }
 
+export function StartScreenShare(arg1) {
+  return window['go']['main']['App']['StartScreenShare'](arg1);
+}
+
 export function StopCamera() {
   return window['go']['main']['App']['StopCamera']();
 }
 
 export function StopMicTest() {
   return window['go']['main']['App']['StopMicTest']();
+}
+
+export function StopScreenShare() {
+  return window['go']['main']['App']['StopScreenShare']();
 }
 
 export function SubscribeBoard(arg1) {
@@ -456,4 +484,8 @@ export function VideoConversionInfo() {
 
 export function VideoSendCodec() {
   return window['go']['main']['App']['VideoSendCodec']();
+}
+
+export function WatchScreen(arg1, arg2) {
+  return window['go']['main']['App']['WatchScreen'](arg1, arg2);
 }
