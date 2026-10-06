@@ -2694,6 +2694,7 @@ function rememberVoiceForRejoin(){
     domain:state.domain,boardId,
     muted:!!document.getElementById('voice-mute-btn')?.classList.contains('muted'),
     deafened:!!document.getElementById('voice-deafen-btn')?.classList.contains('muted'),
+    camera:!!(cam.on||cam.starting), // turned back on after rejoining
   };
   // The server has already dropped us from the call; stop our side of it
   // (microphone, speaker, the dead audio connection) until we rejoin.
@@ -2729,6 +2730,7 @@ async function rejoinVoiceAfterReconnect(){
     if(r.deafened){setDeafenButtonState(await window.go.main.App.ToggleDeafen());setMuteButtonState(await window.go.main.App.IsMuted());}
     else if(r.muted)setMuteButtonState(await window.go.main.App.ToggleMute());
     playSound('join'); // you never left the list, so the snapshot itself won't play it
+    if(r.camera&&!cam.on&&!cam.starting)restoreCameraAfterRejoin();
   }catch(err){
     playSound('error');
     toast('Couldn\u2019t rejoin the voice channel: '+err,true);
@@ -3277,6 +3279,9 @@ function updateVoiceConnectedBar(){
   }
   document.getElementById('voice-connected-name').innerHTML=`${icon('volume_up')}<span>${esc(boardName)}</span>`;
   bar.classList.remove('hidden');
+  // Cameras already on when you joined: the call's snapshot can land
+  // before the join finishes, so draw them now that you're in.
+  renderVideoStage();
   window.go.main.App.IsMuted().then(setMuteButtonState).catch(()=>{});
   window.go.main.App.IsDeafened().then(setDeafenButtonState).catch(()=>{});
 }
@@ -6595,6 +6600,17 @@ async function toggleCamera(){
   cam.starting=true;updateCameraButton();
   try{await startCamera();playSound('webcam_start');}
   catch(err){toast('Camera: '+(err?.message||err),true);stopCamera(true);}
+  finally{cam.starting=false;updateCameraButton();}
+}
+// Your camera was on when the connection dropped: turn it back on once
+// you're in the call again (after your own snapshot shows you in it).
+async function restoreCameraAfterRejoin(){
+  for(let i=0;i<20&&!inMyCall();i++)await new Promise(r=>setTimeout(r,250));
+  if(!inMyCall()||cam.on||cam.starting)return;
+  if(!camSupported()&&!useNative())return;
+  cam.starting=true;updateCameraButton();
+  try{await startCamera();}
+  catch(err){toast('Couldn\u2019t turn your camera back on: '+(err?.message||err),true);stopCamera(true);}
   finally{cam.starting=false;updateCameraButton();}
 }
 // Opens the camera in FFmpeg. send: into the call; preview: frames back
