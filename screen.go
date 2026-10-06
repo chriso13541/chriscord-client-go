@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hraban/opus"
@@ -63,7 +64,31 @@ type ScreenStart struct {
 var (
 	screenMu     sync.Mutex
 	activeScreen *nativeCamera
+	screenGen    int // bumped whenever a share is stopped or replaced
+
+	screenRetryMu sync.Mutex
+	screenRetries []time.Time
 )
+
+// screenRetryAllowed: a share that keeps losing its capture is picked back
+// up at most 5 times a minute; past that something's wrong, and it ends.
+func screenRetryAllowed() bool {
+	screenRetryMu.Lock()
+	defer screenRetryMu.Unlock()
+	now := time.Now()
+	kept := screenRetries[:0]
+	for _, t := range screenRetries {
+		if now.Sub(t) < time.Minute {
+			kept = append(kept, t)
+		}
+	}
+	screenRetries = kept
+	if len(screenRetries) >= 5 {
+		return false
+	}
+	screenRetries = append(screenRetries, now)
+	return true
+}
 
 var (
 	ffFiltersOnce sync.Once
@@ -228,6 +253,7 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("couldn't start FFmpeg: %w", err)
 	}
+	var running atomic.Bool // got going (a share that never started isn't picked back up)
 	c := &nativeCamera{kind: "screen", cmd: cmd, done: make(chan struct{}), clock: newShareClock(), opts: opts, w: w, h: h}
 	if feed != nil {
 		c.tee = tee // a window copied here: the smaller version shares its frames
@@ -283,12 +309,35 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 		if activeScreen == c {
 			activeScreen = nil
 		}
+		gen := screenGen
 		screenMu.Unlock()
+		// Desktop Duplication gives up when the screen changes under it — a
+		// game going full screen, the resolution changing, a UAC prompt —
+		// with "access lost" (887a0026), and FFmpeg's ddagrab stops there.
+		// Pick the share straight back up instead of ending it.
+		if running.Load() && strings.Contains(strings.ToLower(stderr.String()), "887a0026") && screenRetryAllowed() {
+			go func() {
+				time.Sleep(500 * time.Millisecond)
+				screenMu.Lock()
+				still := screenGen == gen && activeScreen == nil // not stopped or replaced meanwhile
+				screenMu.Unlock()
+				if !still {
+					return
+				}
+				log.Printf("screen: screen capture lost access (a full-screen game, a display change…); starting it again")
+				if _, err := a.startScreen(opts); err != nil {
+					log.Printf("screen: couldn't pick the share back up: %v", err)
+					wailsruntime.EventsEmit(a.ctx, "screen:stopped", reason)
+				}
+			}()
+			return
+		}
 		wailsruntime.EventsEmit(a.ctx, "screen:stopped", reason)
 	}()
 
 	select {
 	case <-first:
+		running.Store(true)
 	case <-c.done:
 		if feed != nil {
 			if err := feedReason(0); err != nil {
@@ -440,6 +489,7 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 func (a *App) StopScreenShare() {
 	a.stopScreenLow()
 	screenMu.Lock()
+	screenGen++
 	c := activeScreen
 	activeScreen = nil
 	screenMu.Unlock()

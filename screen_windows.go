@@ -431,8 +431,11 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 			}
 			w, h := shareSize(m.w, m.h, o.Height)
 			// Desktop Duplication never draws a border: used for a whole
-			// screen when the border should be hidden (or WGC is missing).
-			if f["ddagrab"] && (o.HideBorder || !f["gfxcapture"]) {
+			// screen when the border should be hidden on Windows 10 (or WGC
+			// is missing). Windows 11 hides Windows Graphics Capture's own
+			// border, and WGC copes with full-screen games and display
+			// changes, which make Desktop Duplication lose access.
+			if f["ddagrab"] && ((o.HideBorder && !isWindows11()) || !f["gfxcapture"]) {
 				if adapter, output, ok := ddaFind(handle, m.w, m.h); ok {
 					if adapter == 0 {
 						// The default graphics adapter: ddagrab makes its own
