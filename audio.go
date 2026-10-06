@@ -38,11 +38,16 @@ const (
 	// the way Discord's voice processing does — most microphones deliver
 	// speech well below it (around −30 dBFS), which is why people had to be
 	// turned up to 160–200%.
-	agcTargetDB  = -18.0 // speech level aimed for (frame RMS, dBFS)
-	agcMaxBoost  = 24.0  // at most this much louder…
+	agcTargetDB  = -23.0 // speech level aimed for (frame RMS, dBFS)
+	agcMaxBoost  = 12.0  // at most this much louder (4×)…
 	agcMaxCut    = -10.0 // … or quieter
 	agcUpPerSec  = 6.0   // how fast the gain may rise (dB per second)…
 	agcDownPerFr = 1.0   // … and fall (dB per 20 ms frame: loud speech is pulled in quickly)
+	// Between words (the gate held open, nothing above the threshold) the
+	// boost is eased off, so background noise isn't turned up with you;
+	// it comes back as soon as you speak again.
+	agcGapEasePerFr = 1.5 // dB per frame towards no boost in a gap…
+	agcSpeechPerFr  = 4.0 // … and back to your gain when speech resumes
 )
 
 type userAudio struct {
@@ -222,9 +227,10 @@ func (v *voiceActivity) process(buf []int16) (open, changed bool, level, thresho
 // agcTargetDB, slowly enough that it's never heard pumping, with a soft
 // limiter so a shout or a laugh doesn't clip.
 type autoGain struct {
-	have     bool
-	speechDB float64 // running estimate of your speech level, before this gain
-	gainDB   float64
+	have      bool
+	speechDB  float64 // running estimate of your speech level, before this gain
+	gainDB    float64 // the gain your speech gets
+	appliedDB float64 // what's applied right now (eased off between words)
 }
 
 // process applies the gain to one frame. level is its loudness before
@@ -253,8 +259,28 @@ func (g *autoGain) process(buf []int16, level float64, speech bool) {
 			g.gainDB = want
 		}
 	}
-	mul := math.Pow(10, g.gainDB/20)
+	// Speech gets the full gain; a gap between words gets no boost (a cut
+	// still applies), eased towards over a few frames either way.
+	target := g.gainDB
+	step := agcSpeechPerFr
+	if !speech {
+		target = math.Min(g.gainDB, 0)
+		step = agcGapEasePerFr
+	}
+	from := g.appliedDB
+	switch {
+	case target > from+step:
+		g.appliedDB = from + step
+	case target < from-step:
+		g.appliedDB = from - step
+	default:
+		g.appliedDB = target
+	}
+	// Ramped across the frame, so a change is never a click.
+	m0, m1 := math.Pow(10, from/20), math.Pow(10, g.appliedDB/20)
+	n := float64(len(buf))
 	for i, v := range buf {
+		mul := m0 + (m1-m0)*float64(i)/n
 		buf[i] = int16(softLimit(float64(v)*mul/32768) * 32767)
 	}
 }
