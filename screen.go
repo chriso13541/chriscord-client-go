@@ -71,7 +71,7 @@ var (
 )
 
 // screenRetryAllowed: a share that keeps losing its capture is picked back
-// up at most 5 times a minute; past that something's wrong, and it ends.
+// up at most 10 times a minute; past that something's wrong, and it ends.
 func screenRetryAllowed() bool {
 	screenRetryMu.Lock()
 	defer screenRetryMu.Unlock()
@@ -83,7 +83,7 @@ func screenRetryAllowed() bool {
 		}
 	}
 	screenRetries = kept
-	if len(screenRetries) >= 5 {
+	if len(screenRetries) >= 10 {
 		return false
 	}
 	screenRetries = append(screenRetries, now)
@@ -315,24 +315,49 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 		// game going full screen, the resolution changing, a UAC prompt —
 		// with "access lost" (887a0026), and FFmpeg's ddagrab stops there.
 		// Pick the share straight back up instead of ending it.
+		if len(first) > 0 { // its first frame came, but startScreen hadn't seen it yet
+			running.Store(true)
+		}
 		if running.Load() && strings.Contains(strings.ToLower(stderr.String()), "887a0026") && screenRetryAllowed() {
 			go func() {
-				time.Sleep(500 * time.Millisecond)
-				screenMu.Lock()
-				still := screenGen == gen && activeScreen == nil // not stopped or replaced meanwhile
-				screenMu.Unlock()
-				if !still {
-					return
-				}
-				log.Printf("screen: screen capture lost access (a full-screen game, a display change…); starting it again")
-				if _, err := a.startScreen(opts); err != nil {
-					log.Printf("screen: couldn't pick the share back up: %v", err)
-					wailsruntime.EventsEmit(a.ctx, "screen:stopped", reason)
+				// Right after a game takes over the screen, capturing it can
+				// fail for a moment: keep trying for up to 30 s (viewers keep
+				// the last picture meanwhile).
+				deadline := time.Now().Add(30 * time.Second)
+				wait := 500 * time.Millisecond
+				for {
+					time.Sleep(wait)
+					screenMu.Lock()
+					still := screenGen == gen && activeScreen == nil // not stopped or replaced meanwhile
+					screenMu.Unlock()
+					if !still {
+						return
+					}
+					log.Printf("screen: screen capture lost access (a full-screen game, a display change…); starting it again")
+					_, err := a.startScreen(opts)
+					if err == nil {
+						return
+					}
+					log.Printf("screen: couldn't pick the share back up yet: %v", err)
+					if time.Now().After(deadline) {
+						wailsruntime.EventsEmit(a.ctx, "screen:stopped", reason)
+						return
+					}
+					screenMu.Lock()
+					gen = screenGen // the failed try counted as a stop
+					screenMu.Unlock()
+					if wait < 2*time.Second {
+						wait *= 2
+					}
 				}
 			}()
 			return
 		}
-		wailsruntime.EventsEmit(a.ctx, "screen:stopped", reason)
+		// (A share that never got going reports its failure to whoever
+		// started it, through startScreen's error.)
+		if running.Load() {
+			wailsruntime.EventsEmit(a.ctx, "screen:stopped", reason)
+		}
 	}()
 
 	select {
