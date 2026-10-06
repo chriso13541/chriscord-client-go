@@ -33,7 +33,8 @@ const (
 // incoming audio track — a small buffer of decoded PCM the mixer drains
 // from, filled by that track's own read/decode goroutine.
 type voiceRemoteSource struct {
-	username string // whose audio this is — for per-user volume/mute
+	username string // whose audio this is — for per-user volume/mute ("screen:<name>" for a stream's sound)
+	stereo   bool   // a screen share's sound (buf is interleaved L/R); voices are mono
 	decoder  *opus.Decoder
 	mu      sync.Mutex
 	buf     []int16
@@ -56,6 +57,7 @@ type VoiceSession struct {
 	localTrack  *webrtc.TrackLocalStaticSample
 	videoTrack  *webrtc.TrackLocalStaticSample // this app's camera, see video.go
 	screenTrack *webrtc.TrackLocalStaticSample // this app's screen share, see screen.go
+	screenAudioTrack *webrtc.TrackLocalStaticSample // its sound
 	encoder     *opus.Encoder
 
 	captureStream   *portaudio.Stream
@@ -687,11 +689,17 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 
-		s.playBuf = make([]int16, voiceFrameSize)
+		// Stereo out (a shared screen's sound is stereo; voices go to both
+		// sides), unless the device only has one channel.
+		outCh := 2
+		if device.MaxOutputChannels < 2 {
+			outCh = 1
+		}
+		s.playBuf = make([]int16, voiceFrameSize*outCh)
 		params := portaudio.StreamParameters{
 			Output: portaudio.StreamDeviceParameters{
 				Device:   device,
-				Channels: voiceChannels,
+				Channels: outCh,
 				Latency:  device.DefaultLowOutputLatency,
 			},
 			SampleRate:      voiceSampleRate,
@@ -725,7 +733,16 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			s.remotesMu.Lock()
 			for _, r := range s.remotes {
 				r.mu.Lock()
-				n := len(r.buf)
+				inCh := 1
+				if r.stereo {
+					inCh = 2
+					// A stream's sound shouldn't drift behind its picture:
+					// keep at most 300 ms queued.
+					if max := voiceFrameSize * 15 * inCh; len(r.buf) > max {
+						r.buf = r.buf[len(r.buf)-max:]
+					}
+				}
+				n := len(r.buf) / inCh
 				if n > voiceFrameSize {
 					n = voiceFrameSize
 				}
@@ -733,16 +750,22 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				// times overall output volume; 0 means skip them.
 				if g := audioCfg.playbackGain(r.username); !deafened && g > 0 {
 					for i := 0; i < n; i++ {
-						sum := int32(s.playBuf[i]) + int32(clampF(float64(r.buf[i])*g, -32768, 32767))
-						if sum > 32767 {
-							sum = 32767
-						} else if sum < -32768 {
-							sum = -32768
+						var l, rr float64
+						if inCh == 2 {
+							l, rr = float64(r.buf[2*i])*g, float64(r.buf[2*i+1])*g
+						} else {
+							l = float64(r.buf[i]) * g
+							rr = l
 						}
-						s.playBuf[i] = int16(sum)
+						if outCh == 2 {
+							mixInto(&s.playBuf[2*i], l)
+							mixInto(&s.playBuf[2*i+1], rr)
+						} else {
+							mixInto(&s.playBuf[i], (l+rr)/2)
+						}
 					}
 				}
-				r.buf = r.buf[n:]
+				r.buf = r.buf[n*inCh:]
 				r.mu.Unlock()
 			}
 			s.remotesMu.Unlock()
@@ -758,12 +781,20 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 // audio track for as long as it lasts, feeding decoded PCM into that
 // track's own buffer for the playback loop above to mix in.
 func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
-	decoder, err := opus.NewDecoder(voiceSampleRate, voiceChannels)
+	// The server labels each forwarded voice "audio-<username>", and a
+	// screen share's sound "screenaudio-<username>" (stereo; its volume is
+	// set separately, under "screen:<username>").
+	channels := voiceChannels
+	name := strings.TrimPrefix(track.ID(), "audio-")
+	stereo := strings.HasPrefix(track.ID(), "screenaudio-")
+	if stereo {
+		channels, name = 2, "screen:"+strings.TrimPrefix(track.ID(), "screenaudio-")
+	}
+	decoder, err := opus.NewDecoder(voiceSampleRate, channels)
 	if err != nil {
 		return
 	}
-	// The server labels each forwarded track "audio-<username>".
-	source := &voiceRemoteSource{username: strings.TrimPrefix(track.ID(), "audio-"), decoder: decoder}
+	source := &voiceRemoteSource{username: name, decoder: decoder, stereo: stereo}
 	s.remotesMu.Lock()
 	s.remotes[track.ID()] = source
 	s.remotesMu.Unlock()
@@ -773,7 +804,7 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 		s.remotesMu.Unlock()
 	}()
 
-	pcm := make([]int16, voiceFrameSize)
+	pcm := make([]int16, 5760*channels) // room for the longest Opus packet (120 ms)
 	for {
 		select {
 		case <-s.stopped:
@@ -789,7 +820,7 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 			continue
 		}
 		source.mu.Lock()
-		source.buf = append(source.buf, pcm[:n]...)
+		source.buf = append(source.buf, pcm[:n*channels]...)
 		source.mu.Unlock()
 	}
 }
@@ -984,4 +1015,15 @@ func (a *App) StopMicTest() {
 			a.voiceMuted.Store(sess.preTestMuted)
 		}
 	}
+}
+
+// mixInto adds v to one output sample, clipping instead of wrapping.
+func mixInto(dst *int16, v float64) {
+	sum := float64(*dst) + v
+	if sum > 32767 {
+		sum = 32767
+	} else if sum < -32768 {
+		sum = -32768
+	}
+	*dst = int16(sum)
 }

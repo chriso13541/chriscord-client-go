@@ -87,6 +87,27 @@ type nativeCamera struct {
 	gop         []media.Sample
 	gopBytes    int
 	lastFrameAt time.Time
+
+	// Screens only: the sound being shared with it (screen.go).
+	audioMu     sync.Mutex
+	audioStopCh chan struct{}
+	audioDone   chan struct{}
+}
+
+// stopAudio stops a screen share's sound, if it has any (safe to repeat).
+func (c *nativeCamera) stopAudio() {
+	c.audioMu.Lock()
+	stop, done := c.audioStopCh, c.audioDone
+	c.audioStopCh, c.audioDone = nil, nil
+	c.audioMu.Unlock()
+	if stop == nil {
+		return
+	}
+	close(stop)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+	}
 }
 
 // track: the call track this capture feeds.

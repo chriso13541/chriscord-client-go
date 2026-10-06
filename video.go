@@ -126,6 +126,24 @@ func (s *VoiceSession) addVideoSender() {
 	}
 	s.screenTrack = screen
 	go readKeyframeRequests(str.Sender(), func() { s.app.screenKeyframeRequested(screen) })
+
+	// And its sound: stereo Opus, its own send-only audio section after the
+	// video ones (the server maps only the earlier audio sections by
+	// position, so this one at the end doesn't disturb that). Named
+	// "screenaudio"; it only carries packets while a share has sound.
+	sound, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{
+		MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2,
+		SDPFmtpLine: "minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1",
+	}, "screenaudio", "chriscord-screen")
+	if err != nil {
+		log.Printf("screen: sound track: %v", err)
+		return
+	}
+	if _, err := s.pc.AddTransceiverFromTrack(sound, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
+		log.Printf("screen: add sound transceiver: %v", err)
+		return
+	}
+	s.screenAudioTrack = sound
 }
 
 // readKeyframeRequests calls onKey (at most every 300 ms) when the server

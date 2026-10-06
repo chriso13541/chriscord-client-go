@@ -16,3 +16,7 @@ func listShareSources() ([]ShareSource, error)    { return nil, errors.New(scree
 func screenInputArgs(ScreenStart) ([]string, int, int, error) {
 	return nil, 0, 0, errors.New(screenShareUnavailable())
 }
+
+func screenAudioTarget(string) (uint32, bool, error) {
+	return 0, false, errors.New(screenShareUnavailable())
+}

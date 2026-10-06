@@ -410,3 +410,21 @@ func screenInputArgs(o ScreenStart) ([]string, int, int, error) {
 		"gfxcapture=hwnd=%d:max_framerate=%d:capture_cursor=1:width=%d:height=%d:resize_mode=scale_aspect,hwdownload,format=bgra",
 		handle, o.FPS, w, h)}, w, h, nil
 }
+
+// screenAudioTarget: whose sound goes with this share — for a whole screen,
+// everything except this app (exclude this process); for a window, only
+// the program that owns it.
+func screenAudioTarget(id string) (pid uint32, exclude bool, err error) {
+	kind, handle, err := parseShareID(id)
+	if err != nil {
+		return 0, false, err
+	}
+	if kind == "screen" {
+		return uint32(os.Getpid()), true, nil
+	}
+	p, _ := windowProcess(uintptr(handle))
+	if p == 0 {
+		return 0, false, errors.New("couldn't tell which program owns that window")
+	}
+	return p, false, nil
+}

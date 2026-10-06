@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hraban/opus"
 	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3/pkg/media"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -48,6 +50,7 @@ type ScreenStart struct {
 	FPS     int    `json:"fps"`
 	Encoder string `json:"encoder"` // as for the camera
 	Preview bool   `json:"preview"` // frames back to the page as screen:preview
+	Audio   bool   `json:"audio"`   // share its sound too
 }
 
 var (
@@ -194,6 +197,7 @@ func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
 		defer close(c.done)
 		readErr := a.pumpFLV(c, stdout, opts.FPS, first)
 		waitErr := cmd.Wait()
+		c.stopAudio()
 		if c.stopped.Load() {
 			return
 		}
@@ -209,12 +213,89 @@ func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
 
 	select {
 	case <-first:
-		return encoderLabel(enc), nil
 	case <-c.done:
 		return "", errors.New(screenReason(stderr.String(), nil, nil))
 	case <-time.After(10 * time.Second):
 		a.StopScreenShare()
 		return "", errors.New("screen sharing didn't start within 10 seconds")
+	}
+	if opts.Audio {
+		a.startScreenAudio(c, opts.ID)
+	}
+	return encoderLabel(enc), nil
+}
+
+// startScreenAudio starts sending the shared screen's sound: everything
+// playing except this app for a whole screen, just that program for a
+// window. If it can't, the picture carries on and the page is told why
+// ("screen:audio").
+func (a *App) startScreenAudio(c *nativeCamera, id string) {
+	pid, exclude, err := screenAudioTarget(id)
+	if err == nil {
+		err = startSystemAudio(pid, exclude)
+	}
+	if err != nil {
+		log.Printf("screen: no sound: %v", err)
+		wailsruntime.EventsEmit(a.ctx, "screen:audio", map[string]interface{}{"ok": false, "reason": err.Error()})
+		return
+	}
+	log.Printf("screen: sharing sound (pid %d, exclude=%v)", pid, exclude)
+	stop, done := make(chan struct{}), make(chan struct{})
+	c.audioMu.Lock()
+	c.audioStopCh, c.audioDone = stop, done
+	c.audioMu.Unlock()
+	go func() {
+		defer close(done)
+		a.runScreenAudio(c, stop)
+	}()
+	wailsruntime.EventsEmit(a.ctx, "screen:audio", map[string]interface{}{"ok": true})
+}
+
+// runScreenAudio encodes the captured sound (Opus, stereo, 128 kb/s, 20 ms
+// frames) into the call's screen-sound track until stop is closed.
+func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
+	defer stopSystemAudio()
+	enc, err := opus.NewEncoder(48000, 2, opus.AppAudio)
+	if err != nil {
+		log.Printf("screen: sound encoder: %v", err)
+		return
+	}
+	_ = enc.SetBitrate(128000)
+	const frame = 960 // 20 ms
+	f := make([]float32, frame*2)
+	pcm := make([]int16, frame*2)
+	out := make([]byte, 4000)
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-tick.C:
+		}
+		// Fallen far behind (e.g. a moment outside a call): skip to now.
+		for systemAudioAvailable() > frame*10 {
+			readSystemAudio(f)
+		}
+		for systemAudioAvailable() >= frame {
+			if readSystemAudio(f) < frame {
+				break
+			}
+			for i, v := range f {
+				pcm[i] = int16(clampF(float64(v), -1, 1) * 32767)
+			}
+			n, err := enc.Encode(pcm, out)
+			if err != nil {
+				continue
+			}
+			a.voiceMu.Lock()
+			session := a.voice
+			a.voiceMu.Unlock()
+			if session == nil || session.screenAudioTrack == nil || !c.send.Load() {
+				continue
+			}
+			_ = session.screenAudioTrack.WriteSample(media.Sample{Data: append([]byte(nil), out[:n]...), Duration: 20 * time.Millisecond})
+		}
 	}
 }
 
@@ -228,6 +309,7 @@ func (a *App) StopScreenShare() {
 		return
 	}
 	c.stopped.Store(true)
+	c.stopAudio()
 	if c.cmd.Process != nil {
 		c.cmd.Process.Kill()
 	}

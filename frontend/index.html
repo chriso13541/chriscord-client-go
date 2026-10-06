@@ -274,6 +274,14 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .sp-quality { display:flex; gap:14px; align-items:flex-end; margin-top:14px; flex-wrap:wrap; }
 .sp-quality select { padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; min-width:150px; }
 .sp-quality .hint { flex:1; min-width:160px; font-size:.75rem; color:var(--text-muted); }
+.sp-sound { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:.85rem; color:var(--text); cursor:pointer; user-select:none; }
+.sp-sound input { width:16px; height:16px; accent-color:var(--accent); }
+.sp-sound small { color:var(--text-muted); font-size:.75rem; }
+.vs-tile .vs-vol { position:absolute; right:6px; bottom:6px; z-index:2; display:flex; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; background:rgba(0,0,0,.6); opacity:0; transition:opacity .15s; }
+.vs-tile:hover .vs-vol, .vs-tile .vs-vol:focus-within { opacity:1; }
+.vs-tile .vs-vol button { background:none; border:none; color:#fff; cursor:pointer; padding:0; display:inline-flex; }
+.vs-tile .vs-vol button .ic { width:18px; height:18px; }
+.vs-tile .vs-vol input { width:90px; accent-color:var(--accent); }
 /* Settings → Video */
 .settings-sub { margin:28px 0 0; padding-top:18px; border-top:1px solid var(--border); font-size:1rem; color:var(--text-strong); }
 #settings-cam-select, #settings-cam-res, #settings-cam-fps, #settings-cam-enc { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
@@ -1295,6 +1303,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div><label class="settings-label" for="sp-fps">Frame Rate</label><select id="sp-fps"><option value="5">5 fps</option><option value="15">15 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></div>
       <span class="hint" id="sp-hint"></span>
     </div>
+    <label class="sp-sound"><input type="checkbox" id="sp-audio"> Share sound <small id="sp-audio-hint"></small></label>
     <div class="modal-actions"><button class="btn btn-ghost" id="sp-cancel">Cancel</button><button class="btn btn-primary" id="sp-go" disabled>Go Live</button></div>
   </div>
 </div>
@@ -6496,7 +6505,7 @@ const cam={on:false,starting:false,stream:null,encoder:null,reader:null,timer:nu
 const vRemote=new Map(); // username (or scrKey(username) for a screen) → {decoder,canvas,ctx,needKey,lastKeyReq,ts}
 state.voiceVideo=new Set();
 // Screen sharing (see "Screen sharing" below).
-const scr={on:false,starting:false,source:null,height:0,fps:30,label:'',preview:false,announcedAt:0};
+const scr={on:false,starting:false,source:null,height:0,fps:30,label:'',preview:false,announcedAt:0,audio:''};
 const SELF_SCR='\u0000selfscreen'; // your own share's preview decoder
 const scrKey=u=>'\u0002'+u;        // someone's screen: its tile and decoder
 const isScrKey=k=>typeof k==='string'&&k.charCodeAt(0)===2;
@@ -7174,6 +7183,7 @@ async function openScreenPicker(){
   const res=document.getElementById('sp-res'),fps=document.getElementById('sp-fps');
   res.value=localStorage.getItem('screenRes')||'1080';if(!res.value)res.value='1080';
   fps.value=localStorage.getItem('screenFps')||'30';if(!fps.value)fps.value='30';
+  document.getElementById('sp-audio').checked=localStorage.getItem('screenAudio')!=='0';
   spState.sel=scr.on?scr.source?.id||null:null;
   document.getElementById('sp-go').textContent=scr.on?'Switch':'Go Live';
   updateScreenHint();
@@ -7192,6 +7202,10 @@ async function loadShareSources(){
 }
 function renderSharePicker(){
   document.querySelectorAll('#sp-tabs [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===spState.tab));
+  const selKind=spState.sources.find(s=>s.id===spState.sel)?.kind||spState.tab;
+  document.getElementById('sp-audio-hint').textContent=selKind==='window'
+    ?'— only this app’s sound'
+    :'— everything you hear, except chriscord (so nobody hears the call twice)';
   const grid=document.getElementById('sp-grid');
   const list=spState.sources.filter(s=>s.kind===spState.tab);
   if(!list.length){
@@ -7214,13 +7228,16 @@ function updateScreenHint(){
 async function startScreenShare(src){
   if(!src)return;
   const height=+document.getElementById('sp-res').value,fps=+document.getElementById('sp-fps').value;
+  const audio=document.getElementById('sp-audio').checked;
   localStorage.setItem('screenRes',String(height));localStorage.setItem('screenFps',String(fps));
+  localStorage.setItem('screenAudio',audio?'1':'0');
   closeScreenPicker();
   if(!inMyCall()){toast('Join a voice channel to share your screen',true);return;}
   const was=scr.on;
   scr.starting=true;updateScreenButton();
   try{
-    const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview});
+    scr.audio='';
+    const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,audio,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview});
     Object.assign(scr,{on:true,source:src,height,fps,label});
     dropRemoteVideo(SELF_SCR); // a switched share starts its preview afresh
     if(!was){
@@ -7252,7 +7269,17 @@ function onScreenState(list){
     scr.announcedAt=Date.now();window.go.main.App.SetScreenShareEnabled(true).catch(()=>{});
   }
 }
+// Each stream's own volume (its sound is separate from their voice).
+function streamAudio(u){
+  const v=parseFloat(localStorage.getItem('streamVol:'+u));
+  return {vol:isFinite(v)?v:1,muted:localStorage.getItem('streamMute:'+u)==='1'};
+}
+function applyStreamAudio(u){
+  const {vol,muted}=streamAudio(u);
+  window.go.main.App.SetUserAudio('screen:'+u,vol,muted).catch(()=>{});
+}
 function watchScreen(user,on){
+  if(on)applyStreamAudio(user);
   if(on)screenWatch.add(user);else{screenWatch.delete(user);dropRemoteVideo(scrKey(user));}
   window.go.main.App.WatchScreen(user,on).catch(err=>toast('Couldn’t '+(on?'watch':'stop watching')+': '+err,true));
   if(on)vsFocus=scrKey(user); // a stream you open gets the big spot
@@ -7275,11 +7302,11 @@ function renderScreenTile(tile,u){
     let o=tile.querySelector('.vs-scrself');
     if(!o){o=document.createElement('div');o.className='vs-scrself';tile.appendChild(o);}
     const what=scr.source?.name||'your screen';
-    const sig=`${what}|${scr.height}|${scr.fps}|${scr.preview}`;
+    const sig=`${what}|${scr.height}|${scr.fps}|${scr.preview}|${scr.audio}`;
     if(o.dataset.sig!==sig){
       o.dataset.sig=sig;
       o.classList.toggle('has-preview',scr.preview);
-      o.innerHTML=`${icon('screen_share')}<span>You’re sharing ${esc(what)}</span><small>${scr.height?scr.height+'p':'Full size'} · ${scr.fps} fps — only people who click Watch receive it</small>
+      o.innerHTML=`${icon('screen_share')}<span>You’re sharing ${esc(what)}</span><small>${scr.height?scr.height+'p':'Full size'} · ${scr.fps} fps · ${scr.audio==='on'?'with sound':'no sound'} — only people who click Watch receive it</small>
         <div class="vs-btns"><button class="vs-btn" data-act="scr-preview" type="button">${scr.preview?'Hide preview':'Show preview'}</button><button class="vs-btn" data-act="scr-change" type="button">Change</button><button class="vs-btn danger" data-act="scr-stop" type="button">Stop sharing</button></div>`;
     }
     return;
@@ -7293,9 +7320,16 @@ function renderScreenTile(tile,u){
     else if(r.el.parentElement!==tile){tile.prepend(r.el);if(r.live)tile.classList.add('live');if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});}
     if(r&&r.unsupported&&!tile.querySelector('.vs-unsup')){r.unsupported=false;showDecodeUnsupported(scrKey(u),r.codec||'h264');}
     if(!tile.querySelector('.vs-stopwatch'))tile.insertAdjacentHTML('beforeend','<button class="vs-btn vs-stopwatch" data-act="unwatch" type="button">Stop watching</button>');
+    if(!tile.querySelector('.vs-vol')){
+      const {vol,muted}=streamAudio(u);
+      tile.insertAdjacentHTML('beforeend',`<div class="vs-vol" data-act="noop"><button type="button" data-act="stream-mute" title="${muted?'Unmute stream':'Mute stream'}">${icon(muted?'volume_off':'volume_up')}</button><input type="range" min="0" max="200" step="5" value="${Math.round(vol*100)}" title="Stream volume"></div>`);
+      tile.querySelector('.vs-vol input').addEventListener('input',e=>{
+        localStorage.setItem('streamVol:'+u,String(+e.target.value/100));applyStreamAudio(u);
+      });
+    }
   }else{
     tile.classList.add('idle');tile.classList.remove('live');
-    tile.querySelectorAll('video,canvas,.vs-stopwatch,.vs-unsup').forEach(el=>el.remove());
+    tile.querySelectorAll('video,canvas,.vs-stopwatch,.vs-unsup,.vs-vol').forEach(el=>el.remove());
     if(!tile.querySelector('.vs-watch'))tile.insertAdjacentHTML('afterbegin',`<div class="vs-watch">${icon('screen_share')}<span>${esc(u)} is sharing their screen</span><div class="vs-btns"><button class="vs-btn primary" data-act="watch" type="button">Watch Stream</button></div></div>`);
   }
 }
@@ -7304,6 +7338,11 @@ function screenTileAction(act,tile){
   switch(act){
     case 'watch':watchScreen(u,true);break;
     case 'unwatch':watchScreen(u,false);break;
+    case 'noop':break;
+    case 'stream-mute':{
+      const m=!streamAudio(u).muted;localStorage.setItem('streamMute:'+u,m?'1':'0');applyStreamAudio(u);
+      const b=tile.querySelector('[data-act="stream-mute"]');if(b){b.innerHTML=icon(m?'volume_off':'volume_up');b.title=m?'Unmute stream':'Mute stream';}
+      break;}
     case 'scr-stop':stopScreenShare();playSound('webcam_stop');break;
     case 'scr-change':openScreenPicker();break;
     case 'scr-preview':
@@ -7337,6 +7376,11 @@ function initScreenShare(){
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('modal-screen').classList.contains('hidden'))closeScreenPicker();});
   window.runtime.EventsOn('screen:preview',f=>{if(f?.data&&scr.on&&scr.preview)onVideoFrame({...f,user:SELF_SCR,codec:'h264'},true);});
   window.runtime.EventsOn('screen:stats',st=>{vStats.screen=st;});
+  window.runtime.EventsOn('screen:audio',r=>{
+    scr.audio=r?.ok?'on':'';
+    if(!r?.ok)toast('Sharing without sound: '+(r?.reason||'it couldn’t be captured'),true);
+    renderVideoStage();
+  });
   window.runtime.EventsOn('screen:stopped',reason=>{
     if(!scr.on)return;
     toast(reason||'Your screen share stopped',true);stopScreenShare();playSound('webcam_stop');

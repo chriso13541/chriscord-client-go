@@ -390,6 +390,7 @@ export namespace main {
 	    fps: number;
 	    encoder: string;
 	    preview: boolean;
+	    audio: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ScreenStart(source);
@@ -402,6 +403,7 @@ export namespace main {
 	        this.fps = source["fps"];
 	        this.encoder = source["encoder"];
 	        this.preview = source["preview"];
+	        this.audio = source["audio"];
 	    }
 	}
 	export class SearchResult {
