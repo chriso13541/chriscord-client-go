@@ -6736,7 +6736,7 @@ function remoteVideo(user){
   let r=vRemote.get(user);
   if(r)return r;
   if(!decodeSupported())return null;
-  r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null,stats:newVideoStats()};
+  r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null,errs:0,unsupported:false,stats:newVideoStats()};
   const markLive=()=>{if(!r.live){r.live=true;r.el.closest('.vs-tile')?.classList.add('live');}};
   if(window.MediaStreamTrackGenerator){
     // Decoded frames go straight into a video track that a <video> plays:
@@ -6768,11 +6768,37 @@ function remoteVideo(user){
 function configureDecoder(user,r,codec){
   try{if(r.decoder&&r.decoder.state!=='closed')r.decoder.close();}catch{}
   r.codec=codec;r.needKey=true;
+  const cfg={codec:codec==='h264'?'avc1.640034':'vp8',optimizeForLatency:true,hardwareAcceleration:'no-preference'};
   r.decoder=new VideoDecoder({
-    output:frame=>r.write(frame),
-    error:e=>{console.warn('video: decoder error for',user,e);if(vRemote.get(user)===r){r.codec=null;askKeyframe(user,r);}},
+    output:frame=>{r.errs=0;r.write(frame);},
+    error:e=>{
+      console.warn('video: decoder error for',user,e);
+      if(vRemote.get(user)!==r)return;
+      // A decoder that keeps failing can't do this codec here: say so on
+      // the tile rather than showing "Connecting…" forever.
+      if(++r.errs>=3){showDecodeUnsupported(user,codec);return;}
+      r.codec=null;askKeyframe(user,r);
+    },
   });
-  r.decoder.configure({codec:codec==='h264'?'avc1.640034':'vp8',optimizeForLatency:true,hardwareAcceleration:'no-preference'});
+  r.decoder.configure(cfg);
+  // Ask up front too: a web view without a decoder for this codec says so.
+  VideoDecoder.isConfigSupported(cfg).then(res=>{if(!res.supported&&vRemote.get(user)===r)showDecodeUnsupported(user,codec);}).catch(()=>{});
+}
+// Shown on someone's tile when this computer can't decode their video. On
+// Linux the app's web view (WebKitGTK) decodes through GStreamer, which
+// needs its decoder plugins installed.
+function showDecodeUnsupported(user,codec){
+  const r=vRemote.get(user);if(!r||r.unsupported)return;
+  r.unsupported=true;
+  try{if(r.decoder.state!=='closed')r.decoder.close();}catch{}
+  const linux=/Linux/.test(navigator.userAgent)&&!/Android/.test(navigator.userAgent);
+  const name=codec==='h264'?'H.264':'VP8';
+  const msg=linux
+    ?`This computer can\u2019t decode ${name} video yet. Install GStreamer\u2019s decoders \u2014 Debian/Ubuntu: sudo apt install gstreamer1.0-libav gstreamer1.0-plugins-bad \u2014 then restart chriscord.`
+    :`This computer can\u2019t decode ${name} video.`;
+  console.warn('video:',msg);
+  const tile=user===SELF?document.querySelector(`#video-stage .vs-tile[data-user="${CSS.escape(state.username)}"]`):document.querySelector(`#video-stage .vs-tile[data-user="${CSS.escape(user)}"]`);
+  if(tile&&!tile.querySelector('.vs-unsup')){tile.insertAdjacentHTML('afterbegin',`<div class="vs-unsup">${esc(msg)}</div>`);tile.classList.add('live');}
 }
 function askKeyframe(user,r){
   if(user===SELF)return; // our own stream has a keyframe every 2 s anyway
@@ -6902,6 +6928,7 @@ function renderVideoStage(){
       const r=remoteVideo(u);
       if(!r){if(!tile.querySelector('.vs-unsup'))tile.insertAdjacentHTML('afterbegin','<div class="vs-unsup">Video can\u2019t be shown in this version of the app\u2019s web view</div>');}
       else if(r.el.parentElement!==tile){tile.prepend(r.el);if(r.live)tile.classList.add('live');if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});}
+      if(r&&r.unsupported&&!tile.querySelector('.vs-unsup')){r.unsupported=false;showDecodeUnsupported(u,r.codec||'h264');}
     }
     tile.classList.toggle('focus',vsFocus===u);
     tile.classList.toggle('speaking',!!state.voiceSpeaking?.[`${board}:${u}`]);
