@@ -10,7 +10,9 @@
 # Needs (build machine only — not the people you send it to):
 #   pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf \
 #                      mingw-w64-x86_64-portaudio mingw-w64-x86_64-opus
-#   plus Go and the wails CLI on the PATH.
+#   plus Go and the wails CLI, installed in Windows as usual — this script
+#   finds them in their standard places (C:\Program Files\Go\bin and
+#   %USERPROFILE%\go\bin), even though the MSYS2 shell doesn't see them.
 #
 # How it works:
 #   * The Go bindings ask pkg-config how to link PortAudio and Opus. Normally
@@ -33,6 +35,23 @@ case "${MSYSTEM:-}" in
   MINGW64) ;;
   *) echo "Run this in the MSYS2 MINGW64 shell (MSYSTEM is '${MSYSTEM:-unset}')." >&2; exit 1 ;;
 esac
+# The MSYS2 shell starts with a minimal PATH that leaves out programs
+# installed in Windows itself — Go and wails among them. Add their usual
+# places (the Go installer's, and where `go install` puts wails).
+GO_DIRS="/c/Program Files/Go/bin"
+if [ -n "${USERPROFILE:-}" ]; then GO_DIRS="$GO_DIRS
+$(cygpath -u "$USERPROFILE")/go/bin"; fi
+if [ -n "${GOPATH:-}" ]; then GO_DIRS="$GO_DIRS
+$(cygpath -u "$GOPATH")/bin"; fi
+OLD_IFS=$IFS; IFS='
+'
+for d in $GO_DIRS; do
+  if [ -d "$d" ]; then
+    case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
+  fi
+done
+IFS=$OLD_IFS
+export PATH
 for tool in gcc pkg-config go wails cygpath; do
   command -v "$tool" >/dev/null 2>&1 || { echo "missing: $tool (see the top of this file)" >&2; exit 1; }
 done
@@ -49,12 +68,21 @@ printf '@"%s" --static %%*\r\n' "$REAL_PKGCONFIG" > "$WRAP_DIR/pkg-config-static
 export PATH="$WRAP_DIR:$PATH"
 export PKG_CONFIG=pkg-config-static
 export CGO_ENABLED=1
+# MSYS2's PortAudio doesn't list what it needs from Windows for a static
+# link (its pkg-config file has no Libs.private), so name it here: the
+# multimedia (winmm), COM (ole32, uuid) and device-setup (setupapi)
+# libraries its MME/WASAPI/WDM-KS backends use. Extra ones cost nothing.
+export CGO_LDFLAGS="${CGO_LDFLAGS:-} -lwinmm -lole32 -luuid -lsetupapi"
 
 echo "== linking against (static):"
 echo "   portaudio: $(pkg-config --static --libs portaudio-2.0)"
 echo "   opus:      $(pkg-config --static --libs opus)"
 
-wails build -clean -platform windows/amd64 -tags nolibopusfile -ldflags "-extldflags=-static" "$@"
+# The exe being replaced can't be running (Windows locks it).
+if [ -f build/bin/chriscord.exe ] && ! rm -f build/bin/chriscord.exe 2>/dev/null; then
+  echo "build/bin/chriscord.exe is in use — close chriscord, then run this again." >&2; exit 1
+fi
+wails build -platform windows/amd64 -tags nolibopusfile -ldflags "-extldflags=-static" "$@"
 
 EXE=build/bin/chriscord.exe
 echo
