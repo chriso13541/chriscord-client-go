@@ -269,6 +269,10 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #video-stage .vs-unsolo:not(.hidden) + .vs-callmode { margin-left:6px; }
 .vs-tile .vs-scrself.has-preview { inset:auto 8px 8px auto; background:none; padding:0; z-index:2; }
 .vs-tile .vs-scrself.has-preview > :not(.vs-btns) { display:none; }
+/* Over your own preview the picture can be anything (a white page): the
+   buttons get the same dark backing as the name, so they always show. */
+.vs-tile .vs-scrself.has-preview .vs-btn:not(.primary):not(.danger) { background:rgba(0,0,0,.6); }
+.vs-tile .vs-scrself.has-preview .vs-btn:not(.primary):not(.danger):hover { background:rgba(0,0,0,.82); }
 .voice-occupant-status .vs-live { font-size:.55rem; padding:0 4px; margin-left:2px; }
 /* Screen picker */
 .modal.screen-pick { width:760px; max-width:95vw; }
@@ -386,6 +390,7 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 /* A call member with no camera on: their picture on a tile of their colour. */
 .vs-tile.avatar { cursor:pointer; }
 .vs-tile.avatar::before { content:''; position:absolute; inset:0; background:rgba(0,0,0,.28); }
+.vs-tile.avatar.tinted::before { background:rgba(0,0,0,.1); } /* their chosen colour, shown truer */
 .vs-tile.avatar .vs-pfp { position:absolute; left:50%; top:50%; height:42%; width:auto; aspect-ratio:1; transform:translate(-50%,-50%); font-size:2.2rem; box-shadow:0 2px 12px rgba(0,0,0,.35); }
 .vs-tile .vs-flags { display:inline-flex; gap:3px; color:#f47373; }
 .vs-tile .vs-flags:empty { display:none; }
@@ -639,6 +644,12 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 /* ── Profile card (popup + settings preview) ───────────────────── */
 .profile-card { width:300px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 8px 28px rgba(0,0,0,.45); color:var(--text); }
 .pc-banner { height:106px; background-size:cover; background-position:center; }
+/* A chosen card colour: the card's background shades from it. */
+.profile-card.has-tint { background:linear-gradient(180deg, color-mix(in srgb, var(--pc-tint) 46%, var(--bg-mid)) 0%, color-mix(in srgb, var(--pc-tint) 22%, var(--bg-dark)) 100%); border-color:color-mix(in srgb, var(--pc-tint) 55%, var(--border)); }
+.profile-card.has-tint .pc-section, .profile-card.has-tint .pc-edit { background-color:rgba(0,0,0,.22); }
+.profile-card.has-tint .pc-edit:hover { background-color:rgba(0,0,0,.36); }
+#profile-tint { width:44px; height:34px; padding:2px; border:1px solid var(--border); border-radius:6px; background:var(--bg-mid); cursor:pointer; }
+#profile-tint.unset { opacity:.55; }
 .pc-avatar-wrap { position:relative; width:92px; height:92px; margin:-46px 0 0 14px; border-radius:50%; background:var(--bg-mid); padding:6px; box-sizing:border-box; }
 .pc-avatar { width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.9rem; font-weight:700; color:#fff; background-size:cover; background-position:center; cursor:zoom-in; }
 .pc-status { position:absolute; right:4px; bottom:4px; width:18px; height:18px; border-radius:50%; border:4px solid var(--bg-mid); box-sizing:border-box; background:var(--text-muted); }
@@ -1152,6 +1163,18 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .gate-tabs { display:flex; gap:4px; margin-bottom:20px; background:var(--bg-darkest); border-radius:8px; padding:3px; }
 .gate-tab { flex:1; text-align:center; padding:8px; border-radius:6px; font-size:.85rem; font-weight:600; cursor:pointer; color:var(--text-muted); transition:background .15s,color .15s; }
 .gate-tab.active { background:var(--bg-light); color:var(--text-strong); }
+/* Unlock screen: the accounts on this computer — pick one, then its passphrase. */
+#gate-accounts { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; max-height:240px; overflow-y:auto; }
+#gate-accounts:empty { display:none; }
+.gate-acct { display:flex; align-items:center; gap:10px; width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text); font:inherit; cursor:pointer; text-align:left; transition:border-color .15s,background .15s; }
+.gate-acct:hover { border-color:var(--accent-dim); }
+.gate-acct.active { border-color:var(--accent); background:var(--bg-mid); cursor:default; }
+.gate-acct .ga-av { width:34px; height:34px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; background-size:cover; background-position:center; }
+.gate-acct .ga-name { flex:1; min-width:0; font-weight:600; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gate-acct .ga-check { display:none; color:var(--accent); } .gate-acct.active .ga-check { display:inline-flex; }
+.gate-acct .ga-check .ic { width:18px; height:18px; }
+.pc-logout { margin-top:6px; }
+.pc-logout:hover { color:var(--red-light); }
 .gate-link { text-align:center; margin-top:16px; font-size:.82rem; color:var(--text-muted); }
 .gate-link a, .signed-in-as a { color:var(--accent); cursor:pointer; text-decoration:none; }
 .gate-link a:hover, .signed-in-as a:hover { text-decoration:underline; }
@@ -1225,7 +1248,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-notifications_off" viewBox="0 -960 960 960"><path d="M160-200v-80h80v-280q0-33 8.5-65t25.5-61l60 60q-7 16-10.5 32.5T320-560v280h248L56-792l56-56 736 736-56 56-146-144H160Zm560-154-80-80v-126q0-66-47-113t-113-47q-26 0-50 8t-44 24l-58-58q20-16 43-28t49-18v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v206Zm-276-50Zm36 324q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm33-481Z"/></symbol>
   <symbol id="ic-pause" viewBox="0 -960 960 960"><path d="M520-200v-560h240v560H520Zm-320 0v-560h240v560H200Zm400-80h80v-400h-80v400Zm-320 0h80v-400h-80v400Zm0-400v400-400Zm320 0v400-400Z"/></symbol>
   <symbol id="ic-fullscreen" viewBox="0 -960 960 960"><path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/></symbol>
-  <symbol id="ic-grid_view" viewBox="0 -960 960 960"><path fill-rule="evenodd" d="M120-840h320v320H120Zm80 80v160h160v-160Zm320-80h320v320H520Zm80 80v160h160v-160ZM120-440h320v320H120Zm80 80v160h160v-160Zm320-80h320v320H520Zm80 80v160h160v-160Z"/></symbol><symbol id="ic-open_in_full" viewBox="0 -960 960 960"><path d="M120-120v-320h80v184l504-504H520v-80h320v320h-80v-184L256-200h184v80H120Z"/></symbol><symbol id="ic-fullscreen_exit" viewBox="0 -960 960 960"><path d="M240-120v-120H120v-80h200v200h-80Zm400 0v-200h200v80H720v120h-80ZM120-640v-80h120v-120h80v200H120Zm520 0v-200h80v120h120v80H640Z"/></symbol>
+  <symbol id="ic-grid_view" viewBox="0 -960 960 960"><path fill-rule="evenodd" d="M120-840h320v320H120Zm80 80v160h160v-160Zm320-80h320v320H520Zm80 80v160h160v-160ZM120-440h320v320H120Zm80 80v160h160v-160Zm320-80h320v320H520Zm80 80v160h160v-160Z"/></symbol><symbol id="ic-open_in_full" viewBox="0 -960 960 960"><path d="M120-120v-320h80v184l504-504H520v-80h320v320h-80v-184L256-200h184v80H120Z"/></symbol><symbol id="ic-logout" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h280v80H200Zm440-160-55-58 102-102H360v-80h327L585-622l55-58 200 200-200 200Z"/></symbol><symbol id="ic-fullscreen_exit" viewBox="0 -960 960 960"><path d="M240-120v-120H120v-80h200v200h-80Zm400 0v-200h200v80H720v120h-80ZM120-640v-80h120v-120h80v200H120Zm520 0v-200h80v120h120v80H640Z"/></symbol>
   <symbol id="ic-devices" viewBox="0 -960 960 960"><path d="M80-160v-120h80v-440q0-33 23.5-56.5T240-800h600v80H240v440h240v120H80Zm520 0q-17 0-28.5-11.5T560-200v-400q0-17 11.5-28.5T600-640h240q17 0 28.5 11.5T880-600v400q0 17-11.5 28.5T840-160H600Zm40-120h160v-280H640v280Zm0 0h160-160Z"/></symbol>
   <symbol id="ic-person_remove" viewBox="0 -960 960 960"><path d="M640-520v-80h240v80H640Zm-280 40q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
   <symbol id="ic-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
@@ -1265,10 +1288,11 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
     <!-- Shown when an account already exists locally and just needs unlocking -->
     <div id="gate-unlock" class="hidden">
+      <div id="gate-accounts" role="listbox" aria-label="Accounts on this computer"></div>
       <div class="error-msg hidden" id="unlock-error"></div>
       <div class="form-group"><label>Passphrase</label><input id="unlock-passphrase" type="password" placeholder="Unlock your account" autocomplete="off"></div>
       <button class="btn btn-primary" id="unlock-btn" style="width:100%;margin-top:6px">Unlock</button>
-      <div class="gate-link">Not you? <a id="unlock-import-link">Import a different account key</a></div>
+      <div class="gate-link">Not you? <a id="unlock-import-link">Add another account</a></div>
     </div>
 
     <!-- Shown on first run, before any account exists locally -->
@@ -1303,6 +1327,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <div class="form-group"><label>Passphrase</label><input id="import-passphrase" type="password" placeholder="The passphrase this key was created with" autocomplete="off"></div>
         <button class="btn btn-primary" id="import-account-btn" style="width:100%;margin-top:6px">Import Account</button>
       </div>
+      <div class="gate-link hidden" id="onboard-back"><a id="onboard-back-link">Back to sign in</a></div>
     </div>
   </div>
 </div>
@@ -1578,6 +1603,14 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
               <button class="btn btn-primary" id="banner-apply-btn">Apply</button>
             </div>
           </div>
+
+          <hr class="profile-divider">
+          <label class="settings-label" for="profile-tint">Card Colour</label>
+          <div class="profile-btn-row" style="align-items:center">
+            <input type="color" id="profile-tint" value="#5865f2" title="Pick your card colour">
+            <button class="settings-secondary-btn" id="profile-tint-reset" type="button">Use Default</button>
+          </div>
+          <p class="settings-hint" style="margin-top:8px">Tints your profile card, and is the background behind your picture in a call while your camera is off.</p>
 
           <hr class="profile-divider">
           <label class="settings-label" for="profile-bio">Bio</label>
@@ -1890,7 +1923,43 @@ async function boot(){
 function showGateView(view){
   document.getElementById('gate-unlock').classList.toggle('hidden',view!=='unlock');
   document.getElementById('gate-onboard').classList.toggle('hidden',view!=='onboard');
-  if(view==='unlock')document.getElementById('unlock-passphrase').focus();
+  if(view==='unlock'){renderGateAccounts();document.getElementById('unlock-passphrase').focus();}
+  // Adding another account: a way back to the ones already here.
+  if(view==='onboard')window.go.main.App.HasAccount().then(has=>document.getElementById('onboard-back').classList.toggle('hidden',!has)).catch(()=>{});
+}
+// The accounts saved on this computer, the one being unlocked marked.
+// Clicking another makes it the one the passphrase unlocks.
+async function renderGateAccounts(){
+  const box=document.getElementById('gate-accounts');
+  let list=[],active=null;
+  try{[list,active]=await Promise.all([window.go.main.App.ListAccounts(),window.go.main.App.ActiveAccount()]);}catch{}
+  list=(list||[]).slice().sort((a,b)=>(a.username||'').localeCompare(b.username||''));
+  box.innerHTML='';
+  for(const a of list){
+    const b=document.createElement('button');b.type='button';
+    const on=active&&a.slug===active.slug;
+    b.className='gate-acct'+(on?' active':'');b.setAttribute('role','option');b.setAttribute('aria-selected',on?'true':'false');
+    b.innerHTML=`<span class="ga-av"></span><span class="ga-name">${esc(a.username||'unnamed')}</span><span class="ga-check">${icon('check')}</span>`;
+    const av=b.querySelector('.ga-av');setAvatarFallback(av,a.username);
+    if(a.has_avatar)window.go.main.App.AccountAvatar(a.slug).then(u=>{if(u)setAvatarImage(av,u);}).catch(()=>{});
+    if(!on)b.addEventListener('click',async()=>{
+      const errEl=document.getElementById('unlock-error');
+      try{await window.go.main.App.SetActiveAccount(a.slug);errEl.classList.add('hidden');}
+      catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
+      document.getElementById('unlock-passphrase').value='';
+      await renderGateAccounts();document.getElementById('unlock-passphrase').focus();
+    });
+    box.appendChild(b);
+  }
+  // One account: no list to pick from, just whose passphrase it is.
+  if(list.length<2&&active)box.querySelector('.gate-acct').style.cursor='default';
+}
+// Sign out and go back to the unlock screen (to switch to another account,
+// or add one). The page is reloaded so nothing from this account lingers.
+async function switchAccount(){
+  if(inMyCall()&&!confirm('Switch account? You\u2019ll leave the call you\u2019re in.'))return;
+  try{await window.go.main.App.LogOut();}catch{}
+  location.reload();
 }
 
 function setGateTab(tab){
@@ -1907,8 +1976,9 @@ async function enterApp(accountView){
   await loadClientSettings();
   const el=document.getElementById('signed-in-as');
   if(el){
-    el.innerHTML=state.account?`Signed in as <strong>${esc(state.account.username)}</strong> · <a id="export-account-link">Export Account Key</a>`:'';
+    el.innerHTML=state.account?`Signed in as <strong>${esc(state.account.username)}</strong> · <a id="export-account-link">Export Account Key</a> · <a id="switch-account-link">Switch account</a>`:'';
     document.getElementById('export-account-link')?.addEventListener('click',openExportModal);
+    document.getElementById('switch-account-link')?.addEventListener('click',switchAccount);
   }
   showScreen('screen-servers');
   await loadServers();
@@ -5531,6 +5601,7 @@ function formatMemberSince(iso){
 // p: {username, bio, banner, pfp, memberSince, online, own}
 function buildProfileCard(p){
   const card=document.createElement('div');card.className='profile-card';
+  if(p.tint){card.classList.add('has-tint');card.style.setProperty('--pc-tint',p.tint);}
   card.innerHTML=`
     <div class="pc-banner"></div>
     <div class="pc-avatar-wrap"><div class="pc-avatar"></div><div class="pc-status" ${p.own?'data-presence-user-self':`data-presence-user="${esc(p.username)}"`}>${presenceBadge(p.presence||(p.online?'online':'offline'))}</div></div>
@@ -5539,7 +5610,7 @@ function buildProfileCard(p){
       ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
       <div class="pc-section"><div class="pc-label">About Me</div>
         <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>
-      ${p.own&&p.editButton!==false?`<div class="pc-status-menu"></div><button class="pc-edit">${icon('settings')}Edit Profile</button>`:''}
+      ${p.own&&p.editButton!==false?`<div class="pc-status-menu"></div><button class="pc-edit">${icon('settings')}Edit Profile</button><button class="pc-edit pc-logout">${icon('logout')}Switch account</button>`:''}
     </div>`;
   const avatar=card.querySelector('.pc-avatar');
   if(p.pfp){
@@ -5548,12 +5619,14 @@ function buildProfileCard(p){
   }else{setAvatarFallback(avatar,p.username);avatar.style.cursor='default';}
   const banner=card.querySelector('.pc-banner');
   if(p.banner)banner.style.backgroundImage=`url("${p.banner}")`;
+  else if(p.tint)banner.style.backgroundColor=p.tint; // no banner image: their colour
   else{
     banner.style.backgroundColor=avatarColour(p.username);
     bannerColourFromImage(p.pfp).then(c=>{if(c)banner.style.backgroundColor=c;});
   }
   card.querySelectorAll('.msg-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
-  card.querySelector('.pc-edit')?.addEventListener('click',()=>{closeProfilePopup();openSettings('profile');});
+  card.querySelector('.pc-edit:not(.pc-logout)')?.addEventListener('click',()=>{closeProfilePopup();openSettings('profile');});
+  card.querySelector('.pc-logout')?.addEventListener('click',()=>{closeProfilePopup();switchAccount();});
   const menu=card.querySelector('.pc-status-menu');
   if(menu)renderStatusMenu(menu);
   return card;
@@ -5577,10 +5650,10 @@ async function openProfilePopup(user,anchor){
     if(own){
       const [mine,pfp,prof]=await Promise.all([
         window.go.main.App.GetOwnProfile(),window.go.main.App.GetProfilePicture(),getUserProfile(user).catch(()=>null)]);
-      data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,presence,own:true};
+      data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',tint:mine?.tint||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,presence,own:true};
     }else{
       const [prof,pfp]=await Promise.all([getUserProfile(user),getUserPfp(user)]);
-      data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',pfp,memberSince:prof?.member_since||'',online,presence,own:false};
+      data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',tint:prof?.tint||'',pfp,memberSince:prof?.member_since||'',online,presence,own:false};
     }
   }catch(err){
     if(profilePopupFor===user)profilePopupFor=null;
@@ -5651,12 +5724,13 @@ function initProfilePopups(){
 // others will see it once saved. The profile picture keeps its own
 // immediate Save (above), and the preview follows it too.
 const BIO_MAX=500;
-const profileDraft={pfp:'',bio:'',banner:'',savedBio:'',savedBanner:'',memberSince:''};
+const profileDraft={pfp:'',bio:'',banner:'',tint:'',savedBio:'',savedBanner:'',savedTint:'',memberSince:''};
 async function loadProfileEditor(){
   try{
     const mine=await window.go.main.App.GetOwnProfile();
     profileDraft.bio=profileDraft.savedBio=mine?.bio||'';
     profileDraft.banner=profileDraft.savedBanner=mine?.banner||'';
+    profileDraft.tint=profileDraft.savedTint=mine?.tint||'';
   }catch(err){console.error('GetOwnProfile failed:',err);}
   document.getElementById('profile-bio').value=profileDraft.bio;
   document.getElementById('profile-save-hint').textContent='';
@@ -5666,7 +5740,7 @@ async function loadProfileEditor(){
   if(state.domain&&state.username)getUserProfile(state.username)
     .then(p=>{profileDraft.memberSince=p?.member_since||'';renderProfilePreview();}).catch(()=>{});
 }
-function profileDirty(){return profileDraft.bio.trim()!==profileDraft.savedBio.trim()||profileDraft.banner!==profileDraft.savedBanner;}
+function profileDirty(){return profileDraft.bio.trim()!==profileDraft.savedBio.trim()||profileDraft.banner!==profileDraft.savedBanner||profileDraft.tint!==profileDraft.savedTint;}
 function updateProfileEditorState(){
   const n=[...profileDraft.bio].length;
   const count=document.getElementById('profile-bio-count');
@@ -5682,6 +5756,9 @@ function updateProfileEditorState(){
     bannerColourFromImage(profileDraft.pfp).then(c=>{if(c&&!profileDraft.banner)cur.style.backgroundColor=c;});
   }
   document.getElementById('banner-remove-btn').disabled=!profileDraft.banner;
+  const tp=document.getElementById('profile-tint');
+  tp.value=profileDraft.tint||avatarColour(state.username||'?');tp.classList.toggle('unset',!profileDraft.tint);
+  document.getElementById('profile-tint-reset').disabled=!profileDraft.tint;
   renderProfilePreview();
 }
 function renderProfilePreview(){
@@ -5689,15 +5766,16 @@ function renderProfilePreview(){
   if(!slot)return;
   slot.innerHTML='';
   slot.appendChild(buildProfileCard({
-    username:state.username||'you',bio:profileDraft.bio.trim(),banner:profileDraft.banner,pfp:profileDraft.pfp,
+    username:state.username||'you',bio:profileDraft.bio.trim(),banner:profileDraft.banner,tint:profileDraft.tint,pfp:profileDraft.pfp,
     memberSince:profileDraft.memberSince,online:true,presence:'online',own:true,editButton:false}));
 }
 async function saveProfile(){
   const btn=document.getElementById('profile-save-btn');btn.disabled=true;
   try{
-    await window.go.main.App.SaveProfile(profileDraft.bio,profileDraft.banner);
+    await window.go.main.App.SaveProfile(profileDraft.bio,profileDraft.banner,profileDraft.tint);
     profileDraft.bio=profileDraft.bio.trim();
-    profileDraft.savedBio=profileDraft.bio;profileDraft.savedBanner=profileDraft.banner;
+    profileDraft.savedBio=profileDraft.bio;profileDraft.savedBanner=profileDraft.banner;profileDraft.savedTint=profileDraft.tint;
+    refreshTileTints(state.username);
     document.getElementById('profile-bio').value=profileDraft.bio;
     delete profileCache[state.username];
     flashSaveButton(document.getElementById('profile-save-btn'));
@@ -5706,7 +5784,7 @@ async function saveProfile(){
   updateProfileEditorState();
 }
 function resetProfileDraft(){
-  profileDraft.bio=profileDraft.savedBio;profileDraft.banner=profileDraft.savedBanner;
+  profileDraft.bio=profileDraft.savedBio;profileDraft.banner=profileDraft.savedBanner;profileDraft.tint=profileDraft.savedTint;
   document.getElementById('profile-bio').value=profileDraft.bio;
   document.getElementById('profile-save-hint').textContent='';
   updateProfileEditorState();
@@ -5792,6 +5870,8 @@ function initProfileEditor(){
   const bio=document.getElementById('profile-bio');
   bio.addEventListener('input',()=>{profileDraft.bio=bio.value;document.getElementById('profile-save-hint').textContent='';updateProfileEditorState();});
   document.getElementById('profile-save-btn').addEventListener('click',saveProfile);
+  document.getElementById('profile-tint').addEventListener('input',e=>{profileDraft.tint=e.target.value.toLowerCase();updateProfileEditorState();});
+  document.getElementById('profile-tint-reset').addEventListener('click',()=>{profileDraft.tint='';updateProfileEditorState();});
   document.getElementById('profile-reset-btn').addEventListener('click',resetProfileDraft);
 }
 
@@ -7151,6 +7231,7 @@ function renderVideoStage(){
       if(kind==='avatar'){
         tile.classList.add('avatar','live');
         tile.style.backgroundColor=avatarColour(u);
+        applyTileTint(tile,u);
         tile.insertAdjacentHTML('afterbegin',`<span class="voice-occupant-avatar vs-pfp" data-pfp-user="${esc(u)}" style="background-color:${avatarColour(u)}">${esc(u[0].toUpperCase())}</span>`);
         applyUserAvatar(tile.querySelector('.vs-pfp'),u);
       }
@@ -7217,6 +7298,19 @@ function renderVideoStage(){
   // The focused one first.
   if(vsFocus){const f=grid.querySelector('.vs-tile.focus');if(f&&grid.firstChild!==f)grid.prepend(f);}
   layoutVideoStage();
+}
+// A call tile with no camera on is the colour they chose for their profile
+// card (else their usual colour). Fetched after the tile's drawn.
+function applyTileTint(tile,u){
+  const get=u===state.username?window.go.main.App.GetOwnProfile():getUserProfile(u);
+  Promise.resolve(get).then(p=>{
+    if(!tile.isConnected)return;
+    const t=p?.tint||'';
+    tile.style.backgroundColor=t||avatarColour(u);tile.classList.toggle('tinted',!!t);
+  }).catch(()=>{});
+}
+function refreshTileTints(u){
+  document.querySelectorAll(`#video-stage .vs-tile.avatar[data-user="${CSS.escape(u)}"]`).forEach(t=>applyTileTint(t,u));
 }
 // A tile's hover buttons: expand (just this tile) or back, and for someone
 // else's stream, stop watching it.
@@ -9458,6 +9552,7 @@ function init(){
   });
   window.runtime.EventsOn('profile:updated',e=>{
     delete profileCache[e.username];
+    refreshTileTints(e.username);
   });
   window.runtime.EventsOn('pfp:updated',e=>{
     delete state.userPfps[e.username];
@@ -9520,6 +9615,7 @@ function init(){
   document.getElementById('unlock-btn').addEventListener('click',submitUnlock);
   document.getElementById('unlock-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')submitUnlock();});
   document.getElementById('unlock-import-link').addEventListener('click',()=>showGateView('onboard'));
+  document.getElementById('onboard-back-link').addEventListener('click',()=>showGateView('unlock'));
   document.getElementById('tab-create').addEventListener('click',()=>setGateTab('create'));
   document.getElementById('tab-import').addEventListener('click',()=>setGateTab('import'));
   document.getElementById('create-pick-pfp-btn').addEventListener('click',pickCreatePfp);

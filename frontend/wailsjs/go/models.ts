@@ -333,6 +333,7 @@ export namespace main {
 	export class OwnProfile {
 	    bio: string;
 	    banner: string;
+	    tint: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new OwnProfile(source);
@@ -342,6 +343,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bio = source["bio"];
 	        this.banner = source["banner"];
+	        this.tint = source["tint"];
 	    }
 	}
 	
@@ -598,6 +600,7 @@ export namespace main {
 	export class UserProfile {
 	    username: string;
 	    bio: string;
+	    tint: string;
 	    banner: string;
 	    member_since: string;
 	
@@ -609,6 +612,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.username = source["username"];
 	        this.bio = source["bio"];
+	        this.tint = source["tint"];
 	        this.banner = source["banner"];
 	        this.member_since = source["member_since"];
 	    }

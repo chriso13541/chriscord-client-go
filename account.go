@@ -71,6 +71,9 @@ type accountMeta struct {
 	// (the banner itself lives next to pfp.png as banner.png).
 	Bio              string `json:"bio,omitempty"`
 	ProfileUpdatedAt int64  `json:"profile_updated_at,omitempty"`
+	// The card colour chosen ("#rrggbb", "" for the default) — also the
+	// background behind their picture in a call when the camera's off.
+	Tint string `json:"tint,omitempty"`
 }
 
 // Account is the unlocked, in-memory identity. Never marshaled to JSON and
@@ -90,6 +93,7 @@ type Account struct {
 	// Profile card data — see accountMeta. Synced to servers the same way
 	// as the pfp (profile_info / profile_request / profile_upload).
 	Bio              string
+	Tint             string
 	ProfileUpdatedAt int64
 }
 
@@ -221,14 +225,15 @@ func updatePfpTimestamp(dir string, updatedAt int64) error {
 	return os.WriteFile(filepath.Join(dir, "account.json"), data, 0600)
 }
 
-// updateProfileMeta records a new bio and profile timestamp in
+// updateProfileMeta records a new bio, card tint and profile timestamp in
 // account.json, preserving everything else there (see updatePfpTimestamp).
-func updateProfileMeta(dir, bio string, updatedAt int64) error {
+func updateProfileMeta(dir, bio, tint string, updatedAt int64) error {
 	m, err := readAccountMeta(dir)
 	if err != nil {
 		m = &accountMeta{CreatedAt: time.Now().UTC()}
 	}
 	m.Bio = bio
+	m.Tint = tint
 	m.ProfileUpdatedAt = updatedAt
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -486,11 +491,11 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	meta, err := readAccountMeta(dir)
 	username := "unnamed"
 	var pfpUpdatedAt, profileUpdatedAt int64
-	bio := ""
+	bio, tint := "", ""
 	if err == nil {
 		username = meta.Username
 		pfpUpdatedAt = meta.PfpUpdatedAt
-		bio = meta.Bio
+		bio, tint = meta.Bio, meta.Tint
 		profileUpdatedAt = meta.ProfileUpdatedAt
 	}
 	avatarPath, hasAvatar := pfpIfExists(dir)
@@ -507,7 +512,7 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	return &Account{
 		Slug: slug, Username: username, PublicKey: pub, PrivateKey: priv,
 		HasAvatar: hasAvatar, AvatarPath: avatarPath, PfpUpdatedAt: pfpUpdatedAt,
-		Bio: bio, ProfileUpdatedAt: profileUpdatedAt,
+		Bio: bio, Tint: tint, ProfileUpdatedAt: profileUpdatedAt,
 	}, nil
 }
 
@@ -588,7 +593,7 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	if meta, err := readAccountMeta(srcDir); err == nil {
 		writeAccountMeta(destDir, meta.Username)
 		if meta.ProfileUpdatedAt > 0 {
-			_ = updateProfileMeta(destDir, meta.Bio, meta.ProfileUpdatedAt) // bio travels with the account too
+			_ = updateProfileMeta(destDir, meta.Bio, meta.Tint, meta.ProfileUpdatedAt) // bio and card tint travel with the account too
 		}
 	} else {
 		writeAccountMeta(destDir, "unnamed") // account.json is optional too — don't fail the import over it

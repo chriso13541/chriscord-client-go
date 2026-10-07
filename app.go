@@ -157,6 +157,74 @@ func (a *App) UnlockAccount(passphrase string) (*AccountView, error) {
 	return acct.View(), nil
 }
 
+// ActiveAccount describes the account the unlock screen will unlock,
+// without unlocking it (nil if there's none).
+func (a *App) ActiveAccount() *AccountSummary {
+	slug, err := getActiveSlug()
+	if err != nil || slug == "" {
+		return nil
+	}
+	for _, s := range ListAccounts() {
+		if s.Slug == slug {
+			return &s
+		}
+	}
+	return nil
+}
+
+// SetActiveAccount picks which saved account the unlock screen unlocks
+// (switching accounts). Only while signed out: the one in use stays put.
+func (a *App) SetActiveAccount(slug string) error {
+	a.mu.Lock(); signedIn := a.account != nil; a.mu.Unlock()
+	if signedIn {
+		return fmt.Errorf("sign out first")
+	}
+	if slug == "" || strings.ContainsAny(slug, `/\.`) {
+		return fmt.Errorf("unknown account")
+	}
+	if _, err := os.Stat(filepath.Join(accountsDir(), slug, "identity.json")); err != nil {
+		return fmt.Errorf("that account isn't on this computer any more")
+	}
+	return setActiveSlug(slug)
+}
+
+// AccountAvatar returns a saved account's profile picture as a data URL
+// ("" if it has none) — for the account list on the unlock screen. The
+// picture is stored unencrypted, so no unlocking is needed.
+func (a *App) AccountAvatar(slug string) string {
+	if slug == "" || strings.ContainsAny(slug, `/\.`) {
+		return ""
+	}
+	path, ok := pfpIfExists(filepath.Join(accountsDir(), slug))
+	if !ok {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return pfpDataURL(data)
+}
+
+// LogOut signs the current account out: leaves the server (and any call,
+// camera or screen share), and forgets the unlocked key — the page then
+// goes back to the unlock screen, where another account can be picked.
+func (a *App) LogOut() {
+	a.StopScreenShare()
+	a.StopCamera()
+	a.Disconnect()
+	a.mu.Lock()
+	if a.account != nil {
+		for i := range a.account.PrivateKey {
+			a.account.PrivateKey[i] = 0
+		}
+	}
+	a.account = nil
+	a.pendingExport, a.pendingExportAs = nil, ""
+	a.mu.Unlock()
+	log.Printf("account: signed out")
+}
+
 func (a *App) ExportAccount(passphrase string) (string, error) {
 	a.mu.Lock(); slug := ""; if a.account != nil { slug = a.account.Slug }; a.mu.Unlock()
 	if slug == "" { return "", fmt.Errorf("no account unlocked") }
@@ -467,6 +535,7 @@ const maxBioChars = 500
 type OwnProfile struct {
 	Bio    string `json:"bio"`
 	Banner string `json:"banner"` // data URL, "" = no banner (colour from the pfp instead)
+	Tint   string `json:"tint"`   // card colour, "#rrggbb" or "" for the default
 }
 
 // GetOwnProfile returns this account's own bio and banner.
@@ -477,7 +546,7 @@ func (a *App) GetOwnProfile() (*OwnProfile, error) {
 		return nil, fmt.Errorf("no account unlocked")
 	}
 	dir := filepath.Join(accountsDir(), a.account.Slug)
-	p := &OwnProfile{Bio: a.account.Bio}
+	p := &OwnProfile{Bio: a.account.Bio, Tint: a.account.Tint}
 	a.mu.Unlock()
 	if data, err := os.ReadFile(bannerPath(dir)); err == nil {
 		p.Banner = pfpDataURL(data)
@@ -485,13 +554,18 @@ func (a *App) GetOwnProfile() (*OwnProfile, error) {
 	return p, nil
 }
 
-// SaveProfile stores a new bio and banner for this account and pushes
-// them to the connected server. banner is the complete desired state: a
-// data URL to set, or "" for no banner.
-func (a *App) SaveProfile(bio, banner string) error {
+// SaveProfile stores a new bio, banner and card tint for this account and
+// pushes them to the connected server. banner is the complete desired
+// state: a data URL to set, or "" for no banner; tint is "#rrggbb", or ""
+// for the default colour.
+func (a *App) SaveProfile(bio, banner, tint string) error {
 	bio = strings.TrimSpace(bio)
 	if n := len([]rune(bio)); n > maxBioChars {
 		return fmt.Errorf("bio is %d characters — %d max", n, maxBioChars)
+	}
+	tint = strings.ToLower(strings.TrimSpace(tint))
+	if tint != "" && !isHexColour(tint) {
+		return fmt.Errorf("the card colour should look like #5865f2")
 	}
 	a.mu.Lock()
 	slug := ""
@@ -527,12 +601,13 @@ func (a *App) SaveProfile(bio, banner string) error {
 		}
 	}
 	updatedAt := time.Now().Unix()
-	if err := updateProfileMeta(dir, bio, updatedAt); err != nil {
+	if err := updateProfileMeta(dir, bio, tint, updatedAt); err != nil {
 		return err
 	}
 	a.mu.Lock()
 	if a.account != nil {
 		a.account.Bio = bio
+		a.account.Tint = tint
 		a.account.ProfileUpdatedAt = updatedAt
 	}
 	a.mu.Unlock()
@@ -561,7 +636,7 @@ func (a *App) handleProfileRequest() {
 		return
 	}
 	dir := filepath.Join(accountsDir(), a.account.Slug)
-	bio, updatedAt := a.account.Bio, a.account.ProfileUpdatedAt
+	bio, tint, updatedAt := a.account.Bio, a.account.Tint, a.account.ProfileUpdatedAt
 	a.mu.Unlock()
 	banner := ""
 	if data, err := os.ReadFile(bannerPath(dir)); err == nil && len(data) <= maxPfpBytes {
@@ -573,15 +648,29 @@ func (a *App) handleProfileRequest() {
 		return
 	}
 	msg, _ := json.Marshal(map[string]interface{}{
-		"type": "profile_upload", "profile_updated_at": updatedAt, "bio": bio, "banner_data": banner,
+		"type": "profile_upload", "profile_updated_at": updatedAt, "bio": bio, "tint": tint, "banner_data": banner,
 	})
 	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
+}
+
+// isHexColour: "#rrggbb" (lower-case), nothing else.
+func isHexColour(s string) bool {
+	if len(s) != 7 || s[0] != '#' {
+		return false
+	}
+	for _, c := range s[1:] {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // UserProfile is another user's profile card as fetched from the server.
 type UserProfile struct {
 	Username    string `json:"username"`
 	Bio         string `json:"bio"`
+	Tint        string `json:"tint"` // card colour, "" for the default
 	Banner      string `json:"banner"` // data URL, or "" for none
 	MemberSince string `json:"member_since"`
 }
@@ -592,6 +681,7 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 	var raw struct {
 		Username    string `json:"username"`
 		Bio         string `json:"bio"`
+		Tint        string `json:"tint"`
 		HasBanner   bool   `json:"has_banner"`
 		MemberSince string `json:"member_since"`
 	}
@@ -599,6 +689,9 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 		return nil, err
 	}
 	p := &UserProfile{Username: raw.Username, Bio: raw.Bio, MemberSince: raw.MemberSince}
+	if isHexColour(strings.ToLower(raw.Tint)) {
+		p.Tint = strings.ToLower(raw.Tint)
+	}
 	if raw.HasBanner {
 		if data, err := a.fetchAuthed("/api/banner/" + url.PathEscape(username)); err == nil && len(data) > 0 {
 			p.Banner = pfpDataURL(data)
