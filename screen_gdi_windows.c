@@ -202,15 +202,19 @@ static void cc_draw_cursor(gdicap *c, const RECT *wr) {
 static int cc_screen_frame(gdicap *c, int draw_cursor) {
     int sw = c->src.right - c->src.left, sh = c->src.bottom - c->src.top;
     BOOL ok;
-    // CAPTUREBLT: include layered windows (menus, tooltips, many apps' own
-    // title bars) — without it they're missing from the copy.
+    // No CAPTUREBLT: with it, Windows hides the mouse pointer for every
+    // copy (to include layered windows), so at 30 copies a second it
+    // flickers on the sharer's own screen. Since Windows 8 the desktop is
+    // always composited, and a plain copy already includes layered windows
+    // (menus, tooltips) — Chrome's GDI capturer leaves it off for the same
+    // reason. The pointer is drawn onto the copy below instead.
     if (sw == c->ow && sh == c->oh) {
-        ok = BitBlt(c->out, 0, 0, c->ow, c->oh, c->screen, c->src.left, c->src.top, SRCCOPY | CAPTUREBLT);
+        ok = BitBlt(c->out, 0, 0, c->ow, c->oh, c->screen, c->src.left, c->src.top, SRCCOPY);
     } else {
         SetStretchBltMode(c->out, HALFTONE);
         SetBrushOrgEx(c->out, 0, 0, NULL);
         ok = StretchBlt(c->out, 0, 0, c->ow, c->oh, c->screen, c->src.left, c->src.top, sw, sh,
-                        SRCCOPY | CAPTUREBLT);
+                        SRCCOPY);
     }
     if (!ok) {
         GdiFlush();

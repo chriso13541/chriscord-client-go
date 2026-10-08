@@ -390,10 +390,6 @@ export function SetMessagePinned(arg1, arg2) {
   return window['go']['main']['App']['SetMessagePinned'](arg1, arg2);
 }
 
-export function SetServerNickname(arg1) {
-  return window['go']['main']['App']['SetServerNickname'](arg1);
-}
-
 export function SetPresence(arg1) {
   return window['go']['main']['App']['SetPresence'](arg1);
 }
@@ -408,6 +404,10 @@ export function SetScreenShareEnabled(arg1) {
 
 export function SetScreenViewLimit(arg1, arg2) {
   return window['go']['main']['App']['SetScreenViewLimit'](arg1, arg2);
+}
+
+export function SetServerNickname(arg1) {
+  return window['go']['main']['App']['SetServerNickname'](arg1);
 }
 
 export function SetStreamVideoLag(arg1, arg2) {

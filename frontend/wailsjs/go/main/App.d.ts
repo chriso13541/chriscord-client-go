@@ -196,8 +196,6 @@ export function SetLevelMeter(arg1:boolean):Promise<void>;
 
 export function SetMessagePinned(arg1:string,arg2:boolean):Promise<void>;
 
-export function SetServerNickname(arg1:string):Promise<void>;
-
 export function SetPresence(arg1:string):Promise<void>;
 
 export function SetScreenPreview(arg1:boolean):Promise<void>;
@@ -205,6 +203,8 @@ export function SetScreenPreview(arg1:boolean):Promise<void>;
 export function SetScreenShareEnabled(arg1:boolean):Promise<void>;
 
 export function SetScreenViewLimit(arg1:number,arg2:number):Promise<void>;
+
+export function SetServerNickname(arg1:string):Promise<void>;
 
 export function SetStreamVideoLag(arg1:string,arg2:number):Promise<void>;
 
