@@ -62,6 +62,11 @@ type voiceRemoteSource struct {
 	lastSeq uint16
 	fadeIn  bool // the next samples played start a fresh run: fade them in
 
+	// Voices only: since when more than voiceQueueHigh has stayed queued
+	// (zero while it hasn't), and the last skip ahead — see trimVoiceQueue.
+	highSince time.Time
+	lastSkip  time.Time
+
 	// What happened over the last few seconds, for the log (logStats).
 	stAt                                     time.Time
 	stPkts, stLost, stLate                   int
@@ -903,11 +908,19 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				if n > voiceFrameSize {
 					n = voiceFrameSize
 				}
+				// After a skip (trimVoiceQueue), fade the first 5 ms in.
+				fade := 0
+				if r.fadeIn && n > 0 {
+					fade, r.fadeIn = 240, false
+				}
 				// Per-user volume/mute (set from the right-click menu)
 				// times overall output volume; 0 means skip them.
 				if !deafened && g > 0 {
 					for i := 0; i < n; i++ {
 						v := float64(r.buf[i]) * g
+						if i < fade {
+							v *= float64(i) / float64(fade)
+						}
 						if outCh == 2 {
 							mixInto(&s.playBuf[2*i], v)
 							mixInto(&s.playBuf[2*i+1], v)
@@ -972,28 +985,34 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 		if err != nil {
 			return
 		}
-		if stereo {
-			// A stream's sound: packets that arrive after a later one are
-			// dropped (appended out of order they'd crackle), and a few
+		{
+			// Packets that arrive after a later one are dropped (appended
+			// out of order they'd crackle, and add delay), and a few
 			// missing ones are filled in by Opus' loss concealment rather
-			// than leaving a click-shaped hole.
+			// than leaving a click-shaped hole. Voices and stream sound alike.
 			source.mu.Lock()
 			source.stPkts++
 			lost := 0
 			if source.seqHave {
 				d := int16(packet.SequenceNumber - source.lastSeq)
-				if d <= 0 {
+				switch {
+				case d <= 0 && d > -100: // a little behind: late, or a duplicate
 					source.stLate++
 					source.mu.Unlock()
 					continue
+				case d <= 0 || d > 100:
+					// Far off either way: the sender started a new stream
+					// (they reconnected — the server forwards their packets
+					// unrenumbered). Carry on from here, nothing lost.
+				default:
+					lost = int(d) - 1
 				}
-				lost = int(d) - 1
 			}
 			source.seqHave, source.lastSeq = true, packet.SequenceNumber
 			source.stLost += lost
 			source.mu.Unlock()
 			if lost > 0 && lost <= 5 {
-				plc := make([]int16, voiceFrameSize*2)
+				plc := make([]int16, voiceFrameSize*channels)
 				for i := 0; i < lost; i++ {
 					if decoder.DecodePLC(plc) == nil {
 						source.mu.Lock()
@@ -1020,8 +1039,53 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 			}
 		}
 		source.buf = append(source.buf, pcm[:n*channels]...)
+		if !stereo {
+			source.trimVoiceQueue()
+		}
 		source.mu.Unlock()
 	}
+}
+
+// How much of someone's voice may wait to be played (samples at 48 kHz,
+// mono). Packets normally arrive about as fast as they're played, so only
+// a frame or two is queued. After the network stalls, though, everything
+// held up arrives in one burst — and, played at normal speed, that backlog
+// would stay as delay for the rest of the call (it used to: seconds of lag
+// until the connection was rebuilt). So a backlog is skipped.
+const (
+	voiceQueueTarget = 48 * 60  // kept after catching up: 60 ms
+	voiceQueueHigh   = 48 * 120 // more than this for 2 s straight: catch up
+	voiceQueueMax    = 48 * 250 // more than this: catch up straight away
+)
+
+// trimVoiceQueue drops the oldest queued sound when too much has built up
+// (call with r.mu held, after adding to it). The next sound played is
+// faded in, so the skip doesn't click.
+func (r *voiceRemoteSource) trimVoiceQueue() {
+	n := len(r.buf)
+	switch {
+	case n > voiceQueueMax:
+	case n > voiceQueueHigh:
+		if r.highSince.IsZero() {
+			r.highSince = time.Now()
+			return
+		}
+		if time.Since(r.highSince) < 2*time.Second {
+			return
+		}
+	default:
+		r.highSince = time.Time{}
+		return
+	}
+	drop := n - voiceQueueTarget
+	r.buf = r.buf[drop:]
+	r.highSince = time.Time{}
+	r.fadeIn = true
+	// A burst skips again with each packet that lands: one line per hiccup.
+	if time.Since(r.lastSkip) > 5*time.Second {
+		log.Printf("voice: %s's sound was %d ms behind (a network hiccup) — skipped ahead", r.username, n/48)
+	}
+	r.lastSkip = time.Now()
 }
 
 func (s *VoiceSession) close() {
