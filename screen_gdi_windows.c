@@ -56,6 +56,8 @@ struct gdicap {
     int cur_hx, cur_hy;
     HWND video;          // the player's video area, if it has one (see video_child)
     int video_check;     // frames until it's looked for again
+    int screen_mode;     // copying a part of the desktop, not a window
+    RECT src;            // that part, in desktop coordinates
 };
 
 // Window classes of video players' video areas. VLC's video output lives
@@ -130,6 +132,23 @@ fail:
     return NULL;
 }
 
+// A whole monitor, copied with BitBlt from the screen's DC — what the
+// share picker's thumbnails do. It's slower than Desktop Duplication and
+// Windows Graphics Capture, but needs nothing from the graphics card, so
+// it works where they can't: virtual machines (Hyper-V, VirtualBox,
+// VMware with the basic display driver), Remote Desktop sessions.
+gdicap *gdicap_open_screen(int x, int y, int src_w, int src_h, int width, int height) {
+    if (src_w <= 0 || src_h <= 0) return NULL;
+    gdicap *c = gdicap_open(0, width, height);
+    if (!c) return NULL;
+    c->screen_mode = 1;
+    c->src.left = x;
+    c->src.top = y;
+    c->src.right = x + src_w;
+    c->src.bottom = y + src_h;
+    return c;
+}
+
 void *gdicap_bits(gdicap *c) { return c->bits; }
 
 static void cc_free_full(gdicap *c) {
@@ -180,7 +199,52 @@ static void cc_draw_cursor(gdicap *c, const RECT *wr) {
                ci.hCursor, 0, 0, 0, NULL, DI_NORMAL);
 }
 
+static int cc_screen_frame(gdicap *c, int draw_cursor) {
+    int sw = c->src.right - c->src.left, sh = c->src.bottom - c->src.top;
+    BOOL ok;
+    // CAPTUREBLT: include layered windows (menus, tooltips, many apps' own
+    // title bars) — without it they're missing from the copy.
+    if (sw == c->ow && sh == c->oh) {
+        ok = BitBlt(c->out, 0, 0, c->ow, c->oh, c->screen, c->src.left, c->src.top, SRCCOPY | CAPTUREBLT);
+    } else {
+        SetStretchBltMode(c->out, HALFTONE);
+        SetBrushOrgEx(c->out, 0, 0, NULL);
+        ok = StretchBlt(c->out, 0, 0, c->ow, c->oh, c->screen, c->src.left, c->src.top, sw, sh,
+                        SRCCOPY | CAPTUREBLT);
+    }
+    if (!ok) {
+        GdiFlush();
+        return GDICAP_FAIL; // e.g. the secure desktop (a UAC prompt) is up
+    }
+    if (draw_cursor) {
+        // GDI copies leave the pointer out: draw it on, scaled into place.
+        CURSORINFO ci;
+        memset(&ci, 0, sizeof(ci));
+        ci.cbSize = sizeof(ci);
+        if (GetCursorInfo(&ci) && (ci.flags & CURSOR_SHOWING) && ci.hCursor &&
+            PtInRect(&c->src, ci.ptScreenPos)) {
+            if (ci.hCursor != c->cur) {
+                ICONINFO ii;
+                c->cur = ci.hCursor;
+                c->cur_hx = c->cur_hy = 0;
+                if (GetIconInfo(ci.hCursor, &ii)) {
+                    c->cur_hx = (int)ii.xHotspot;
+                    c->cur_hy = (int)ii.yHotspot;
+                    if (ii.hbmMask) DeleteObject(ii.hbmMask);
+                    if (ii.hbmColor) DeleteObject(ii.hbmColor);
+                }
+            }
+            int px = (int)((long long)(ci.ptScreenPos.x - c->src.left) * c->ow / sw);
+            int py = (int)((long long)(ci.ptScreenPos.y - c->src.top) * c->oh / sh);
+            DrawIconEx(c->out, px - c->cur_hx, py - c->cur_hy, ci.hCursor, 0, 0, 0, NULL, DI_NORMAL);
+        }
+    }
+    GdiFlush(); // the DIB's pixels are read straight after this
+    return GDICAP_OK;
+}
+
 int gdicap_frame(gdicap *c, int draw_cursor) {
+    if (c->screen_mode) return cc_screen_frame(c, draw_cursor);
     if (!IsWindow(c->hwnd)) return GDICAP_GONE;
     if (IsIconic(c->hwnd)) return GDICAP_HIDDEN;
     RECT wr;

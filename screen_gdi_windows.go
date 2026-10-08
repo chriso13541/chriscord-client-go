@@ -40,13 +40,29 @@ func videoArea(hwnd uintptr) (w, h int, ok bool) {
 // share, when one is being sent (screen_low.go), takes its frames from
 // here rather than copying the window a second time.
 func gdiWindowFeed(hwnd uintptr, w, h, fps int, tee *frameTee) screenFeed {
+	return gdiFeed(func() *C.gdicap { return C.gdicap_open(C.ulonglong(hwnd), C.int(w), C.int(h)) },
+		"window", w, h, fps, tee)
+}
+
+// gdiScreenFeed: the same, for a whole monitor (src, in desktop
+// coordinates) copied with plain GDI — the last resort when neither
+// Desktop Duplication nor Windows Graphics Capture works, as in most
+// virtual machines.
+func gdiScreenFeed(src winRect, w, h, fps int, tee *frameTee) screenFeed {
+	return gdiFeed(func() *C.gdicap {
+		return C.gdicap_open_screen(C.int(src.Left), C.int(src.Top),
+			C.int(src.Right-src.Left), C.int(src.Bottom-src.Top), C.int(w), C.int(h))
+	}, "screen", w, h, fps, tee)
+}
+
+func gdiFeed(open func() *C.gdicap, what string, w, h, fps int, tee *frameTee) screenFeed {
 	return func(out io.Writer, stop <-chan struct{}) error {
 		// GDI device contexts belong to the thread that made them.
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
-		c := C.gdicap_open(C.ulonglong(hwnd), C.int(w), C.int(h))
+		c := open()
 		if c == nil {
-			return errors.New("couldn't set up copying that window")
+			return errors.New("couldn't set up copying that " + what)
 		}
 		defer C.gdicap_close(c)
 		frame := unsafe.Slice((*byte)(C.gdicap_bits(c)), w*h*4)
@@ -83,8 +99,8 @@ func gdiWindowFeed(hwnd uintptr, w, h, fps int, tee *frameTee) screenFeed {
 					return errors.New("the window you were sharing was closed")
 				case C.GDICAP_FAIL:
 					fails++
-					if i == 0 || fails >= 3*fps {
-						return errors.New("Windows wouldn't copy that window")
+					if i == 0 || (what == "window" && fails >= 3*fps) {
+						return errors.New("Windows wouldn't copy that " + what)
 					}
 				} // GDICAP_HIDDEN (minimised): keep sending the last picture
 				spent += time.Since(t0)
@@ -101,8 +117,8 @@ func gdiWindowFeed(hwnd uintptr, w, h, fps int, tee *frameTee) screenFeed {
 				if copies > 0 {
 					avg = spent / time.Duration(copies)
 				}
-				log.Printf("screen: window copy: %d fresh, %d repeated in %.0fs (%.1f ms per copy)",
-					copies, repeats, el.Seconds(), float64(avg)/float64(time.Millisecond))
+				log.Printf("screen: %s copy: %d fresh, %d repeated in %.0fs (%.1f ms per copy)",
+					what, copies, repeats, el.Seconds(), float64(avg)/float64(time.Millisecond))
 				copies, repeats, spent, statT = 0, 0, 0, time.Now()
 			}
 		}

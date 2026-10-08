@@ -657,6 +657,21 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .pc-body { padding:8px 16px 16px; }
 .pc-name { font-size:1.25rem; font-weight:800; color:var(--text-strong); word-break:break-word; }
 .pc-since { font-size:.75rem; color:var(--text-muted); margin-top:2px; }
+.pc-username { font-size:.85rem; color:var(--text); margin-top:1px; word-break:break-word; }
+.pc-nick-view { display:flex; align-items:center; gap:6px; font-size:.85rem; }
+.pc-nick-val { flex:1; min-width:0; word-break:break-word; }
+.pc-nick-val.empty { color:var(--text-muted); font-style:italic; }
+.pc-nick-edit { flex:none; display:inline-flex; padding:4px; border:none; border-radius:4px; background:transparent; color:var(--text-muted); cursor:pointer; }
+.pc-nick-edit:hover { background:rgba(255,255,255,.08); color:var(--text-strong); }
+.pc-nick-edit .ic { width:16px; height:16px; }
+.pc-nick-form input { width:100%; box-sizing:border-box; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font:inherit; font-size:.85rem; }
+.pc-nick-form input:focus { outline:none; border-color:var(--accent, #5865f2); }
+.pc-nick-btns { display:flex; justify-content:flex-end; gap:6px; margin-top:6px; }
+.pc-nick-btns button { padding:4px 10px; border-radius:5px; border:1px solid var(--border); background:var(--bg-light); color:var(--text); font:inherit; font-size:.8rem; font-weight:600; cursor:pointer; }
+.pc-nick-btns .pc-nick-save { background:var(--accent, #5865f2); border-color:transparent; color:#fff; }
+.pc-nick-btns button:disabled { opacity:.55; cursor:default; }
+.pc-nick-hint { font-size:.72rem; color:var(--text-muted); margin-top:6px; line-height:1.35; }
+.es-row .es-handle { color:var(--text-muted); font-size:.8em; margin-left:4px; }
 .pc-section { margin-top:12px; padding:10px 12px; background:var(--bg-dark); border-radius:8px; }
 .pc-label { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:4px; }
 .pc-bio { font-size:.85rem; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
@@ -687,6 +702,7 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 #banner-zoom-slider { width:340px; display:block; margin:12px 0; }
 #profile-bio { width:100%; min-height:110px; resize:vertical; padding:10px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font:inherit; font-size:.88rem; line-height:1.45; box-sizing:border-box; }
 #profile-bio-count { font-size:.75rem; color:var(--text-muted); text-align:right; margin-top:4px; }
+#profile-nickname { width:100%; box-sizing:border-box; padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font:inherit; }
 #profile-bio-count.over { color:var(--red); }
 #profile-save-bar { display:flex; align-items:center; gap:10px; margin-top:20px; }
 #profile-save-bar .hint { font-size:.8rem; color:var(--text-muted); }
@@ -1567,6 +1583,11 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <h2>Profile</h2>
       <div id="profile-editor">
         <div id="profile-editor-fields">
+          <label class="settings-label" for="profile-nickname">Display Name</label>
+          <input type="text" id="profile-nickname" maxlength="32" autocomplete="off" spellcheck="false">
+          <p class="settings-hint" id="profile-nickname-hint" style="margin-top:8px">Shown instead of your username on every server you join. To use a different name on one server, click your own name there and set a server nickname.</p>
+
+          <hr class="profile-divider">
           <label class="settings-label">Profile Picture</label>
           <div id="pfp-current-display">
             <div id="pfp-current-circle"></div>
@@ -2135,6 +2156,29 @@ function renderTextOnly(text) {
 // like Discord's; a new one plays the mention sound and badges its channel.
 // Usernames can contain spaces and punctuation, so mentions are matched
 // against the actual member list (longest name first) instead of a pattern.
+// ── NICKNAMES ────────────────────────────────────────────────────
+// Usernames stay the identity (mentions, roles, the server all use them);
+// what people *see* is displayName: their nickname on this server, else the
+// global nickname from their profile, else the username. Both maps come
+// with the member list (chat:users). Names are drawn as dnHTML spans, so a
+// nickname change can update every one on screen (refreshDisplayNames)
+// without rebuilding the messages.
+const NICK_MAX=32;
+function displayName(u){
+  if(!u)return '';
+  return state.nicknames?.[u]||state.globalNicknames?.[u]||u;
+}
+function dnHTML(u){return `<span data-dn="${esc(u)}" title="${esc(u)}">${esc(displayName(u))}</span>`;}
+function refreshDisplayNames(){
+  document.querySelectorAll('[data-dn]').forEach(el=>{const n=displayName(el.dataset.dn);if(el.textContent!==n)el.textContent=n;});
+  document.querySelectorAll('.pc-nick-val[data-nick-of]').forEach(el=>{
+    const nick=state.nicknames?.[el.dataset.nickOf]||'';
+    el.textContent=nick||'None';el.classList.toggle('empty',!nick);
+  });
+}
+// The nickname rules the server applies: trimmed, spaces collapsed, at most
+// 32 characters (the server also refuses invisible characters).
+function cleanNickname(s){return (s||'').trim().replace(/\s+/g,' ');}
 function knownUsernames(){
   return [...new Set([...(lastUsersPayload?.all||[]),...(state.onlineUsers||[]),state.username,...(state.messages||[]).map(m=>m.username)])].filter(Boolean);
 }
@@ -2159,7 +2203,7 @@ function highlightMentions(escapedHtml){
   return escapedHtml.replace(re,(all,lead,name)=>{
     const real=byLower.get(name.toLowerCase())||name;
     const me=real===state.username;
-    return `${lead}<span class="mention${me?' me':''}" data-user="${esc(real)}">@${esc(real)}</span>`;
+    return `${lead}<span class="mention${me?' me':''}" data-user="${esc(real)}">@${dnHTML(real)}</span>`;
   });
 }
 function mentionsMe(text){
@@ -2269,7 +2313,7 @@ state.replyingTo=null;
 const pingsMe=msg=>msg.username!==state.username&&(mentionsMe(msg.content)||msg.reply?.username===state.username&&!msg.reply?.deleted);
 function startReply(msg){
   state.replyingTo={id:msg.id,username:msg.username};
-  document.getElementById('reply-bar-name').textContent=msg.username;
+  document.getElementById('reply-bar-name').textContent=displayName(msg.username);
   document.getElementById('reply-bar').classList.remove('hidden');
   document.getElementById('msg-input').focus();
 }
@@ -2286,7 +2330,7 @@ function replyLineHTML(r,replyTo){
   const deleted=!r||r.deleted;
   const name=r?.username||'';
   return `<div class="msg-reply${deleted?' deleted':''}" data-reply-id="${esc(replyTo)}" title="${deleted?'':'Jump to the original message'}">
-    ${deleted?'':`<span class="mr-avatar" data-pfp-user="${esc(name)}"></span><span class="mr-name"${nameColor(name)?` style="color:${nameColor(name)}"`:''}>${esc(name)}</span>`}
+    ${deleted?'':`<span class="mr-avatar" data-pfp-user="${esc(name)}"></span><span class="mr-name"${nameColor(name)?` style="color:${nameColor(name)}"`:''}>${dnHTML(name)}</span>`}
     <span class="mr-text">${replyPreviewText(r)}</span></div>`;
 }
 // Original edited (content) or deleted (null): update every reply to it.
@@ -3002,6 +3046,7 @@ async function doConnect(domain,serverKey,inviteCode=''){
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';
   state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
+  state.nicknames={};state.globalNicknames={}; // this server's come with its member list
   CUSTOM_BY_ID=new Map();CUSTOM_BY_NAME=new Map();STICKER_BY_ID=new Map();closeStickerPicker();
   serverBannerAt=-1; // a different server: forget the last one's banner
   state.serverDescription='';closeServerInfo();document.getElementById('server-info-btn').classList.add('hidden');
@@ -3377,7 +3422,7 @@ function renderSidebar(){
               ((status.muted||status.deafened)?icon('mic_off','off'):'')+(status.deafened?icon('headset_off','off'):'')+
               (state.voiceVideo?.has(user)||(user===state.username&&cam.on&&state.voiceHere===board.id)?`<span title="Camera on" style="display:inline-flex">${icon('videocam','cam')}</span>`:'')+
               (state.voiceScreens?.has(user)||(user===state.username&&scr.on&&state.voiceHere===board.id)?`<span class="vs-live" title="Sharing their screen">LIVE</span>`:'');
-            row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${esc(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
+            row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${dnHTML(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
             list.appendChild(row);
             applyUserAvatar(row.querySelector('.voice-occupant-avatar'),user);
           });
@@ -4073,13 +4118,14 @@ function ensureMembersPanelOpen(){
 function renderMembers(payload){
   const online=payload?.online??[],all=payload?.all??[];
   state.onlineUsers=online;state.userStatuses=payload?.statuses||{};
+  if(payload&&'nicknames' in payload){state.nicknames=payload.nicknames||{};state.globalNicknames=payload.global_nicknames||{};}
   if(payload&&'owner' in payload)state.serverOwner=payload.owner||'';
   const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
   const onlineEl=document.getElementById('members-online'),offlineEl=document.getElementById('members-offline');
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${esc(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${dnHTML(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
@@ -4969,7 +5015,7 @@ function buildSearchResultRow(msg){
   const files=attachments.filter(a=>!a.mime?.startsWith('image/'));
   const row=document.createElement('div');row.className='search-result-row';
   row.innerHTML=`
-    <div class="sr-head"><div class="sr-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div><span class="sr-user">${esc(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
+    <div class="sr-head"><div class="sr-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div><span class="sr-user">${dnHTML(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
     ${msg.content?`<div class="sr-content">${emojify(esc(msg.content))}</div>`:''}
     ${images.length?`<div class="sr-images${images.length>1?' multi':''}"></div>`:''}
     ${files.map(a=>`<div class="sr-attach" title="${esc(a.name||'File')}">${icon(fileTypeIcon(a.name,a.mime))}<span>${esc(a.name||'File')}</span></div>`).join('')}`;
@@ -4994,7 +5040,7 @@ function buildSearchResultRow(msg){
 function buildSystemMsgEl(msg){
   const div=document.createElement('div');
   div.className='msg-group msg-system';div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
-  const name=`<span class="msg-username sys-name" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${esc(msg.username)}</span>`;
+  const name=`<span class="msg-username sys-name" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span>`;
   // A few friendly variations, picked by message id so everyone sees the same one.
   const lines=[n=>`${n} joined the server.`,n=>`Welcome, ${n}! Say hi.`,n=>`${n} just showed up.`,n=>`Everyone welcome ${n}!`,n=>`${n} hopped into the server.`];
   const pick=[...msg.id].reduce((a,c)=>a+c.charCodeAt(0),0)%lines.length;
@@ -5020,7 +5066,7 @@ function buildMsgEl(msg,grouped){
       : `<div class="msg-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
-        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${esc(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
+        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}
       </div>
       ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
@@ -5598,18 +5644,31 @@ function formatMemberSince(iso){
   try{return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}catch{return'';}
 }
 
-// p: {username, bio, banner, pfp, memberSince, online, own}
+// p: {username, bio, banner, pfp, memberSince, online, own}; optionally
+// shownName (the name to show, instead of displayName — the settings
+// preview passes the draft) and, on your own card in a server,
+// globalNick (for the server-nickname editor's hint).
 function buildProfileCard(p){
+  const shown=p.shownName??displayName(p.username);
+  // Your own card, opened in a server: you can set your nickname for it here.
+  const nickEditor=p.own&&p.editButton!==false&&!!state.domain;
+  const serverNick=state.nicknames?.[p.username]||'';
   const card=document.createElement('div');card.className='profile-card';
   if(p.tint){card.classList.add('has-tint');card.style.setProperty('--pc-tint',p.tint);}
   card.innerHTML=`
     <div class="pc-banner"></div>
     <div class="pc-avatar-wrap"><div class="pc-avatar"></div><div class="pc-status" ${p.own?'data-presence-user-self':`data-presence-user="${esc(p.username)}"`}>${presenceBadge(p.presence||(p.online?'online':'offline'))}</div></div>
     <div class="pc-body">
-      <div class="pc-name">${esc(p.username)}</div>
+      <div class="pc-name"${p.shownName==null?` data-dn="${esc(p.username)}"`:''}>${esc(shown)}</div>
+      ${shown!==p.username?`<div class="pc-username">${esc(p.username)}</div>`:''}
       ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
       <div class="pc-section"><div class="pc-label">About Me</div>
         <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>
+      ${nickEditor?`<div class="pc-section pc-nick"><div class="pc-label">Server Nickname</div>
+        <div class="pc-nick-view"><span class="pc-nick-val${serverNick?'':' empty'}" data-nick-of="${esc(p.username)}">${esc(serverNick||'None')}</span><button class="pc-nick-edit" type="button" title="Change your nickname on this server">${icon('edit')}</button></div>
+        <form class="pc-nick-form hidden"><input type="text" maxlength="${NICK_MAX}" autocomplete="off" spellcheck="false" placeholder="${esc(p.globalNick||p.username)}">
+          <div class="pc-nick-btns"><button type="button" class="pc-nick-cancel">Cancel</button><button type="submit" class="pc-nick-save">Save</button></div>
+          <div class="pc-nick-hint">Only on this server. Leave it blank to use ${p.globalNick?'your display name':'your username'} here.</div></form></div>`:''}
       ${p.own&&p.editButton!==false?`<div class="pc-status-menu"></div><button class="pc-edit">${icon('settings')}Edit Profile</button><button class="pc-edit pc-logout">${icon('logout')}Switch account</button>`:''}
     </div>`;
   const avatar=card.querySelector('.pc-avatar');
@@ -5629,6 +5688,31 @@ function buildProfileCard(p){
   card.querySelector('.pc-logout')?.addEventListener('click',()=>{closeProfilePopup();switchAccount();});
   const menu=card.querySelector('.pc-status-menu');
   if(menu)renderStatusMenu(menu);
+  const nickBox=card.querySelector('.pc-nick');
+  if(nickBox){
+    const view=nickBox.querySelector('.pc-nick-view'),form=nickBox.querySelector('.pc-nick-form');
+    const input=form.querySelector('input'),save=form.querySelector('.pc-nick-save');
+    const close=()=>{form.classList.add('hidden');view.classList.remove('hidden');};
+    nickBox.querySelector('.pc-nick-edit').addEventListener('click',()=>{
+      view.classList.add('hidden');form.classList.remove('hidden');
+      input.value=state.nicknames?.[p.username]||'';input.focus();input.select();
+    });
+    form.querySelector('.pc-nick-cancel').addEventListener('click',close);
+    form.addEventListener('submit',async e=>{
+      e.preventDefault();
+      const nick=cleanNickname(input.value);
+      if([...nick].length>NICK_MAX){toast(`Nicknames can be at most ${NICK_MAX} characters`,true);return;}
+      if(nick===(state.nicknames?.[p.username]||'')){close();return;}
+      save.disabled=true;
+      try{
+        // The server sends the member list back out with the new name,
+        // which updates this card and every name on screen.
+        await window.go.main.App.SetServerNickname(nick);
+        close();
+      }catch(err){toast('Could not change your nickname: '+err,true);}
+      save.disabled=false;
+    });
+  }
   return card;
 }
 
@@ -5650,7 +5734,7 @@ async function openProfilePopup(user,anchor){
     if(own){
       const [mine,pfp,prof]=await Promise.all([
         window.go.main.App.GetOwnProfile(),window.go.main.App.GetProfilePicture(),getUserProfile(user).catch(()=>null)]);
-      data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',tint:mine?.tint||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,presence,own:true};
+      data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',tint:mine?.tint||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,presence,own:true,globalNick:mine?.nickname||''};
     }else{
       const [prof,pfp]=await Promise.all([getUserProfile(user),getUserPfp(user)]);
       data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',tint:prof?.tint||'',pfp,memberSince:prof?.member_since||'',online,presence,own:false};
@@ -5724,15 +5808,18 @@ function initProfilePopups(){
 // others will see it once saved. The profile picture keeps its own
 // immediate Save (above), and the preview follows it too.
 const BIO_MAX=500;
-const profileDraft={pfp:'',bio:'',banner:'',tint:'',savedBio:'',savedBanner:'',savedTint:'',memberSince:''};
+const profileDraft={pfp:'',nickname:'',bio:'',banner:'',tint:'',savedNickname:'',savedBio:'',savedBanner:'',savedTint:'',memberSince:''};
 async function loadProfileEditor(){
   try{
     const mine=await window.go.main.App.GetOwnProfile();
+    profileDraft.nickname=profileDraft.savedNickname=mine?.nickname||'';
     profileDraft.bio=profileDraft.savedBio=mine?.bio||'';
     profileDraft.banner=profileDraft.savedBanner=mine?.banner||'';
     profileDraft.tint=profileDraft.savedTint=mine?.tint||'';
   }catch(err){console.error('GetOwnProfile failed:',err);}
   document.getElementById('profile-bio').value=profileDraft.bio;
+  const nickIn=document.getElementById('profile-nickname');
+  nickIn.value=profileDraft.nickname;nickIn.placeholder=state.username||'';
   document.getElementById('profile-save-hint').textContent='';
   updateProfileEditorState();
   // Join date for the preview, from the server you're connected to (none
@@ -5740,13 +5827,13 @@ async function loadProfileEditor(){
   if(state.domain&&state.username)getUserProfile(state.username)
     .then(p=>{profileDraft.memberSince=p?.member_since||'';renderProfilePreview();}).catch(()=>{});
 }
-function profileDirty(){return profileDraft.bio.trim()!==profileDraft.savedBio.trim()||profileDraft.banner!==profileDraft.savedBanner||profileDraft.tint!==profileDraft.savedTint;}
+function profileDirty(){return cleanNickname(profileDraft.nickname)!==profileDraft.savedNickname||profileDraft.bio.trim()!==profileDraft.savedBio.trim()||profileDraft.banner!==profileDraft.savedBanner||profileDraft.tint!==profileDraft.savedTint;}
 function updateProfileEditorState(){
   const n=[...profileDraft.bio].length;
   const count=document.getElementById('profile-bio-count');
   count.textContent=`${n} / ${BIO_MAX}`;count.classList.toggle('over',n>BIO_MAX);
   const dirty=profileDirty();
-  document.getElementById('profile-save-btn').disabled=!dirty||n>BIO_MAX;
+  document.getElementById('profile-save-btn').disabled=!dirty||n>BIO_MAX||[...cleanNickname(profileDraft.nickname)].length>NICK_MAX;
   document.getElementById('profile-reset-btn').disabled=!dirty;
   markUnsaved('profile-save-hint',dirty);
   const cur=document.getElementById('banner-current');
@@ -5766,13 +5853,15 @@ function renderProfilePreview(){
   if(!slot)return;
   slot.innerHTML='';
   slot.appendChild(buildProfileCard({
-    username:state.username||'you',bio:profileDraft.bio.trim(),banner:profileDraft.banner,tint:profileDraft.tint,pfp:profileDraft.pfp,
+    username:state.username||'you',shownName:cleanNickname(profileDraft.nickname)||state.username||'you',bio:profileDraft.bio.trim(),banner:profileDraft.banner,tint:profileDraft.tint,pfp:profileDraft.pfp,
     memberSince:profileDraft.memberSince,online:true,presence:'online',own:true,editButton:false}));
 }
 async function saveProfile(){
   const btn=document.getElementById('profile-save-btn');btn.disabled=true;
   try{
-    await window.go.main.App.SaveProfile(profileDraft.bio,profileDraft.banner,profileDraft.tint);
+    await window.go.main.App.SaveProfile(profileDraft.bio,profileDraft.banner,profileDraft.tint,cleanNickname(profileDraft.nickname));
+    profileDraft.nickname=profileDraft.savedNickname=cleanNickname(profileDraft.nickname);
+    document.getElementById('profile-nickname').value=profileDraft.nickname;
     profileDraft.bio=profileDraft.bio.trim();
     profileDraft.savedBio=profileDraft.bio;profileDraft.savedBanner=profileDraft.banner;profileDraft.savedTint=profileDraft.tint;
     refreshTileTints(state.username);
@@ -5784,6 +5873,8 @@ async function saveProfile(){
   updateProfileEditorState();
 }
 function resetProfileDraft(){
+  profileDraft.nickname=profileDraft.savedNickname;
+  document.getElementById('profile-nickname').value=profileDraft.nickname;
   profileDraft.bio=profileDraft.savedBio;profileDraft.banner=profileDraft.savedBanner;profileDraft.tint=profileDraft.savedTint;
   document.getElementById('profile-bio').value=profileDraft.bio;
   document.getElementById('profile-save-hint').textContent='';
@@ -5867,6 +5958,7 @@ function initProfileEditor(){
   vp.addEventListener('mousedown',start);vp.addEventListener('touchstart',start,{passive:false});
   window.addEventListener('mousemove',move);window.addEventListener('touchmove',move,{passive:true});
   window.addEventListener('mouseup',end);window.addEventListener('touchend',end);
+  document.getElementById('profile-nickname').addEventListener('input',e=>{profileDraft.nickname=e.target.value;document.getElementById('profile-save-hint').textContent='';updateProfileEditorState();});
   const bio=document.getElementById('profile-bio');
   bio.addEventListener('input',()=>{profileDraft.bio=bio.value;document.getElementById('profile-save-hint').textContent='';updateProfileEditorState();});
   document.getElementById('profile-save-btn').addEventListener('click',saveProfile);
@@ -5958,7 +6050,7 @@ function openVoiceUserMenu(user,x,y){
   const menu=document.getElementById('voice-user-menu');
   const ua=getUserAudio(user);
   menu.innerHTML=`
-    <div class="vum-head"><div class="user-avatar" data-pfp-user="${esc(user)}"></div><span>${esc(user)}</span></div>
+    <div class="vum-head"><div class="user-avatar" data-pfp-user="${esc(user)}"></div>${dnHTML(user)}</div>
     <div class="vum-item" id="vum-mute"><span>Mute</span><input type="checkbox" ${ua.muted?'checked':''} tabindex="-1"></div>
     <div class="vum-label">User Volume</div>
     <div class="slider-row"><input type="range" id="vum-volume" min="0" max="200" step="1" value="${Math.round(ua.volume*100)}"><span class="slider-val" id="vum-volume-val">${Math.round(ua.volume*100)}%</span></div>
@@ -6015,7 +6107,7 @@ function reactionEmojiHTML(emoji){
 }
 function reactionTitle(r){
   const e=EMOJI_BY_CHAR.get(r.emoji.replace(/\uFE0F/g,''));
-  const names=(r.users||[]).map(u=>u===state.username?'You':u);
+  const names=(r.users||[]).map(u=>u===state.username?'You':displayName(u));
   const who=names.length<=3?names.join(names.length===2?' and ':', ').replace(/, ([^,]*)$/,' and $1')
     :`${names.slice(0,3).join(', ')} and ${names.length-3} other${names.length-3===1?'':'s'}`;
   const c=r.emoji.startsWith('c:')&&CUSTOM_BY_ID.get(r.emoji.slice(2).toLowerCase());
@@ -7226,7 +7318,7 @@ function renderVideoStage(){
     if(!tile){
       tile=document.createElement('div');tile.className='vs-tile'+(u===state.username&&!screen?' me':'')+(screen?' screen':'');tile.dataset.user=id;
       tile.dataset.kind=kind;
-      tile.innerHTML=`<div class="vs-name"><span>${esc(u===state.username?`${u} (you)`:u)}</span>${screen?'<span class="vs-live">LIVE</span>':'<span class="vs-flags"></span>'}</div>`;
+      tile.innerHTML=`<div class="vs-name"><span>${dnHTML(u)}${u===state.username?' (you)':''}</span>${screen?'<span class="vs-live">LIVE</span>':'<span class="vs-flags"></span>'}</div>`;
       vsAvatar(tile,u);
       if(kind==='avatar'){
         tile.classList.add('avatar','live');
@@ -7639,7 +7731,7 @@ function renderScreenTile(tile,u){
   }else{
     tile.classList.add('idle');tile.classList.remove('live');
     tile.querySelectorAll('video,canvas,.vs-tools,.vs-unsup,.vs-vol').forEach(el=>el.remove());
-    if(!tile.querySelector('.vs-watch'))tile.insertAdjacentHTML('afterbegin',`<div class="vs-watch">${icon('screen_share')}<span>${esc(u)} is sharing their screen</span><div class="vs-btns"><button class="vs-btn primary" data-act="watch" type="button">Watch Stream</button></div></div>`);
+    if(!tile.querySelector('.vs-watch'))tile.insertAdjacentHTML('afterbegin',`<div class="vs-watch">${icon('screen_share')}<span>${dnHTML(u)} is sharing their screen</span><div class="vs-btns"><button class="vs-btn primary" data-act="watch" type="button">Watch Stream</button></div></div>`);
   }
 }
 function screenTileAction(act,tile){
@@ -8711,7 +8803,7 @@ function acceptEmojiSuggest(){
 function renderUserSuggest(q){
   const box=document.getElementById('emoji-suggest');
   box.innerHTML=`<div class="es-title">Members${q?` matching @${esc(q)}`:''}</div>`+suggest.items.map((it,i)=>
-    `<div class="es-row${i===suggest.index?' on':''}" data-i="${i}"><div class="user-avatar" data-pfp-user="${esc(it.user)}"></div><span>${esc(it.user)}</span><span class="es-status">${it.online?'online':''}</span></div>`).join('');
+    `<div class="es-row${i===suggest.index?' on':''}" data-i="${i}"><div class="user-avatar" data-pfp-user="${esc(it.user)}"></div><span>${esc(displayName(it.user))}${displayName(it.user)!==it.user?`<span class="es-handle">${esc(it.user)}</span>`:''}</span><span class="es-status">${it.online?'online':''}</span></div>`).join('');
   box.querySelectorAll('.es-row').forEach(r=>{
     const av=r.querySelector('.user-avatar'),u=suggest.items[+r.dataset.i].user;setAvatarFallback(av,u);applyUserAvatar(av,u);
     r.addEventListener('mousedown',ev=>{ev.preventDefault();suggest.index=+r.dataset.i;acceptEmojiSuggest();});
@@ -8723,8 +8815,11 @@ function renderUserSuggest(q){
 function userMatches(q){
   q=q.toLowerCase();
   const online=new Set(state.onlineUsers||[]);
-  return knownUsernames().filter(u=>u!==state.username&&u.toLowerCase().includes(q))
-    .sort((a,b)=>(b.toLowerCase().startsWith(q)-a.toLowerCase().startsWith(q))||(online.has(b)-online.has(a))||a.localeCompare(b))
+  // By username or by the name shown for them here.
+  const hay=u=>[u.toLowerCase(),displayName(u).toLowerCase()];
+  const starts=u=>hay(u).some(s=>s.startsWith(q));
+  return knownUsernames().filter(u=>u!==state.username&&hay(u).some(s=>s.includes(q)))
+    .sort((a,b)=>(starts(b)-starts(a))||(online.has(b)-online.has(a))||displayName(a).localeCompare(displayName(b)))
     .slice(0,8).map(u=>({user:u,online:online.has(u)}));
 }
 function onShortcodeInput(ta){
@@ -9040,7 +9135,7 @@ function memberMenu(user,e){
 }
 function confirmRemove(user,ban){
   const ov=document.createElement('div');ov.className='modal-overlay';
-  ov.innerHTML=`<div class="modal"><h2>${ban?'Ban':'Kick'} ${esc(user)}?</h2>
+  ov.innerHTML=`<div class="modal"><h2>${ban?'Ban':'Kick'} ${esc(displayName(user))}${displayName(user)!==user?` <span style="font-weight:400;color:var(--text-muted)">(${esc(user)})</span>`:''}?</h2>
     <p style="color:var(--text-muted);margin:0 0 12px">${ban?'They\\u2019re removed now and can\\u2019t rejoin unless the server owner unbans them.':'They\\u2019re removed now, but can rejoin later.'}</p>
     <div class="form-group"><label>Reason (optional, shown to them)</label><input type="text" maxlength="200" id="rm-reason"></div>
     <div class="modal-actions"><button class="btn btn-ghost" id="rm-cancel">Cancel</button><button class="btn btn-danger" id="rm-go">${ban?'Ban':'Kick'}</button></div></div>`;
@@ -9076,7 +9171,7 @@ function openLightbox(src,attach,msg){
     av.dataset.pfpUser=msg.username;
     setAvatarFallback(av,msg.username);
     applyUserAvatar(av,msg.username);
-    sender.querySelector('.lb-name').textContent=msg.username;
+    sender.querySelector('.lb-name').textContent=displayName(msg.username);
     const date=formatDateSeparator(msg.created_at),time=formatTime(msg.created_at);
     sender.querySelector('.lb-time').textContent=date&&time?`${date} at ${time}`:(date||time);
   }else sender.style.display='none';
@@ -9477,7 +9572,7 @@ function init(){
     refreshPinsIfOpen(ev.board_id);
     if(ev.pinned&&ev.by&&ev.by!==state.username)toast(`${ev.by} pinned a message`);
   });
-  window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshPresenceBadges();renderComposerHighlight();});
+  window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshDisplayNames();refreshPresenceBadges();renderComposerHighlight();});
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
   // Roles changed: colours/permissions, and which channels you can see.
   window.runtime.EventsOn('server:roles',()=>{loadRoles();refreshRoomsAndBoards();});

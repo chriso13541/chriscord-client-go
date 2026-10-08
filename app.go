@@ -533,6 +533,7 @@ const maxBioChars = 500
 
 // OwnProfile is what the profile settings page edits.
 type OwnProfile struct {
+	Nickname string `json:"nickname"` // global nickname, "" = none
 	Bio    string `json:"bio"`
 	Banner string `json:"banner"` // data URL, "" = no banner (colour from the pfp instead)
 	Tint   string `json:"tint"`   // card colour, "#rrggbb" or "" for the default
@@ -546,7 +547,7 @@ func (a *App) GetOwnProfile() (*OwnProfile, error) {
 		return nil, fmt.Errorf("no account unlocked")
 	}
 	dir := filepath.Join(accountsDir(), a.account.Slug)
-	p := &OwnProfile{Bio: a.account.Bio, Tint: a.account.Tint}
+	p := &OwnProfile{Bio: a.account.Bio, Tint: a.account.Tint, Nickname: a.account.Nickname}
 	a.mu.Unlock()
 	if data, err := os.ReadFile(bannerPath(dir)); err == nil {
 		p.Banner = pfpDataURL(data)
@@ -554,11 +555,16 @@ func (a *App) GetOwnProfile() (*OwnProfile, error) {
 	return p, nil
 }
 
-// SaveProfile stores a new bio, banner and card tint for this account and
-// pushes them to the connected server. banner is the complete desired
-// state: a data URL to set, or "" for no banner; tint is "#rrggbb", or ""
-// for the default colour.
-func (a *App) SaveProfile(bio, banner, tint string) error {
+// SaveProfile stores a new bio, banner, card tint and global nickname for
+// this account and pushes them to the connected server. banner is the
+// complete desired state: a data URL to set, or "" for no banner; tint is
+// "#rrggbb", or "" for the default colour; nickname "" means none (your
+// username shows).
+func (a *App) SaveProfile(bio, banner, tint, nickname string) error {
+	nickname, err := cleanNickname(nickname)
+	if err != nil {
+		return err
+	}
 	bio = strings.TrimSpace(bio)
 	if n := len([]rune(bio)); n > maxBioChars {
 		return fmt.Errorf("bio is %d characters — %d max", n, maxBioChars)
@@ -601,13 +607,14 @@ func (a *App) SaveProfile(bio, banner, tint string) error {
 		}
 	}
 	updatedAt := time.Now().Unix()
-	if err := updateProfileMeta(dir, bio, tint, updatedAt); err != nil {
+	if err := updateProfileMeta(dir, bio, tint, nickname, updatedAt); err != nil {
 		return err
 	}
 	a.mu.Lock()
 	if a.account != nil {
 		a.account.Bio = bio
 		a.account.Tint = tint
+		a.account.Nickname = nickname
 		a.account.ProfileUpdatedAt = updatedAt
 	}
 	a.mu.Unlock()
@@ -636,7 +643,7 @@ func (a *App) handleProfileRequest() {
 		return
 	}
 	dir := filepath.Join(accountsDir(), a.account.Slug)
-	bio, tint, updatedAt := a.account.Bio, a.account.Tint, a.account.ProfileUpdatedAt
+	bio, tint, nickname, updatedAt := a.account.Bio, a.account.Tint, a.account.Nickname, a.account.ProfileUpdatedAt
 	a.mu.Unlock()
 	banner := ""
 	if data, err := os.ReadFile(bannerPath(dir)); err == nil && len(data) <= maxPfpBytes {
@@ -648,7 +655,7 @@ func (a *App) handleProfileRequest() {
 		return
 	}
 	msg, _ := json.Marshal(map[string]interface{}{
-		"type": "profile_upload", "profile_updated_at": updatedAt, "bio": bio, "tint": tint, "banner_data": banner,
+		"type": "profile_upload", "profile_updated_at": updatedAt, "bio": bio, "tint": tint, "nickname": nickname, "banner_data": banner,
 	})
 	_ = a.ws.WriteMessage(websocket.TextMessage, msg)
 }
@@ -669,6 +676,8 @@ func isHexColour(s string) bool {
 // UserProfile is another user's profile card as fetched from the server.
 type UserProfile struct {
 	Username    string `json:"username"`
+	Nickname       string `json:"nickname"`        // on this server, "" = none
+	GlobalNickname string `json:"global_nickname"` // from their profile, "" = none
 	Bio         string `json:"bio"`
 	Tint        string `json:"tint"` // card colour, "" for the default
 	Banner      string `json:"banner"` // data URL, or "" for none
@@ -682,13 +691,15 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 		Username    string `json:"username"`
 		Bio         string `json:"bio"`
 		Tint        string `json:"tint"`
+		Nickname       string `json:"nickname"`
+		GlobalNickname string `json:"global_nickname"`
 		HasBanner   bool   `json:"has_banner"`
 		MemberSince string `json:"member_since"`
 	}
 	if err := a.doGET("/api/profile/"+url.PathEscape(username), &raw); err != nil {
 		return nil, err
 	}
-	p := &UserProfile{Username: raw.Username, Bio: raw.Bio, MemberSince: raw.MemberSince}
+	p := &UserProfile{Username: raw.Username, Nickname: raw.Nickname, GlobalNickname: raw.GlobalNickname, Bio: raw.Bio, MemberSince: raw.MemberSince}
 	if isHexColour(strings.ToLower(raw.Tint)) {
 		p.Tint = strings.ToLower(raw.Tint)
 	}
@@ -936,6 +947,10 @@ type serverMsg struct {
 	// key — "statuses" is already the voice status list below.
 	Presence      map[string]string   `json:"presence"`
 	Owner         string              `json:"owner"`  // on "users": the crowned member
+	// On "users": what to call people — this server's nicknames, and the
+	// global ones from their profiles (username → nickname, only those set).
+	Nicknames       map[string]string `json:"nicknames"`
+	GlobalNicknames map[string]string `json:"global_nicknames"`
 	DeniedMsg     string              `json:"message"` // on "action_denied": what you weren't allowed to do
 	Banned        bool                `json:"banned"` // on "kicked"
 	Reason        string              `json:"reason"` // on "kicked"
@@ -978,7 +993,7 @@ type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
 }
-type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"` }
+type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"` }
 type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }
 type typingEvent struct { Username string `json:"username"`; Typing bool `json:"typing"` }
 type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"`; VideoOn []string `json:"video_on"`; ScreenOn []string `json:"screen_on"` }
@@ -1119,7 +1134,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "history":
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
 		case "users":
-			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner})
+			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner, Nicknames: msg.Nicknames, GlobalNicknames: msg.GlobalNicknames})
 		case "voice_removed":
 			// No longer allowed in the voice channel we were in (a role or
 			// channel change): the server has taken us out; hang up here.

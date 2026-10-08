@@ -108,6 +108,21 @@ type VoiceSession struct {
 
 	closeOnce sync.Once
 	stopped   chan struct{}
+
+	// Trickle-ICE ordering. Candidates start flowing both ways the moment
+	// each side calls SetLocalDescription — before the other side has the
+	// description they belong to. The server drops a candidate that
+	// arrives before this client's offer (it has no connection for it
+	// yet), and pion rejects one added before the server's answer has
+	// been applied ("remote description not set"). Either way the
+	// candidate is lost and ICE has to find the path the slow way
+	// (peer-reflexive discovery, retransmits) — the multi-second wait
+	// before audio. So both directions are held here until it's safe.
+	iceMu      sync.Mutex
+	offerSent  bool                      // our offer is on the wire: local candidates can go straight out
+	pendingOut []webrtc.ICECandidateInit // local candidates gathered before the offer was sent
+	remoteSet  bool                      // the server's answer is applied: remote candidates can be added
+	pendingIn  []webrtc.ICECandidateInit // server candidates that arrived before its answer
 }
 
 // findDeviceByName does a case-insensitive substring match against
@@ -384,16 +399,16 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 			return
 		}
 		init := c.ToJSON()
-		a.writeMu.Lock()
-		defer a.writeMu.Unlock()
-		if a.ws == nil {
+		session.iceMu.Lock()
+		if !session.offerSent {
+			// The server has no connection to put this on yet: hold it
+			// until the offer has gone (sent right after it, below).
+			session.pendingOut = append(session.pendingOut, init)
+			session.iceMu.Unlock()
 			return
 		}
-		msg, _ := json.Marshal(map[string]interface{}{
-			"type": "voice_ice", "board_id": boardID,
-			"candidate": init.Candidate, "sdp_mid": init.SDPMid, "sdp_mline_index": init.SDPMLineIndex,
-		})
-		a.ws.WriteMessage(websocket.TextMessage, msg)
+		session.iceMu.Unlock()
+		a.sendVoiceCandidate(boardID, init)
 	})
 
 	pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
@@ -427,22 +442,57 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 	a.voice = session
 	a.voiceMu.Unlock()
 
+	// The offer goes out first, so ICE and DTLS get going on the server
+	// while the sound devices open — opening them can take a second or
+	// more (PortAudio enumerating devices, WASAPI starting up — slower
+	// still in a virtual machine), and used to hold the offer back.
+	a.writeMu.Lock()
+	if a.ws == nil {
+		a.writeMu.Unlock()
+		return fmt.Errorf("not connected")
+	}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"type": "voice_offer", "board_id": boardID, "sdp": offer.SDP, "expected_others": knownOthers,
+	})
+	err = a.ws.WriteMessage(websocket.TextMessage, msg)
+	a.writeMu.Unlock()
+	if err != nil {
+		return err
+	}
+	log.Printf("voice: offer sent")
+
+	// Now the candidates gathered meanwhile (sent after the offer on the
+	// same socket, so the server always has the connection for them).
+	session.iceMu.Lock()
+	session.offerSent = true
+	held := session.pendingOut
+	session.pendingOut = nil
+	session.iceMu.Unlock()
+	for _, c := range held {
+		a.sendVoiceCandidate(boardID, c)
+	}
+
 	if err := session.startCapture(micName); err != nil {
 		wailsruntime.EventsEmit(a.ctx, "voice:error", fmt.Sprintf("microphone: %v", err))
 	}
 	if err := session.startPlayback(speakerName); err != nil {
 		wailsruntime.EventsEmit(a.ctx, "voice:error", fmt.Sprintf("speaker: %v", err))
 	}
+	return nil
+}
 
+// sendVoiceCandidate sends one of this client's ICE candidates to the server.
+func (a *App) sendVoiceCandidate(boardID string, init webrtc.ICECandidateInit) {
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
 	if a.ws == nil {
-		return fmt.Errorf("not connected")
+		return
 	}
 	msg, _ := json.Marshal(map[string]interface{}{
-		"type": "voice_offer", "board_id": boardID, "sdp": offer.SDP, "expected_others": knownOthers,
+		"type": "voice_ice", "board_id": boardID,
+		"candidate": init.Candidate, "sdp_mid": init.SDPMid, "sdp_mline_index": init.SDPMLineIndex,
 	})
-	return a.ws.WriteMessage(websocket.TextMessage, msg)
+	a.ws.WriteMessage(websocket.TextMessage, msg)
 }
 
 func (a *App) stopVoiceSession() {
@@ -468,6 +518,20 @@ func (a *App) handleVoiceAnswer(sdp string) {
 	answer := webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: sdp}
 	if err := session.pc.SetRemoteDescription(answer); err != nil {
 		wailsruntime.EventsEmit(a.ctx, "voice:error", fmt.Sprintf("failed to apply answer: %v", err))
+		return
+	}
+	// The server's candidates that got here before its answer did (it
+	// starts sending them as soon as it has made the answer).
+	session.iceMu.Lock()
+	session.remoteSet = true
+	held := session.pendingIn
+	session.pendingIn = nil
+	session.iceMu.Unlock()
+	if len(held) > 0 {
+		log.Printf("voice: answer applied; adding %d server candidate(s) that arrived before it", len(held))
+	}
+	for _, c := range held {
+		a.addVoiceCandidate(session, c)
 	}
 }
 
@@ -487,7 +551,26 @@ func (a *App) handleVoiceICE(candidate, sdpMid string, sdpMLineIndex *uint16) {
 	if sdpMLineIndex != nil {
 		init.SDPMLineIndex = sdpMLineIndex
 	}
-	_ = session.pc.AddICECandidate(init)
+	session.iceMu.Lock()
+	if !session.remoteSet {
+		// pion refuses candidates before the remote description is set:
+		// keep it for when the answer arrives (handleVoiceAnswer).
+		session.pendingIn = append(session.pendingIn, init)
+		session.iceMu.Unlock()
+		return
+	}
+	session.iceMu.Unlock()
+	a.addVoiceCandidate(session, init)
+}
+
+// addVoiceCandidate adds one of the server's ICE candidates to the session
+// (once its answer is applied), plus a copy at the address this client
+// reaches the server at.
+func (a *App) addVoiceCandidate(session *VoiceSession, init webrtc.ICECandidateInit) {
+	candidate := init.Candidate
+	if err := session.pc.AddICECandidate(init); err != nil {
+		log.Printf("voice: could not add server candidate %q: %v", candidate, err)
+	}
 
 	// The server is behind the same router as its LAN, so the address it
 	// advertises is usually a private one (192.168.x.x) that nobody outside

@@ -12,6 +12,7 @@ func screenShareUnavailable() string {
 	return "Sharing your screen from Linux isn't available yet — you can still watch other people's"
 }
 func screenWindowsSupported() bool             { return false }
+func screenGDIFallback(string) bool            { return false }
 func listShareSources() ([]ShareSource, error) { return nil, errors.New(screenShareUnavailable()) }
 func screenInput(ScreenStart, *frameTee) ([]string, int, int, screenFeed, error) {
 	return nil, 0, 0, nil, errors.New(screenShareUnavailable())

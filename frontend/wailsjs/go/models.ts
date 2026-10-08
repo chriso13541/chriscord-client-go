@@ -331,6 +331,7 @@ export namespace main {
 	    }
 	}
 	export class OwnProfile {
+	    nickname: string;
 	    bio: string;
 	    banner: string;
 	    tint: string;
@@ -341,6 +342,7 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nickname = source["nickname"];
 	        this.bio = source["bio"];
 	        this.banner = source["banner"];
 	        this.tint = source["tint"];
@@ -599,6 +601,8 @@ export namespace main {
 	}
 	export class UserProfile {
 	    username: string;
+	    nickname: string;
+	    global_nickname: string;
 	    bio: string;
 	    tint: string;
 	    banner: string;
@@ -611,6 +615,8 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.username = source["username"];
+	        this.nickname = source["nickname"];
+	        this.global_nickname = source["global_nickname"];
 	        this.bio = source["bio"];
 	        this.tint = source["tint"];
 	        this.banner = source["banner"];

@@ -385,6 +385,14 @@ func listShareSources() ([]ShareSource, error) {
 	return out, nil
 }
 
+// screenGDIFallback: a share of this source can fall back to a plain GDI
+// copy — whole screens only (a window has its own PrintWindow route), and
+// only with an FFmpeg that reads raw frames.
+func screenGDIFallback(id string) bool {
+	kind, _, err := parseShareID(id)
+	return err == nil && kind == "screen" && strings.Contains(ffmpegInputs()["rawvideo"], "D")
+}
+
 func screenWindowsSupported() bool { return ffmpegFilters()["gfxcapture"] || gdiWindowsSupported() }
 
 // gdiWindowsSupported: windows can be shared the border-free Windows 10 way
@@ -400,6 +408,23 @@ func screenInput(o ScreenStart, tee *frameTee) ([]string, int, int, screenFeed, 
 	kind, handle, err := parseShareID(o.ID)
 	if err != nil {
 		return nil, 0, 0, nil, err
+	}
+	// A whole screen copied with plain GDI (StartScreenShare's last resort,
+	// when the graphics card's capture methods don't work — a virtual
+	// machine, say).
+	if kind == "screen" && o.GDI {
+		for _, m := range listMonitors() {
+			if uint64(m.handle) != handle {
+				continue
+			}
+			// m.rect is in this app's desktop coordinates, which is what
+			// the screen DC uses too; the copy is scaled to the send size.
+			w, h := shareSize(m.w, m.h, o.Height)
+			log.Printf("screen: Windows build %d; sharing monitor %d with a plain GDI copy at %dx%d", windowsBuild(), handle, w, h)
+			return []string{"-f", "rawvideo", "-pixel_format", "bgra", "-video_size", fmt.Sprintf("%dx%d", w, h),
+				"-framerate", strconv.Itoa(o.FPS), "-i", "pipe:0"}, w, h, gdiScreenFeed(m.rect, w, h, o.FPS, tee), nil
+		}
+		return nil, 0, 0, nil, errors.New("that screen isn't connected any more")
 	}
 	// A single window on Windows 10 (where Windows Graphics Capture always
 	// draws the yellow border): copied the way Chrome/Discord do, when the

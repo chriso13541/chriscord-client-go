@@ -13,6 +13,9 @@ enum {
 };
 
 gdicap *gdicap_open(unsigned long long hwnd, int width, int height);
+/* A part of the desktop (a monitor) instead of a window — plain GDI, for
+   where Desktop Duplication and Windows Graphics Capture both fail. */
+gdicap *gdicap_open_screen(int x, int y, int src_w, int src_h, int width, int height);
 int gdicap_frame(gdicap *c, int draw_cursor);
 void *gdicap_bits(gdicap *c);
 void gdicap_close(gdicap *c);

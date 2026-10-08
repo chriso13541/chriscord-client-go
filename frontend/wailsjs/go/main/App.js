@@ -342,8 +342,8 @@ export function SaveClientSettings(arg1) {
   return window['go']['main']['App']['SaveClientSettings'](arg1);
 }
 
-export function SaveProfile(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SaveProfile'](arg1, arg2, arg3);
+export function SaveProfile(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SaveProfile'](arg1, arg2, arg3, arg4);
 }
 
 export function SaveProfilePicture(arg1) {
@@ -388,6 +388,10 @@ export function SetLevelMeter(arg1) {
 
 export function SetMessagePinned(arg1, arg2) {
   return window['go']['main']['App']['SetMessagePinned'](arg1, arg2);
+}
+
+export function SetServerNickname(arg1) {
+  return window['go']['main']['App']['SetServerNickname'](arg1);
 }
 
 export function SetPresence(arg1) {

@@ -59,6 +59,7 @@ type ScreenStart struct {
 	Preview    bool   `json:"preview"`    // frames back to the page as screen:preview
 	Audio      bool   `json:"audio"`      // share its sound too
 	HideBorder bool   `json:"hideBorder"` // no yellow capture border — always set by StartScreenShare; false only for its fallback
+	GDI        bool   `json:"-"`          // a whole screen copied with plain GDI — StartScreenShare's last resort (screenGDIFallback)
 }
 
 var (
@@ -186,9 +187,28 @@ func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
 		// Windows Graphics Capture instead, and say so.
 		log.Printf("screen: border-free capture failed (%v); trying Windows Graphics Capture", err)
 		opts.HideBorder = false
-		if label, err2 := a.startScreen(opts); err2 == nil {
+		label2, err2 := a.startScreen(opts)
+		if err2 == nil {
 			wailsruntime.EventsEmit(a.ctx, "screen:notice", "Couldn’t hide the yellow border on this computer ("+err.Error()+"), so it’s showing.")
-			return label, nil
+			return label2, nil
+		}
+		log.Printf("screen: Windows Graphics Capture failed too (%v)", err2)
+		// Neither of the graphics card's capture methods works here — the
+		// usual story in a virtual machine or a Remote Desktop session.
+		// A whole screen can still be copied the plain way, as the share
+		// picker's thumbnails are: slower, but it works anywhere.
+		if screenGDIFallback(opts.ID) {
+			log.Printf("screen: falling back to a plain GDI copy of the screen")
+			opts.GDI = true
+			label3, err3 := a.startScreen(opts)
+			if err3 == nil {
+				wailsruntime.EventsEmit(a.ctx, "screen:notice", "This computer’s graphics driver doesn’t support fast screen capture (common in virtual machines), so a slower method is being used — high frame rates may stutter.")
+				return label3, nil
+			}
+			log.Printf("screen: GDI copy failed too (%v)", err3)
+			err = fmt.Errorf("%v; Windows Graphics Capture: %v; plain copy: %v", err, err2, err3)
+		} else {
+			err = fmt.Errorf("%v; Windows Graphics Capture: %v", err, err2)
 		}
 	}
 	return label, err

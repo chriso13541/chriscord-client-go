@@ -74,6 +74,10 @@ type accountMeta struct {
 	// The card colour chosen ("#rrggbb", "" for the default) — also the
 	// background behind their picture in a call when the camera's off.
 	Tint string `json:"tint,omitempty"`
+	// Global nickname: the name shown for you on every server ("" = your
+	// username), unless you've given yourself a nickname on that server.
+	// Synced with the profile, so it changes ProfileUpdatedAt too.
+	Nickname string `json:"nickname,omitempty"`
 }
 
 // Account is the unlocked, in-memory identity. Never marshaled to JSON and
@@ -94,6 +98,7 @@ type Account struct {
 	// as the pfp (profile_info / profile_request / profile_upload).
 	Bio              string
 	Tint             string
+	Nickname         string // global nickname, "" = none
 	ProfileUpdatedAt int64
 }
 
@@ -225,15 +230,17 @@ func updatePfpTimestamp(dir string, updatedAt int64) error {
 	return os.WriteFile(filepath.Join(dir, "account.json"), data, 0600)
 }
 
-// updateProfileMeta records a new bio, card tint and profile timestamp in
-// account.json, preserving everything else there (see updatePfpTimestamp).
-func updateProfileMeta(dir, bio, tint string, updatedAt int64) error {
+// updateProfileMeta records a new bio, card tint, global nickname and
+// profile timestamp in account.json, preserving everything else there (see
+// updatePfpTimestamp).
+func updateProfileMeta(dir, bio, tint, nickname string, updatedAt int64) error {
 	m, err := readAccountMeta(dir)
 	if err != nil {
 		m = &accountMeta{CreatedAt: time.Now().UTC()}
 	}
 	m.Bio = bio
 	m.Tint = tint
+	m.Nickname = nickname
 	m.ProfileUpdatedAt = updatedAt
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -491,11 +498,11 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	meta, err := readAccountMeta(dir)
 	username := "unnamed"
 	var pfpUpdatedAt, profileUpdatedAt int64
-	bio, tint := "", ""
+	bio, tint, nickname := "", "", ""
 	if err == nil {
 		username = meta.Username
 		pfpUpdatedAt = meta.PfpUpdatedAt
-		bio, tint = meta.Bio, meta.Tint
+		bio, tint, nickname = meta.Bio, meta.Tint, meta.Nickname
 		profileUpdatedAt = meta.ProfileUpdatedAt
 	}
 	avatarPath, hasAvatar := pfpIfExists(dir)
@@ -512,7 +519,7 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	return &Account{
 		Slug: slug, Username: username, PublicKey: pub, PrivateKey: priv,
 		HasAvatar: hasAvatar, AvatarPath: avatarPath, PfpUpdatedAt: pfpUpdatedAt,
-		Bio: bio, Tint: tint, ProfileUpdatedAt: profileUpdatedAt,
+		Bio: bio, Tint: tint, Nickname: nickname, ProfileUpdatedAt: profileUpdatedAt,
 	}, nil
 }
 
@@ -593,7 +600,7 @@ func ImportAccount(sourcePath, passphrase string) (*Account, error) {
 	if meta, err := readAccountMeta(srcDir); err == nil {
 		writeAccountMeta(destDir, meta.Username)
 		if meta.ProfileUpdatedAt > 0 {
-			_ = updateProfileMeta(destDir, meta.Bio, meta.Tint, meta.ProfileUpdatedAt) // bio and card tint travel with the account too
+			_ = updateProfileMeta(destDir, meta.Bio, meta.Tint, meta.Nickname, meta.ProfileUpdatedAt) // bio, card tint and nickname travel with the account too
 		}
 	} else {
 		writeAccountMeta(destDir, "unnamed") // account.json is optional too — don't fail the import over it
