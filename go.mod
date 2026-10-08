@@ -12,7 +12,7 @@ require (
 	github.com/pion/rtcp v1.2.14
 	github.com/pion/rtp v1.8.7
 	github.com/pion/webrtc/v3 v3.3.6
-	github.com/wailsapp/wails/v2 v2.16.0
+	github.com/wailsapp/wails/v2 v2.12.0
 	golang.org/x/crypto v0.53.0
 )
 

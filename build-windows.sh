@@ -20,11 +20,18 @@
 #     libraries need from Windows (winmm, ole32, setupapi…). Go can't be told
 #     to add --static, so a tiny wrapper that does is put first in the PATH
 #     and handed to Go as PKG_CONFIG.
+#   * -linkmode=external hands the final link to MinGW's gcc. (Go can link
+#     cgo programs on Windows by itself, but its own linker ignores
+#     -extldflags and links the DLL versions — that's how the DLLs ended up
+#     next to the exe.)
 #   * -extldflags=-static makes the linker take the .a (static) versions of
 #     every library instead of the .dll.a ones.
 #   * -tags nolibopusfile leaves out the Opus *file* reader (opusfile, and the
 #     libogg it needs): chriscord only encodes and decodes Opus packets, it
 #     never opens .opus files, so it needs neither.
+#
+# The exe's icon is build/windows/icon.ico (Wails builds it into the exe;
+# only if that file is missing does it make one from build/appicon.png).
 #
 # At the end it lists the DLLs the exe still loads: they should all be
 # Windows' own (in C:\Windows). Anything from mingw64 means something wasn't
@@ -74,15 +81,27 @@ export CGO_ENABLED=1
 # libraries its MME/WASAPI/WDM-KS backends use. Extra ones cost nothing.
 export CGO_LDFLAGS="${CGO_LDFLAGS:-} -lwinmm -lole32 -luuid -lsetupapi"
 
+# The icon that goes into the exe.
+ICON=build/windows/icon.ico
+if [ -f "$ICON" ]; then
+  echo "== icon: $ICON ($(du -h "$ICON" | cut -f1))"
+else
+  echo "== icon: $ICON is missing — Wails will make one from build/appicon.png"
+fi
+
 echo "== linking against (static):"
 echo "   portaudio: $(pkg-config --static --libs portaudio-2.0)"
 echo "   opus:      $(pkg-config --static --libs opus)"
+
+# DLLs left in build/bin by an earlier, non-static build: the exe doesn't
+# need them, and they'd hide a problem (the exe would only run from here).
+rm -f build/bin/*.dll
 
 # The exe being replaced can't be running (Windows locks it).
 if [ -f build/bin/chriscord.exe ] && ! rm -f build/bin/chriscord.exe 2>/dev/null; then
   echo "build/bin/chriscord.exe is in use — close chriscord, then run this again." >&2; exit 1
 fi
-wails build -platform windows/amd64 -tags nolibopusfile -ldflags "-extldflags=-static" "$@"
+wails build -platform windows/amd64 -tags nolibopusfile -ldflags "-linkmode=external -extldflags=-static" "$@"
 
 EXE=build/bin/chriscord.exe
 echo
@@ -94,4 +113,8 @@ if ldd "$EXE" | grep -qi '/mingw64/'; then
   exit 1
 fi
 echo
+# Explorer caches icons by file path, so a rebuilt exe in the same place
+# can keep showing the old icon. Ask Windows to refresh its icon cache.
+ie4uinit.exe -show >/dev/null 2>&1 || true
+
 echo "Done: $EXE ($(du -h "$EXE" | cut -f1)) — send just this file."
