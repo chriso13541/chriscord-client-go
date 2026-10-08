@@ -406,10 +406,6 @@ export function SetScreenViewLimit(arg1, arg2) {
   return window['go']['main']['App']['SetScreenViewLimit'](arg1, arg2);
 }
 
-export function SetVoiceSmoothing(arg1) {
-  return window['go']['main']['App']['SetVoiceSmoothing'](arg1);
-}
-
 export function SetServerNickname(arg1) {
   return window['go']['main']['App']['SetServerNickname'](arg1);
 }
@@ -432,6 +428,10 @@ export function SetVideoCodec(arg1) {
 
 export function SetVideoEnabled(arg1) {
   return window['go']['main']['App']['SetVideoEnabled'](arg1);
+}
+
+export function SetVoiceSmoothing(arg1) {
+  return window['go']['main']['App']['SetVoiceSmoothing'](arg1);
 }
 
 export function StartCamera(arg1) {

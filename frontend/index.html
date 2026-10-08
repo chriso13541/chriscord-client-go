@@ -512,6 +512,8 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .link-preview-title { font-size:.9rem; font-weight:700; color:var(--accent); margin-bottom:4px; }
 .link-preview-desc { font-size:.8rem; color:var(--text-muted); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .link-preview-img { width:100%; height:200px; object-fit:contain; display:block; background:var(--bg-mid); }
+.link-preview .link-preview-video { margin:0; width:100%; border:none; border-radius:0; }
+.link-embed { margin-top:6px; }
 
 /* Multi-image grid */
 /* Images keep their own aspect ratio — the box is sized to the picture
@@ -1159,6 +1161,22 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .member-dot.online { background:var(--green); }
 .member-dot.offline { background:var(--text-muted); }
 .member-name { font-size:.88rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Long names: cut off with "…" (the full name is in the tooltip) rather
+   than pushing icons, times and badges out of view. A name in a flex row
+   only shrinks with min-width:0, and the "…" goes on the element holding
+   the text — so each name span gets both, and what sits beside it (icons,
+   LIVE, the crown, the time) never shrinks. */
+.voice-occupant-name, .member-name, .vs-tile .vs-name .vs-label, .msg-reply .mr-name,
+#voice-user-menu .vum-head > [data-dn] { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.voice-occupant-name { flex:0 1 auto; }
+.member-name > [data-dn] { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.member-name > [data-dn] { display:block; }
+.vs-tile .vs-name > :not(.vs-label), .owner-crown, .voice-occupant-status, .msg-time { flex-shrink:0; }
+.msg-reply .mr-name { flex-shrink:1; max-width:45%; }
+.msg-username { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.msg-username:not(.sys-name) { display:inline-block; max-width:100%; vertical-align:bottom; }
+.msg-meta { min-width:0; }
+#reply-bar > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .msg-placeholder { color:var(--text-muted); font-style:italic; font-size:.85rem; padding:8px 0; }
 .date-separator { display:flex; align-items:center; gap:12px; margin:16px 0 8px; color:var(--text-muted); font-size:.75rem; font-weight:600; }
@@ -4381,7 +4399,16 @@ function initDragDrop(){
 }
 
 // ── LINK PREVIEW ─────────────────────────────────────────────────
+// The first link in a message gets a preview. A link to an image or a
+// video file shows that image or video (by its extension straight away,
+// otherwise when the server finds it's one); a page gets a card — title,
+// description and picture, or a playable video when the page offers one.
 const previewCache={};
+const LINK_IMAGE=/\.(png|jpe?g|gif|webp|avif|bmp)$/i,LINK_VIDEO=/\.(mp4|webm|mov|m4v)$/i;
+function linkPath(url){try{return new URL(url).pathname;}catch{return '';}}
+function renderPreview(body,p,url){
+  if(p.kind)appendMediaEmbed(body,p);else appendPreviewCard(body,p,url);
+}
 async function maybeRenderPreviews(msgEl,text){
   const urls=extractURLs(text);
   if(!urls.length)return;
@@ -4390,17 +4417,46 @@ async function maybeRenderPreviews(msgEl,text){
   const body=msgEl.querySelector('.msg-body');
   if(!body)return;
 
+  // A direct link to an image or a video: no need to ask the server.
+  const path=linkPath(url);
+  if(LINK_IMAGE.test(path)){appendMediaEmbed(body,{kind:'image',image:url,url});return;}
+  if(LINK_VIDEO.test(path)){appendMediaEmbed(body,{kind:'video',video:url,url});return;}
+
   // Check cache
   if(previewCache[url]===null)return; // known failure
-  if(previewCache[url]){appendPreviewCard(body,previewCache[url],url);return;}
+  if(previewCache[url]){renderPreview(body,previewCache[url],url);return;}
 
   try{
     const p=await window.go.main.App.FetchLinkPreview(url);
-    if(!p||(!p.title&&!p.description&&!p.image)){previewCache[url]=null;return;}
+    if(!p||(!p.title&&!p.description&&!p.image&&!p.kind&&!p.video)){previewCache[url]=null;return;}
     previewCache[url]=p;
     // Only attach if the message element is still in the DOM
-    if(document.contains(msgEl))appendPreviewCard(body,p,url);
+    if(document.contains(msgEl))renderPreview(body,p,url);
   }catch{previewCache[url]=null;}
+}
+
+// A linked image or video shown as itself — like an attachment, loaded
+// straight from where it's hosted. If it won't load, the embed goes and the
+// link is left as it was.
+function appendMediaEmbed(body,p){
+  const before=body.querySelector('.msg-reactions'); // reactions stay last
+  if(p.kind==='image'){
+    const grid=document.createElement('div');grid.className='img-grid img-grid-1 link-embed';
+    const img=document.createElement('img');img.className='grid-img loading';img.alt='';img.referrerPolicy='no-referrer';
+    img.addEventListener('load',()=>sizeLoadedImage(img),{once:true});
+    img.addEventListener('error',()=>grid.remove(),{once:true});
+    img.addEventListener('click',e=>{e.stopPropagation();openLightbox(p.image,null,null);});
+    img.src=p.image;
+    grid.appendChild(img);body.insertBefore(grid,before);
+    return;
+  }
+  const player=linkVideoPlayer(p.video);
+  player.classList.add('link-embed');
+  body.insertBefore(player,before);
+}
+function linkVideoPlayer(src){
+  let name='';try{name=decodeURIComponent(linkPath(src).split('/').pop()||'');}catch{}
+  return buildMediaPlayer({url:src,name:name||'Video',external:true},'video');
 }
 
 function appendPreviewCard(body,p,url){
@@ -4408,13 +4464,19 @@ function appendPreviewCard(body,p,url){
   card.addEventListener('click',()=>window.go.main.App.GetFileURL(url).then(()=>{})); // open externally
   card.addEventListener('click',()=>openExternalURL(url));
   let html='';
-  if(p.image)html+=`<img class="link-preview-img" src="${esc(p.image)}" alt="" onerror="this.style.display='none'">`;
+  if(p.image&&!p.video)html+=`<img class="link-preview-img" src="${esc(p.image)}" alt="" onerror="this.style.display='none'">`;
   html+=`<div class="link-preview-inner">`;
   if(p.site_name)html+=`<div class="link-preview-site">${esc(p.site_name)}</div>`;
   if(p.title)html+=`<div class="link-preview-title">${esc(p.title)}</div>`;
   if(p.description)html+=`<div class="link-preview-desc">${esc(p.description)}</div>`;
   html+=`</div>`;
   card.innerHTML=html;
+  if(p.video){ // the page's video, playable right here (clicks on it don't open the page)
+    const player=linkVideoPlayer(p.video);
+    player.classList.add('link-preview-video');
+    player.addEventListener('click',e=>e.stopPropagation());
+    card.prepend(player);
+  }
   body.insertBefore(card,body.querySelector('.msg-reactions')); // reactions stay last
 }
 
@@ -5166,6 +5228,7 @@ function toggleDropdown(msgEl,msg){
 // the file name is fully percent-encoded so nothing in it is left raw.
 const strictEncode=v=>encodeURIComponent(v).replace(/[!'()*~]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
 async function downloadAttachment(a){
+  if(a.external){window.go.main.App.OpenURL(a.url).catch(()=>{});return;} // a linked video: open its link
   try{
     // Always a brand-new link (not the cached one used for display), so
     // the browser gets the full 5 minutes to start the download.
@@ -5444,7 +5507,10 @@ function buildMediaPlayer(a,kind){
   }
   // A format this app can't play (e.g. MKV with HEVC video): say so, and
   // offer to open it in the computer's own player, or download it.
-  attachMediaSource(media,a.url,()=>showUnplayable(wrap,a,kind));
+  if(a.external){ // a linked video, loaded from where it's hosted: if it won't play, the embed goes
+    media.src=a.url;
+    media.addEventListener('error',()=>wrap.remove(),{once:true});
+  }else attachMediaSource(media,a.url,()=>showUnplayable(wrap,a,kind));
   if(kind==='video')watchPartialPlayback(wrap,media,a);
   paintPlay();paintVol();
   return wrap;
@@ -7323,7 +7389,7 @@ function renderVideoStage(){
     if(!tile){
       tile=document.createElement('div');tile.className='vs-tile'+(u===state.username&&!screen?' me':'')+(screen?' screen':'');tile.dataset.user=id;
       tile.dataset.kind=kind;
-      tile.innerHTML=`<div class="vs-name"><span>${dnHTML(u)}${u===state.username?' (you)':''}</span>${screen?'<span class="vs-live">LIVE</span>':'<span class="vs-flags"></span>'}</div>`;
+      tile.innerHTML=`<div class="vs-name"><span class="vs-label">${dnHTML(u)}${u===state.username?' (you)':''}</span>${screen?'<span class="vs-live">LIVE</span>':'<span class="vs-flags"></span>'}</div>`;
       vsAvatar(tile,u);
       if(kind==='avatar'){
         tile.classList.add('avatar','live');

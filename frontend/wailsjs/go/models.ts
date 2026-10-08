@@ -316,6 +316,8 @@ export namespace main {
 	    description?: string;
 	    image?: string;
 	    site_name?: string;
+	    kind?: string;
+	    video?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new LinkPreview(source);
@@ -328,6 +330,8 @@ export namespace main {
 	        this.description = source["description"];
 	        this.image = source["image"];
 	        this.site_name = source["site_name"];
+	        this.kind = source["kind"];
+	        this.video = source["video"];
 	    }
 	}
 	export class OwnProfile {

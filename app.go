@@ -1685,13 +1685,17 @@ func (a *App) GetFileURL(path string) string {
 	return normaliseHTTP(a.domain) + path
 }
 
-// FetchLinkPreview fetches OG data for a URL via the server proxy.
-func (a *App) FetchLinkPreview(url string) (*LinkPreview, error) {
+// FetchLinkPreview fetches a link's preview via the server: a page's OG
+// data, or (Kind "image"/"video") that the link is a media file itself.
+// The link is query-escaped — sent raw, everything after its first "&" or
+// "#" (most links with tracking parameters, Reddit's share links…) was cut
+// off before the server saw it.
+func (a *App) FetchLinkPreview(link string) (*LinkPreview, error) {
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
 	if domain == "" { return nil, fmt.Errorf("not connected") }
 
 	req, err := http.NewRequest("GET",
-		normaliseHTTP(domain)+"/api/preview?url="+url, nil)
+		normaliseHTTP(domain)+"/api/preview?url="+url.QueryEscape(link), nil)
 	if err != nil { return nil, err }
 	req.Header.Set("X-Session-Token", token)
 

@@ -204,8 +204,6 @@ export function SetScreenShareEnabled(arg1:boolean):Promise<void>;
 
 export function SetScreenViewLimit(arg1:number,arg2:number):Promise<void>;
 
-export function SetVoiceSmoothing(arg1:boolean):Promise<void>;
-
 export function SetServerNickname(arg1:string):Promise<void>;
 
 export function SetStreamVideoLag(arg1:string,arg2:number):Promise<void>;
@@ -217,6 +215,8 @@ export function SetUserAudio(arg1:string,arg2:number,arg3:boolean):Promise<void>
 export function SetVideoCodec(arg1:string):Promise<void>;
 
 export function SetVideoEnabled(arg1:boolean):Promise<void>;
+
+export function SetVoiceSmoothing(arg1:boolean):Promise<void>;
 
 export function StartCamera(arg1:main.CameraStart):Promise<string>;
 

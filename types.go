@@ -141,4 +141,8 @@ type LinkPreview struct {
 	Description *string `json:"description"`
 	Image       *string `json:"image"`
 	SiteName    *string `json:"site_name"`
+	// "image" or "video" when the link is that media file itself ("" for
+	// a page); Video is a file the page offers to play (og:video).
+	Kind        string  `json:"kind,omitempty"`
+	Video       *string `json:"video,omitempty"`
 }
