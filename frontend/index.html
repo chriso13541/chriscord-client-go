@@ -1793,6 +1793,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <p class="settings-hint" style="margin-top:0">Brings your voice to a steady, normal loudness for everyone else, however quiet your microphone is. Turn off to send exactly what Input Volume gives.</p>
       <label class="settings-label" for="output-volume">Output Volume</label>
       <div class="slider-row"><input type="range" id="output-volume" min="0" max="200" step="1"><span class="slider-val" id="output-volume-val">100%</span></div>
+      <label class="check-row"><input type="checkbox" id="voice-smoothing"> Smooth out network hiccups</label>
+      <p class="settings-hint" style="margin-top:0">When someone's connection stutters, their voice can fall behind. This catches it back up by shortening the pauses between their words (and, if it has to, trimming a few milliseconds of speech without changing how they sound). Turn off to skip ahead instead.</p>
 
       <label class="settings-label">Input Sensitivity</label>
       <label class="check-row"><input type="checkbox" id="sens-auto"> Automatically determine input sensitivity</label>
@@ -5971,7 +5973,7 @@ function initProfileEditor(){
 // Input/output volume, input sensitivity (auto or a manual threshold in
 // dBFS) and per-user volume/mute. Saved in localStorage and pushed to the
 // Go side, which applies them to every audio frame (audio.go).
-const AUDIO_DEFAULTS={inputGain:1,outputVolume:1,autoSensitivity:true,thresholdDB:-50,autoGain:true};
+const AUDIO_DEFAULTS={inputGain:1,outputVolume:1,autoSensitivity:true,thresholdDB:-50,autoGain:true,smoothing:true};
 function loadAudioSettings(){
   try{return {...AUDIO_DEFAULTS,...JSON.parse(localStorage.getItem('audioSettings')||'{}')};}catch{return {...AUDIO_DEFAULTS};}
 }
@@ -5982,6 +5984,7 @@ function pushAudioSettings(){
   localStorage.setItem('audioSettings',JSON.stringify(audioSettings));
   const a=audioSettings;
   window.go?.main?.App?.SetAudioSettings(a.inputGain,a.outputVolume,a.autoSensitivity,a.thresholdDB,a.autoGain!==false)?.catch?.(()=>{});
+  window.go?.main?.App?.SetVoiceSmoothing?.(a.smoothing!==false)?.catch?.(()=>{});
 }
 function setUserAudio(user,patch){
   const next={...getUserAudio(user),...patch};
@@ -6024,9 +6027,11 @@ function initAudioSettingsUI(){
     document.getElementById('input-gain-val').textContent=gain.value+'%';
     document.getElementById('output-volume-val').textContent=vol.value+'%';
     document.getElementById('auto-gain').checked=audioSettings.autoGain!==false;
+    document.getElementById('voice-smoothing').checked=audioSettings.smoothing!==false;
     renderSensitivity();
   };
   document.getElementById('auto-gain').addEventListener('change',e=>{audioSettings.autoGain=e.target.checked;sync();pushAudioSettings();});
+  document.getElementById('voice-smoothing').addEventListener('change',e=>{audioSettings.smoothing=e.target.checked;sync();pushAudioSettings();});
   gain.addEventListener('input',()=>{audioSettings.inputGain=+gain.value/100;sync();pushAudioSettings();});
   vol.addEventListener('input',()=>{audioSettings.outputVolume=+vol.value/100;sync();pushAudioSettings();});
   document.getElementById('sens-auto').addEventListener('change',e=>{audioSettings.autoSensitivity=e.target.checked;sync();pushAudioSettings();});

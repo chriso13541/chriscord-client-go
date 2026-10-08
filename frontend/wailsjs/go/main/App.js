@@ -406,6 +406,10 @@ export function SetScreenViewLimit(arg1, arg2) {
   return window['go']['main']['App']['SetScreenViewLimit'](arg1, arg2);
 }
 
+export function SetVoiceSmoothing(arg1) {
+  return window['go']['main']['App']['SetVoiceSmoothing'](arg1);
+}
+
 export function SetServerNickname(arg1) {
   return window['go']['main']['App']['SetServerNickname'](arg1);
 }

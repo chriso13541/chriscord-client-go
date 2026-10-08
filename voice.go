@@ -63,9 +63,11 @@ type voiceRemoteSource struct {
 	fadeIn  bool // the next samples played start a fresh run: fade them in
 
 	// Voices only: since when more than voiceQueueHigh has stayed queued
-	// (zero while it hasn't), and the last skip ahead — see trimVoiceQueue.
+	// (zero while it hasn't), and the last skip ahead — see trimVoiceQueue,
+	// used when smooth playback (po, playout.go) is turned off.
 	highSince time.Time
 	lastSkip  time.Time
+	po        playout
 
 	// What happened over the last few seconds, for the log (logStats).
 	stAt                                     time.Time
@@ -904,11 +906,23 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 					r.mu.Unlock()
 					continue
 				}
+				// Smooth playback (playout.go): trims built-up delay out of
+				// pauses, and waits for a little to queue after running dry.
+				if voiceSmoothing.Load() {
+					play, fade := r.po.next(&r.buf)
+					if fade {
+						r.fadeIn = true
+					}
+					if !play {
+						r.mu.Unlock()
+						continue
+					}
+				}
 				n := len(r.buf)
 				if n > voiceFrameSize {
 					n = voiceFrameSize
 				}
-				// After a skip (trimVoiceQueue), fade the first 5 ms in.
+				// After a skip or a cut, fade the first 5 ms in.
 				fade := 0
 				if r.fadeIn && n > 0 {
 					fade, r.fadeIn = 240, false
@@ -962,7 +976,7 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 	if err != nil {
 		return
 	}
-	source := &voiceRemoteSource{username: name, decoder: decoder, stereo: stereo, sharer: strings.TrimPrefix(name, "screen:"), fadeIn: true}
+	source := &voiceRemoteSource{username: name, decoder: decoder, stereo: stereo, sharer: strings.TrimPrefix(name, "screen:"), fadeIn: true, po: newPlayout(name)}
 	// Keyed per track (a new share by the same person arrives as a new one).
 	key := fmt.Sprintf("%s#%d", track.ID(), track.SSRC())
 	s.remotesMu.Lock()
@@ -1039,8 +1053,8 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 			}
 		}
 		source.buf = append(source.buf, pcm[:n*channels]...)
-		if !stereo {
-			source.trimVoiceQueue()
+		if !stereo && !voiceSmoothing.Load() {
+			source.trimVoiceQueue() // smoothing's off: the plain skip-ahead
 		}
 		source.mu.Unlock()
 	}
