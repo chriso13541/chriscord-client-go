@@ -978,6 +978,7 @@ type serverMsg struct {
 	On            bool                `json:"on"`
 	By            string              `json:"by"`
 	Height        int                 `json:"height"` // voice_screen_low: the smaller version wanted (0: none)
+	Viewers       []string            `json:"viewers"` // voice_screen_viewers: who's watching your screen
 	FPS           int                 `json:"fps"`
 }
 
@@ -1192,6 +1193,12 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "voice:peer_speaking", voiceSpeakingEvent{BoardID: msg.BoardID, Username: msg.Username, Speaking: msg.Speaking})
 		case "voice_mute_state":
 			runtime.EventsEmit(a.ctx, "voice:peer_mute_state", voiceMuteStateEvent{BoardID: msg.BoardID, Username: msg.Username, Muted: msg.Muted, Deafened: msg.Deafened})
+		case "voice_screen_viewers":
+			viewers := msg.Viewers
+			if viewers == nil {
+				viewers = []string{}
+			}
+			runtime.EventsEmit(a.ctx, "screen:viewers", map[string]interface{}{"board_id": msg.BoardID, "viewers": viewers})
 		case "voice_status_snapshot":
 			runtime.EventsEmit(a.ctx, "voice:status_snapshot", voiceStatusSnapshotEvent{BoardID: msg.BoardID, Statuses: msg.Statuses})
 		case "pfp_request":

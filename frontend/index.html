@@ -257,6 +257,16 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile .vs-btn.danger { background:#c9302c; }
 /* On a tile's picture, on hover: expand it (just this one, as big as the
    area allows) and, for someone's stream, stop watching it. */
+.vs-tile .vs-viewers { position:absolute; top:8px; right:8px; z-index:3; display:flex; align-items:center; gap:4px; padding:3px 8px; border:none; border-radius:4px; background:rgba(0,0,0,.6); color:#fff; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; }
+.vs-tile .vs-viewers:hover { background:rgba(0,0,0,.8); }
+.vs-tile .vs-viewers.none { color:rgba(255,255,255,.6); }
+.vs-tile .vs-viewers .ic { width:16px; height:16px; }
+.vs-tile.has-viewers .vs-stats { top:38px; }
+.vs-tile .vs-viewers-list { position:absolute; top:38px; right:8px; z-index:4; min-width:180px; max-width:calc(100% - 16px); max-height:calc(100% - 46px); overflow-y:auto; padding:6px; border-radius:6px; background:rgb(18,18,24); box-shadow:0 6px 18px rgba(0,0,0,.45); color:#fff; font-size:.82rem; cursor:default; }
+.vs-viewers-list .vvl-title { padding:2px 4px 6px; font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:rgba(255,255,255,.65); }
+.vs-viewers-list .vvl-row { display:flex; align-items:center; gap:8px; padding:4px; border-radius:4px; min-width:0; }
+.vs-viewers-list .vvl-row .user-avatar { width:20px; height:20px; font-size:.6rem; flex-shrink:0; }
+.vs-viewers-list .vvl-row [data-dn] { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .vs-tile .vs-tools { position:absolute; top:8px; left:8px; z-index:2; display:flex; gap:6px; opacity:0; transition:opacity .15s; }
 .vs-tile:hover .vs-tools, .vs-tile .vs-tools:focus-within { opacity:1; }
 .vs-tile .vs-tools button { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 8px; border:none; border-radius:6px; background:rgba(0,0,0,.65); color:#fff; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; }
@@ -1244,6 +1254,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
   <symbol id="ic-sync" viewBox="0 -960 960 960"><path d="M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z"/></symbol>
   <symbol id="ic-expand_less" viewBox="0 -960 960 960"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></symbol>
+  <symbol id="ic-visibility" viewBox="0 -960 960 960"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/></symbol>
   <symbol id="ic-videocam" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h480q33 0 56.5 23.5T720-720v180l160-160v440L720-420v180q0 33-23.5 56.5T640-160H160Zm0-80h480v-480H160v480Zm0 0v-480 480Z"/></symbol>
   <symbol id="ic-screen_share" viewBox="0 -960 960 960"><path d="M320-400h80v-80q0-17 11.5-28.5T440-520h80v80l120-120-120-120v80h-80q-50 0-85 35t-35 85v80ZM160-240q-33 0-56.5-23.5T80-320v-440q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v440q0 33-23.5 56.5T800-240H160Zm0-80h640v-440H160v440Zm0 0v-440 440ZM40-120v-80h880v80H40Z"/></symbol>
   <symbol id="ic-stop_screen_share" viewBox="0 -960 960 960"><path d="M160-240q-33 0-56.5-23.5T80-320v-440q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v440q0 33-23.5 56.5T800-240H160Zm0-80h640v-440H160v440Zm0 0v-440 440ZM40-120v-80h880v80H40Z"/><path d="M380-640 580-440M580-640 380-440" fill="none" stroke="currentColor" stroke-width="64" stroke-linecap="round"/></symbol>
@@ -1787,7 +1798,10 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
     <div id="settings-tab-screenshare" class="settings-tab-pane">
       <h2>Screen Sharing</h2>
-      <h3 class="settings-sub" style="margin-top:0">Watching streams</h3>
+      <h3 class="settings-sub" style="margin-top:0">Sharing your screen</h3>
+      <label class="check-row"><input type="checkbox" id="ss-resume"> Reshare automatically after a disconnect</label>
+      <p class="settings-hint" style="margin-top:0">If your connection drops while you're sharing, the same screen or window is shared again as soon as you're back in the call, at the same settings. Off: the share ends when the connection drops.</p>
+      <h3 class="settings-sub">Watching streams</h3>
       <label class="check-row"><input type="checkbox" id="ss-override"> Override stream native settings</label>
       <p class="settings-hint" style="margin-top:0">Receive other people's streams at no more than the size and frame rate below, instead of whatever they're sharing at — less for this computer to download and decode. Their app sends a second, smaller version just for the people who ask for one.</p>
       <div class="ss-view-row">
@@ -2949,9 +2963,19 @@ function rememberVoiceForRejoin(){
     muted:!!document.getElementById('voice-mute-btn')?.classList.contains('muted'),
     deafened:!!document.getElementById('voice-deafen-btn')?.classList.contains('muted'),
     camera:!!(cam.on||cam.starting), // turned back on after rejoining
+    // Your screen share, shared again after rejoining if that's turned on
+    // (Settings → Screen Sharing); and the streams you were watching,
+    // watched again (the server forgets both when the connection drops).
+    screen:scr.on&&scr.source&&localStorage.getItem('screenResume')==='1'
+      ?{source:scr.source,height:scr.height,fps:scr.fps,audio:!!scr.wantAudio}:null,
+    watching:[...screenWatch],focus:vsFocus,
   };
   // The server has already dropped us from the call; stop our side of it
-  // (microphone, speaker, the dead audio connection) until we rejoin.
+  // (microphone, speaker, the dead audio connection, camera and screen
+  // share) until we rejoin.
+  if(cam.on||cam.starting)stopCamera(true);
+  if(scr.on||scr.starting)stopScreenShare(true);
+  screenWatch.clear();
   state.voiceHere=null;
   window.go.main.App.LeaveVoiceChannel().catch(()=>{});
   playSound('error');
@@ -2985,7 +3009,8 @@ async function rejoinVoiceAfterReconnect(){
     else if(r.muted)setMuteButtonState(await window.go.main.App.ToggleMute());
     playSound('join'); // you never left the list, so the snapshot itself won't play it
     if(r.camera&&!cam.on&&!cam.starting)restoreCameraAfterRejoin();
-    resendScreenWatches(); // streams you were watching (the server forgot when you dropped)
+    restoreWatchesAfterRejoin(r);
+    if(r.screen)resumeScreenShare(r.screen);
   }catch(err){
     playSound('error');
     toast('Couldn\u2019t rejoin the voice channel: '+err,true);
@@ -3522,11 +3547,16 @@ function updateVoiceConnectedBar(){
     const sw=document.getElementById('voice-switch-btn');sw.onclick=()=>toggleVoiceChannel(elsewhere);
     bar.classList.remove('hidden');setMuteButtonState(false);setDeafenButtonState(false);return;
   }
-  const boardId=state.voiceHere&&(state.voiceChannels[state.voiceHere]||[]).includes(state.username)?state.voiceHere:null;
+  // This device's call. Right after joining (or rejoining) it the server's
+  // list may not show us yet — we're still in the call: only hanging up
+  // (voiceHere cleared) ends the camera, the share and the streams. Ending
+  // them on that brief gap used to stop a share and forget every stream
+  // being watched each time a dropped connection rejoined.
+  const boardId=state.voiceHere||null;
   if(!boardId){
     bar.classList.add('hidden');setMuteButtonState(false);setDeafenButtonState(false);
     if(scr.on||scr.starting)stopScreenShare(true); // likewise a screen share
-    screenWatch.clear();
+    screenWatch.clear();screenRewatch.clear();
     if(cam.on||cam.starting)stopCamera(true); // left the call: the camera goes off with it
     else renderVideoStage();
     return;
@@ -6810,6 +6840,9 @@ const SELF_SCR='\u0000selfscreen'; // your own share's preview decoder
 const scrKey=u=>'\u0002'+u;        // someone's screen: its tile and decoder
 const isScrKey=k=>typeof k==='string'&&k.charCodeAt(0)===2;
 const screenWatch=new Set();        // whose screens you're watching
+// Streams to watch again once their sharer is back (their connection, or
+// ours, dropped while watching): username → until when (ms).
+const screenRewatch=new Map(),REWATCH_MS=90000;
 state.voiceScreens=new Set();
 
 const modeLabel=m=>{
@@ -7412,7 +7445,7 @@ function renderVideoStage(){
     const ms=state.voiceMuteStatus?.[`${board}:${u}`];
     const flags=tile.querySelector('.vs-flags');
     if(flags){
-      const html=ms?.deafened?icon('headset_off'):ms?.muted?icon('mic_off'):'';
+      const html=ms?.deafened?icon('mic_off')+icon('headset_off'):ms?.muted?icon('mic_off'):'';
       if(flags.innerHTML!==html)flags.innerHTML=html;
     }
     if(kind==='avatar'){
@@ -7711,7 +7744,7 @@ async function startScreenShare(src){
     scr.audio='';
     const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,audio,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,
       hideBorder:true});
-    Object.assign(scr,{on:true,source:src,height,fps,label});
+    Object.assign(scr,{on:true,source:src,height,fps,label,wantAudio:audio});
     dropRemoteVideo(SELF_SCR); // a switched share starts its preview afresh
     if(!was){
       scr.announcedAt=Date.now();
@@ -7725,8 +7758,33 @@ async function startScreenShare(src){
     scr.starting=false;updateScreenButton();renderVideoStage();renderSidebar();
   }
 }
+// Sharing again what was being shared when the connection dropped (Settings
+// → Screen Sharing → Reshare automatically after a disconnect).
+async function resumeScreenShare(s){
+  // Just rejoined: wait (up to 3 s) for the server to list us in the call.
+  for(let i=0;i<6&&state.voiceHere&&!inMyCall();i++)await nextVoiceSnapshot(500);
+  if(!inMyCall()||scr.on||scr.starting)return;
+  scr.starting=true;updateScreenButton();
+  try{
+    scr.audio='';
+    const label=await window.go.main.App.StartScreenShare({id:s.source.id,height:s.height,fps:s.fps,audio:s.audio,
+      encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,hideBorder:true});
+    if(!inMyCall()){window.go.main.App.StopScreenShare().catch(()=>{});return;} // hung up meanwhile
+    Object.assign(scr,{on:true,source:s.source,height:s.height,fps:s.fps,label,wantAudio:s.audio});
+    dropRemoteVideo(SELF_SCR);
+    scr.announcedAt=Date.now();
+    await window.go.main.App.SetScreenShareEnabled(true).catch(()=>{});
+    playSound('webcam_start');
+    toast(`Sharing ${s.source.name||'your screen'} again`);
+  }catch(err){
+    toast(`Couldn\u2019t share ${s.source.name||'your screen'} again: `+String(err?.message||err).replace(/^Error: /,''),true);
+  }finally{
+    scr.starting=false;updateScreenButton();renderVideoStage();renderSidebar();
+  }
+}
 function stopScreenShare(quiet){
   const was=scr.on;
+  state.screenViewers=[];
   Object.assign(scr,{on:false,starting:false,source:null});
   window.go.main.App.StopScreenShare().catch(()=>{});
   dropRemoteVideo(SELF_SCR);
@@ -7737,7 +7795,16 @@ function stopScreenShare(quiet){
 // and ours is re-announced if the server lost track (a rejoin).
 function onScreenState(list){
   state.voiceScreens=new Set(list||[]);
-  for(const u of [...screenWatch])if(!state.voiceScreens.has(u)){screenWatch.delete(u);dropRemoteVideo(scrKey(u));}
+  for(const u of [...screenWatch])if(!state.voiceScreens.has(u)){
+    // Gone because their connection dropped (they're shown as reconnecting,
+    // not as having stopped): watch again when they share again.
+    if(isVoiceReconnecting(u))screenRewatch.set(u,Date.now()+REWATCH_MS);
+    screenWatch.delete(u);dropRemoteVideo(scrKey(u));
+  }
+  for(const [u,until] of [...screenRewatch]){
+    if(Date.now()>until){screenRewatch.delete(u);continue;}
+    if(state.voiceScreens.has(u)&&inMyCall()&&!screenWatch.has(u)){screenRewatch.delete(u);watchScreen(u,true,{keepFocus:true});}
+  }
   if(scr.on&&inMyCall()&&!state.voiceScreens.has(state.username)&&Date.now()-scr.announcedAt>3000){
     scr.announcedAt=Date.now();window.go.main.App.SetScreenShareEnabled(true).catch(()=>{});
   }
@@ -7751,16 +7818,59 @@ function applyStreamAudio(u){
   const {vol,muted}=streamAudio(u);
   window.go.main.App.SetUserAudio('screen:'+u,vol,muted).catch(()=>{});
 }
-function watchScreen(user,on){
+function watchScreen(user,on,{keepFocus=false}={}){
+  screenRewatch.delete(user); // chosen now: no automatic rewatch pending
   if(on)applyStreamAudio(user);
   if(on)screenWatch.add(user);else{screenWatch.delete(user);dropRemoteVideo(scrKey(user));}
   window.go.main.App.WatchScreen(user,on).catch(err=>toast('Couldn’t '+(on?'watch':'stop watching')+': '+err,true));
-  if(on)vsFocus=scrKey(user); // a stream you open gets the big spot
-  else if(vsFocus===scrKey(user))vsFocus=null;
+  if(on&&!keepFocus)vsFocus=scrKey(user); // a stream you open gets the big spot
+  else if(!on&&vsFocus===scrKey(user))vsFocus=null;
   renderVideoStage();
 }
 function resendScreenWatches(){
   for(const u of screenWatch)window.go.main.App.WatchScreen(u,true).catch(()=>{});
+}
+function isVoiceReconnecting(u){return Object.values(state.voiceReconnecting||{}).some(l=>(l||[]).includes(u));}
+// After our own dropped connection rejoined: the streams we were watching,
+// now if they're still being shared, or as soon as they are again.
+function restoreWatchesAfterRejoin(r){
+  for(const u of r.watching||[]){
+    if(state.voiceScreens.has(u))watchScreen(u,true,{keepFocus:true});
+    else screenRewatch.set(u,Date.now()+REWATCH_MS);
+  }
+  if(r.focus&&!vsFocus){vsFocus=r.focus;renderVideoStage();}
+}
+
+// ── WHO'S WATCHING YOUR SCREEN ──
+// The server says (screen:viewers) whenever it changes; your own screen
+// tile shows the count, and clicking it lists them.
+state.screenViewers=[];
+function renderScreenViewers(tile){
+  const v=state.screenViewers||[],n=v.length;
+  let chip=tile.querySelector('.vs-viewers');
+  if(!chip){chip=document.createElement('button');chip.type='button';chip.className='vs-viewers';chip.dataset.act='scr-viewers';tile.appendChild(chip);}
+  chip.title=n?`Watching: ${v.map(displayName).join(', ')}`:'Nobody is watching yet';
+  const html=`${icon('visibility')}<span>${n}</span>`;
+  if(chip.innerHTML!==html)chip.innerHTML=html;
+  chip.classList.toggle('none',!n);
+  tile.classList.add('has-viewers');
+  const list=tile.querySelector('.vs-viewers-list');
+  if(list)fillScreenViewers(list);
+}
+function fillScreenViewers(list){
+  const v=state.screenViewers||[];
+  const sig=v.join('\n');
+  if(list.dataset.sig===sig)return;
+  list.dataset.sig=sig;
+  list.innerHTML=`<div class="vvl-title">${v.length?`Watching your screen \u2014 ${v.length}`:'Nobody is watching yet'}</div>`+
+    v.map(u=>`<div class="vvl-row" data-u="${esc(u)}"><div class="user-avatar" data-pfp-user="${esc(u)}"></div>${dnHTML(u)}</div>`).join('');
+  list.querySelectorAll('.vvl-row').forEach(r=>{const av=r.querySelector('.user-avatar');setAvatarFallback(av,r.dataset.u);applyUserAvatar(av,r.dataset.u);});
+}
+function toggleScreenViewers(tile){
+  const open=tile.querySelector('.vs-viewers-list');
+  if(open){open.remove();return;}
+  const list=document.createElement('div');list.className='vs-viewers-list';list.dataset.act='noop';
+  tile.appendChild(list);fillScreenViewers(list);
 }
 // One screen tile: yours (what you're sharing, with a preview if you want
 // one), or someone else's — a Watch button until you watch it.
@@ -7772,6 +7882,7 @@ function renderScreenTile(tile,u){
       const r=remoteVideo(SELF_SCR);
       if(r&&r.el.parentElement!==tile){tile.prepend(r.el);if(r.el.tagName==='VIDEO')r.el.play().catch(()=>{});}
     }else tile.querySelectorAll('video,canvas').forEach(el=>el.remove());
+    renderScreenViewers(tile);
     let o=tile.querySelector('.vs-scrself');
     if(!o){o=document.createElement('div');o.className='vs-scrself';tile.appendChild(o);}
     const what=scr.source?.name||'your screen';
@@ -7785,6 +7896,7 @@ function renderScreenTile(tile,u){
     return;
   }
   tile.querySelector('.vs-scrself')?.remove();
+  tile.querySelectorAll('.vs-viewers,.vs-viewers-list').forEach(el=>el.remove());tile.classList.remove('has-viewers');
   if(screenWatch.has(u)){
     tile.classList.remove('idle');
     tile.querySelector('.vs-watch')?.remove();
@@ -7820,6 +7932,7 @@ function screenTileAction(act,tile){
       const b=tile.querySelector('[data-act="stream-mute"]');if(b){b.innerHTML=icon(m?'volume_off':'volume_up');b.title=m?'Unmute stream':'Mute stream';}
       break;}
     case 'scr-stop':stopScreenShare();playSound('webcam_stop');break;
+    case 'scr-viewers':toggleScreenViewers(tile);break;
     case 'scr-change':openScreenPicker();break;
     case 'scr-preview':
       scr.preview=!scr.preview;
@@ -7830,6 +7943,15 @@ function screenTileAction(act,tile){
 }
 function initScreenShare(){
   window.runtime.EventsOn('stream:audiolag',e=>{if(e?.user)streamAudioLag.set(e.user,e.ms);});
+  window.runtime.EventsOn('screen:viewers',e=>{
+    if(!e||(state.voiceHere&&e.board_id&&e.board_id!==state.voiceHere))return;
+    state.screenViewers=(e.viewers||[]).filter(u=>u!==state.username);
+    document.querySelectorAll('#video-stage .vs-tile').forEach(t=>{if(t.querySelector('.vs-viewers'))renderScreenViewers(t);});
+  });
+  // Settings → Screen Sharing: share again after a disconnect.
+  const rs=document.getElementById('ss-resume');
+  rs.checked=localStorage.getItem('screenResume')==='1';
+  rs.addEventListener('change',()=>{localStorage.setItem('screenResume',rs.checked?'1':'0');settingsSaved();});
   // Settings → Screen Sharing: watching streams at a lower size/frame rate
   // than they're shared at. Screens being watched switch over straight away.
   const ov=document.getElementById('ss-override'),vr=document.getElementById('ss-view-res'),vf=document.getElementById('ss-view-fps');
