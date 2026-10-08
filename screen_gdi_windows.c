@@ -15,6 +15,12 @@
 // picture — so FFmpeg gets the same size of frame even if the window is
 // resized mid-share.
 //
+// Video players: when the window has a video area of its own (VLC draws its
+// video into a child window), only that area is sent — not the player's
+// menus, toolbar and seek bar — and it follows the area as the window is
+// resized or goes full screen. With no video showing (an audio file, the
+// playlist), the whole window is sent.
+//
 // Everything here must run on one OS thread (screen_gdi_windows.go locks it).
 
 #define WIN32_LEAN_AND_MEAN
@@ -48,7 +54,47 @@ struct gdicap {
     cc_dwm_get_attr_fn get_attr;
     HCURSOR cur;         // last pointer seen, and its hotspot
     int cur_hx, cur_hy;
+    HWND video;          // the player's video area, if it has one (see video_child)
+    int video_check;     // frames until it's looked for again
 };
+
+// Window classes of video players' video areas. VLC's video output lives
+// in "VLC video main", with the picture in its "VLC video output" child.
+static const wchar_t *cc_video_classes[] = { L"VLC video main", L"VLC video output" };
+
+typedef struct { HWND best; LONG area; } cc_video_search;
+
+static BOOL CALLBACK cc_find_video(HWND h, LPARAM lp) {
+    cc_video_search *vs = (cc_video_search *)lp;
+    wchar_t cls[64];
+    if (!IsWindowVisible(h) || !GetClassNameW(h, cls, 64)) return TRUE;
+    for (size_t i = 0; i < sizeof(cc_video_classes) / sizeof(cc_video_classes[0]); i++) {
+        if (wcscmp(cls, cc_video_classes[i]) != 0) continue;
+        RECT r;
+        if (GetWindowRect(h, &r)) {
+            LONG area = (r.right - r.left) * (r.bottom - r.top);
+            if (area > vs->area) { vs->area = area; vs->best = h; } // the largest: the whole picture
+        }
+    }
+    return TRUE;
+}
+
+// video_child: the visible video area inside top, or NULL. Tiny ones (a
+// player with nothing playing still has one, a few pixels big) don't count.
+static HWND video_child(HWND top) {
+    cc_video_search vs = { NULL, 0 };
+    EnumChildWindows(top, cc_find_video, (LPARAM)&vs);
+    return vs.area >= 160 * 90 ? vs.best : NULL;
+}
+
+int gdicap_video_size(unsigned long long hwnd, int *w, int *h) {
+    HWND v = video_child((HWND)(ULONG_PTR)hwnd);
+    RECT r;
+    if (!v || !GetWindowRect(v, &r)) return 0;
+    *w = r.right - r.left;
+    *h = r.bottom - r.top;
+    return 1;
+}
 
 gdicap *gdicap_open(unsigned long long hwnd, int width, int height) {
     if (width <= 0 || height <= 0) return NULL;
@@ -156,6 +202,18 @@ int gdicap_frame(gdicap *c, int draw_cursor) {
         if (GetMonitorInfoW(MonitorFromWindow(c->hwnd, MONITOR_DEFAULTTONEAREST), &mi) &&
             IntersectRect(&clip, &vis, &mi.rcWork))
             vis = clip;
+    }
+    // Just the video, when the player is showing one (looked for again
+    // every 15 frames, and whenever the one found goes away).
+    if (--c->video_check <= 0 || (c->video && !IsWindow(c->video))) {
+        c->video = video_child(c->hwnd);
+        c->video_check = 15;
+    }
+    if (c->video && IsWindowVisible(c->video)) {
+        RECT vr, both;
+        if (GetWindowRect(c->video, &vr) && IntersectRect(&both, &vr, &vis) &&
+            (both.right - both.left) * (both.bottom - both.top) >= 160 * 90)
+            vis = both;
     }
     int cx = vis.left - wr.left, cy = vis.top - wr.top;
     int cw = vis.right - vis.left, ch = vis.bottom - vis.top;

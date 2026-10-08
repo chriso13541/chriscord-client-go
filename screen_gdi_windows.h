@@ -16,5 +16,8 @@ gdicap *gdicap_open(unsigned long long hwnd, int width, int height);
 int gdicap_frame(gdicap *c, int draw_cursor);
 void *gdicap_bits(gdicap *c);
 void gdicap_close(gdicap *c);
+/* The size of a video player's video area in this window, if it has one
+   showing (returns 1), so a share can be sized to it. */
+int gdicap_video_size(unsigned long long hwnd, int *w, int *h);
 
 #endif

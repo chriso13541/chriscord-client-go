@@ -95,6 +95,7 @@ type monitorEntry struct {
 	rect    winRect // desktop coordinates (as this app sees them)
 	w, h    int     // real pixels
 	primary bool
+	number  int // Windows' own number for it (\\.\DISPLAY2 → 2), 0 if unknown
 }
 
 var (
@@ -107,6 +108,7 @@ var (
 		mi.CbSize = uint32(unsafe.Sizeof(mi))
 		if r, _, _ := pGetMonitorInfoW.Call(hmon, uintptr(unsafe.Pointer(&mi))); r != 0 {
 			m := monitorEntry{handle: hmon, rect: mi.RcMonitor, primary: mi.DwFlags&1 != 0}
+			m.number = displayNumber(syscall.UTF16ToString(mi.SzDevice[:]))
 			m.w, m.h = int(mi.RcMonitor.Right-mi.RcMonitor.Left), int(mi.RcMonitor.Bottom-mi.RcMonitor.Top)
 			// Its real resolution (the rectangle above can be scaled for DPI).
 			var dm [220]byte
@@ -127,7 +129,22 @@ var (
 	})
 )
 
-// monitors, left to right (that's how they're numbered: Screen 1, 2, …).
+// displayNumber: the number in a display's device name, "\\.\DISPLAY2" → 2 —
+// the same number Windows shows for it (Settings → Display, "Identify").
+func displayNumber(device string) int {
+	i := strings.LastIndex(strings.ToUpper(device), "DISPLAY")
+	if i < 0 {
+		return 0
+	}
+	n, err := strconv.Atoi(device[i+len("DISPLAY"):])
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
+}
+
+// monitors, left to right (the order Desktop Duplication's fallback counts
+// them in); the picker shows them by Windows' own numbers instead.
 func listMonitors() []monitorEntry {
 	enumMu.Lock()
 	defer enumMu.Unlock()
@@ -301,9 +318,23 @@ func listShareSources() ([]ShareSource, error) {
 		r    winRect
 	}
 	var jobs []job
-	for i, m := range listMonitors() {
+	// Screens, named and ordered by the numbers Windows gives them (Screen 1
+	// is the one Windows calls 1, wherever it sits), falling back to left
+	// to right for any whose number can't be read.
+	mons := listMonitors()
+	for i := range mons {
+		if mons[i].number == 0 {
+			mons[i].number = 1000 + i
+		}
+	}
+	sort.SliceStable(mons, func(i, j int) bool { return mons[i].number < mons[j].number })
+	for i, m := range mons {
+		n := m.number
+		if n >= 1000 {
+			n = i + 1
+		}
 		out = append(out, ShareSource{
-			ID: fmt.Sprintf("m:%d", m.handle), Kind: "screen", Name: fmt.Sprintf("Screen %d", i+1),
+			ID: fmt.Sprintf("m:%d", m.handle), Kind: "screen", Name: fmt.Sprintf("Screen %d", n),
 			W: m.w, H: m.h, Primary: m.primary, Index: i,
 		})
 		jobs = append(jobs, job{len(out) - 1, 0, m.rect})
@@ -373,7 +404,11 @@ func screenInput(o ScreenStart, tee *frameTee) ([]string, int, int, screenFeed, 
 	// A single window on Windows 10 (where Windows Graphics Capture always
 	// draws the yellow border): copied the way Chrome/Discord do, when the
 	// border should be hidden — or when this FFmpeg has no gfxcapture.
-	if kind == "window" && gdiWindowsSupported() && (o.HideBorder || !ffmpegFilters()["gfxcapture"]) {
+	// A video player showing a video (VLC) is copied that way on any
+	// Windows: just its picture is sent, without the player's controls.
+	_, _, isVideo := videoArea(uintptr(handle))
+	rawOK := strings.Contains(ffmpegInputs()["rawvideo"], "D")
+	if kind == "window" && rawOK && (isVideo || gdiWindowsSupported() && (o.HideBorder || !ffmpegFilters()["gfxcapture"])) {
 		hwnd := uintptr(handle)
 		if ok, _, _ := pIsWindow.Call(hwnd); ok == 0 {
 			return nil, 0, 0, nil, errors.New("that window has been closed")
@@ -382,6 +417,10 @@ func screenInput(o ScreenStart, tee *frameTee) ([]string, int, int, screenFeed, 
 			return nil, 0, 0, nil, errors.New("that window is minimised — restore it, then share it")
 		}
 		sw, sh, _ := windowSize(hwnd)
+		if vw, vh, ok := videoArea(hwnd); ok {
+			sw, sh = vw, vh // sized to the video, not the whole player
+			log.Printf("screen: window %d is a video player showing a video: sending just the video (%dx%d)", hwnd, vw, vh)
+		}
 		w, h := shareSize(sw, sh, o.Height)
 		log.Printf("screen: Windows build %d; sharing window %d without the yellow border (PrintWindow copy)", windowsBuild(), hwnd)
 		return []string{"-f", "rawvideo", "-pixel_format", "bgra", "-video_size", fmt.Sprintf("%dx%d", w, h),

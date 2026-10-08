@@ -17,6 +17,16 @@ import (
 	"unsafe"
 )
 
+// videoArea: the size of the video player's picture inside this window
+// (VLC's video area), if it's showing one — see screen_gdi_windows.c.
+func videoArea(hwnd uintptr) (w, h int, ok bool) {
+	var cw, ch C.int
+	if C.gdicap_video_size(C.ulonglong(hwnd), &cw, &ch) == 0 {
+		return 0, 0, false
+	}
+	return int(cw), int(ch), true
+}
+
 // gdiWindowFeed: frames of one window, copied without Windows Graphics
 // Capture (so with no yellow border on Windows 10 — screen_gdi_windows.c),
 // written to FFmpeg as raw BGRA at a steady fps.
