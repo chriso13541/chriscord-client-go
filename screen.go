@@ -404,6 +404,7 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 		_ = a.sendVoiceJSON(map[string]interface{}{"type": "voice_screen_native", "board_id": session.boardID, "height": h, "fps": opts.FPS})
 	}
 	go a.restartScreenLow()
+	go a.watchSharedWindow(c, opts.ID)
 	if opts.Audio {
 		select {
 		case <-c.done: // FFmpeg already gave up after its first frame
@@ -527,6 +528,37 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 			} else {
 				sent++
 			}
+		}
+	}
+}
+
+// watchSharedWindow tells the page whether the window being shared is in
+// front, behind other windows or minimised ("screen:window"), so it can
+// warn the sharer: Windows doesn't draw a minimised window at all, so its
+// stream holds on the last picture, and some apps (Firefox) only update
+// their copy while they're on screen. Checked once a second with two
+// cheap Windows calls, and only for window shares; it ends with the share.
+func (a *App) watchSharedWindow(c *nativeCamera, id string) {
+	last := sharedWindowState(id)
+	if last == "" {
+		return // a whole screen: nothing to watch
+	}
+	wailsruntime.EventsEmit(a.ctx, "screen:window", last)
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-tick.C:
+		}
+		if c.stopped.Load() {
+			return
+		}
+		if st := sharedWindowState(id); st != last {
+			last = st
+			log.Printf("screen: shared window is now %s", st)
+			wailsruntime.EventsEmit(a.ctx, "screen:window", st)
 		}
 	}
 }

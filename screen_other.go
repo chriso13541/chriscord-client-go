@@ -13,6 +13,7 @@ func screenShareUnavailable() string {
 }
 func screenWindowsSupported() bool             { return false }
 func screenGDIFallback(string) bool            { return false }
+func sharedWindowState(string) string          { return "" }
 func listShareSources() ([]ShareSource, error) { return nil, errors.New(screenShareUnavailable()) }
 func screenInput(ScreenStart, *frameTee) ([]string, int, int, screenFeed, error) {
 	return nil, 0, 0, nil, errors.New(screenShareUnavailable())

@@ -42,6 +42,8 @@ var (
 	pIsWindow                = user32.NewProc("IsWindow")
 	pIsWindowVisible         = user32.NewProc("IsWindowVisible")
 	pIsIconic                = user32.NewProc("IsIconic")
+	pGetForegroundWindow     = user32.NewProc("GetForegroundWindow")
+	pGetAncestor             = user32.NewProc("GetAncestor")
 	pGetWindowTextW          = user32.NewProc("GetWindowTextW")
 	pGetWindowTextLengthW    = user32.NewProc("GetWindowTextLengthW")
 	pGetClassNameW           = user32.NewProc("GetClassNameW")
@@ -394,6 +396,31 @@ func screenGDIFallback(id string) bool {
 }
 
 func screenWindowsSupported() bool { return ffmpegFilters()["gfxcapture"] || gdiWindowsSupported() }
+
+// sharedWindowState: how the window being shared sits right now —
+// "focused" (in front), "background" (open, behind something else),
+// "minimized", or "closed". "" for a share that isn't a window.
+func sharedWindowState(id string) string {
+	kind, handle, err := parseShareID(id)
+	if err != nil || kind != "window" {
+		return ""
+	}
+	hwnd := uintptr(handle)
+	if ok, _, _ := pIsWindow.Call(hwnd); ok == 0 {
+		return "closed"
+	}
+	if m, _, _ := pIsIconic.Call(hwnd); m != 0 {
+		return "minimized"
+	}
+	const gaRootOwner = 3
+	if fg, _, _ := pGetForegroundWindow.Call(); fg != 0 {
+		// A menu or dialog of the shared app counts as the app being in front.
+		if root, _, _ := pGetAncestor.Call(fg, gaRootOwner); fg == hwnd || root == hwnd {
+			return "focused"
+		}
+	}
+	return "background"
+}
 
 // gdiWindowsSupported: windows can be shared the border-free Windows 10 way
 // (screen_gdi_windows.c) — FFmpeg only has to read raw frames from a pipe.
