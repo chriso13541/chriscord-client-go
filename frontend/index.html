@@ -1121,6 +1121,41 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .attach-tile.error .tile-status { color:#ff9b9b; }
 .attach-tile .chip-remove { position:absolute; top:-8px; right:-8px; width:24px; height:24px; border-radius:50%; background:var(--bg-mid); border:1px solid var(--border); color:var(--text-muted); cursor:pointer; padding:0; }
 .attach-tile .chip-remove:hover { color:var(--red); }
+/* Spoiler toggle, left of the remove button. On: the thumbnail is blurred
+   and labelled, the same way everyone else will see it. */
+.attach-tile .chip-spoiler { position:absolute; top:-8px; right:22px; width:24px; height:24px; border-radius:50%; background:var(--bg-mid); border:1px solid var(--border); color:var(--text-muted); cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; }
+.attach-tile .chip-spoiler .ic { width:14px; height:14px; }
+.attach-tile .chip-spoiler:hover { color:var(--text); }
+.attach-tile.spoiler-on .chip-spoiler { background:var(--accent); border-color:var(--accent); color:#fff; }
+.attach-tile.spoiler-on .tile-thumb > :not(.tile-status):not(.tile-spoiler):not(.tile-spoiler-label) { filter:blur(14px); }
+.attach-tile.spoiler-on .tile-thumb { background-image:none !important; }
+.attach-tile .tile-spoiler { position:absolute; inset:0; background:center/cover no-repeat; filter:blur(14px); transform:scale(1.15); }
+.attach-tile .tile-spoiler-label { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); padding:3px 8px; border-radius:999px; background:rgba(0,0,0,.65); color:#fff; font-weight:700; font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; }
+
+/* ── Spoilers in messages ─────────────────────────────────────────
+   A spoiler is covered from the moment its element is made: the classes
+   are set before the image (or video) is given any data, so it can never
+   be painted unblurred, not even for a frame. Clicking removes the cover
+   for the rest of this view of the message. */
+.spoiler { position:relative; }
+.spoiler-hidden { overflow:hidden; cursor:pointer !important; isolation:isolate; }
+.spoiler-hidden > :not(.spoiler-label) { filter:blur(44px) brightness(.85) !important; pointer-events:none !important; user-select:none; }
+.spoiler-hidden > img, .spoiler-hidden > video { transform:scale(1.15); }
+.spoiler-label { display:none; }
+.spoiler-hidden > .spoiler-label { display:block; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); padding:6px 12px; border-radius:999px; background:rgba(0,0,0,.6); color:#fff; font-weight:700; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; pointer-events:none; transition:background .15s; z-index:1; }
+.spoiler-hidden:hover > .spoiler-label { background:rgba(0,0,0,.85); }
+/* A file chip or audio player is short: a smaller label, a lighter blur. */
+.msg-file-chip.spoiler-hidden > :not(.spoiler-label), .mp-audio.spoiler-hidden > :not(.spoiler-label) { filter:blur(8px) !important; }
+.msg-file-chip.spoiler-hidden > .spoiler-label, .mp-audio.spoiler-hidden > .spoiler-label { padding:3px 10px; font-size:.65rem; }
+/* Images in the grid: the wrapper takes the image's place and size. */
+.img-grid .grid-spoiler { border-radius:8px; line-height:0; }
+.img-grid-1 .grid-spoiler { max-width:min(520px,100%); }
+.img-grid-2 .grid-spoiler, .img-grid-3 .grid-spoiler, .img-grid-4 .grid-spoiler { max-width:calc(50% - 2px); }
+.img-grid .grid-spoiler .grid-img { max-width:100%; }
+.img-grid .grid-spoiler .grid-img.loading { width:260px; max-width:100%; height:180px; }
+.sr-images .grid-spoiler { border-radius:6px; line-height:0; max-width:100%; }
+.sr-images.multi .grid-spoiler { max-width:calc(50% - 2px); }
+.sr-images .grid-spoiler .sr-img { max-width:100%; }
 #input-wrap { display:flex; align-items:center; background:var(--bg-light); border-radius:8px; border:1px solid var(--border); padding:0 12px; gap:8px; transition:border-color .15s; }
 #input-wrap:focus-within { border-color:var(--accent-dim); }
 #attach-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem; padding:4px 2px; transition:color .15s; line-height:1; flex-shrink:0; }
@@ -1267,6 +1302,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
   <symbol id="ic-sync" viewBox="0 -960 960 960"><path d="M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z"/></symbol>
   <symbol id="ic-expand_less" viewBox="0 -960 960 960"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></symbol>
+<symbol id="ic-visibility_off" viewBox="0 -960 960 960"><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/></symbol>
   <symbol id="ic-visibility" viewBox="0 -960 960 960"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/></symbol>
   <symbol id="ic-videocam" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h480q33 0 56.5 23.5T720-720v180l160-160v440L720-420v180q0 33-23.5 56.5T640-160H160Zm0-80h480v-480H160v480Zm0 0v-480 480Z"/></symbol>
   <symbol id="ic-screen_share" viewBox="0 -960 960 960"><path d="M320-400h80v-80q0-17 11.5-28.5T440-520h80v80l120-120-120-120v80h-80q-50 0-85 35t-35 85v80ZM160-240q-33 0-56.5-23.5T80-320v-440q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v440q0 33-23.5 56.5T800-240H160Zm0-80h640v-440H160v440Zm0 0v-440 440ZM40-120v-80h880v80H40Z"/></symbol>
@@ -4242,7 +4278,8 @@ function renderAttachQueue(){
     const status=item.status==='converting'?`${icon('progress_activity','spin')}${esc(item.convertStage||'Converting')}${item.convertPct?` ${item.convertPct}%`:''}`
       :item.status==='pending'?`${icon('progress_activity','spin')}Uploading${item.uploadPct!=null?` ${item.uploadPct}%`:''}`
       :item.status==='error'?`${icon('error')}Failed`:'';
-    tile.innerHTML=`<div class="tile-thumb">${status?`<span class="tile-status">${status}</span>`:''}</div><span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
+    tile.innerHTML=`<div class="tile-thumb">${status?`<span class="tile-status">${status}</span>`:''}</div><span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-spoiler" type="button" title="${item.spoiler?'Unmark spoiler':'Mark as spoiler'}" aria-pressed="${!!item.spoiler}">${icon(item.spoiler?'visibility_off':'visibility')}</button><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
+    if(item.spoiler)tile.classList.add('spoiler-on');
     const thumb=tile.querySelector('.tile-thumb');
     if(item.preview){
       // Image: straight from the local file, before the upload finishes.
@@ -4255,6 +4292,13 @@ function renderAttachQueue(){
     }else{
       thumb.insertAdjacentHTML('afterbegin',icon(fileTypeIcon(item.filename,item.mime),'tile-type-ic'));
     }
+    if(item.spoiler){
+      // Blurred the way it will look in the chat. An image's own copy goes
+      // in its own layer, so the blur doesn't smear past the tile's edges.
+      if(item.preview){const s=document.createElement('div');s.className='tile-spoiler';s.style.backgroundImage=`url("${item.preview}")`;thumb.prepend(s);}
+      thumb.insertAdjacentHTML('beforeend','<span class="tile-spoiler-label">Spoiler</span>');
+    }
+    tile.querySelector('.chip-spoiler').addEventListener('click',e=>{e.stopPropagation();item.spoiler=!item.spoiler;renderAttachQueue();});
     tile.querySelector('.chip-remove').addEventListener('click',e=>{e.stopPropagation();const id=+e.currentTarget.dataset.id;
       if(state.attachQueue.find(a=>a.id===id)?.status==='converting')window.go.main.App.CancelConversion('att'+id);
       state.attachQueue=state.attachQueue.filter(a=>a.id!==id);renderAttachQueue();});
@@ -5133,10 +5177,11 @@ function buildSearchResultRow(msg){
   const imgWrap=row.querySelector('.sr-images');
   images.slice(0,4).forEach(a=>{
     const img=document.createElement('img');img.className='sr-img loading';img.alt=a.name||'image';
+    if(a.spoiler){imgWrap.appendChild(spoilerCover(img,'grid-spoiler'));}
     img.addEventListener('load',()=>img.classList.remove('loading'),{once:true});
     getImageBlobURL(a.url).then(url=>{img.src=url;limitAnimation(img,url);}).catch(err=>console.error('image load failed:',err));
     img.addEventListener('click',e=>{e.stopPropagation();getImageBlobURL(a.url).then(url=>openLightbox(url,a,msg)).catch(()=>{});});
-    imgWrap.appendChild(img);
+    if(!a.spoiler)imgWrap.appendChild(img);
   });
   applyUserAvatar(row.querySelector('.sr-avatar'),msg.username);
   row.addEventListener('click',()=>jumpToSearchResult(msg));
@@ -5199,10 +5244,11 @@ function buildMsgEl(msg,grouped){
     grid.className=`img-grid img-grid-${Math.min(images.length,4)}`;
     images.slice(0,4).forEach(a=>{
       const img=document.createElement('img');img.className='grid-img loading';img.alt=a.name||'image';
+      // A spoiler's cover goes on before the image gets its src (below).
+      if(a.spoiler)grid.appendChild(spoilerCover(img,'grid-spoiler'));else grid.appendChild(img);
       img.addEventListener('load',()=>sizeLoadedImage(img),{once:true});
       getImageBlobURL(a.url).then(url=>{img.src=url;limitAnimation(img,url);}).catch(err=>console.error('image load failed:',err));
       img.addEventListener('click',()=>getImageBlobURL(a.url).then(url=>openLightbox(url,a,msg)).catch(()=>{}));
-      grid.appendChild(img);
     });
     body.appendChild(grid);
   }
@@ -5216,6 +5262,7 @@ function buildMsgEl(msg,grouped){
     }else{
       const chip=document.createElement('div');chip.className='msg-file-chip';
       chip.innerHTML=`${icon(fileTypeIcon(a.name,a.mime),'file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
+      if(a.spoiler)coverSpoiler(chip);
       chip.addEventListener('click',()=>downloadAttachment(a));
       body.appendChild(chip);
     }
@@ -5412,7 +5459,7 @@ async function sendMessage(){
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
   input.value='';autoResize(input);closeEmojiSuggest();renderComposerHighlight();
   stopTyping(); // sent — back to the plain green circle
-  const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime}));
+  const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime,...(a.spoiler?{spoiler:true}:{})}));
   // The picture you just sent is already in memory from its preview — seed
   // the image cache so your own message shows it without downloading it
   // straight back from the server.
@@ -5596,6 +5643,7 @@ function buildMediaPlayer(a,kind){
   }else attachMediaSource(media,a.url,()=>showUnplayable(wrap,a,kind));
   if(kind==='video')watchPartialPlayback(wrap,media,a);
   paintPlay();paintVol();
+  if(a.spoiler)coverSpoiler(wrap); // before it's on screen (the caller adds it)
   return wrap;
 }
 // Keys for the video player that has them — the one in fullscreen, or the
@@ -5732,6 +5780,35 @@ function sizeLoadedImage(img){
   if(wasNearBottom){c.scrollTop=c.scrollHeight;return;}
   const delta=(img.getBoundingClientRect().height-before.height)/uiScale();
   if(delta&&before.bottom<=c.getBoundingClientRect().top)c.scrollTop+=delta;
+}
+
+// ── SPOILERS ─────────────────────────────────────────────────────
+// coverSpoiler(el) blurs everything inside el under a "Spoiler" label until
+// it's clicked; that first click only uncovers it (it doesn't also open the
+// image or start a download). Called while the element is being built,
+// before it's in the page or has any image/video data, so a spoiler is
+// never shown unblurred first and then covered.
+function coverSpoiler(el){
+  el.classList.add('spoiler','spoiler-hidden');
+  const label=document.createElement('span');label.className='spoiler-label';label.textContent='Spoiler';
+  el.appendChild(label);
+  el.setAttribute('role','button');el.tabIndex=0;el.setAttribute('aria-label','Spoiler, click to show');
+  const reveal=e=>{
+    if(!el.classList.contains('spoiler-hidden'))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    el.classList.remove('spoiler-hidden');
+    el.removeAttribute('role');el.removeAttribute('aria-label');el.removeAttribute('tabindex');
+  };
+  el.addEventListener('click',reveal,true);
+  el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')reveal(e);},true);
+  return el;
+}
+// An image needs a wrapper to carry the label: returns it, covered, with
+// the image inside.
+function spoilerCover(img,cls){
+  const w=document.createElement('div');w.className=cls;
+  w.appendChild(img);
+  return coverSpoiler(w);
 }
 
 // Markup for a UI icon from the sprite at the top of <body>.

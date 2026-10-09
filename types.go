@@ -85,6 +85,9 @@ type Attachment struct {
 	URL  string `json:"url"`
 	Name string `json:"name"`
 	Mime string `json:"mime"`
+	// Spoiler: shown blurred until clicked. omitempty, so servers from
+	// before spoilers just see an ordinary attachment.
+	Spoiler bool `json:"spoiler,omitempty"`
 }
 
 type ChatMessage struct {

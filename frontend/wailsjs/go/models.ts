@@ -38,6 +38,7 @@ export namespace main {
 	    url: string;
 	    name: string;
 	    mime: string;
+	    spoiler?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Attachment(source);
@@ -48,6 +49,7 @@ export namespace main {
 	        this.url = source["url"];
 	        this.name = source["name"];
 	        this.mime = source["mime"];
+	        this.spoiler = source["spoiler"];
 	    }
 	}
 	export class Board {
