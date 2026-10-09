@@ -168,6 +168,8 @@ export function RequestVideoKeyframe(arg1:string):Promise<void>;
 
 export function ResolveServerAddress(arg1:string):Promise<string>;
 
+export function RestartToUpdate():Promise<void>;
+
 export function SaveAccountExport():Promise<string>;
 
 export function SaveClientSettings(arg1:string):Promise<void>;
@@ -241,6 +243,8 @@ export function UnlockAccount(arg1:string):Promise<main.AccountView>;
 export function UpdateEmoji(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function UpdateServer(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<main.SavedServer>>;
+
+export function UpdateStatus():Promise<main.UpdateStatus>;
 
 export function UpdateSticker(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 

@@ -1017,6 +1017,12 @@ body.bg-image #titlebar { background:var(--pane-bg); backdrop-filter:blur(12px);
 #titlebar .tb-btn:active { background:var(--border); }
 #titlebar .tb-close:hover { background:#e81123; color:#fff; }
 #titlebar .tb-close:active { background:#f1707a; color:#fff; }
+/* Update ready (like Discord's green arrow): only shown when there's one. */
+#titlebar .tb-btn.tb-update { color:var(--green); }
+#titlebar .tb-btn.tb-update svg { width:18px; height:18px; }
+#titlebar .tb-btn.tb-update:hover { background:color-mix(in srgb, var(--green) 18%, transparent); }
+#titlebar .tb-btn.tb-update:active { background:color-mix(in srgb, var(--green) 30%, transparent); }
+#titlebar .tb-btn.tb-update:disabled { opacity:.5; }
 body.tb-mac #titlebar .tb-controls { display:none; }
 body.tb-mac #titlebar .tb-title { padding-left:78px; justify-content:center; padding-right:78px; } /* room for the traffic lights */
 /* Full-screen layers start below the bar, so it's never covered. */
@@ -1230,6 +1236,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 <div id="titlebar" class="hidden">
   <div class="tb-title"><span class="tb-app">Chriscord</span><span class="tb-where" id="tb-where"></span></div>
   <div class="tb-controls">
+    <button class="tb-btn tb-update hidden" id="tb-update" title="Update ready — click to restart Chriscord and install it" aria-label="Update ready"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button>
     <button class="tb-btn" id="tb-min" title="Minimize" aria-label="Minimize"><svg viewBox="0 0 10 10"><path d="M0 5.5h10" stroke="currentColor" stroke-width="1"/></svg></button>
     <button class="tb-btn" id="tb-max" title="Maximize" aria-label="Maximize"><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg></button>
     <button class="tb-btn tb-close" id="tb-close" title="Close" aria-label="Close"><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.1"/></svg></button>
@@ -9221,6 +9228,31 @@ async function initTitlebar(){
   bar.addEventListener('dblclick',e=>{if(!e.target.closest('.tb-controls')){window.runtime.WindowToggleMaximise();setTimeout(syncMax,150);}});
   window.addEventListener('resize',()=>{clearTimeout(syncMax.t);syncMax.t=setTimeout(syncMax,100);});
   syncMax();
+  initUpdateButton();
+}
+
+// The green arrow left of minimise: shown only once the app has found a
+// newer build (update.go; it checks quietly about once an hour). Clicking it
+// closes Chriscord and runs the launcher, which installs the update and opens
+// it again.
+function initUpdateButton(){
+  const btn=document.getElementById('tb-update');
+  const show=s=>{
+    if(!s?.available)return;
+    btn.dataset.tip=btn.title=`Update ready${s.version?` (${s.version})`:''} — click to restart Chriscord and install it`;
+    btn.classList.remove('hidden');
+  };
+  const restart=async()=>{
+    btn.disabled=true;
+    try{await window.go.main.App.RestartToUpdate();}
+    catch(err){btn.disabled=false;toast('Couldn\u2019t restart to update: '+err,true);}
+  };
+  btn.addEventListener('click',()=>{
+    if(state.voiceHere){toast('Restarting will disconnect you from the call.',false,{label:'Restart now',fn:restart});return;}
+    restart();
+  });
+  window.runtime.EventsOn('update:available',show);
+  window.go.main.App.UpdateStatus().then(show).catch(()=>{}); // in case it was found before the page was ready
 }
 function updateTitlebarLocation(){
   const onChat=!document.getElementById('screen-chat')?.classList.contains('hidden');

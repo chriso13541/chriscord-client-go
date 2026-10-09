@@ -14,8 +14,13 @@ import (
 //go:embed all:frontend
 var assets embed.FS
 
+// singleInstanceID names Chriscord's single-instance lock. Keep it the same
+// in every build, or an old and a new copy could run side by side.
+const singleInstanceID = "app.chriscord.client"
+
 func main() {
 	app := NewApp()
+	allowOtherInstanceToFocus()
 
 	err := wails.Run(&options.App{
 		Title:     "Chriscord",
@@ -46,6 +51,14 @@ func main() {
 		},
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true,
+		},
+		// Only one Chriscord at a time: starting it again (the shortcut, the
+		// Start menu, the launcher after an update) brings the window that's
+		// already open to the front instead of opening a second one, which
+		// would log in twice and fight over the microphone.
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId:               singleInstanceID,
+			OnSecondInstanceLaunch: app.onSecondInstanceLaunch,
 		},
 		OnStartup: app.startup,
 		OnShutdown: app.shutdown, // leave any call and close cleanly when the window closes

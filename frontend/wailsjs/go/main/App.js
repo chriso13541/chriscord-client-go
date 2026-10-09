@@ -334,6 +334,10 @@ export function ResolveServerAddress(arg1) {
   return window['go']['main']['App']['ResolveServerAddress'](arg1);
 }
 
+export function RestartToUpdate() {
+  return window['go']['main']['App']['RestartToUpdate']();
+}
+
 export function SaveAccountExport() {
   return window['go']['main']['App']['SaveAccountExport']();
 }
@@ -480,6 +484,10 @@ export function UpdateEmoji(arg1, arg2, arg3) {
 
 export function UpdateServer(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateServer'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateStatus() {
+  return window['go']['main']['App']['UpdateStatus']();
 }
 
 export function UpdateSticker(arg1, arg2, arg3, arg4) {

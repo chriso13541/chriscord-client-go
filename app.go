@@ -23,6 +23,7 @@ import (
 
 	"github.com/gordonklaus/portaudio"
 	"github.com/gorilla/websocket"
+	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -49,6 +50,9 @@ type App struct {
 	// PrepareAccountExport and SaveAccountExport (see those).
 	pendingExport    []byte
 	pendingExportAs  string
+	// updates watches for a newer build (the title bar's update arrow);
+	// see update.go.
+	updates          updateWatcher
 }
 
 func NewApp() *App { return &App{} }
@@ -59,6 +63,19 @@ func (a *App) startup(ctx context.Context) {
 	if err := portaudio.Initialize(); err != nil {
 		runtime.LogWarningf(ctx, "portaudio init failed, voice audio won't work: %v", err)
 	}
+	a.startUpdateWatcher()
+}
+
+// onSecondInstanceLaunch runs when Chriscord is started while it's already
+// open (see SingleInstanceLock in main.go): show this window instead. The
+// second copy exits by itself.
+func (a *App) onSecondInstanceLaunch(options.SecondInstanceData) {
+	if a.ctx == nil {
+		return // still starting up; the window is about to appear anyway
+	}
+	runtime.WindowUnminimise(a.ctx)
+	runtime.WindowShow(a.ctx) // restores it if minimised and brings it to the front
+	a.updates.onSecondLaunch()
 }
 
 func normaliseHTTP(domain string) string {
