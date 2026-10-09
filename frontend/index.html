@@ -614,6 +614,12 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .msg-file-chip { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:8px 12px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--text); font-size:.85rem; transition:border-color .15s; user-select:text; }
 .msg-file-chip:hover { border-color:var(--accent); }
 .msg-file-chip .fname { font-weight:600; color:var(--text-strong); }
+/* "Download all N files": under a message's attachments when it has
+   several; quieter than a file chip so it doesn't compete with them. */
+.msg-zip-chip { display:flex; align-items:center; gap:6px; width:fit-content; margin-top:6px; padding:4px 10px 4px 8px; background:none; border:1px solid var(--border); border-radius:999px; color:var(--text-muted); font:inherit; font-size:.8rem; cursor:pointer; transition:color .15s,border-color .15s; }
+.msg-zip-chip:hover { color:var(--text); border-color:var(--accent); }
+.msg-zip-chip .ic { width:16px; height:16px; }
+.msg-zip-chip.busy { cursor:progress; color:var(--text); }
 
 /* Inline edit */
 .msg-edit-wrap { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
@@ -5215,6 +5221,16 @@ function buildMsgEl(msg,grouped){
     }
   });
 
+  // Several files of ours: one button to get them all as a zip.
+  const zippable=attachments.filter(isServerFile);
+  if(zippable.length>=2){
+    const zipBtn=document.createElement('button');zipBtn.type='button';zipBtn.className='msg-zip-chip';
+    zipBtn.dataset.tip=`Download all ${zippable.length} files as one .zip`;
+    zipBtn.innerHTML=`${icon('folder_zip')}<span>Download all</span>`;
+    zipBtn.addEventListener('click',e=>{e.stopPropagation();downloadAllAttachments(msg,zipBtn);});
+    body.appendChild(zipBtn);
+  }
+
   // Wire link clicks
   div.querySelectorAll('.msg-link').forEach(a=>{
     a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);});
@@ -5273,6 +5289,36 @@ async function downloadAttachment(a){
     const sep=base.includes('?')?'&':'?';
     await window.go.main.App.OpenURL(`${base}${sep}download=1&name=${strictEncode(a.name||'file')}`);
   }catch(err){toast('Download failed: '+err,true);}
+}
+// "Download all": the server zips every file in the message and hands back
+// a short-lived link (5 minutes, like single files), which opens in the
+// browser like any other download. The zip is deleted on the server once
+// that link expires. Building it can take a moment for big files, so the
+// button says what's happening meanwhile.
+const isServerFile=a=>!a.external&&typeof a.url==='string'&&a.url.startsWith('/api/files/');
+async function downloadAllAttachments(msg,btn){
+  btn=btn||document.querySelector(`.msg-group[data-id="${CSS.escape(msg.id)}"] .msg-zip-chip`);
+  if(btn?.classList.contains('busy'))return;
+  const label=btn?.querySelector('span'),icn=btn?.querySelector('.ic');
+  const oldIcon=icn?.outerHTML;
+  if(btn){
+    btn.classList.add('busy');
+    label.textContent='Zipping files\u2026';
+    icn.outerHTML=icon('progress_activity','spin');
+  }else toast('Zipping files\u2026');
+  try{
+    const z=await window.go.main.App.GetMessageZipLink(msg.id);
+    await window.go.main.App.OpenURL(z.url); // the server always sends it as a download, named for you
+  }catch(err){
+    const m=String(err);
+    toast(/HTTP 404/.test(m)?'This server needs an update before it can zip files.':'Download all failed: '+m,true);
+  }finally{
+    if(btn){
+      btn.classList.remove('busy');
+      label.textContent='Download all';
+      btn.querySelector('.ic').outerHTML=oldIcon;
+    }
+  }
 }
 function closeDropdown(){if(dotsMenuFor)closeContextMenu();state.activeDropdown=null;}
 
@@ -8867,6 +8913,7 @@ function messageMenu(msgEl,msg,e){
     }},
     isOwn&&!msg.kind?{label:'Edit Message',icon:'edit',action:()=>startEdit(msgEl,msg)}:null,
     ...(!imgAttach?attachments.map(a=>({label:`Download ${a.name||'file'}`,icon:'download',action:()=>downloadAttachment(a)})):[]),
+    !imgAttach&&attachments.filter(isServerFile).length>=2?{label:'Download All as .zip',icon:'folder_zip',action:()=>downloadAllAttachments(msg)}:null,
     (isOwn||can(PERM.MANAGE))?'-':null,
     (isOwn||can(PERM.MANAGE))?{label:'Delete Message',icon:'delete',danger:true,action:()=>showDeleteConfirm(msg.id)}:null,
   ];

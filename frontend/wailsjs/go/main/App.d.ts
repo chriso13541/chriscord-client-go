@@ -68,6 +68,8 @@ export function GetFileURL(arg1:string):Promise<string>;
 
 export function GetFingerprint():Promise<string>;
 
+export function GetMessageZipLink(arg1:string):Promise<main.MessageZip>;
+
 export function GetMessagesAround(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
 
 export function GetMessagesBefore(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;

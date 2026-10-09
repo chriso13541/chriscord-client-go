@@ -1703,6 +1703,30 @@ func (a *App) GetFileLink(path string) (string, error) {
 	return normaliseHTTP(a.domain) + resp.URL, nil
 }
 
+// MessageZip is a short-lived link to a zip of all of a message's files.
+type MessageZip struct {
+	URL  string `json:"url"`
+	Name string `json:"name"` // what the browser saves it as
+	Size int64  `json:"size"`
+}
+
+// GetMessageZipLink asks the server to zip every file attached to a
+// message ("Download all") and returns a link to the zip, valid for the
+// same 5 minutes as a single file's link. The server builds the zip if it
+// doesn't have one for this message yet (which takes a moment for big
+// files) and deletes it once the link has expired. Servers from before
+// this feature answer HTTP 404.
+func (a *App) GetMessageZipLink(messageID string) (*MessageZip, error) {
+	var z MessageZip
+	if err := a.doGET("/api/messages/"+url.PathEscape(messageID)+"/zip/link", &z); err != nil {
+		return nil, err
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	z.URL = normaliseHTTP(a.domain) + z.URL
+	return &z, nil
+}
+
 // GetFileURL returns the full URL for a server-relative path.
 func (a *App) GetFileURL(path string) string {
 	a.mu.Lock(); defer a.mu.Unlock()
