@@ -10,6 +10,10 @@ export function ActiveAccount() {
   return window['go']['main']['App']['ActiveAccount']();
 }
 
+export function AutoLogin() {
+  return window['go']['main']['App']['AutoLogin']();
+}
+
 export function CameraModes(arg1) {
   return window['go']['main']['App']['CameraModes'](arg1);
 }
@@ -324,6 +328,14 @@ export function RecheckGPUEncoder() {
 
 export function ReconnectVoice(arg1) {
   return window['go']['main']['App']['ReconnectVoice'](arg1);
+}
+
+export function RememberAccount(arg1) {
+  return window['go']['main']['App']['RememberAccount'](arg1);
+}
+
+export function RememberAvailable() {
+  return window['go']['main']['App']['RememberAvailable']();
 }
 
 export function RemoveServer(arg1) {

@@ -495,6 +495,13 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 	if err != nil {
 		return nil, err
 	}
+	return accountFromKeys(slug, pub, priv), nil
+}
+
+// accountFromKeys builds the in-memory account from its decrypted key pair
+// (by passphrase, or a saved sign-in: remember.go) and its plaintext files.
+func accountFromKeys(slug string, pub ed25519.PublicKey, priv ed25519.PrivateKey) *Account {
+	dir := filepath.Join(accountsDir(), slug)
 	meta, err := readAccountMeta(dir)
 	username := "unnamed"
 	var pfpUpdatedAt, profileUpdatedAt int64
@@ -520,7 +527,7 @@ func unlockSlug(slug, passphrase string) (*Account, error) {
 		Slug: slug, Username: username, PublicKey: pub, PrivateKey: priv,
 		HasAvatar: hasAvatar, AvatarPath: avatarPath, PfpUpdatedAt: pfpUpdatedAt,
 		Bio: bio, Tint: tint, Nickname: nickname, ProfileUpdatedAt: profileUpdatedAt,
-	}, nil
+	}
 }
 
 // UnlockActiveAccount decrypts whichever account is currently marked active.

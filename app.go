@@ -174,6 +174,51 @@ func (a *App) UnlockAccount(passphrase string) (*AccountView, error) {
 	return acct.View(), nil
 }
 
+// RememberAvailable says whether "Keep me signed in" can be offered here
+// (Windows, for now: remember.go).
+func (a *App) RememberAvailable() bool { return rememberSupported }
+
+// RememberAccount turns "Keep me signed in" on or off for the account
+// that's signed in now.
+func (a *App) RememberAccount(on bool) error {
+	a.mu.Lock()
+	acct := a.account
+	a.mu.Unlock()
+	if acct == nil {
+		return fmt.Errorf("not signed in")
+	}
+	if !on {
+		forgetRemembered(acct.Slug)
+		return nil
+	}
+	return saveRemembered(acct)
+}
+
+// AutoLogin signs in with the saved sign-in of the account the unlock
+// screen would unlock, if it was kept signed in on this computer. nil
+// (and no error) means there isn't one: show the unlock screen. A saved
+// sign-in that no longer works is deleted, so it's only tried once.
+func (a *App) AutoLogin() *AccountView {
+	a.mu.Lock()
+	signedIn := a.account != nil
+	a.mu.Unlock()
+	slug, err := getActiveSlug()
+	if signedIn || err != nil || slug == "" || !isRemembered(slug) {
+		return nil
+	}
+	acct, err := loadRemembered(slug)
+	if err != nil {
+		log.Printf("account: automatic sign-in failed, asking for the passphrase: %v", err)
+		forgetRemembered(slug)
+		return nil
+	}
+	a.mu.Lock()
+	a.account = acct
+	a.mu.Unlock()
+	log.Printf("account: signed in automatically as %s", acct.Slug)
+	return acct.View()
+}
+
 // ActiveAccount describes the account the unlock screen will unlock,
 // without unlocking it (nil if there's none).
 func (a *App) ActiveAccount() *AccountSummary {
@@ -232,6 +277,9 @@ func (a *App) LogOut() {
 	a.Disconnect()
 	a.mu.Lock()
 	if a.account != nil {
+		// Logging out also stops this computer keeping you signed in;
+		// otherwise the next start would sign straight back in.
+		forgetRemembered(a.account.Slug)
 		for i := range a.account.PrivateKey {
 			a.account.PrivateKey[i] = 0
 		}

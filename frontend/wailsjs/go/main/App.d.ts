@@ -6,6 +6,8 @@ export function AccountAvatar(arg1:string):Promise<string>;
 
 export function ActiveAccount():Promise<main.AccountSummary>;
 
+export function AutoLogin():Promise<main.AccountView>;
+
 export function CameraModes(arg1:string):Promise<Array<main.CameraMode>>;
 
 export function CancelAccountExport():Promise<void>;
@@ -163,6 +165,10 @@ export function ReadImageFiles(arg1:Array<string>):Promise<Array<main.EmojiFile>
 export function RecheckGPUEncoder():Promise<Record<string, any>>;
 
 export function ReconnectVoice(arg1:Array<string>):Promise<void>;
+
+export function RememberAccount(arg1:boolean):Promise<void>;
+
+export function RememberAvailable():Promise<boolean>;
 
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
