@@ -1043,6 +1043,25 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .pf-seg button.on { background:var(--accent); color:#fff; }
 #pf-limits.off { opacity:.45; pointer-events:none; }
 #settings-tab-performance .settings-hint { margin-bottom:18px; }
+/* Settings > About */
+.about-card { padding:18px 20px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
+.about-name { font-weight:800; letter-spacing:.06em; text-transform:uppercase; font-size:.8rem; color:var(--text-muted); }
+.about-version { margin-top:6px; font-size:1.35rem; font-weight:700; color:var(--text-strong); font-variant-numeric:tabular-nums; word-break:break-all; }
+.about-meta { margin-top:4px; font-size:.82rem; color:var(--text-muted); }
+.about-meta a { color:var(--text-link, var(--accent)); cursor:pointer; text-decoration:none; }
+.about-meta a:hover { text-decoration:underline; }
+#settings-tab-about .settings-label { margin-top:26px; }
+.about-update { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
+.about-update .au-ic { width:24px; height:24px; flex-shrink:0; color:var(--text-muted); }
+.about-update.ok .au-ic, .about-update.available .au-ic { color:var(--green); }
+.about-update.error .au-ic { color:var(--red); }
+.about-update .au-text { flex:1; min-width:200px; }
+.about-update .au-title { font-weight:600; color:var(--text-strong); font-size:.9rem; }
+.about-update .au-sub { margin-top:2px; font-size:.8rem; color:var(--text-muted); line-height:1.45; }
+.about-update .au-btns { display:flex; gap:8px; }
+.about-update .settings-secondary-btn { margin-top:0; }
+.about-update .btn-update { background:var(--green); color:#fff; }
+.about-update button:disabled { opacity:.6; cursor:default; }
 #settings-tab-performance #pf-cpu-hint { margin-top:2px; }
 /* Lightbox */
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:200; overflow:hidden; user-select:none; }
@@ -1302,7 +1321,9 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-volume_off" viewBox="0 -960 960 960"><path d="M792-56 671-177q-25 16-53 27.5T560-131v-82q14-5 27.5-10t25.5-12L480-368v208L280-360H120v-240h128L56-792l56-56 736 736-56 56Zm-8-232-58-58q17-31 25.5-65t8.5-70q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 53-14.5 102T784-288ZM650-422l-90-90v-130q47 22 73.5 66t26.5 96q0 15-2.5 29.5T650-422ZM480-592 376-696l104-104v208Zm-80 238v-94l-72-72H200v80h114l86 86Zm-36-130Z"/></symbol>
   <symbol id="ic-sync" viewBox="0 -960 960 960"><path d="M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z"/></symbol>
   <symbol id="ic-expand_less" viewBox="0 -960 960 960"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></symbol>
-<symbol id="ic-visibility_off" viewBox="0 -960 960 960"><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/></symbol>
+<symbol id="ic-check_circle" viewBox="0 -960 960 960"><path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ic-update" viewBox="0 -960 960 960"><path d="M480-120q-75 0-140.5-28.5t-114-77q-48.5-48.5-77-114T120-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T480-840q82 0 155.5 35T760-706v-94h80v240H600v-80h110q-41-56-101-88t-129-32q-117 0-198.5 81.5T200-480q0 117 81.5 198.5T480-200q105 0 183.5-68T756-440h82q-15 137-117.5 228.5T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></symbol>
+  <symbol id="ic-visibility_off" viewBox="0 -960 960 960"><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/></symbol>
   <symbol id="ic-visibility" viewBox="0 -960 960 960"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/></symbol>
   <symbol id="ic-videocam" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h480q33 0 56.5 23.5T720-720v180l160-160v440L720-420v180q0 33-23.5 56.5T640-160H160Zm0-80h480v-480H160v480Zm0 0v-480 480Z"/></symbol>
   <symbol id="ic-screen_share" viewBox="0 -960 960 960"><path d="M320-400h80v-80q0-17 11.5-28.5T440-520h80v80l120-120-120-120v80h-80q-50 0-85 35t-35 85v80ZM160-240q-33 0-56.5-23.5T80-320v-440q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v440q0 33-23.5 56.5T800-240H160Zm0-80h640v-440H160v440Zm0 0v-440 440ZM40-120v-80h880v80H40Z"/></symbol>
@@ -1655,6 +1676,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div class="settings-tab" data-tab="voice">Voice &amp; Video</div>
     <div class="settings-tab" data-tab="screenshare">Screen Sharing</div>
     <div class="settings-tab" data-tab="performance">Performance</div>
+    <div class="settings-tab" data-tab="about">About</div>
   </div>
   <div id="settings-content">
     <div id="settings-tab-profile" class="settings-tab-pane active">
@@ -1843,6 +1865,17 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <p class="settings-hint pf-gpu-problem hidden" id="pf-gpu-problem"></p>
         <button class="settings-secondary-btn" type="button" id="pf-gpu-recheck" style="margin-top:4px">Check again</button>
       </div>
+    </div>
+
+    <div id="settings-tab-about" class="settings-tab-pane">
+      <h2>About</h2>
+      <div class="about-card">
+        <div class="about-name">Chriscord</div>
+        <div class="about-version" id="about-version"></div>
+        <div class="about-meta" id="about-meta"></div>
+      </div>
+      <label class="settings-label">Updates</label>
+      <div class="about-update" id="about-update" aria-live="polite"></div>
     </div>
 
     <div id="settings-tab-screenshare" class="settings-tab-pane">
@@ -3712,6 +3745,79 @@ function switchSettingsTab(name){
   document.getElementById('settings-content').classList.toggle('wide',name==='profile'||name==='appearance');
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
+  if(name==='about')renderAbout();
+}
+
+// ── SETTINGS > ABOUT ─────────────────────────────────────────────
+// The running build's version (the same one chriscord.app shows, made from
+// the git commit's date and hash), and a manual update check. Updating is
+// the same as the title bar arrow: Chriscord closes, the launcher installs
+// the new build, and Chriscord opens again.
+const about={state:'idle',version:'',error:'',checkedAt:0};
+async function renderAbout(){
+  let info={};
+  try{info=await window.go.main.App.GetAboutInfo();}catch{}
+  const ver=document.getElementById('about-version'),meta=document.getElementById('about-meta');
+  if(!info.installed){
+    ver.textContent='Development build';
+    meta.textContent='Not installed with the Chriscord installer.';
+    about.state='uninstalled';
+  }else{
+    ver.textContent=info.version||'Unknown version';
+    const parts=[];
+    if(info.channel)parts.push(info.channel==='stable'?'Stable':info.channel[0].toUpperCase()+info.channel.slice(1));
+    const when=info.released?new Date(info.released):null;
+    if(when&&!isNaN(when))parts.push('released '+when.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}));
+    meta.textContent=parts.join(' \u00b7 ');
+    if(info.commit){
+      meta.append(parts.length?' \u00b7 ':'');
+      const a=document.createElement('a');a.textContent='commit '+info.commit.slice(0,7);a.title='See this commit on GitHub';
+      a.addEventListener('click',()=>window.go.main.App.OpenURL('https://github.com/chriso13541/chriscord-client-go/commit/'+encodeURIComponent(info.commit)).catch(()=>{}));
+      meta.append(a);
+    }
+    if(info.update?.available){about.state='available';about.version=info.update.version||'';}
+    else if(about.state==='uninstalled')about.state='idle';
+  }
+  paintAboutUpdate();
+}
+function paintAboutUpdate(){
+  const box=document.getElementById('about-update');if(!box)return;
+  const ago=()=>{const s=Math.round((Date.now()-about.checkedAt)/1000);return s<60?'just now':s<3600?`${Math.round(s/60)} min ago`:'over an hour ago';};
+  const inCall=!!state.voiceHere;
+  const views={
+    idle:       {ic:'update',            title:'Updates',                    sub:'Chriscord checks for updates by itself about once an hour.', btn:'Check for updates'},
+    checking:   {ic:'progress_activity', spin:true, title:'Checking for updates\u2026', sub:'Asking chriscord.app for the latest version.'},
+    ok:         {ic:'check_circle',      title:'You\u2019re up to date',    sub:`This is the latest version. Checked ${ago()}.`, btn:'Check again'},
+    available:  {ic:'download',          title:about.version?`Version ${about.version} is ready`:'An update is ready',
+                 sub:'Chriscord will close, install it and open again. It takes a few seconds.'+(inCall?' You\u2019ll leave your call.':''), btn:'Restart and update', primary:true},
+    restarting: {ic:'progress_activity', spin:true, title:'Restarting\u2026', sub:'Chriscord will open again in a moment.'},
+    error:      {ic:'error',             title:'Couldn\u2019t check for updates', sub:about.error||'Something went wrong.', btn:'Try again'},
+    uninstalled:{ic:'info',              title:'Updates aren\u2019t available', sub:'This copy wasn\u2019t installed with the Chriscord installer, so it can\u2019t update itself. Get the installer from chriscord.app.'},
+  };
+  const v=views[about.state]||views.idle;
+  box.className='about-update'+(about.state==='ok'?' ok':about.state==='available'?' available':about.state==='error'?' error':'');
+  box.innerHTML=`${icon(v.ic,'au-ic'+(v.spin?' spin':''))}<div class="au-text"><div class="au-title">${esc(v.title)}</div><div class="au-sub">${esc(v.sub)}</div></div>`
+    +(v.btn?`<div class="au-btns"><button type="button" class="${v.primary?'btn btn-update':'settings-secondary-btn'}" id="about-update-btn">${esc(v.btn)}</button></div>`:'');
+  document.getElementById('about-update-btn')?.addEventListener('click',about.state==='available'?aboutRestart:aboutCheck);
+}
+async function aboutCheck(){
+  if(about.state==='checking')return;
+  about.state='checking';paintAboutUpdate();
+  const started=Date.now();
+  let res=null,err=null;
+  try{res=await window.go.main.App.CheckForUpdates();}catch(e){err=e;}
+  // Long enough to see that it checked, even when the answer is instant.
+  await new Promise(r=>setTimeout(r,Math.max(0,600-(Date.now()-started))));
+  about.checkedAt=Date.now();
+  if(err){about.state='error';const m=String(err).replace(/^Error:\s*/,'');about.error=m.charAt(0).toUpperCase()+m.slice(1)+(/[.!?]$/.test(m)?'':'.');}
+  else if(res?.available){about.state='available';about.version=res.version||'';}
+  else about.state='ok';
+  paintAboutUpdate();
+}
+async function aboutRestart(){
+  about.state='restarting';paintAboutUpdate();
+  try{await window.go.main.App.RestartToUpdate();}
+  catch(err){about.state='error';about.error='Couldn\u2019t restart to update: '+String(err);paintAboutUpdate();}
 }
 
 // ── PROFILE PICTURE CROPPER ──────────────────────────────────────
@@ -9365,6 +9471,7 @@ function initUpdateButton(){
     if(!s?.available)return;
     btn.dataset.tip=btn.title=`Update ready${s.version?` (${s.version})`:''} — click to restart Chriscord and install it`;
     btn.classList.remove('hidden');
+    if(about.state!=='restarting'){about.state='available';about.version=s.version||'';paintAboutUpdate();}
   };
   const restart=async()=>{
     btn.disabled=true;

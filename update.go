@@ -64,6 +64,7 @@ type launcherState struct {
 	Channel  string `json:"channel"`
 	Released string `json:"released"`
 	Version  string `json:"version"`
+	Commit   string `json:"commit"`
 	SHA256   string `json:"sha256"`
 }
 
@@ -149,14 +150,10 @@ func (a *App) watchForUpdates() {
 		}
 		found, version := u.newerOnDisk()
 		if !found && fromNetwork {
-			found, version = u.newerOnServer(&etag)
+			found, version, _ = u.newerOnServer(&etag) // offline etc.: just try again next time
 		}
 		if found {
-			u.mu.Lock()
-			u.status = UpdateStatus{Available: true, Version: version}
-			s := u.status
-			u.mu.Unlock()
-			runtime.EventsEmit(a.ctx, "update:available", s)
+			a.announceUpdate(version)
 			return
 		}
 		if fromNetwork {
@@ -178,8 +175,21 @@ func (u *updateWatcher) newerOnDisk() (bool, string) {
 	return true, st.Version
 }
 
-// newerOnServer: is there a newer build on this channel than the running one?
-func (u *updateWatcher) newerOnServer(etag *string) (bool, string) {
+// announceUpdate records that an update is waiting and tells the frontend
+// (the title bar arrow and Settings > About).
+func (a *App) announceUpdate(version string) {
+	u := &a.updates
+	u.mu.Lock()
+	u.status = UpdateStatus{Available: true, Version: version}
+	s := u.status
+	u.mu.Unlock()
+	runtime.EventsEmit(a.ctx, "update:available", s)
+}
+
+// newerOnServer: is there a newer build on this channel than the running
+// one? err is for a check that couldn't be done (offline, server error);
+// an unchanged manifest (304) is simply "no".
+func (u *updateWatcher) newerOnServer(etag *string) (bool, string, error) {
 	base := updateManifestBase
 	if v := os.Getenv("CHRISCORD_UPDATE_URL"); v != "" { // same override as the launcher
 		base = strings.TrimRight(v, "/")
@@ -187,7 +197,7 @@ func (u *updateWatcher) newerOnServer(etag *string) (bool, string) {
 	url := fmt.Sprintf("%s/client/%s/latest.json", base, u.running.Channel)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return false, ""
+		return false, "", err
 	}
 	req.Header.Set("User-Agent", "Chriscord/"+u.running.Version)
 	if *etag != "" {
@@ -195,12 +205,15 @@ func (u *updateWatcher) newerOnServer(etag *string) (bool, string) {
 	}
 	resp, err := u.client.Do(req)
 	if err != nil {
-		return false, "" // offline: try again next time
+		return false, "", fmt.Errorf("couldn't reach chriscord.app")
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotModified || resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK {
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return false, ""
+		if resp.StatusCode == http.StatusNotModified {
+			return false, "", nil // same manifest as last time
+		}
+		return false, "", fmt.Errorf("chriscord.app answered %s", resp.Status)
 	}
 	var m struct {
 		Channel  string `json:"channel"`
@@ -211,22 +224,22 @@ func (u *updateWatcher) newerOnServer(etag *string) (bool, string) {
 		} `json:"builds"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&m); err != nil {
-		return false, ""
+		return false, "", fmt.Errorf("the release info from chriscord.app couldn't be read")
 	}
 	*etag = resp.Header.Get("ETag")
 
 	b, ok := m.Builds[goruntime.GOOS+"-"+goruntime.GOARCH]
 	switch {
 	case !ok || b.SHA256 == "":
-		return false, "" // nothing published for this platform
+		return false, "", nil // nothing published for this platform
 	case m.Channel != "" && m.Channel != u.running.Channel:
-		return false, ""
+		return false, "", nil
 	case strings.EqualFold(b.SHA256, u.running.SHA256):
-		return false, "" // that's us
+		return false, "", nil // that's us
 	case u.running.Released != "" && m.Released <= u.running.Released:
-		return false, "" // not newer (the launcher would refuse it anyway)
+		return false, "", nil // not newer (the launcher would refuse it anyway)
 	}
-	return true, m.Version
+	return true, m.Version, nil
 }
 
 // onSecondLaunch is called when Chriscord was started again while running.
@@ -251,6 +264,59 @@ func (a *App) UpdateStatus() UpdateStatus {
 	a.updates.mu.Lock()
 	defer a.updates.mu.Unlock()
 	return a.updates.status
+}
+
+// AboutInfo is what Settings > About shows.
+type AboutInfo struct {
+	// Installed: started from an install made by the Chriscord launcher,
+	// so it can update itself. False for a dev build or a copied exe.
+	Installed bool         `json:"installed"`
+	Version   string       `json:"version"`  // e.g. 2026.10.08-302bf3a, as on chriscord.app
+	Commit    string       `json:"commit"`   // the full git commit it was built from
+	Channel   string       `json:"channel"`  // stable or testing
+	Released  string       `json:"released"` // RFC 3339
+	Update    UpdateStatus `json:"update"`
+}
+
+// GetAboutInfo describes the running build.
+func (a *App) GetAboutInfo() AboutInfo {
+	u := &a.updates
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.dir == "" {
+		return AboutInfo{}
+	}
+	r := u.running
+	return AboutInfo{Installed: true, Version: r.Version, Commit: r.Commit, Channel: r.Channel, Released: r.Released, Update: u.status}
+}
+
+// CheckForUpdates is the "Check for updates" button: checks right now
+// (one small request, same as the hourly check) and says whether a newer
+// build is out. If there is one, the title bar arrow appears too.
+func (a *App) CheckForUpdates() (UpdateStatus, error) {
+	u := &a.updates
+	u.mu.Lock()
+	dir, status := u.dir, u.status
+	u.mu.Unlock()
+	if dir == "" {
+		return UpdateStatus{}, fmt.Errorf("this copy of Chriscord wasn't installed with the Chriscord installer, so it can't update itself")
+	}
+	if status.Available {
+		return status, nil
+	}
+	found, version := u.newerOnDisk()
+	if !found {
+		noETag := "" // always the full manifest: the answer has to be fresh
+		var err error
+		if found, version, err = u.newerOnServer(&noETag); err != nil {
+			return UpdateStatus{}, err
+		}
+	}
+	if found {
+		a.announceUpdate(version)
+		return UpdateStatus{Available: true, Version: version}, nil
+	}
+	return UpdateStatus{}, nil
 }
 
 // RestartToUpdate closes Chriscord and starts the launcher, which installs

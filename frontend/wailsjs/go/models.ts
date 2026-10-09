@@ -1,5 +1,45 @@
 export namespace main {
 	
+	export class AboutInfo {
+	    installed: boolean;
+	    version: string;
+	    commit: string;
+	    channel: string;
+	    released: string;
+	    update: UpdateStatus;
+	
+	    static createFrom(source: any = {}) {
+	        return new AboutInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.installed = source["installed"];
+	        this.version = source["version"];
+	        this.commit = source["commit"];
+	        this.channel = source["channel"];
+	        this.released = source["released"];
+	        this.update = this.convertValues(source["update"], UpdateStatus);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AccountSummary {
 	    slug: string;
 	    username: string;

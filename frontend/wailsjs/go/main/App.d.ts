@@ -14,6 +14,8 @@ export function CancelConversion(arg1:string):Promise<void>;
 
 export function CaptureEncoders():Promise<Array<main.EncoderChoice>>;
 
+export function CheckForUpdates():Promise<main.UpdateStatus>;
+
 export function Connect(arg1:string,arg2:string):Promise<void>;
 
 export function ConvertVideoForPlayback(arg1:string,arg2:string):Promise<string>;
@@ -51,6 +53,8 @@ export function FetchServerThemeBackground():Promise<string>;
 export function FetchUserPfp(arg1:string):Promise<string>;
 
 export function FetchUserProfile(arg1:string):Promise<main.UserProfile>;
+
+export function GetAboutInfo():Promise<main.AboutInfo>;
 
 export function GetAccountInfo():Promise<main.AccountView>;
 

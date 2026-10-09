@@ -26,6 +26,10 @@ export function CaptureEncoders() {
   return window['go']['main']['App']['CaptureEncoders']();
 }
 
+export function CheckForUpdates() {
+  return window['go']['main']['App']['CheckForUpdates']();
+}
+
 export function Connect(arg1, arg2) {
   return window['go']['main']['App']['Connect'](arg1, arg2);
 }
@@ -100,6 +104,10 @@ export function FetchUserPfp(arg1) {
 
 export function FetchUserProfile(arg1) {
   return window['go']['main']['App']['FetchUserProfile'](arg1);
+}
+
+export function GetAboutInfo() {
+  return window['go']['main']['App']['GetAboutInfo']();
 }
 
 export function GetAccountInfo() {
