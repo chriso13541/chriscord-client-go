@@ -1028,6 +1028,7 @@ type serverMsg struct {
 	MuteStates    map[string]MuteState `json:"mute_states"` // voice_state: everyone's current mute/deafen
 	VideoOn       []string            `json:"video_on"`    // voice_state: who has their camera on
 	ScreenOn      []string            `json:"screen_on"`   // voice_state: who's sharing their screen
+	ScreenWindow  map[string]string   `json:"screen_window"` // voice_state: sharers whose window is "background" or "minimized"
 	SDP           string              `json:"sdp"`
 	Candidate     string              `json:"candidate"`
 	SDPMid        string              `json:"sdp_mid"`
@@ -1062,7 +1063,7 @@ type historyEvent struct {
 type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"` }
 type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }
 type typingEvent struct { Username string `json:"username"`; Typing bool `json:"typing"` }
-type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"`; VideoOn []string `json:"video_on"`; ScreenOn []string `json:"screen_on"` }
+type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"`; VideoOn []string `json:"video_on"`; ScreenOn []string `json:"screen_on"`; ScreenWindow map[string]string `json:"screen_window"` }
 
 // MuteState is one person's mute/deafen in a voice_state update.
 type MuteState struct {
@@ -1245,7 +1246,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "rooms_updated":
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
-			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels, Reconnecting: msg.Reconnecting, MuteStates: msg.MuteStates, VideoOn: msg.VideoOn, ScreenOn: msg.ScreenOn})
+			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels, Reconnecting: msg.Reconnecting, MuteStates: msg.MuteStates, VideoOn: msg.VideoOn, ScreenOn: msg.ScreenOn, ScreenWindow: msg.ScreenWindow})
 		case "voice_answer":
 			a.handleVoiceAnswer(msg.SDP)
 		case "voice_ice":

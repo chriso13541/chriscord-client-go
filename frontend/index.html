@@ -238,6 +238,9 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile .vs-selfoff { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:rgba(255,255,255,.75); font-size:.85rem; font-weight:600; }
 .vs-tile .vs-selfoff .ic { width:28px; height:28px; opacity:.8; }
 .vs-tile .vs-selfoff small { font-weight:400; font-size:.75rem; color:rgba(255,255,255,.5); }
+.vs-tile .vs-rwarn { position:absolute; top:8px; left:8px; right:8px; margin:0 auto; width:fit-content; z-index:3; display:flex; align-items:center; gap:7px; padding:5px 10px; border-radius:6px; background:rgba(20,16,6,.82); border:1px solid rgba(250,166,26,.5); color:#ffd27a; font-size:.75rem; font-weight:600; line-height:1.35; pointer-events:none; backdrop-filter:blur(4px); }
+.vs-tile .vs-rwarn.bad { background:rgba(30,10,10,.85); border-color:rgba(240,71,71,.6); color:#ffb3b3; }
+.vs-tile .vs-rwarn .ic { width:15px; height:15px; flex-shrink:0; }
 .vs-tile .vs-unsup { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; text-align:center; color:rgba(255,255,255,.7); font-size:.82rem; }
 .vs-tile:fullscreen { border-radius:0; cursor:default; width:100% !important; height:100% !important; }
 .vs-tile .vs-name .vs-av { width:18px; height:18px; font-size:.65rem; }
@@ -255,7 +258,7 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile .vs-scrwarn { display:flex; align-items:center; gap:7px; max-width:92%; padding:6px 10px; border-radius:6px; background:rgba(250,166,26,.16); border:1px solid rgba(250,166,26,.45); color:#ffd27a; font-size:.76rem; font-weight:600; text-align:left; line-height:1.35; }
 .vs-tile .vs-scrwarn.bad { background:rgba(240,71,71,.18); border-color:rgba(240,71,71,.55); color:#ffb3b3; }
 .vs-tile .vs-scrwarn .ic { width:16px; height:16px; flex-shrink:0; opacity:1; }
-.vs-tile .vs-scrself.has-preview .vs-scrwarn { position:absolute; top:8px; left:50%; transform:translateX(-50%); }
+.vs-tile .vs-scrself.has-preview .vs-scrwarn { position:absolute; top:8px; left:8px; right:8px; margin:0 auto; width:fit-content; max-width:none; }
 #voice-connected-bar #voice-screen-btn { position:relative; }
 #voice-connected-bar #voice-screen-btn.warn::after { content:''; position:absolute; top:1px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--yellow); box-shadow:0 0 0 2px var(--bg-mid); }
 #voice-connected-bar #voice-screen-btn.warn.bad::after { background:var(--red); }
@@ -8161,6 +8164,18 @@ function stopScreenShare(quiet){
 }
 // From voice:state — who's sharing. Watching ends when their share does,
 // and ours is re-announced if the server lost track (a rejoin).
+// Someone else's shared window out of focus or minimised (they share it,
+// voice_state carries it): said on their tile, so the people watching know
+// why the picture paused.
+function paintRemoteWindowWarn(tile,u){
+  const st=state.screenWindow?.[u],min=st==='minimized';
+  let el=tile.querySelector('.vs-rwarn');
+  if(st!=='background'&&!min){el?.remove();return;}
+  const html=`${icon(min?'pause':'warning')}<span>${min?`Paused: ${dnHTML(u)} minimised the window they\u2019re sharing`:`${dnHTML(u)}\u2019s shared window is out of focus, so the stream may pause`}</span>`;
+  if(!el){el=document.createElement('div');el.setAttribute('role','status');tile.appendChild(el);}
+  el.className='vs-rwarn'+(min?' bad':'');
+  if(el.dataset.st!==st){el.dataset.st=st;el.innerHTML=html;}
+}
 function onScreenState(list){
   state.voiceScreens=new Set(list||[]);
   for(const u of [...screenWatch])if(!state.voiceScreens.has(u)){
@@ -8266,6 +8281,7 @@ function renderScreenTile(tile,u){
   }
   tile.querySelector('.vs-scrself')?.remove();
   tile.querySelectorAll('.vs-viewers,.vs-viewers-list').forEach(el=>el.remove());tile.classList.remove('has-viewers');
+  paintRemoteWindowWarn(tile,u);
   if(screenWatch.has(u)){
     tile.classList.remove('idle');
     tile.querySelector('.vs-watch')?.remove();
@@ -10257,6 +10273,7 @@ function init(){
     voiceSoundsFor(state.voiceChannels,next,state.voiceReconnecting,payload?.reconnecting||{});
     state.voiceChannels=next;
     state.voiceReconnecting=payload?.reconnecting||{};
+    state.screenWindow=payload?.screen_window||{};
     onScreenState(payload?.screen_on);
     onVideoState(payload?.video_on);
     voiceSnapshotWaiters.splice(0).forEach(w=>w());

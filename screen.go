@@ -541,9 +541,11 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 func (a *App) watchSharedWindow(c *nativeCamera, id string) {
 	last := sharedWindowState(id)
 	if last == "" {
-		return // a whole screen: nothing to watch
+		a.tellWatchersWindow("focused") // a whole screen: clear any note left from a window shared before
+		return
 	}
 	wailsruntime.EventsEmit(a.ctx, "screen:window", last)
+	a.tellWatchersWindow(last)
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
@@ -559,8 +561,22 @@ func (a *App) watchSharedWindow(c *nativeCamera, id string) {
 			last = st
 			log.Printf("screen: shared window is now %s", st)
 			wailsruntime.EventsEmit(a.ctx, "screen:window", st)
+			a.tellWatchersWindow(st)
 		}
 	}
+}
+
+// tellWatchersWindow passes the shared window's state on to the server,
+// which shows the people watching why the picture may have stopped
+// ("voice_screen_window"; servers from before this just ignore it).
+func (a *App) tellWatchersWindow(st string) {
+	a.voiceMu.Lock()
+	session := a.voice
+	a.voiceMu.Unlock()
+	if session == nil {
+		return
+	}
+	_ = a.sendVoiceJSON(map[string]interface{}{"type": "voice_screen_window", "board_id": session.boardID, "window": st})
 }
 
 // SetScreenShareAudio turns the current share's sound on or off while the
