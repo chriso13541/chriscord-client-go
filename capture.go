@@ -102,7 +102,25 @@ type nativeCamera struct {
 	audioMu     sync.Mutex
 	audioStopCh chan struct{}
 	audioDone   chan struct{}
-	audioOff    bool // stopped for good: no sound may start after this
+	audioOff    bool   // stopped for good: no sound may start after this
+	sourceID    string // the screen or window being shared (to restart its sound)
+}
+
+// pauseAudio stops a screen share's sound but, unlike stopAudio, lets it
+// be started again (turning "Share sound" off and on during a share).
+func (c *nativeCamera) pauseAudio() {
+	c.audioMu.Lock()
+	stop, done := c.audioStopCh, c.audioDone
+	c.audioStopCh, c.audioDone = nil, nil
+	c.audioMu.Unlock()
+	if stop == nil {
+		return
+	}
+	close(stop)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+	}
 }
 
 // stopAudio stops a screen share's sound, if it has any (safe to repeat).

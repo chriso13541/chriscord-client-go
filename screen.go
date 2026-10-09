@@ -281,6 +281,7 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	c.send.Store(true)
 	c.preview.Store(opts.Preview)
 	first := make(chan struct{}, 1)
+	c.sourceID = opts.ID
 	screenMu.Lock()
 	activeScreen = c
 	screenMu.Unlock()
@@ -528,6 +529,32 @@ func (a *App) runScreenAudio(c *nativeCamera, stop <-chan struct{}) {
 			}
 		}
 	}
+}
+
+// SetScreenShareAudio turns the current share's sound on or off while the
+// picture carries on as it is (the share button's right-click menu). Turning
+// it on reports how that went through "screen:audio", like at the start of
+// a share.
+func (a *App) SetScreenShareAudio(on bool) error {
+	screenMu.Lock()
+	c := activeScreen
+	screenMu.Unlock()
+	if c == nil {
+		return errors.New("you're not sharing your screen")
+	}
+	c.audioMu.Lock()
+	running, ended := c.audioStopCh != nil, c.audioOff
+	c.audioMu.Unlock()
+	switch {
+	case ended:
+		return errors.New("the share has ended")
+	case on && !running:
+		a.startScreenAudio(c, c.sourceID)
+	case !on && running:
+		c.pauseAudio()
+		log.Printf("screen: sound turned off")
+	}
+	return nil
 }
 
 // StopScreenShare stops sharing (no-op if not sharing).
