@@ -158,6 +158,10 @@ export function GetMessagesBefore(arg1, arg2) {
   return window['go']['main']['App']['GetMessagesBefore'](arg1, arg2);
 }
 
+export function GetOpenOnStartup() {
+  return window['go']['main']['App']['GetOpenOnStartup']();
+}
+
 export function GetOwnProfile() {
   return window['go']['main']['App']['GetOwnProfile']();
 }
@@ -416,6 +420,10 @@ export function SetLevelMeter(arg1) {
 
 export function SetMessagePinned(arg1, arg2) {
   return window['go']['main']['App']['SetMessagePinned'](arg1, arg2);
+}
+
+export function SetOpenOnStartup(arg1) {
+  return window['go']['main']['App']['SetOpenOnStartup'](arg1);
 }
 
 export function SetPresence(arg1) {

@@ -623,6 +623,20 @@ export namespace main {
 	        this.note = source["note"];
 	    }
 	}
+	export class StartupSetting {
+	    supported: boolean;
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new StartupSetting(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supported = source["supported"];
+	        this.enabled = source["enabled"];
+	    }
+	}
 	export class Sticker {
 	    id: string;
 	    name: string;

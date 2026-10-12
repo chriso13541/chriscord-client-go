@@ -1721,6 +1721,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div class="settings-tab" data-tab="voice">Voice &amp; Video</div>
     <div class="settings-tab" data-tab="screenshare">Screen Sharing</div>
     <div class="settings-tab" data-tab="performance">Performance</div>
+    <div class="settings-tab" data-tab="system">System</div>
     <div class="settings-tab" data-tab="about">About</div>
   </div>
   <div id="settings-content">
@@ -1910,6 +1911,13 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <p class="settings-hint pf-gpu-problem hidden" id="pf-gpu-problem"></p>
         <button class="settings-secondary-btn" type="button" id="pf-gpu-recheck" style="margin-top:4px">Check again</button>
       </div>
+    </div>
+
+    <div id="settings-tab-system" class="settings-tab-pane">
+      <h2>System</h2>
+      <label class="settings-label">Startup</label>
+      <label class="check-row"><input type="checkbox" id="sys-startup"> Open Chriscord when you sign in to Windows</label>
+      <p class="settings-hint" style="margin-top:0" id="sys-startup-hint">It opens through the Chriscord launcher, so it's up to date when it starts. This is the same switch as Chriscord in Task Manager's Startup apps.</p>
     </div>
 
     <div id="settings-tab-about" class="settings-tab-pane">
@@ -3830,6 +3838,26 @@ function switchSettingsTab(name){
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
   if(name==='about')renderAbout();
+  if(name==='system')renderSystemSettings();
+}
+
+// ── SETTINGS > SYSTEM ────────────────────────────────────────────
+// Open on startup: the Run entry under the Windows user (system.go). Read
+// fresh each time the tab opens, since it can also be switched off in Task
+// Manager.
+async function renderSystemSettings(){
+  const box=document.getElementById('sys-startup'),hint=document.getElementById('sys-startup-hint');
+  let st={supported:false,enabled:false};
+  try{st=await window.go.main.App.GetOpenOnStartup();}catch{}
+  box.disabled=!st.supported;box.checked=!!st.enabled;
+  if(!st.supported)hint.textContent='Opening at sign-in is only available on Windows for now.';
+}
+async function onStartupToggle(e){
+  const box=e.currentTarget,on=box.checked;
+  box.disabled=true;
+  try{await window.go.main.App.SetOpenOnStartup(on);settingsSaved();}
+  catch(err){box.checked=!on;toast('Couldn\u2019t change that: '+String(err).replace(/^Error: /,''),true);}
+  finally{box.disabled=false;}
 }
 
 // ── SETTINGS > ABOUT ─────────────────────────────────────────────
@@ -9602,8 +9630,9 @@ async function limitAnimationOn(srcUrl,show,hoverEl){
     if(playing!==srcUrl){URL.revokeObjectURL(playing);playing=srcUrl;}
   };
   const arm=()=>{clearTimeout(timer);timer=setTimeout(pause,info.loopMs*ANIMATION_PLAYS);};
+  const ctl={};
   const wake=()=>{
-    hovered=true;
+    hovered=true;animHovered.add(ctl);
     if(hoverEl.classList.contains('anim-paused')){
       // A fresh URL restarts the animation from its first frame.
       if(playing!==srcUrl)URL.revokeObjectURL(playing);
@@ -9612,13 +9641,38 @@ async function limitAnimationOn(srcUrl,show,hoverEl){
       arm();
     }else if(!timer)arm();
   };
-  // Any pointer movement over it counts, not just the moment of entering:
-  // after the window is resized or zoomed, the pointer can already be
-  // over it (or "enter" can be missed), and moving should still wake it.
-  hoverEl.addEventListener('pointerenter',wake);
-  hoverEl.addEventListener('pointermove',()=>{if(!hovered||hoverEl.classList.contains('anim-paused'))wake();});
-  hoverEl.addEventListener('pointerleave',()=>{hovered=false;});
+  // Whether the pointer is over it comes from the page-wide tracker below
+  // (initAnimationHover), not from enter/leave events on hoverEl.
+  ctl.move=()=>{if(!hovered||hoverEl.classList.contains('anim-paused'))wake();};
+  ctl.leave=()=>{hovered=false;animHovered.delete(ctl);};
+  animCtl.set(hoverEl,ctl);
+  initAnimationHover();
   arm();
+}
+// One pointer tracker for every animated banner/emoji. Enter/leave events
+// on each element used to decide "hovered", but moving the window to a
+// monitor with a different scale (or resizing it) moves things under a
+// pointer that hasn't moved, and those events can be skipped: the banner
+// then thought it was still hovered, or never saw the pointer arrive, and
+// stopped replaying. Here, every pointer movement anywhere decides afresh
+// which one (if any) it's over, and resizing or leaving the window clears
+// them all. One listener however many animations there are.
+const animCtl=new WeakMap(); // hover element → its controller
+const animHovered=new Set();  // controllers that think the pointer is over them
+let animHoverReady=false;
+function initAnimationHover(){
+  if(animHoverReady)return;
+  animHoverReady=true;
+  document.addEventListener('pointermove',e=>{
+    let over=null;
+    for(let el=e.target;el&&el.nodeType===1;el=el.parentElement){const c=animCtl.get(el);if(c){over=c;break;}}
+    for(const c of [...animHovered])if(c!==over)c.leave();
+    over?.move();
+  },{capture:true,passive:true});
+  const leaveAll=()=>{for(const c of [...animHovered])c.leave();};
+  window.addEventListener('resize',leaveAll);
+  window.addEventListener('blur',leaveAll);
+  document.documentElement.addEventListener('pointerleave',leaveAll);
 }
 function limitAnimation(img,url){limitAnimationOn(url,u=>{img.src=u;},img);}
 // Animated custom emoji anywhere in the app (messages, replies, reactions,
@@ -10473,6 +10527,7 @@ function init(){
     window.addEventListener('touchend',onPfpDragEnd);
   }
   document.querySelectorAll('.settings-tab').forEach(t=>t.addEventListener('click',()=>switchSettingsTab(t.dataset.tab)));
+  document.getElementById('sys-startup').addEventListener('change',onStartupToggle);
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
     localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');

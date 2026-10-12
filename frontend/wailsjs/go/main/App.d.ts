@@ -80,6 +80,8 @@ export function GetMessagesAround(arg1:string,arg2:string):Promise<Array<main.Ch
 
 export function GetMessagesBefore(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
 
+export function GetOpenOnStartup():Promise<main.StartupSetting>;
+
 export function GetOwnProfile():Promise<main.OwnProfile>;
 
 export function GetPinnedMessages(arg1:string):Promise<Array<main.ChatMessage>>;
@@ -209,6 +211,8 @@ export function SetCameraOutputs(arg1:boolean,arg2:boolean):Promise<void>;
 export function SetLevelMeter(arg1:boolean):Promise<void>;
 
 export function SetMessagePinned(arg1:string,arg2:boolean):Promise<void>;
+
+export function SetOpenOnStartup(arg1:boolean):Promise<void>;
 
 export function SetPresence(arg1:string):Promise<void>;
 
