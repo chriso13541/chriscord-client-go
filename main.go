@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"net/http"
+	"os"
 	goruntime "runtime"
 
 	"github.com/wailsapp/wails/v2"
@@ -19,6 +20,15 @@ var assets embed.FS
 const singleInstanceID = "app.chriscord.client"
 
 func main() {
+	// The uninstaller asks the app to take out its own "open when you sign
+	// in" entry (Settings > System): that code lives here, not in the
+	// updater. Nothing else runs: no window, no single-instance lock.
+	for _, arg := range os.Args[1:] {
+		if arg == "--remove-startup" {
+			_ = setStartup(false, "")
+			return
+		}
+	}
 	app := NewApp()
 	allowOtherInstanceToFocus()
 
