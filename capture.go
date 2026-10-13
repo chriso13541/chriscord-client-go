@@ -674,7 +674,11 @@ func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct
 					c.remember(au, key)
 					c.gopMu.Unlock()
 				} else {
-					err = trk.WriteSample(media.Sample{Data: au, Duration: dur})
+					if sealed := a.e2ee.seal(kindH264, au); sealed != nil { // encrypted end to end (e2ee.go)
+						err = trk.WriteSample(media.Sample{Data: sealed, Duration: dur})
+					} else {
+						err = errors.New("the call has ended")
+					}
 				}
 				if err != nil {
 					why = "writing to the call failed: " + err.Error()

@@ -53,9 +53,15 @@ type App struct {
 	// updates watches for a newer build (the title bar's update arrow);
 	// see update.go.
 	updates          updateWatcher
+	// e2ee is the current call's end-to-end encryption (e2ee.go).
+	e2ee             *callCrypto
 }
 
-func NewApp() *App { return &App{} }
+func NewApp() *App {
+	a := &App{}
+	a.e2ee = newCallCrypto(a)
+	return a
+}
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx    = ctx
@@ -1154,6 +1160,7 @@ func (a *App) hangUpAndClose(conn *websocket.Conn) {
 	if inCall {
 		a.stopVoiceSession()
 	}
+	a.e2ee.end()
 	a.writeMu.Lock()
 	if inCall {
 		msg, _ := json.Marshal(map[string]string{"type": "leave_voice"})
@@ -1206,6 +1213,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			// No longer allowed in the voice channel we were in (a role or
 			// channel change): the server has taken us out; hang up here.
 			a.stopVoiceSession()
+			a.e2ee.end()
 			a.voiceMuted.Store(false)
 			a.voiceDeafened.Store(false)
 			runtime.EventsEmit(a.ctx, "voice:removed", msg.DeniedMsg)
@@ -1218,6 +1226,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			if inCall {
 				a.stopVoiceSession()
 			}
+			a.e2ee.end()
 			a.voiceMuted.Store(false)
 			a.voiceDeafened.Store(false)
 			runtime.EventsEmit(a.ctx, "voice:moved", msg.BoardID)
@@ -1246,7 +1255,10 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "rooms_updated":
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
+			a.e2ee.updateRoster(msg.Channels)
 			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels, Reconnecting: msg.Reconnecting, MuteStates: msg.MuteStates, VideoOn: msg.VideoOn, ScreenOn: msg.ScreenOn, ScreenWindow: msg.ScreenWindow})
+		case "voice_e2ee":
+			a.handleVoiceE2EE(raw)
 		case "voice_answer":
 			a.handleVoiceAnswer(msg.SDP)
 		case "voice_ice":

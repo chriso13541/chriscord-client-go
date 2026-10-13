@@ -224,6 +224,7 @@ func (a *App) ReconnectVoice(knownOthers []string) error {
 
 func (a *App) LeaveVoiceChannel() error {
 	a.stopVoiceSession()
+	a.e2ee.end()
 	a.voiceMuted.Store(false)
 	a.voiceDeafened.Store(false)
 
@@ -467,6 +468,9 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 		return err
 	}
 	log.Printf("voice: offer sent")
+	// Hello to everyone in the call, for the keys (e2ee.go) — after
+	// join_voice and the offer, so the server has us in the channel.
+	a.e2ee.begin(boardID)
 
 	// Now the candidates gathered meanwhile (sent after the offer on the
 	// same socket, so the server always has the connection for them).
@@ -794,8 +798,12 @@ func (s *VoiceSession) startCapture(micName string) error {
 			if err != nil {
 				continue
 			}
-			sample := media.Sample{Data: append([]byte(nil), encoded[:n]...), Duration: voiceFrameMs * 1e6}
-			_ = s.localTrack.WriteSample(sample)
+			// Encrypted end to end (e2ee.go); the server only forwards it.
+			sealed := s.app.e2ee.seal(kindAudio, encoded[:n])
+			if sealed == nil {
+				continue
+			}
+			_ = s.localTrack.WriteSample(media.Sample{Data: sealed, Duration: voiceFrameMs * 1e6})
 		}
 	}()
 	return <-started
@@ -1036,7 +1044,13 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 				}
 			}
 		}
-		n, err := decoder.Decode(packet.Payload, pcm)
+		// Decrypt (e2ee.go). A frame that doesn't open — no key from them
+		// yet, or not encrypted at all — is treated like a lost packet.
+		payload, ok := s.app.e2ee.open(source.sharer, kindAudio, packet.Payload)
+		if !ok {
+			continue
+		}
+		n, err := decoder.Decode(payload, pcm)
 		if err != nil {
 			continue
 		}

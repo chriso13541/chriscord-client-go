@@ -47,10 +47,11 @@ type rtpOut struct {
 	payloader rtp.Payloader
 	seq       uint16
 	video     bool
+	crypt     *callCrypto // every frame is encrypted end to end (e2ee.go)
 }
 
-func newRTPOut(trk *webrtc.TrackLocalStaticRTP, video bool) *rtpOut {
-	o := &rtpOut{trk: trk, video: video, seq: uint16(time.Now().UnixNano())}
+func newRTPOut(trk *webrtc.TrackLocalStaticRTP, video bool, crypt *callCrypto) *rtpOut {
+	o := &rtpOut{trk: trk, video: video, crypt: crypt, seq: uint16(time.Now().UnixNano())}
 	if video {
 		o.payloader = &codecs.H264Payloader{}
 	} else {
@@ -61,9 +62,17 @@ func newRTPOut(trk *webrtc.TrackLocalStaticRTP, video bool) *rtpOut {
 
 // write sends one frame (an Annex B access unit, or one Opus packet).
 func (o *rtpOut) write(frame []byte, ts uint32) error {
+	kind := byte(kindAudio)
+	if o.video {
+		kind = kindH264
+	}
+	sealed := o.crypt.seal(kind, frame)
+	if sealed == nil {
+		return nil // not in a call any more
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	payloads := o.payloader.Payload(rtpMTU, frame)
+	payloads := o.payloader.Payload(rtpMTU, sealed)
 	for i, p := range payloads {
 		pkt := &rtp.Packet{
 			Header: rtp.Header{

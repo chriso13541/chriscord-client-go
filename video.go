@@ -125,7 +125,7 @@ func (s *VoiceSession) addVideoSender() {
 		log.Printf("screen: add transceiver: %v", err)
 		return
 	}
-	s.screenOut = newRTPOut(screen, true)
+	s.screenOut = newRTPOut(screen, true, s.app.e2ee)
 	go readKeyframeRequests(str.Sender(), func() { s.app.screenKeyframeRequested(s.screenOut) })
 
 	// And its sound: stereo Opus, its own send-only audio section after the
@@ -144,7 +144,7 @@ func (s *VoiceSession) addVideoSender() {
 		log.Printf("screen: add sound transceiver: %v", err)
 		return
 	}
-	s.soundOut = newRTPOut(sound, false)
+	s.soundOut = newRTPOut(sound, false, s.app.e2ee)
 
 	// The smaller version of the screen share (screen_low.go), last of all.
 	// It only carries packets when the server asks for one; a server that
@@ -159,7 +159,7 @@ func (s *VoiceSession) addVideoSender() {
 		log.Printf("screen: add smaller version's transceiver: %v", err)
 		return
 	}
-	s.screenLowOut = newRTPOut(low, true)
+	s.screenLowOut = newRTPOut(low, true, s.app.e2ee)
 	go readKeyframeRequests(ltr.Sender(), func() { s.app.screenLowKeyframeRequested(s.screenLowOut) })
 }
 
@@ -201,7 +201,15 @@ func (a *App) PushVideoFrame(data string, durationMs int) error {
 	if durationMs <= 0 {
 		durationMs = 33
 	}
-	return session.videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Duration(durationMs) * time.Millisecond})
+	kind := byte(kindVP8)
+	if strings.EqualFold(session.videoTrack.Codec().MimeType, webrtc.MimeTypeH264) {
+		kind = kindH264
+	}
+	sealed := a.e2ee.seal(kind, frame) // encrypted end to end (e2ee.go)
+	if sealed == nil {
+		return fmt.Errorf("not in a call")
+	}
+	return session.videoTrack.WriteSample(media.Sample{Data: sealed, Duration: time.Duration(durationMs) * time.Millisecond})
 }
 
 // VideoSendCodec says which codec the current call's camera track is in
@@ -313,10 +321,12 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 	codec := "vp8"
 	var depacketizer rtp.Depacketizer = &codecs.VP8Packet{}
 	isKey := func(f []byte) bool { return f[0]&0x01 == 0 } // VP8 frame tag: bit 0 clear = keyframe
+	kindByte := byte(kindVP8)
 	if strings.EqualFold(track.Codec().MimeType, webrtc.MimeTypeH264) {
 		codec = "h264"
 		depacketizer = &codecs.H264Packet{} // gives Annex B, which the page's decoder takes
 		isKey = h264HasKeyframe
+		kindByte = kindH264
 	}
 	log.Printf("video: receiving %s's %s (%s)", user, kind, codec)
 	// The picture can only start from a keyframe.
@@ -353,6 +363,13 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 			if len(sample.Data) == 0 {
 				continue
 			}
+			// Decrypt (e2ee.go): what comes out is the frame as it was
+			// encoded. One that doesn't open is skipped, like a lost one.
+			frame, ok := s.app.e2ee.open(user, kindByte, sample.Data)
+			if !ok || len(frame) == 0 {
+				continue
+			}
+			sample.Data = frame
 			if waitKey {
 				if !isKey(sample.Data) {
 					if time.Since(keyAsked) > time.Second {

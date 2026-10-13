@@ -204,6 +204,19 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #voice-connected-bar.reconnecting { color:var(--red); }
 #voice-connected-bar #voice-video-btn.on { color:var(--green); }
 #voice-connected-bar.elsewhere #voice-video-btn { display:none; }
+/* Call encryption (e2ee.go): green lock when everyone's encrypted, yellow when someone isn't. */
+#voice-connected-bar #voice-e2ee-btn.ok { color:var(--green); }
+#voice-connected-bar #voice-e2ee-btn.warn { color:var(--yellow); }
+#voice-connected-bar.elsewhere #voice-e2ee-btn { display:none; }
+#voice-connected-bar #voice-e2ee-btn { margin-left:auto; }
+#voice-connected-bar #voice-e2ee-btn ~ #voice-deafen-btn { margin-left:0; }
+.e2ee-code { font-family:Consolas,monospace; font-size:1.3rem; letter-spacing:.05em; color:var(--text-strong); text-align:center; padding:12px; background:var(--bg-darkest); border-radius:8px; margin:0 0 16px; user-select:all; }
+.e2ee-peers { list-style:none; margin:0; padding:0; max-height:240px; overflow:auto; }
+.e2ee-peers li { display:flex; justify-content:space-between; gap:12px; padding:6px 2px; font-size:.9rem; color:var(--text); border-top:1px solid var(--border); }
+.e2ee-peers li:first-child { border-top:none; }
+.e2ee-peers .st { text-align:right; color:var(--text-muted); }
+.e2ee-peers .st.ok { color:var(--green); }
+.e2ee-peers .st.bad { color:var(--red); }
 .voice-occupant-status .ic.cam { color:var(--text-muted); }
 /* Cameras in a call, above the messages */
 #video-stage { position:relative; flex-shrink:0; display:flex; flex-direction:column; gap:8px; padding:8px 12px 14px; height:var(--vs-h,38vh); min-height:150px; max-height:75%; background:var(--bg-darkest); border-bottom:1px solid var(--border); }
@@ -1587,6 +1600,19 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="modal-e2ee">
+  <div class="modal">
+    <h2>End-to-End Encrypted</h2>
+    <p id="e2ee-summary">Your voice, camera and screen are encrypted on your device. Only the people in this call can decrypt them — not the server, and not whoever runs it.</p>
+    <div class="form-group"><label>Call code</label></div>
+    <div class="e2ee-code" id="e2ee-code"></div>
+    <p style="margin:-6px 0 16px;font-size:.8rem">Everyone in the call should see the same code. To be sure nobody's listening in, read it out to each other — if anyone's is different, the server isn't showing you the same call.</p>
+    <ul class="e2ee-peers" id="e2ee-peers"></ul>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="e2ee-close-btn">Done</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="modal-export">
   <div class="modal">
     <h2>Export Account Key</h2>
@@ -1621,6 +1647,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div id="room-list"></div>
     <div id="voice-connected-bar" class="hidden">
       <span id="voice-connected-name"></span>
+      <button id="voice-e2ee-btn" class="voice-bar-btn" title="End-to-end encryption"><svg class="ic" aria-hidden="true"><use href="#ic-lock"/></svg></button>
       <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
       <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
       <button id="voice-video-btn" class="voice-bar-btn" title="Turn on camera"><svg class="ic" aria-hidden="true"><use href="#ic-videocam_off"/></svg></button>
@@ -10377,6 +10404,47 @@ function init(){
   // fails while the server is still reachable, rebuild it automatically —
   // a few tries, a little apart — rather than leaving you silent until you
   // rejoin by hand. Your camera, screen share and mute carry over.
+  // Call encryption (e2ee.go): the lock in the voice bar, and the call code.
+  let e2ee={active:false,code:'',peers:[]};
+  const e2eeWarned=new Set();
+  const e2eeLabels={ok:'Encrypted',waiting:'Exchanging keys\u2026',
+    unsupported:'Can\u2019t encrypt \u2014 needs to update Chriscord',
+    changed:'Identity key changed \u2014 compare the call code'};
+  const renderE2EE=()=>{
+    const btn=document.getElementById('voice-e2ee-btn');
+    const bad=e2ee.peers.filter(p=>p.status==='unsupported'||p.status==='changed');
+    const waiting=e2ee.peers.some(p=>p.status==='waiting');
+    btn.classList.toggle('ok',e2ee.active&&!bad.length&&!waiting);
+    btn.classList.toggle('warn',e2ee.active&&bad.length>0);
+    btn.title=!e2ee.active?'Not encrypted':bad.length?'End-to-end encrypted \u2014 but not with everyone (click for details)':'End-to-end encrypted (click for the call code)';
+    document.getElementById('e2ee-code').textContent=e2ee.active?e2ee.code:'\u2014';
+    document.getElementById('e2ee-peers').innerHTML=e2ee.peers.map(p=>{
+      const cls=p.status==='ok'?'ok':(p.status==='waiting'?'':'bad');
+      return `<li><span>${esc(displayName(p.user))}</span><span class="st ${cls}">${esc(e2eeLabels[p.status]||p.status)}</span></li>`;
+    }).join('')||'<li><span style="color:var(--text-muted)">Nobody else is here yet.</span></li>';
+  };
+  window.runtime.EventsOn('voice:e2ee',st=>{
+    e2ee=st&&st.peers?st:{active:false,code:'',peers:[]};
+    if(!e2ee.active)e2eeWarned.clear();
+    for(const p of e2ee.peers){
+      const k=p.status+':'+p.user;
+      if((p.status==='unsupported'||p.status==='changed')&&!e2eeWarned.has(k)){
+        e2eeWarned.add(k);
+        toast(p.status==='changed'
+          ?`${displayName(p.user)}\u2019s identity key has changed. Compare the call code (lock icon) to make sure it\u2019s really them.`
+          :`${displayName(p.user)}\u2019s Chriscord can\u2019t do encrypted calls \u2014 you won\u2019t hear each other until they update.`,true);
+      }
+    }
+    renderE2EE();
+  });
+  window.go.main.App.GetVoiceEncryption().then(st=>{if(st&&st.peers){e2ee=st;renderE2EE();}}).catch(()=>{});
+  document.getElementById('voice-e2ee-btn').addEventListener('click',()=>{
+    renderE2EE();
+    document.getElementById('modal-e2ee').classList.remove('hidden');
+  });
+  document.getElementById('e2ee-close-btn').addEventListener('click',()=>document.getElementById('modal-e2ee').classList.add('hidden'));
+  document.getElementById('modal-e2ee').addEventListener('click',e=>{if(e.target.id==='modal-e2ee')e.currentTarget.classList.add('hidden');});
+
   let voiceRetries=0,voiceRetryTimer=null;
   window.runtime.EventsOn('voice:connectionState',connState=>{
     if(connState==='connected'){
