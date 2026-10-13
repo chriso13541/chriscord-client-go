@@ -10140,20 +10140,26 @@ function buildDateSeparator(iso){
   el.innerHTML=`<span>${esc(formatDateSeparator(iso))}</span>`;
   return el;
 }
-// Grows a text box with what's typed, up to about 120 px, in whole rows:
-// the browser sizes a row itself (line height + padding), so nothing here
-// mixes measured pixels with CSS ones — which is what went wrong at other
-// zoom levels, and on macOS (WebKit counts an empty box's placeholder, and
-// measures zoomed text boxes differently from Chromium).
+// Grows a text box with what's typed, up to about 120 px, in whole lines:
+// its height is always padding + n × line height, from its own CSS values,
+// and the only measuring is "does the text still overflow?" (scrollHeight
+// against clientHeight, both from the same box, so the zoom can't skew the
+// comparison). Never the browser's own size for rows="1": macOS (WebKit)
+// adds room for a horizontal scrollbar to that, so a one-line box came out
+// ~16 px too tall with the text stuck at the top — and counts an empty
+// box's placeholder as taller than a line.
 function autoResize(el){
   const cs=getComputedStyle(el);
   const line=parseFloat(cs.lineHeight)||20;
-  const pad=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  const pad=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)
+    +(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0); // border-box sizing
   const maxRows=Math.max(1,Math.floor((120-pad)/line));
-  el.style.height='';
-  el.rows=1;
-  if(el.value)while(el.rows<maxRows&&el.scrollHeight>el.clientHeight+2)el.rows++;
-  el.style.overflowY=el.value&&el.scrollHeight>el.clientHeight+2?'auto':'hidden';
+  const fit=n=>{el.style.height=(pad+n*line)+'px';};
+  let rows=1;
+  el.style.overflowY='hidden'; // no scrollbar taking room while it's measured
+  fit(rows);
+  if(el.value)while(rows<maxRows&&el.scrollHeight>el.clientHeight+2)fit(++rows);
+  if(el.value&&el.scrollHeight>el.clientHeight+2)el.style.overflowY='auto'; // past the most: scroll
   if(el.id==='msg-input')renderComposerHighlight();
 }
 // Boxes behind @mentions in the message box (see #msg-hl). Matched against
