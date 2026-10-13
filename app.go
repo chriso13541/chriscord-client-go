@@ -55,11 +55,14 @@ type App struct {
 	updates          updateWatcher
 	// e2ee is the current call's end-to-end encryption (e2ee.go).
 	e2ee             *callCrypto
+	// text is end-to-end encryption for messages (textcrypt.go).
+	text             *textCrypto
 }
 
 func NewApp() *App {
 	a := &App{}
 	a.e2ee = newCallCrypto(a)
+	a.text = newTextCrypto(a)
 	return a
 }
 
@@ -1003,6 +1006,7 @@ func (a *App) connect(domain, serverKey, invite string) error {
 	watchConnection(conn)
 	a.ws = conn
 	go a.wsReader(conn)
+	a.text.begin() // message encryption: publish this account's key, share keys others need
 	a.sendPfpInfo(a.account.PfpUpdatedAt)
 	a.sendProfileInfo(a.account.ProfileUpdatedAt)
 	return nil
@@ -1076,7 +1080,7 @@ type MuteState struct {
 	Muted    bool `json:"muted"`
 	Deafened bool `json:"deafened"`
 }
-type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"` }
+type editEvent   struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Content string `json:"content"`; E2EE string `json:"e2ee,omitempty"` }
 type deleteEvent struct { ID string `json:"id"`; BoardID string `json:"board_id"` }
 type pinEvent    struct { ID string `json:"id"`; BoardID string `json:"board_id"`; Pinned bool `json:"pinned"`; By string `json:"by"` }
 type reactionEvent struct {
@@ -1213,9 +1217,15 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		}
 		switch msg.Type {
 		case "message":
-			if msg.Data != nil { runtime.EventsEmit(a.ctx, "chat:message", *msg.Data) }
+			if msg.Data != nil {
+				a.text.open(msg.Data) // decrypt (textcrypt.go)
+				runtime.EventsEmit(a.ctx, "chat:message", *msg.Data)
+			}
 		case "history":
+			a.text.openAll(msg.Messages)
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
+		case "e2ee_changed":
+			a.text.changed() // keys moved: share any this app can, retry locked messages
 		case "users":
 			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner, Nicknames: msg.Nicknames, GlobalNicknames: msg.GlobalNicknames})
 		case "voice_removed":
@@ -1240,6 +1250,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.voiceDeafened.Store(false)
 			runtime.EventsEmit(a.ctx, "voice:moved", msg.BoardID)
 		case "roles_updated":
+			a.text.changed() // who can see which channel may have changed
 			runtime.EventsEmit(a.ctx, "server:roles")
 		case "emojis_updated":
 			a.emitEmojisUpdated()
@@ -1254,7 +1265,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "typing":
 			runtime.EventsEmit(a.ctx, "chat:typing", typingEvent{Username: msg.Username, Typing: msg.Typing})
 		case "message_edit":
-			runtime.EventsEmit(a.ctx, "chat:edit", editEvent{ID: msg.ID, BoardID: msg.BoardID, Content: msg.Content})
+			content, state := a.text.openEdit(msg.ID, msg.BoardID, msg.Content)
+			runtime.EventsEmit(a.ctx, "chat:edit", editEvent{ID: msg.ID, BoardID: msg.BoardID, Content: content, E2EE: state})
 		case "message_delete":
 			runtime.EventsEmit(a.ctx, "chat:delete", deleteEvent{ID: msg.ID, BoardID: msg.BoardID})
 		case "message_reaction":
@@ -1262,6 +1274,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "message_pin":
 			runtime.EventsEmit(a.ctx, "chat:pin", pinEvent{ID: msg.ID, BoardID: msg.BoardID, Pinned: msg.Pinned, By: msg.By})
 		case "rooms_updated":
+			a.text.changed()
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
 			a.e2ee.updateRoster(msg.Channels)
@@ -1317,7 +1330,17 @@ func (a *App) GetBoards(roomID string) ([]Board, error) {
 func (a *App) SearchServer(query string) ([]SearchResult, error) {
 	var results []SearchResult
 	path := "/api/search?q=" + url.QueryEscape(query)
-	return results, a.doGET(path, &results)
+	err := a.doGET(path, &results)
+	a.openResults(results)
+	return results, err
+}
+
+// openResults decrypts search results (the server can only match words in
+// unencrypted messages, but filters like from:/in:/has: find encrypted ones).
+func (a *App) openResults(rs []SearchResult) {
+	for i := range rs {
+		a.text.open(&rs[i].ChatMessage)
+	}
 }
 
 // SearchServerFiltered is SearchServer plus the search box's filters:
@@ -1333,7 +1356,9 @@ func (a *App) SearchServerFiltered(query, from, has, inBoard, after, before stri
 		}
 	}
 	var results []SearchResult
-	return results, a.doGET("/api/search?"+v.Encode(), &results)
+	err := a.doGET("/api/search?"+v.Encode(), &results)
+	a.openResults(results)
+	return results, err
 }
 
 // GetMessagesBefore fetches one page of messages older than beforeID, for
@@ -1343,7 +1368,9 @@ func (a *App) SearchServerFiltered(query, from, has, inBoard, after, before stri
 func (a *App) GetMessagesBefore(boardID, beforeID string) ([]ChatMessage, error) {
 	var msgs []ChatMessage
 	path := "/api/boards/" + boardID + "/messages?before=" + url.QueryEscape(beforeID)
-	return msgs, a.doGET(path, &msgs)
+	err := a.doGET(path, &msgs)
+	a.text.openAll(msgs)
+	return msgs, err
 }
 
 // GetMessagesAround fetches a window of messages centered on a specific
@@ -1352,10 +1379,13 @@ func (a *App) GetMessagesBefore(boardID, beforeID string) ([]ChatMessage, error)
 func (a *App) GetMessagesAround(boardID, messageID string) ([]ChatMessage, error) {
 	var msgs []ChatMessage
 	path := "/api/boards/" + boardID + "/messages/around/" + url.PathEscape(messageID)
-	return msgs, a.doGET(path, &msgs)
+	err := a.doGET(path, &msgs)
+	a.text.openAll(msgs)
+	return msgs, err
 }
 
 func (a *App) SubscribeBoard(boardID string) error {
+	a.text.setCurrent(boardID)
 	a.writeMu.Lock(); defer a.writeMu.Unlock()
 	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
 	if conn == nil { return fmt.Errorf("not connected") }
@@ -1370,6 +1400,9 @@ func (a *App) SubscribeBoard(boardID string) error {
 // SendMessage posts a message; replyTo is the id of the message it replies
 // to, or "".
 func (a *App) SendMessage(boardID, content string, attachments []Attachment, replyTo string) error {
+	// Encrypted end to end before it leaves (textcrypt.go).
+	content, err := a.text.seal(boardID, content)
+	if err != nil { return err }
 	a.writeMu.Lock(); defer a.writeMu.Unlock()
 	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
 	if conn == nil { return fmt.Errorf("not connected") }
@@ -1408,6 +1441,7 @@ func (a *App) DeleteMessage(msgID string) error {
 func (a *App) GetPinnedMessages(boardID string) ([]ChatMessage, error) {
 	var out []ChatMessage
 	err := a.doGET("/api/boards/"+boardID+"/pins", &out)
+	a.text.openAll(out)
 	return out, err
 }
 
@@ -1604,6 +1638,9 @@ func (a *App) SetMessagePinned(msgID string, pinned bool) error {
 }
 
 func (a *App) EditMessage(msgID, content string) error {
+	// Encrypted like a new message, with the channel's newest key.
+	content, err := a.text.seal(a.text.boardOf(msgID), content)
+	if err != nil { return err }
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
 	data, _ := json.Marshal(map[string]string{"content": content})
 	req, err := http.NewRequest("PATCH", normaliseHTTP(domain)+"/api/messages/"+msgID, bytes.NewReader(data))
@@ -1840,6 +1877,7 @@ func (a *App) Disconnect() {
 	a.ws = nil
 	a.token = ""; a.domain = ""; a.username = ""; a.fingerprint = ""
 	a.mu.Unlock()
+	a.text.end()
 	a.hangUpAndClose(conn) // leaving the server is leaving its call too
 }
 

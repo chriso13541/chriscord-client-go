@@ -103,6 +103,9 @@ type ChatMessage struct {
 	ReplyTo     string        `json:"reply_to,omitempty"` // the message this replies to
 	Reply       *ReplyPreview `json:"reply,omitempty"`    // and a preview of it
 	Kind        string        `json:"kind,omitempty"`     // "join" = "<username> joined the server."
+	// Set by this app, not the server (textcrypt.go): "" plain text, "ok"
+	// decrypted, "locked" (no key yet), "error", or "forged".
+	E2EE        string        `json:"e2ee,omitempty"`
 }
 
 // ReplyPreview is what a reply shows of the message it answers.
