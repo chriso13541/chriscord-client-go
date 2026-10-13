@@ -58,6 +58,7 @@ const (
 	switchDelay    = 800 * time.Millisecond // a new key is handed out this long before it's used
 	keysKept       = 4                      // per person: their current key and a few before it
 	helloGrace     = 5 * time.Second        // no hello after this long: their app can't encrypt
+	resyncEvery    = 2 * time.Second        // how often to chase anyone keys haven't reached yet
 )
 
 type sendKey struct {
@@ -103,6 +104,8 @@ type callCrypto struct {
 
 	peers       map[string]*e2eePeer // everyone whose hello checked out
 	roster      map[string]time.Time // the others in this call (voice_state), and since when
+	channels    map[string][]string  // the latest voice_state, kept even between calls (see updateRoster)
+	resync      *time.Timer          // the periodic check for anyone keys haven't reached (resyncLoop)
 	dropped     int                  // frames that didn't open, since the last log line
 	droppedLast time.Time
 
@@ -179,7 +182,14 @@ func (c *callCrypto) begin(board string) {
 		}
 		c.board, c.me, c.myIDHex, c.domain, c.lastKID = board, me, idHex, domain, 1
 		c.peers, c.roster = map[string]*e2eePeer{}, map[string]time.Time{}
+		c.resync = time.AfterFunc(resyncEvery, c.resyncLoop)
 		log.Printf("e2ee: call in %s is end-to-end encrypted", board)
+	}
+	// Who's in the call already: the voice_state from joining has usually
+	// arrived before this (the call's connection takes a moment to set up),
+	// while there was no call here yet to apply it to.
+	if c.channels != nil {
+		c.applyRosterLocked(c.channels)
 	}
 	hello := c.helloLocked(priv, false)
 	c.mu.Unlock()
@@ -202,6 +212,10 @@ func (c *callCrypto) resetLocked() {
 	if c.rotate != nil {
 		c.rotate.Stop()
 		c.rotate = nil
+	}
+	if c.resync != nil {
+		c.resync.Stop()
+		c.resync = nil
 	}
 	for _, k := range []*sendKey{c.cur, c.next} {
 		if k != nil {
@@ -449,20 +463,29 @@ func (c *callCrypto) onKeyLocked(m *e2eeMsg) bool {
 }
 
 // updateRoster takes who's in which call (voice_state). Someone arriving
-// or leaving this call means a new sending key.
+// or leaving this call means a new sending key. Kept even when not in a
+// call, for begin to start from.
 func (c *callCrypto) updateRoster(channels map[string][]string) {
 	c.mu.Lock()
+	c.channels = channels
 	if c.board == "" {
 		c.mu.Unlock()
 		return
 	}
+	changed, added := c.applyRosterLocked(channels)
+	c.mu.Unlock()
+	if changed || added {
+		c.emitState()
+	}
+}
+
+func (c *callCrypto) applyRosterLocked(channels map[string][]string) (changed, added bool) {
 	now := map[string]bool{}
 	for _, u := range channels[c.board] {
 		if u != c.me {
 			now[u] = true
 		}
 	}
-	changed := false
 	for u := range c.roster {
 		if !now[u] {
 			delete(c.roster, u)
@@ -470,7 +493,6 @@ func (c *callCrypto) updateRoster(channels map[string][]string) {
 			changed = true
 		}
 	}
-	added := false
 	for u := range now {
 		if _, ok := c.roster[u]; !ok {
 			c.roster[u] = time.Now()
@@ -483,15 +505,41 @@ func (c *callCrypto) updateRoster(channels map[string][]string) {
 	if changed {
 		c.scheduleRotateLocked()
 	}
+	return changed, added
+}
+
+// resyncLoop runs every resyncEvery during a call. Anyone in it whose
+// hello hasn't arrived, or whose keys haven't, gets this app's hello again
+// (just them): that makes them answer with theirs and send their keys
+// again. So a message that got lost on the way — a reconnect, a race at
+// joining — only costs a couple of seconds, not the call. It also
+// refreshes what the page shows (someone with no hello for helloGrace
+// shows as unable to encrypt).
+func (c *callCrypto) resyncLoop() {
+	a := c.app
+	a.mu.Lock()
+	var priv ed25519.PrivateKey
+	if a.account != nil {
+		priv = a.account.PrivateKey
+	}
+	a.mu.Unlock()
+
+	c.mu.Lock()
+	if c.board == "" || priv == nil {
+		c.mu.Unlock()
+		return
+	}
+	var out []outMsg
+	for u, since := range c.roster {
+		p := c.peers[u]
+		if (p == nil || len(p.keys) == 0) && time.Since(since) >= resyncEvery {
+			out = append(out, outMsg{to: u, data: c.helloLocked(priv, false)})
+		}
+	}
+	c.resync = time.AfterFunc(resyncEvery, c.resyncLoop)
 	c.mu.Unlock()
-	if changed || added {
-		c.emitState()
-	}
-	if added {
-		// Re-check once their hello should have arrived, to show anyone
-		// whose app can't encrypt.
-		time.AfterFunc(helloGrace+500*time.Millisecond, c.emitState)
-	}
+	c.send(out)
+	c.emitState()
 }
 
 func (c *callCrypto) scheduleRotateLocked() {

@@ -412,3 +412,52 @@ func TestCallReconnect(t *testing.T) {
 	mustOpen(t, bob, "alice", kindAudio, alice.e2ee.seal(kindAudio, msg), msg)
 	mustOpen(t, alice, "bob", kindAudio, bob.e2ee.seal(kindAudio, msg), msg)
 }
+
+// The real order on the one joining: the voice_state from their join_voice
+// usually arrives before their call's connection (and begin) has started.
+func TestJoinStateBeforeBegin(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AppData", t.TempDir())
+	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
+	alice, bob := s.add(t, "alice"), s.add(t, "bob")
+	alice.e2ee.begin("vc1")
+	s.roster("alice")
+	s.settle()
+	s.roster("alice", "bob") // bob's join_voice → voice_state, to both
+	bob.e2ee.begin("vc1")    // then his call's connection starts
+	s.settle()
+	ca, cb := alice.GetVoiceEncryption(), bob.GetVoiceEncryption()
+	if ca.Code != cb.Code || len(cb.Peers) != 1 || cb.Peers[0].Status != "ok" || ca.Peers[0].Status != "ok" {
+		t.Fatalf("after joining:\n alice %+v\n bob   %+v", ca, cb)
+	}
+	msg := []byte("x")
+	mustOpen(t, bob, "alice", kindAudio, alice.e2ee.seal(kindAudio, msg), msg)
+	mustOpen(t, alice, "bob", kindAudio, bob.e2ee.seal(kindAudio, msg), msg)
+}
+
+// A hello lost on the way is made up for by the periodic resync.
+func TestLostHelloRecovers(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AppData", t.TempDir())
+	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
+	alice, bob := s.add(t, "alice"), s.add(t, "bob")
+	alice.e2ee.begin("vc1")
+	s.roster("alice", "bob")
+	bob.e2ee.begin("vc1")
+	s.mu.Lock()
+	s.queue = nil // both hellos lost
+	s.mu.Unlock()
+	s.settle()
+	time.Sleep(resyncEvery + 300*time.Millisecond)
+	s.settle()
+	time.Sleep(resyncEvery)
+	s.settle()
+	msg := []byte("x")
+	mustOpen(t, bob, "alice", kindAudio, alice.e2ee.seal(kindAudio, msg), msg)
+	mustOpen(t, alice, "bob", kindAudio, bob.e2ee.seal(kindAudio, msg), msg)
+	if alice.GetVoiceEncryption().Code != bob.GetVoiceEncryption().Code {
+		t.Fatal("codes differ")
+	}
+}
