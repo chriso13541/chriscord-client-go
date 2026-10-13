@@ -26,6 +26,9 @@ html { height:100%; background:var(--bg-darkest); }
 @font-face { font-family:'OpenMojiInput'; src:url('emoji/OpenMoji-color-glyf_colr_0.woff2') format('woff2'); font-display:swap; size-adjust:160%; ascent-override:72%; descent-override:18%;
   unicode-range:U+00A9,U+00AE,U+203C,U+2049,U+2122,U+2139,U+2194-2199,U+21A9-21AA,U+231A-231B,U+2328,U+23CF,U+23E9-23F3,U+23F8-23FA,U+24C2,U+25AA-25AB,U+25B6,U+25C0,U+25FB-25FE,U+2600-27BF,U+2934-2935,U+2B05-2B07,U+2B1B-2B1C,U+2B50,U+2B55,U+3030,U+303D,U+3297,U+3299,U+FE0F,U+200D,U+20E3,U+1F000-1FAFF,U+E0020-E007F; }
 #msg-input, .msg-edit-input { font-family:'OpenMojiInput','Segoe UI',system-ui,-apple-system,sans-serif; line-height:1.5; }
+/* No native text-box styling (macOS adds its own margins and inner offset,
+   which put the text out of line with the highlight layer behind it). */
+#msg-input, .msg-edit-input { -webkit-appearance:none; appearance:none; margin:0; box-sizing:border-box; }
 body { font-family:'OpenMojiColor','Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg-darkest); color:var(--text); height:100%; overflow:hidden; user-select:none; }
 .hidden { display:none !important; }
 /* ── Appearance: optional background image behind the whole app ── */
@@ -1049,11 +1052,17 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
    macOS: the system's traffic lights sit at its left; we leave room.
    Linux keeps its desktop's own bar, so none of this applies there. */
 :root { --titlebar-h:0px; }
-body.custom-titlebar { --titlebar-h:32px; padding-top:var(--titlebar-h); box-sizing:border-box; }
-body.custom-titlebar.tb-mac { --titlebar-h:32px; } /* the traffic lights sit in the top 28 px (main.go) */
-#titlebar { position:fixed; top:0; left:0; right:0; height:var(--titlebar-h); z-index:1000; display:flex; align-items:stretch;
+/* The bar is the same size on screen at any zoom (Ctrl +/-), like the
+   system's own: --tb-size is its real height, applyZoom() un-zooms the bar
+   itself, and --titlebar-h is that height in the zoomed page's pixels
+   (for the room left above the app, and full-screen layers' tops). */
+body.custom-titlebar { --tb-size:32px; --titlebar-h:calc(var(--tb-size) / var(--ui-zoom, 1)); padding-top:var(--titlebar-h); box-sizing:border-box; }
+body.custom-titlebar.tb-mac { --tb-size:28px; } /* macOS's own title bar height: the traffic lights sit centred in it */
+#titlebar { position:fixed; top:0; left:0; right:0; height:var(--tb-size); z-index:1000; display:flex; align-items:stretch;
   background:var(--bg-darkest); border-bottom:1px solid var(--border); --wails-draggable:drag; user-select:none; }
 body.bg-image #titlebar { background:var(--pane-bg); backdrop-filter:blur(12px); }
+/* macOS: no system rubber-banding anywhere (the app's own, per the setting, instead). */
+html.no-native-bounce, html.no-native-bounce body, html.no-native-bounce * { overscroll-behavior:none; }
 #titlebar .tb-title { flex:1; display:flex; align-items:center; gap:8px; padding-left:12px; min-width:0; font-size:.78rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; }
 #titlebar .tb-app { font-weight:800; letter-spacing:.06em; color:var(--text); text-transform:uppercase; font-size:.72rem; }
 #titlebar .tb-where { overflow:hidden; text-overflow:ellipsis; }
@@ -2085,6 +2094,10 @@ const ZOOM_MIN=0.5,ZOOM_MAX=2,ZOOM_STEP=0.1,ZOOM_DEFAULT=1;
 function applyZoom(level){
   state.zoomLevel=Math.min(ZOOM_MAX,Math.max(ZOOM_MIN,Math.round(level*100)/100));
   document.body.style.zoom=state.zoomLevel;
+  // The title bar keeps its size (see #titlebar): undo the zoom for it.
+  document.body.style.setProperty('--ui-zoom',state.zoomLevel);
+  const bar=document.getElementById('titlebar');
+  if(bar)bar.style.zoom=1/state.zoomLevel;
   localStorage.setItem('zoomLevel',state.zoomLevel);
 }
 applyZoom(parseFloat(localStorage.getItem('zoomLevel'))||ZOOM_DEFAULT);
@@ -9229,10 +9242,10 @@ function initSettingsFeedback(){
 // Settings → Appearance (on by default).
 const ELASTIC_MAX=36;
 let elasticOn=localStorage.getItem('elasticScroll')!=='0';
-// macOS rubber-bands every scroll area itself, so this one would come on
-// top of it (a double bounce). There the setting is left as it is (it's
-// shared with your other computers) but does nothing.
-const nativeElastic=/Macintosh|Mac OS X/.test(navigator.userAgent);
+// macOS rubber-bands every scroll area by itself; that's switched off
+// (html.no-native-bounce), so this setting decides there too — on: the
+// app's own bounce, off: none at all, like Discord.
+if(/Macintosh|Mac OS X/.test(navigator.userAgent))document.documentElement.classList.add('no-native-bounce');
 function attachElastic(el){
   let off=0,timer=null,settleTimer=null;
   const release=()=>{
@@ -9246,7 +9259,7 @@ function attachElastic(el){
     settleTimer=setTimeout(()=>{if(!off){el.style.transform='';el.style.transition='';}},400);
   };
   el.addEventListener('wheel',e=>{
-    if(!elasticOn||nativeElastic||e.ctrlKey||!e.deltaY)return;
+    if(!elasticOn||e.ctrlKey||!e.deltaY)return;
     const atTop=el.scrollTop<=0&&e.deltaY<0;
     const atBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-1&&e.deltaY>0;
     if(!atTop&&!atBottom){release();return;}
@@ -9263,11 +9276,6 @@ function initElasticScroll(){
   attachElastic(document.getElementById('messages'));
   const box=document.getElementById('ap-elastic');
   box.checked=elasticOn;
-  if(nativeElastic){
-    box.disabled=true;
-    box.closest('label').title='macOS already does elastic scrolling itself';
-    box.closest('label').style.opacity='.5';
-  }
   box.addEventListener('change',()=>{elasticOn=box.checked;localStorage.setItem('elasticScroll',elasticOn?'1':'0');persistClientSettings();});
 }
 
@@ -10132,17 +10140,20 @@ function buildDateSeparator(iso){
   el.innerHTML=`<span>${esc(formatDateSeparator(iso))}</span>`;
   return el;
 }
+// Grows a text box with what's typed, up to about 120 px, in whole rows:
+// the browser sizes a row itself (line height + padding), so nothing here
+// mixes measured pixels with CSS ones — which is what went wrong at other
+// zoom levels, and on macOS (WebKit counts an empty box's placeholder, and
+// measures zoomed text boxes differently from Chromium).
 function autoResize(el){
-  el.style.height='auto';
-  let h=el.scrollHeight;
-  if(!el.value){
-    // Empty: exactly one line. On macOS (WebKit) an empty box's
-    // scrollHeight includes the placeholder's own box, which comes out
-    // taller than a line, so the box grew with nothing in it.
-    const cs=getComputedStyle(el);
-    h=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)+(parseFloat(cs.lineHeight)||20);
-  }
-  el.style.height=Math.min(h,120)+'px';
+  const cs=getComputedStyle(el);
+  const line=parseFloat(cs.lineHeight)||20;
+  const pad=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  const maxRows=Math.max(1,Math.floor((120-pad)/line));
+  el.style.height='';
+  el.rows=1;
+  if(el.value)while(el.rows<maxRows&&el.scrollHeight>el.clientHeight+2)el.rows++;
+  el.style.overflowY=el.value&&el.scrollHeight>el.clientHeight+2?'auto':'hidden';
   if(el.id==='msg-input')renderComposerHighlight();
 }
 // Boxes behind @mentions in the message box (see #msg-hl). Matched against
