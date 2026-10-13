@@ -5640,9 +5640,9 @@ const isEncryptedFile=a=>typeof a?.url==='string'&&a.url.startsWith('/e2ee-file/
 async function downloadAttachment(a){
   if(a.external){window.go.main.App.OpenURL(a.url).catch(()=>{});return;} // a linked video: open its link
   if(isEncryptedFile(a)){
-    // Encrypted end to end: only this app can decrypt it, so it saves it
-    // (a Save dialog) rather than handing a link to the browser.
-    try{const p=await window.go.main.App.SaveAttachment(a.url,a.name||'file');if(p)toast('Saved '+(a.name||'file'));}
+    // Encrypted end to end: the browser downloads it from this app, which
+    // decrypts it as it goes (a link to this computer, valid 5 minutes).
+    try{await window.go.main.App.OpenURL(await window.go.main.App.AttachmentDownloadLink(a.url,a.name||'file'));}
     catch(err){toast('Download failed: '+err,true);}
     return;
   }
@@ -5672,10 +5672,9 @@ async function downloadAllAttachments(msg,btn){
   }else toast('Zipping files\u2026');
   try{
     if((msg.attachments||[]).some(isEncryptedFile)){
-      // Encrypted files: the server only has the encrypted blobs, so the
-      // zip is made here, decrypted (a Save dialog first).
-      const p=await window.go.main.App.SaveAllAttachments(msg.id);
-      if(p)toast('Saved the files as a .zip');
+      // Encrypted files: the server only has the encrypted blobs, so this
+      // app makes the zip, decrypted, as the browser downloads it.
+      await window.go.main.App.OpenURL(await window.go.main.App.AttachmentsZipLink(msg.id));
       return;
     }
     const z=await window.go.main.App.GetMessageZipLink(msg.id);
@@ -10140,25 +10139,27 @@ function buildDateSeparator(iso){
   el.innerHTML=`<span>${esc(formatDateSeparator(iso))}</span>`;
   return el;
 }
-// Grows a text box with what's typed, up to about 120 px, in whole lines:
-// its height is always padding + n × line height, from its own CSS values,
-// and the only measuring is "does the text still overflow?" (scrollHeight
-// against clientHeight, both from the same box, so the zoom can't skew the
-// comparison). Never the browser's own size for rows="1": macOS (WebKit)
-// adds room for a horizontal scrollbar to that, so a one-line box came out
-// ~16 px too tall with the text stuck at the top — and counts an empty
-// box's placeholder as taller than a line.
+// Grows a text box with what's typed, in whole lines, up to MAX_ROWS:
+// height = its padding + n lines, all in em of its own font size, so the
+// browser itself turns that into pixels at whatever size the text is
+// drawn (zoom, macOS's scaling) — the box always fits the text, the same
+// way at every size. Never the browser's own size for rows="1": macOS
+// (WebKit) adds room for a horizontal scrollbar to that, and counts an
+// empty box's placeholder as taller than a line. The only measuring is
+// "does the text still overflow?" (two numbers from the same box).
+const MAX_ROWS=4;
 function autoResize(el){
   const cs=getComputedStyle(el);
-  const line=parseFloat(cs.lineHeight)||20;
-  const pad=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)
-    +(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0); // border-box sizing
-  const maxRows=Math.max(1,Math.floor((120-pad)/line));
-  const fit=n=>{el.style.height=(pad+n*line)+'px';};
+  const fs=parseFloat(cs.fontSize)||14;
+  // Ratios to the font size: the same whichever pixels an engine reports in.
+  const lineEm=(parseFloat(cs.lineHeight)||fs*1.5)/fs;
+  const padEm=((parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)
+    +(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0))/fs; // border-box sizing
+  const fit=n=>{el.style.height=(padEm+n*lineEm).toFixed(4)+'em';};
   let rows=1;
   el.style.overflowY='hidden'; // no scrollbar taking room while it's measured
   fit(rows);
-  if(el.value)while(rows<maxRows&&el.scrollHeight>el.clientHeight+2)fit(++rows);
+  if(el.value)while(rows<MAX_ROWS&&el.scrollHeight>el.clientHeight+2)fit(++rows);
   if(el.value&&el.scrollHeight>el.clientHeight+2)el.style.overflowY='auto'; // past the most: scroll
   if(el.id==='msg-input')renderComposerHighlight();
 }

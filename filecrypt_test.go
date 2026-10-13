@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
@@ -299,5 +300,66 @@ func TestUploadEncrypted(t *testing.T) {
 	a.serveE2EEFile(w, httptest.NewRequest("GET", res.URL, nil))
 	if w.Code != 200 || !bytes.Equal(w.Body.Bytes(), plain) || w.Header().Get("Content-Type") != "video/mp4" {
 		t.Fatalf("served back: %d, %d bytes, %s", w.Code, w.Body.Len(), w.Header().Get("Content-Type"))
+	}
+}
+
+// Downloads: the browser gets a link to this app, which streams the file
+// (or a zip of a message's files) decrypted.
+func TestBrowserDownloadLinks(t *testing.T) {
+	plain := make([]byte, 3*fileChunk+99)
+	rand.Read(plain)
+	blob, e := encryptedBlob(t, plain)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, "x", time.Time{}, bytes.NewReader(blob))
+	}))
+	defer srv.Close()
+	a := &App{domain: srv.URL}
+	a.text = newTextCrypto(a)
+	e.meta.Name, e.meta.Mime = "holiday clip.mp4", "video/mp4"
+	a.text.files["x.e2ee"] = e
+	a.text.msgFiles["m1"] = []fileMeta{e.meta, e.meta}
+
+	link, err := a.AttachmentDownloadLink(fileLocalPrefix+"x.e2ee", "holiday clip.mp4")
+	if err != nil || !strings.HasPrefix(link, "http://127.0.0.1:") {
+		t.Fatalf("link %q: %v", link, err)
+	}
+	resp, err := http.Get(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got bytes.Buffer
+	got.ReadFrom(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || !bytes.Equal(got.Bytes(), plain) ||
+		!strings.Contains(resp.Header.Get("Content-Disposition"), "attachment") {
+		t.Fatalf("download: %d, %d bytes, %q", resp.StatusCode, got.Len(), resp.Header.Get("Content-Disposition"))
+	}
+
+	zlink, err := a.AttachmentsZipLink("m1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.Get(zlink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got.Reset()
+	got.ReadFrom(resp.Body)
+	resp.Body.Close()
+	zr, err := zip.NewReader(bytes.NewReader(got.Bytes()), int64(got.Len()))
+	if err != nil || len(zr.File) != 2 || zr.File[1].Name != "holiday clip (2).mp4" {
+		t.Fatalf("zip: %v %d", err, len(zr.File))
+	}
+	f, _ := zr.File[0].Open()
+	var one bytes.Buffer
+	one.ReadFrom(f)
+	if !bytes.Equal(one.Bytes(), plain) {
+		t.Fatal("zipped file differs")
+	}
+
+	// A made-up or expired token doesn't work.
+	bad := zlink[:strings.Index(zlink, "/dl/")+4] + "00000000000000000000000000000000/x"
+	if r, _ := http.Get(bad); r == nil || r.StatusCode != http.StatusGone {
+		t.Fatal("unknown token accepted")
 	}
 }
