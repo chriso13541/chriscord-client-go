@@ -59,12 +59,15 @@ func main() {
 		//             maximise / close, and the window still resizes from
 		//             its edges and snaps like any other.
 		//   macOS   — the system title bar is hidden but the traffic-light
-		//             buttons stay, inset over the app's own bar.
+		//             buttons stay, over the app's own bar. (Not the
+		//             "inset" style: that adds a toolbar-height strip,
+		//             putting the buttons ~26 px down — below a normal-
+		//             height bar, over the app itself.)
 		//   Linux   — the desktop's own title bar is kept: window managers
 		//             differ too much for a drawn one to behave well.
 		Frameless: goruntime.GOOS == "windows",
 		Mac: &mac.Options{
-			TitleBar:   mac.TitleBarHiddenInset(),
+			TitleBar:   mac.TitleBarHidden(),
 			Appearance: mac.NSAppearanceNameDarkAqua,
 		},
 		DragAndDrop: &options.DragAndDrop{

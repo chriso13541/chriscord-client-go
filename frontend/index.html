@@ -1050,7 +1050,7 @@ img.emoji { width:1.7em; height:1.7em; vertical-align:-.45em; margin:0 .05em; ob
    Linux keeps its desktop's own bar, so none of this applies there. */
 :root { --titlebar-h:0px; }
 body.custom-titlebar { --titlebar-h:32px; padding-top:var(--titlebar-h); box-sizing:border-box; }
-body.custom-titlebar.tb-mac { --titlebar-h:28px; }
+body.custom-titlebar.tb-mac { --titlebar-h:32px; } /* the traffic lights sit in the top 28 px (main.go) */
 #titlebar { position:fixed; top:0; left:0; right:0; height:var(--titlebar-h); z-index:1000; display:flex; align-items:stretch;
   background:var(--bg-darkest); border-bottom:1px solid var(--border); --wails-draggable:drag; user-select:none; }
 body.bg-image #titlebar { background:var(--pane-bg); backdrop-filter:blur(12px); }
@@ -9229,6 +9229,10 @@ function initSettingsFeedback(){
 // Settings → Appearance (on by default).
 const ELASTIC_MAX=36;
 let elasticOn=localStorage.getItem('elasticScroll')!=='0';
+// macOS rubber-bands every scroll area itself, so this one would come on
+// top of it (a double bounce). There the setting is left as it is (it's
+// shared with your other computers) but does nothing.
+const nativeElastic=/Macintosh|Mac OS X/.test(navigator.userAgent);
 function attachElastic(el){
   let off=0,timer=null,settleTimer=null;
   const release=()=>{
@@ -9242,7 +9246,7 @@ function attachElastic(el){
     settleTimer=setTimeout(()=>{if(!off){el.style.transform='';el.style.transition='';}},400);
   };
   el.addEventListener('wheel',e=>{
-    if(!elasticOn||e.ctrlKey||!e.deltaY)return;
+    if(!elasticOn||nativeElastic||e.ctrlKey||!e.deltaY)return;
     const atTop=el.scrollTop<=0&&e.deltaY<0;
     const atBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-1&&e.deltaY>0;
     if(!atTop&&!atBottom){release();return;}
@@ -9259,6 +9263,11 @@ function initElasticScroll(){
   attachElastic(document.getElementById('messages'));
   const box=document.getElementById('ap-elastic');
   box.checked=elasticOn;
+  if(nativeElastic){
+    box.disabled=true;
+    box.closest('label').title='macOS already does elastic scrolling itself';
+    box.closest('label').style.opacity='.5';
+  }
   box.addEventListener('change',()=>{elasticOn=box.checked;localStorage.setItem('elasticScroll',elasticOn?'1':'0');persistClientSettings();});
 }
 
@@ -10124,7 +10133,16 @@ function buildDateSeparator(iso){
   return el;
 }
 function autoResize(el){
-  el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';
+  el.style.height='auto';
+  let h=el.scrollHeight;
+  if(!el.value){
+    // Empty: exactly one line. On macOS (WebKit) an empty box's
+    // scrollHeight includes the placeholder's own box, which comes out
+    // taller than a line, so the box grew with nothing in it.
+    const cs=getComputedStyle(el);
+    h=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)+(parseFloat(cs.lineHeight)||20);
+  }
+  el.style.height=Math.min(h,120)+'px';
   if(el.id==='msg-input')renderComposerHighlight();
 }
 // Boxes behind @mentions in the message box (see #msg-hl). Matched against
