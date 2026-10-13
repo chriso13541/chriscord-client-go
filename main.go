@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"net/http"
+	"strings"
 	"os"
 	goruntime "runtime"
 
@@ -42,7 +43,14 @@ func main() {
 			Assets: assets,
 			// Anything not in the bundled frontend: custom emoji images
 			// (/cc-emoji/<id>), from a disk cache or the server.
-			Handler: http.HandlerFunc(app.serveEmojiAsset),
+			// And encrypted attachments (/e2ee-file/<name>), decrypted here.
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasPrefix(r.URL.Path, fileLocalPrefix) {
+					app.serveE2EEFile(w, r)
+					return
+				}
+				app.serveEmojiAsset(w, r)
+			}),
 		},
 		BackgroundColour: &options.RGBA{R: 14, G: 17, B: 23, A: 255},
 		// The window's title bar is drawn by the app itself, in the user's

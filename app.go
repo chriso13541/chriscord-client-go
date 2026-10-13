@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -1422,8 +1421,9 @@ func (a *App) SubscribeBoard(boardID string) error {
 // SendMessage posts a message; replyTo is the id of the message it replies
 // to, or "".
 func (a *App) SendMessage(boardID, content string, attachments []Attachment, replyTo string) error {
-	// Encrypted end to end before it leaves (textcrypt.go).
-	content, err := a.text.seal(boardID, content)
+	// Encrypted end to end before it leaves (textcrypt.go), attachments'
+	// details and keys included (filecrypt.go).
+	content, attachments, err := a.text.sealMessage(boardID, content, attachments)
 	if err != nil { return err }
 	a.writeMu.Lock(); defer a.writeMu.Unlock()
 	a.mu.Lock(); conn := a.ws; a.mu.Unlock()
@@ -1660,8 +1660,9 @@ func (a *App) SetMessagePinned(msgID string, pinned bool) error {
 }
 
 func (a *App) EditMessage(msgID, content string) error {
-	// Encrypted like a new message, with the channel's newest key.
-	content, err := a.text.seal(a.text.boardOf(msgID), content)
+	// Encrypted like a new message, with the channel's newest key (and the
+	// message's attachments carried over).
+	content, err := a.text.sealEdit(msgID, content)
 	if err != nil { return err }
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
 	data, _ := json.Marshal(map[string]string{"content": content})
@@ -1728,35 +1729,9 @@ func (a *App) UploadFileWithProgress(filePath, jobID string) (*UploadResult, err
 		}}
 	}
 
-	filename := filepath.Base(filePath)
-	pr, pw   := io.Pipe()
-	mw       := multipart.NewWriter(pw)
-
-	go func() {
-		fw, err := mw.CreateFormFile("file", filename)
-		if err != nil { pw.CloseWithError(err); return }
-		if _, err := io.Copy(fw, f); err != nil { pw.CloseWithError(err); return }
-		mw.Close(); pw.Close()
-	}()
-
-	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/upload", pr)
-	if err != nil { pr.CloseWithError(err); return nil, err }
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	req.Header.Set("X-Session-Token", token)
-
-	client := &http.Client{Timeout: 10 * 60 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil { return nil, fmt.Errorf("upload failed: %w", err) }
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		var e map[string]string; json.NewDecoder(resp.Body).Decode(&e)
-		if msg, ok := e["error"]; ok { return nil, fmt.Errorf("%s", msg) }
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-	var result UploadResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil { return nil, err }
-	return &result, nil
+	// Encrypted end to end while it uploads (filecrypt.go): the server only
+	// ever gets a nameless encrypted blob.
+	return a.uploadEncrypted(domain, token, filepath.Base(filePath), f)
 }
 
 // progressReader counts bytes as the upload reads the file and reports the
@@ -1821,6 +1796,10 @@ func (a *App) UploadFileData(filename, dataBase64 string) (*UploadResult, error)
 // download goes through one of these. Links last 5 minutes (server-side
 // LINK_TTL), checked when each request starts.
 func (a *App) GetFileLink(path string) (string, error) {
+	// An encrypted attachment: this app serves it itself, decrypted (filecrypt.go).
+	if strings.HasPrefix(path, fileLocalPrefix) {
+		return path, nil
+	}
 	var resp struct {
 		URL string `json:"url"`
 	}

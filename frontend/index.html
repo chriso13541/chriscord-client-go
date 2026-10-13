@@ -5571,8 +5571,16 @@ function toggleDropdown(msgEl,msg){
 // BrowserOpenURL — that one refuses URLs with characters like ( ) ! ~ — and
 // the file name is fully percent-encoded so nothing in it is left raw.
 const strictEncode=v=>encodeURIComponent(v).replace(/[!'()*~]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
+const isEncryptedFile=a=>typeof a?.url==='string'&&a.url.startsWith('/e2ee-file/');
 async function downloadAttachment(a){
   if(a.external){window.go.main.App.OpenURL(a.url).catch(()=>{});return;} // a linked video: open its link
+  if(isEncryptedFile(a)){
+    // Encrypted end to end: only this app can decrypt it, so it saves it
+    // (a Save dialog) rather than handing a link to the browser.
+    try{const p=await window.go.main.App.SaveAttachment(a.url,a.name||'file');if(p)toast('Saved '+(a.name||'file'));}
+    catch(err){toast('Download failed: '+err,true);}
+    return;
+  }
   try{
     // Always a brand-new link (not the cached one used for display), so
     // the browser gets the full 5 minutes to start the download.
@@ -5586,7 +5594,7 @@ async function downloadAttachment(a){
 // browser like any other download. The zip is deleted on the server once
 // that link expires. Building it can take a moment for big files, so the
 // button says what's happening meanwhile.
-const isServerFile=a=>!a.external&&typeof a.url==='string'&&a.url.startsWith('/api/files/');
+const isServerFile=a=>!a.external&&typeof a.url==='string'&&(a.url.startsWith('/api/files/')||a.url.startsWith('/e2ee-file/'));
 async function downloadAllAttachments(msg,btn){
   btn=btn||document.querySelector(`.msg-group[data-id="${CSS.escape(msg.id)}"] .msg-zip-chip`);
   if(btn?.classList.contains('busy'))return;
@@ -5598,6 +5606,13 @@ async function downloadAllAttachments(msg,btn){
     icn.outerHTML=icon('progress_activity','spin');
   }else toast('Zipping files\u2026');
   try{
+    if((msg.attachments||[]).some(isEncryptedFile)){
+      // Encrypted files: the server only has the encrypted blobs, so the
+      // zip is made here, decrypted (a Save dialog first).
+      const p=await window.go.main.App.SaveAllAttachments(msg.id);
+      if(p)toast('Saved the files as a .zip');
+      return;
+    }
     const z=await window.go.main.App.GetMessageZipLink(msg.id);
     await window.go.main.App.OpenURL(z.url); // the server always sends it as a download, named for you
   }catch(err){

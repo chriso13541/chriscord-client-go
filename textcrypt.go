@@ -109,6 +109,8 @@ type textCrypto struct {
 	curBoard  string                 // the board the page is showing
 	boardLock map[string]*sync.Mutex // one key change per board at a time
 	published string                 // scope whose key has been published
+	files     map[string]*fileEntry  // stored file name → its key and details (filecrypt.go)
+	msgFiles  map[string][]fileMeta  // message id → its encrypted attachments
 	pendingT  *time.Timer
 	tickStop  chan struct{}
 
@@ -131,6 +133,8 @@ func (t *textCrypto) resetLocked(scope string) {
 	t.locked = map[string]bool{}
 	t.triedAt = map[string]time.Time{}
 	t.boardLock = map[string]*sync.Mutex{}
+	t.files = map[string]*fileEntry{}
+	t.msgFiles = map[string][]fileMeta{}
 	t.curBoard = ""
 }
 
@@ -292,10 +296,13 @@ func openBox(id textIdentity, senderID string, senderEnc [32]byte, board string,
 // ── Messages ──────────────────────────────────────────────────────────────────
 
 // textPlain is what's inside an encrypted message: who wrote it (so the
-// server can't pass one person's message off as another's) and the text.
+// server can't pass one person's message off as another's), the text, and
+// its encrypted attachments — where each is, what it really is, and its key
+// (filecrypt.go).
 type textPlain struct {
-	U string `json:"u"`
-	T string `json:"t"`
+	U string     `json:"u"`
+	T string     `json:"t"`
+	A []fileMeta `json:"a,omitempty"`
 }
 
 func textAAD(board string, gen int) []byte {
@@ -303,11 +310,15 @@ func textAAD(board string, gen int) []byte {
 }
 
 func sealText(key []byte, board string, gen int, author, text string) (string, error) {
+	return sealPlain(key, board, gen, textPlain{U: author, T: text})
+}
+
+func sealPlain(key []byte, board string, gen int, p textPlain) (string, error) {
 	aead, err := chacha20poly1305.NewX(key)
 	if err != nil {
 		return "", err
 	}
-	pt, _ := json.Marshal(textPlain{U: author, T: text})
+	pt, _ := json.Marshal(p)
 	nonce := make([]byte, aead.NonceSize(), aead.NonceSize()+len(pt)+aead.Overhead())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", err
@@ -549,7 +560,13 @@ func (t *textCrypto) newGeneration(board string, bk *boardKeys) error {
 // seal encrypts a message's text for sending in board. Empty text stays
 // empty (a files-only message).
 func (t *textCrypto) seal(board, text string) (string, error) {
-	if text == "" {
+	return t.sealWith(board, text, nil)
+}
+
+// sealWith encrypts a message's text and its encrypted attachments'
+// details. Nothing at all stays empty.
+func (t *textCrypto) sealWith(board, text string, files []fileMeta) (string, error) {
+	if text == "" && len(files) == 0 {
 		return "", nil
 	}
 	id, ok := t.identity()
@@ -581,7 +598,7 @@ func (t *textCrypto) seal(board, text string) (string, error) {
 		gen := t.boards[board].latest
 		key := t.boards[board].keys[gen]
 		t.mu.Unlock()
-		return sealText(key, board, gen, id.me, text)
+		return sealPlain(key, board, gen, textPlain{U: id.me, T: text, A: files})
 	}
 }
 
@@ -589,9 +606,15 @@ func (t *textCrypto) seal(board, text string) (string, error) {
 // a plain (unencrypted) message, "ok", "locked" (no key yet), "error" or
 // "forged" (it says it's from someone other than who the server says).
 func (t *textCrypto) openContent(board, author, content string) (string, string) {
+	text, state, _ := t.openFull(board, author, content)
+	return text, state
+}
+
+// openFull is openContent plus the message's encrypted attachments.
+func (t *textCrypto) openFull(board, author, content string) (string, string, []fileMeta) {
 	gen, blob, ok := parseText(content)
 	if !ok {
-		return content, ""
+		return content, "", nil
 	}
 	key := t.key(board, gen)
 	if key == nil {
@@ -615,16 +638,16 @@ func (t *textCrypto) openContent(board, author, content string) (string, string)
 		t.mu.Lock()
 		t.locked[board] = true
 		t.mu.Unlock()
-		return textLockedMsg, "locked"
+		return textLockedMsg, "locked", nil
 	}
 	p, err := openText(key, board, gen, blob)
 	if err != nil {
-		return textBrokenMsg, "error"
+		return textBrokenMsg, "error", nil
 	}
 	if author != "" && p.U != author {
-		return fmt.Sprintf("⚠ Written by %s, not %s: %s", p.U, author, p.T), "forged"
+		return fmt.Sprintf("⚠ Written by %s, not %s: %s", p.U, author, p.T), "forged", p.A
 	}
-	return p.T, "ok"
+	return p.T, "ok", p.A
 }
 
 // open decrypts a message (and the preview of the one it replies to) in place.
@@ -638,7 +661,9 @@ func (t *textCrypto) open(m *ChatMessage) {
 		t.msgUser[m.ID] = m.Username
 	}
 	t.mu.Unlock()
-	m.Content, m.E2EE = t.openContent(m.BoardID, m.Username, m.Content)
+	var files []fileMeta
+	m.Content, m.E2EE, files = t.openFull(m.BoardID, m.Username, m.Content)
+	m.Attachments = t.showAttachments(m.ID, m.Attachments, m.E2EE, files)
 	if m.Reply != nil {
 		m.Reply.Content, _ = t.openContent(m.BoardID, m.Reply.Username, m.Reply.Content)
 	}
@@ -655,7 +680,11 @@ func (t *textCrypto) openEdit(id, board, content string) (string, string) {
 	t.mu.Lock()
 	author := t.msgUser[id]
 	t.mu.Unlock()
-	return t.openContent(board, author, content)
+	text, state, files := t.openFull(board, author, content)
+	if state == "ok" || state == "forged" {
+		t.showAttachments(id, nil, state, files) // keep what an edit carries over
+	}
+	return text, state
 }
 
 // boardOf is the board a message is in, as far as this app knows.
