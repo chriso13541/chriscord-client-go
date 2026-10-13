@@ -666,6 +666,11 @@ func (t *textCrypto) open(m *ChatMessage) {
 	m.Attachments = t.showAttachments(m.ID, m.Attachments, m.E2EE, files)
 	if m.Reply != nil {
 		m.Reply.Content, _ = t.openContent(m.BoardID, m.Reply.Username, m.Reply.Content)
+		// The start of it, as the server used to send (it can't shorten an
+		// encrypted one without breaking it).
+		if r := []rune(m.Reply.Content); len(r) > 200 {
+			m.Reply.Content = string(r[:200])
+		}
 	}
 }
 

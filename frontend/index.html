@@ -1252,6 +1252,11 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 #results-summary .results-title .ic { width:18px; height:18px; }
 .results-empty { display:flex; flex-direction:column; align-items:center; gap:8px; padding:28px 8px; text-align:center; font-size:.82rem; color:var(--text-muted); }
 .results-empty .ic { width:36px; height:36px; opacity:.6; }
+/* Search goes back through history a stretch at a time (search.go). */
+.results-more { display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 4px 14px; font-size:.75rem; color:var(--text-muted); text-align:center; }
+.results-more button { font:inherit; font-size:.8rem; font-weight:600; color:var(--text); background:var(--bg-light); border:1px solid var(--border); border-radius:6px; padding:6px 14px; cursor:pointer; }
+.results-more button:hover:not(:disabled) { background:var(--accent); border-color:var(--accent); color:#fff; }
+.results-more button:disabled { opacity:.6; cursor:default; }
 .msg-pin { display:inline-flex; align-self:center; margin-right:-4px; }
 .msg-pin-ic { width:15px; height:15px; color:var(--text-muted); }
 #results-summary .clear-results { background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:auto; font-size:.78rem; padding:2px 5px; border-radius:4px; flex-shrink:0; }
@@ -5069,11 +5074,54 @@ async function runSearch(){
     boardId=b.id;
   }
   if(!f.text&&!f.from&&!f.has.length&&!boardId&&!f.after&&!f.before){exitSearch();return;}
+  // Messages are encrypted, so this app does the matching (search.go): it
+  // goes back through history newest first and stops at a screenful;
+  // "Search older" carries on from there.
+  const run=searchRun={f,raw,args:[f.text,f.from,f.has.join(','),boardId,
+    f.after?f.after.toISOString():'',f.before?f.before.toISOString():''],results:[],page:null};
+  showSearchResults([],raw,f,{searching:true});
+  await searchMore(run);
+}
+let searchRun=null; // the search on screen
+async function searchMore(run){
+  if(run.busy)return;
+  run.busy=true;
+  renderSearchMore(run);
   try{
-    const results=await window.go.main.App.SearchServerFiltered(f.text,f.from,f.has.join(','),boardId,
-      f.after?f.after.toISOString():'',f.before?f.before.toISOString():'')||[];
-    showSearchResults(results,raw,f);
-  }catch(err){toast('Search failed: '+err,true);}
+    const page=await window.go.main.App.SearchMessages(...run.args,run.page?run.page.next:0,25);
+    if(run!==searchRun||state.resultsMode!=='search')return; // replaced or closed meanwhile
+    run.page=page;
+    const list=document.getElementById('results-list');
+    list.querySelector('.results-none')?.remove();
+    for(const m of page.results||[]){run.results.push(m);list.appendChild(buildSearchResultRow(m));}
+    updateSearchCount(run);
+  }catch(err){if(run===searchRun)toast('Search failed: '+err,true);}
+  finally{run.busy=false;if(run===searchRun)renderSearchMore(run);}
+}
+const searchedTo=p=>p?.oldest_at?new Date(p.oldest_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
+function updateSearchCount(run){
+  const n=run.results.length,done=run.page&&run.page.next<0;
+  const el=document.querySelector('#results-summary .rs-count');
+  if(el)el.textContent=`${n}${done?'':'+'} result${n===1?'':'s'}`;
+}
+// The line under the results: searching…, "Search older", or the end.
+function renderSearchMore(run){
+  const list=document.getElementById('results-list');
+  list.querySelector('.results-more')?.remove();
+  const p=run.page,more=document.createElement('div');more.className='results-more';
+  if(run.busy){
+    more.innerHTML=`${icon('progress_activity','spin')}<span>Searching${p?' older messages':''}\u2026</span>`;
+  }else if(p&&p.next>=0){
+    more.innerHTML=`<span>Searched back to ${esc(searchedTo(p))}</span><button type="button">Search older</button>`;
+    more.querySelector('button').addEventListener('click',()=>searchMore(run));
+  }else{
+    if(!run.results.length){
+      list.innerHTML='<div class="results-none" style="font-size:.8rem;color:var(--text-muted);padding:4px 2px">No messages found.</div>';
+      return;
+    }
+    more.innerHTML=`<span>That\u2019s everything${p&&p.oldest_at?' \u2014 back to '+esc(searchedTo(p)):''}</span>`;
+  }
+  list.appendChild(more);
 }
 
 // Draws the search text with filters highlighted, behind the input (whose
@@ -5241,7 +5289,7 @@ function closeResultsPanel(){
   }
   state.membersWasOpenBeforeSearch=null;
 }
-function showSearchResults(results,q,f){
+function showSearchResults(results,q,f,opts={}){
   openResultsPanel('search');
   document.getElementById('msg-search-clear').classList.remove('hidden');
 
@@ -5257,15 +5305,19 @@ function showSearchResults(results,q,f){
     else if(f.before)pills.push(`before ${day(f.before)}`);
   }
   const label=f&&f.text?`"${esc(f.text)}"`:(f?'your filters':`"${esc(q)}"`);
-  summary.innerHTML=`<span>${results.length} result${results.length===1?'':'s'} for ${label}${pills.length?`<span class="rs-filters">${pills.map(p=>`<span>${esc(p)}</span>`).join('')}</span>`:''}</span>`+
+  const count=opts.searching?'Searching':`${results.length} result${results.length===1?'':'s'}`;
+  summary.innerHTML=`<span><span class="rs-count">${count}</span> for ${label}${pills.length?`<span class="rs-filters">${pills.map(p=>`<span>${esc(p)}</span>`).join('')}</span>`:''}</span>`+
     `<button class="clear-results" title="Back to members">${icon('close')}</button>`;
   summary.querySelector('.clear-results').addEventListener('click',exitSearch);
 
   const list=document.getElementById('results-list');list.innerHTML='';
+  if(opts.searching)return; // results arrive as they're found (searchMore)
   if(!results.length){list.innerHTML='<div style="font-size:.8rem;color:var(--text-muted);padding:4px 2px">No messages found.</div>';return;}
   results.forEach(m=>list.appendChild(buildSearchResultRow(m)));
 }
 function exitSearch(){
+  searchRun=null;
+  window.go.main.App.ClearSearch().catch(()=>{}); // drop the decrypted pages kept for refining
   document.getElementById('msg-search-input').value='';
   renderSearchHighlight();closeSearchSuggest();
   document.getElementById('msg-search-clear').classList.add('hidden');
