@@ -204,12 +204,12 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 #voice-connected-bar.reconnecting { color:var(--red); }
 #voice-connected-bar #voice-video-btn.on { color:var(--green); }
 #voice-connected-bar.elsewhere #voice-video-btn { display:none; }
-/* Call encryption (e2ee.go): green lock when everyone's encrypted, yellow when someone isn't. */
-#voice-connected-bar #voice-e2ee-btn.ok { color:var(--green); }
-#voice-connected-bar #voice-e2ee-btn.warn { color:var(--yellow); }
-#voice-connected-bar.elsewhere #voice-e2ee-btn { display:none; }
-#voice-connected-bar #voice-e2ee-btn { margin-left:auto; }
-#voice-connected-bar #voice-e2ee-btn ~ #voice-deafen-btn { margin-left:0; }
+/* Call encryption (e2ee.go), in the menu on the connected channel's name:
+   green lock when everyone's encrypted, yellow when someone isn't, grey
+   while keys are still being swapped. */
+.ctx-item .ctx-lead { color:var(--text-muted); }
+.ctx-item.e2ee-ok .ctx-lead { color:var(--green); }
+.ctx-item.e2ee-warn .ctx-lead { color:var(--yellow); }
 .e2ee-code { font-family:Consolas,monospace; font-size:1.3rem; letter-spacing:.05em; color:var(--text-strong); text-align:center; padding:12px; background:var(--bg-darkest); border-radius:8px; margin:0 0 16px; user-select:all; }
 .e2ee-peers { list-style:none; margin:0; padding:0; max-height:240px; overflow:auto; }
 .e2ee-peers li { display:flex; justify-content:space-between; gap:12px; padding:6px 2px; font-size:.9rem; color:var(--text); border-top:1px solid var(--border); }
@@ -1647,7 +1647,6 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div id="room-list"></div>
     <div id="voice-connected-bar" class="hidden">
       <span id="voice-connected-name"></span>
-      <button id="voice-e2ee-btn" class="voice-bar-btn" title="End-to-end encryption"><svg class="ic" aria-hidden="true"><use href="#ic-lock"/></svg></button>
       <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
       <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
       <button id="voice-video-btn" class="voice-bar-btn" title="Turn on camera"><svg class="ic" aria-hidden="true"><use href="#ic-videocam_off"/></svg></button>
@@ -9224,7 +9223,8 @@ function showContextMenu(items,x,y,opts={}){
   if(py+r.height>innerHeight-m)py=Math.max(m,y-r.height);
   menu.style.left=px/z+'px';menu.style.top=py/z+'px';
 }
-// Items: {label, icon, action, danger, disabled, cls}, '-' for a line,
+// Items: {label, icon, lead, action, danger, disabled, cls}, '-' for a line
+// (icon goes after the label, lead before it),
 // {header:'…'} for a section heading, plus:
 //   {label, check:true|false, action(on)}  a check box; the menu stays open
 //   {label, selected:true, action}         one choice of several, ticked
@@ -9245,7 +9245,8 @@ function fillContextMenu(box,items){
       :it.submenu?icon('chevron_right')
       :'selected' in it?icon('check','ctx-tick')
       :it.icon?icon(it.icon):'';
-    b.innerHTML=`<span class="ctx-label">${esc(it.label)}</span>${right}`;
+    const lead=it.lead?icon(it.lead,'ctx-lead'):''; // an icon before the label (e.g. Encryption's lock)
+    b.innerHTML=`${lead}<span class="ctx-label">${esc(it.label)}</span>${right}`;
     if(it.submenu){
       const open=()=>{
         if(openSub?.item===b)return;
@@ -9370,6 +9371,11 @@ function initContextMenus(){
     e.preventDefault(); // never the browser's own menu
     closeContextMenu();
     if(e.target.closest('.voice-occupant-row[data-user]'))return; // its own menu (initVoiceUserMenu)
+    // The call you're in (its name, bottom left): Encryption.
+    if(e.target.closest('#voice-connected-name')&&!document.getElementById('voice-connected-bar').classList.contains('elsewhere')){
+      const items=window.e2eeMenuItems?window.e2eeMenuItems():[];
+      if(items.length){showContextMenu(items,e.clientX,e.clientY);return;}
+    }
     const memberRowEl=e.target.closest('.member-row[data-user]');
     if(memberRowEl){showContextMenu(memberMenu(memberRowEl.dataset.user,e),e.clientX,e.clientY);return;}
     const field=e.target.closest('input[type=text],input[type=password],input[type=search],input:not([type]),textarea');
@@ -10410,13 +10416,18 @@ function init(){
   const e2eeLabels={ok:'Encrypted',waiting:'Exchanging keys\u2026',
     unsupported:'Can\u2019t encrypt \u2014 needs to update Chriscord',
     changed:'Identity key changed \u2014 compare the call code'};
+  // 'ok' (green), 'warn' (yellow: someone can't encrypt, or their key
+  // changed) or '' (grey: keys still being swapped, or not in a call).
+  const e2eeLevel=()=>{
+    if(!e2ee.active)return '';
+    if(e2ee.peers.some(p=>p.status==='unsupported'||p.status==='changed'))return 'warn';
+    return e2ee.peers.some(p=>p.status==='waiting')?'':'ok';
+  };
+  // Right-click the channel name in the voice bar (initContextMenus).
+  window.e2eeMenuItems=()=>e2ee.active?[{label:'Encryption',lead:'lock',cls:e2eeLevel()?'e2ee-'+e2eeLevel():'',action:()=>{
+    renderE2EE();document.getElementById('modal-e2ee').classList.remove('hidden');
+  }}]:[];
   const renderE2EE=()=>{
-    const btn=document.getElementById('voice-e2ee-btn');
-    const bad=e2ee.peers.filter(p=>p.status==='unsupported'||p.status==='changed');
-    const waiting=e2ee.peers.some(p=>p.status==='waiting');
-    btn.classList.toggle('ok',e2ee.active&&!bad.length&&!waiting);
-    btn.classList.toggle('warn',e2ee.active&&bad.length>0);
-    btn.title=!e2ee.active?'Not encrypted':bad.length?'End-to-end encrypted \u2014 but not with everyone (click for details)':'End-to-end encrypted (click for the call code)';
     document.getElementById('e2ee-code').textContent=e2ee.active?e2ee.code:'\u2014';
     document.getElementById('e2ee-peers').innerHTML=e2ee.peers.map(p=>{
       const cls=p.status==='ok'?'ok':(p.status==='waiting'?'':'bad');
@@ -10438,10 +10449,6 @@ function init(){
     renderE2EE();
   });
   window.go.main.App.GetVoiceEncryption().then(st=>{if(st&&st.peers){e2ee=st;renderE2EE();}}).catch(()=>{});
-  document.getElementById('voice-e2ee-btn').addEventListener('click',()=>{
-    renderE2EE();
-    document.getElementById('modal-e2ee').classList.remove('hidden');
-  });
   document.getElementById('e2ee-close-btn').addEventListener('click',()=>document.getElementById('modal-e2ee').classList.add('hidden'));
   document.getElementById('modal-e2ee').addEventListener('click',e=>{if(e.target.id==='modal-e2ee')e.currentTarget.classList.add('hidden');});
 
