@@ -1201,7 +1201,16 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		if err != nil { return }
 		_ = conn.SetReadDeadline(time.Now().Add(wsDeadAfter)) // heard from the server: still alive
 		var msg serverMsg
-		if err := json.Unmarshal(raw, &msg); err != nil { continue }
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			// A voice_e2ee message's "data" is call-encryption key exchange,
+			// not a chat message, and a hello's "reply": true/false doesn't
+			// fit ChatMessage's "reply" (a preview) — so it lands here.
+			var head struct{ Type string `json:"type"` }
+			if json.Unmarshal(raw, &head) == nil && head.Type == "voice_e2ee" {
+				a.handleVoiceE2EE(raw)
+			}
+			continue
+		}
 		switch msg.Type {
 		case "message":
 			if msg.Data != nil { runtime.EventsEmit(a.ctx, "chat:message", *msg.Data) }
