@@ -100,6 +100,8 @@ export function GetSystemIdleSeconds():Promise<number>;
 
 export function GetUsername():Promise<string>;
 
+export function GetVoiceEncryption():Promise<main.e2eeState>;
+
 export function HasAccount():Promise<boolean>;
 
 export function ImageFromURL(arg1:string):Promise<main.EmojiFile>;
@@ -217,6 +219,8 @@ export function SetOpenOnStartup(arg1:boolean):Promise<void>;
 export function SetPresence(arg1:string):Promise<void>;
 
 export function SetScreenPreview(arg1:boolean):Promise<void>;
+
+export function SetScreenShareAudio(arg1:boolean):Promise<void>;
 
 export function SetScreenShareEnabled(arg1:boolean):Promise<void>;
 

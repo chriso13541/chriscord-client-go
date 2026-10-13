@@ -198,6 +198,10 @@ export function GetUsername() {
   return window['go']['main']['App']['GetUsername']();
 }
 
+export function GetVoiceEncryption() {
+  return window['go']['main']['App']['GetVoiceEncryption']();
+}
+
 export function HasAccount() {
   return window['go']['main']['App']['HasAccount']();
 }
@@ -432,6 +436,10 @@ export function SetPresence(arg1) {
 
 export function SetScreenPreview(arg1) {
   return window['go']['main']['App']['SetScreenPreview'](arg1);
+}
+
+export function SetScreenShareAudio(arg1) {
+  return window['go']['main']['App']['SetScreenShareAudio'](arg1);
 }
 
 export function SetScreenShareEnabled(arg1) {

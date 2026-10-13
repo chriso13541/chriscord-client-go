@@ -1186,13 +1186,33 @@ func (a *App) hangUpAndClose(conn *websocket.Conn) {
 // shutdown runs when the app window closes: leave any call and close the
 // connection cleanly, so nobody sees a stale "still in the call" after
 // you've quit.
+//
+// If that hasn't finished within shutdownGrace — something stuck, like a
+// lock that's never released — the app exits anyway. Otherwise the process
+// would stay running with no window: the next launch would hand over to it
+// (one copy at a time) and seem to close at once, and "Restart to update"
+// would wait for it forever.
 func (a *App) shutdown(ctx context.Context) {
-	a.mu.Lock()
-	conn := a.ws
-	a.ws = nil
-	a.mu.Unlock()
-	a.hangUpAndClose(conn)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		a.mu.Lock()
+		conn := a.ws
+		a.ws = nil
+		a.mu.Unlock()
+		a.hangUpAndClose(conn)
+	}()
+	select {
+	case <-done:
+	case <-time.After(shutdownGrace):
+		log.Printf("shutdown: didn't finish cleanly within %v — exiting anyway", shutdownGrace)
+		os.Exit(0)
+	}
 }
+
+// How long closing cleanly may take before the app exits regardless (it
+// normally takes well under a second).
+const shutdownGrace = 3 * time.Second
 
 func (a *App) wsReader(conn *websocket.Conn) {
 	done := make(chan struct{})

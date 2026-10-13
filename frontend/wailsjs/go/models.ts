@@ -1,5 +1,19 @@
 export namespace main {
 	
+	export class UpdateStatus {
+	    available: boolean;
+	    version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.available = source["available"];
+	        this.version = source["version"];
+	    }
+	}
 	export class AboutInfo {
 	    installed: boolean;
 	    version: string;
@@ -170,22 +184,6 @@ export namespace main {
 	        this.encoder = source["encoder"];
 	    }
 	}
-	export class MessageZip {
-	    url: string;
-	    name: string;
-	    size: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new MessageZip(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.url = source["url"];
-	        this.name = source["name"];
-	        this.size = source["size"];
-	    }
-	}
 	export class ReplyPreview {
 	    id: string;
 	    username: string;
@@ -235,6 +233,7 @@ export namespace main {
 	    reply_to?: string;
 	    reply?: ReplyPreview;
 	    kind?: string;
+	    e2ee?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatMessage(source);
@@ -254,6 +253,7 @@ export namespace main {
 	        this.reply_to = source["reply_to"];
 	        this.reply = this.convertValues(source["reply"], ReplyPreview);
 	        this.kind = source["kind"];
+	        this.e2ee = source["e2ee"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -392,6 +392,22 @@ export namespace main {
 	        this.video = source["video"];
 	    }
 	}
+	export class MessageZip {
+	    url: string;
+	    name: string;
+	    size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MessageZip(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.name = source["name"];
+	        this.size = source["size"];
+	    }
+	}
 	export class OwnProfile {
 	    nickname: string;
 	    bio: string;
@@ -487,6 +503,7 @@ export namespace main {
 	    reply_to?: string;
 	    reply?: ReplyPreview;
 	    kind?: string;
+	    e2ee?: string;
 	    board_name: string;
 	    room_id: string;
 	
@@ -508,6 +525,7 @@ export namespace main {
 	        this.reply_to = source["reply_to"];
 	        this.reply = this.convertValues(source["reply"], ReplyPreview);
 	        this.kind = source["kind"];
+	        this.e2ee = source["e2ee"];
 	        this.board_name = source["board_name"];
 	        this.room_id = source["room_id"];
 	    }
@@ -659,20 +677,7 @@ export namespace main {
 	        this.created_by = source["created_by"];
 	    }
 	}
-	export class UpdateStatus {
-	    available: boolean;
-	    version: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new UpdateStatus(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.available = source["available"];
-	        this.version = source["version"];
-	    }
-	}
 	export class UploadResult {
 	    url: string;
 	    filename: string;
@@ -712,6 +717,54 @@ export namespace main {
 	        this.banner = source["banner"];
 	        this.member_since = source["member_since"];
 	    }
+	}
+	export class e2eePeerState {
+	    user: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new e2eePeerState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.user = source["user"];
+	        this.status = source["status"];
+	    }
+	}
+	export class e2eeState {
+	    active: boolean;
+	    code: string;
+	    peers: e2eePeerState[];
+	
+	    static createFrom(source: any = {}) {
+	        return new e2eeState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.active = source["active"];
+	        this.code = source["code"];
+	        this.peers = this.convertValues(source["peers"], e2eePeerState);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
