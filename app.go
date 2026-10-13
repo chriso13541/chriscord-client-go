@@ -1006,7 +1006,9 @@ func (a *App) connect(domain, serverKey, invite string) error {
 	watchConnection(conn)
 	a.ws = conn
 	go a.wsReader(conn)
-	a.text.begin() // message encryption: publish this account's key, share keys others need
+	// Message encryption: publish this account's key, share keys others need.
+	// In its own goroutine: it needs a.mu, which connect holds until it returns.
+	go a.text.begin()
 	a.sendPfpInfo(a.account.PfpUpdatedAt)
 	a.sendProfileInfo(a.account.ProfileUpdatedAt)
 	return nil
