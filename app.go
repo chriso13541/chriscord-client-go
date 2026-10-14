@@ -755,6 +755,23 @@ type UserProfile struct {
 	Tint        string `json:"tint"` // card colour, "" for the default
 	Banner      string `json:"banner"` // data URL, or "" for none
 	MemberSince string `json:"member_since"`
+	// Someone imported from Discord whom no member has claimed yet.
+	Imported *ImportedProfile `json:"imported,omitempty"`
+}
+
+// ImportedProfile: who an imported (not yet claimed) name was on Discord.
+type ImportedProfile struct {
+	Source       string `json:"source"`
+	Name         string `json:"name"`
+	Handle       string `json:"handle"`
+	FirstMessage string `json:"first_message"`
+	Requested    bool   `json:"requested"` // you've asked to claim them
+}
+
+// RequestClaim asks the server's owner to give you an imported person's
+// messages ("This is me" on their profile card).
+func (a *App) RequestClaim(username string) error {
+	return a.doJSON("POST", "/api/claims", map[string]string{"username": username}, nil)
 }
 
 // FetchUserProfile fetches a user's bio, banner and join date from the
@@ -768,11 +785,12 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 		GlobalNickname string `json:"global_nickname"`
 		HasBanner   bool   `json:"has_banner"`
 		MemberSince string `json:"member_since"`
+		Imported    *ImportedProfile `json:"imported"`
 	}
 	if err := a.doGET("/api/profile/"+url.PathEscape(username), &raw); err != nil {
 		return nil, err
 	}
-	p := &UserProfile{Username: raw.Username, Nickname: raw.Nickname, GlobalNickname: raw.GlobalNickname, Bio: raw.Bio, MemberSince: raw.MemberSince}
+	p := &UserProfile{Username: raw.Username, Nickname: raw.Nickname, GlobalNickname: raw.GlobalNickname, Bio: raw.Bio, MemberSince: raw.MemberSince, Imported: raw.Imported}
 	if isHexColour(strings.ToLower(raw.Tint)) {
 		p.Tint = strings.ToLower(raw.Tint)
 	}
@@ -1249,6 +1267,11 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
 		case "e2ee_changed":
 			a.text.changed() // keys moved: share any this app can, retry locked messages
+		case "history_changed":
+			// Messages changed under the page (history imported, or an
+			// imported person claimed): the open channel loads again.
+			a.text.historyChanged(msg.BoardID)
+			runtime.EventsEmit(a.ctx, "chat:history_changed", msg.BoardID)
 		case "users":
 			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner, Nicknames: msg.Nicknames, GlobalNicknames: msg.GlobalNicknames})
 		case "voice_removed":

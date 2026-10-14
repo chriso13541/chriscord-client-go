@@ -694,6 +694,26 @@ export namespace main {
 	        this.mime = source["mime"];
 	    }
 	}
+	export class ImportedProfile {
+	    source: string;
+	    name: string;
+	    handle: string;
+	    first_message: string;
+	    requested: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportedProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.name = source["name"];
+	        this.handle = source["handle"];
+	        this.first_message = source["first_message"];
+	        this.requested = source["requested"];
+	    }
+	}
 	export class UserProfile {
 	    username: string;
 	    nickname: string;
@@ -702,6 +722,7 @@ export namespace main {
 	    tint: string;
 	    banner: string;
 	    member_since: string;
+	    imported?: ImportedProfile;
 	
 	    static createFrom(source: any = {}) {
 	        return new UserProfile(source);
@@ -716,7 +737,26 @@ export namespace main {
 	        this.tint = source["tint"];
 	        this.banner = source["banner"];
 	        this.member_since = source["member_since"];
+	        this.imported = this.convertValues(source["imported"], ImportedProfile);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class e2eePeerState {
 	    user: string;

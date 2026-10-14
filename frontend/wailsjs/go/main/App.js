@@ -354,6 +354,10 @@ export function ReorderServers(arg1) {
   return window['go']['main']['App']['ReorderServers'](arg1);
 }
 
+export function RequestClaim(arg1) {
+  return window['go']['main']['App']['RequestClaim'](arg1);
+}
+
 export function RequestScreenKeyframe(arg1) {
   return window['go']['main']['App']['RequestScreenKeyframe'](arg1);
 }

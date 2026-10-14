@@ -103,9 +103,15 @@ type ChatMessage struct {
 	ReplyTo     string        `json:"reply_to,omitempty"` // the message this replies to
 	Reply       *ReplyPreview `json:"reply,omitempty"`    // and a preview of it
 	Kind        string        `json:"kind,omitempty"`     // "join" = "<username> joined the server."
+	// Imported history (chriscord-import): whose it originally was,
+	// "discord:<their id>". The encrypted message says the same inside.
+	ImportedFrom string `json:"imported_from,omitempty"`
 	// Set by this app, not the server (textcrypt.go): "" plain text, "ok"
 	// decrypted, "locked" (no key yet), "error", or "forged".
 	E2EE        string        `json:"e2ee,omitempty"`
+	// Also set by this app: an imported message's author's name where it
+	// came from (from inside the encrypted message).
+	ImportedName string `json:"imported_name,omitempty"`
 }
 
 // ReplyPreview is what a reply shows of the message it answers.
@@ -115,6 +121,7 @@ type ReplyPreview struct {
 	Content     string `json:"content"`
 	Attachments int    `json:"attachments"`
 	Deleted     bool   `json:"deleted"`
+	ImportedFrom string `json:"imported_from,omitempty"` // see ChatMessage
 }
 
 // Reaction is one emoji's reactions on a message, in the order that emoji
@@ -123,6 +130,9 @@ type Reaction struct {
 	Emoji string   `json:"emoji"`
 	Count int      `json:"count"`
 	Users []string `json:"users"`
+	// Reactions that came with imported history, whose names aren't known:
+	// part of Count, not of Users.
+	Imported int `json:"imported,omitempty"`
 }
 
 // SearchResult is a ChatMessage plus which board (and its room) it came

@@ -539,6 +539,8 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .msg-username { font-weight:700; font-size:.9rem; color:var(--text-strong); }
 .msg-time { font-size:.72rem; color:var(--text-muted); }
 .msg-edited-tag { font-size:.68rem; color:var(--text-muted); font-style:italic; }
+.msg-imported-tag { margin-left:6px; padding:0 5px; border-radius:4px; font-size:.62rem; font-weight:600; letter-spacing:.02em; text-transform:uppercase; color:var(--text-muted); background:var(--bg-mid,rgba(127,127,127,.15)); vertical-align:1px; cursor:default; }
+.pc-claim-sent { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:.82rem; color:var(--text-muted); }
 .msg-content { font-size:.9rem; line-height:1.5; color:var(--text); word-break:break-word; white-space:pre-wrap; user-select:text; }
 
 /* Inline links */
@@ -5526,6 +5528,15 @@ function buildSearchResultRow(msg){
   return row;
 }
 
+// Imported history (chriscord-import): a small tag saying where it came
+// from, and who wrote it there (from inside the encrypted message).
+function importedTagHTML(msg){
+  if(!msg.imported_from)return '';
+  const src=msg.imported_from.split(':')[0];
+  const where=src==='discord'?'Discord':src.charAt(0).toUpperCase()+src.slice(1);
+  const who=msg.imported_name&&msg.imported_name!==msg.username?`, where they were ${msg.imported_name}`:'';
+  return `<span class="msg-imported-tag" title="${esc(`Imported from ${where}${who}`)}">${esc(where)}</span>`;
+}
 // "<name> joined the server." — a system line instead of a normal message.
 function buildSystemMsgEl(msg){
   const div=document.createElement('div');
@@ -5557,7 +5568,7 @@ function buildMsgEl(msg,grouped){
     <div class="msg-body">
       <div class="msg-meta">
         ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
-        ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}
+        ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}${importedTagHTML(msg)}
       </div>
       ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
     </div>
@@ -6228,6 +6239,17 @@ function formatMemberSince(iso){
 // shownName (the name to show, instead of displayName — the settings
 // preview passes the draft) and, on your own card in a server,
 // globalNick (for the server-nickname editor's hint).
+// An imported (Discord) person nobody has claimed yet: who they were there,
+// and "This is me" to ask the server owner for their messages.
+function importedProfileHTML(p){
+  const im=p.imported,where=im.source==='discord'?'Discord':im.source;
+  const handle=im.handle&&im.handle!==im.name?` (@${esc(im.handle)})`:'';
+  const since=im.first_message?` First message ${esc(formatMemberSince(im.first_message))}.`:'';
+  return `<div class="pc-section"><div class="pc-label">Imported from ${esc(where)}</div>
+    <div class="pc-bio">${esc(im.name)}${handle} on ${esc(where)} — their messages were brought over, but nobody here has claimed them yet.${since}</div>
+    ${im.requested?`<div class="pc-claim-sent">${icon('schedule')}You've asked — the server owner will confirm it's you.</div>`
+      :`<button class="pc-edit pc-claim" type="button">${icon('verified_user')}This is me</button>`}</div>`;
+}
 function buildProfileCard(p){
   const shown=p.shownName??displayName(p.username);
   // Your own card, opened in a server: you can set your nickname for it here.
@@ -6242,8 +6264,8 @@ function buildProfileCard(p){
       <div class="pc-name"${p.shownName==null?` data-dn="${esc(p.username)}"`:''}>${esc(shown)}</div>
       ${shown!==p.username?`<div class="pc-username">${esc(p.username)}</div>`:''}
       ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
-      <div class="pc-section"><div class="pc-label">About Me</div>
-        <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>
+      ${p.imported?importedProfileHTML(p):`<div class="pc-section"><div class="pc-label">About Me</div>
+        <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>`}
       ${nickEditor?`<div class="pc-section pc-nick"><div class="pc-label">Server Nickname</div>
         <div class="pc-nick-view"><span class="pc-nick-val${serverNick?'':' empty'}" data-nick-of="${esc(p.username)}">${esc(serverNick||'None')}</span><button class="pc-nick-edit" type="button" title="Change your nickname on this server">${icon('edit')}</button></div>
         <form class="pc-nick-form hidden"><input type="text" maxlength="${NICK_MAX}" autocomplete="off" spellcheck="false" placeholder="${esc(p.globalNick||p.username)}">
@@ -6265,6 +6287,14 @@ function buildProfileCard(p){
   }
   card.querySelectorAll('.msg-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);}));
   card.querySelector('.pc-edit:not(.pc-logout)')?.addEventListener('click',()=>{closeProfilePopup();openSettings('profile');});
+  card.querySelector('.pc-claim')?.addEventListener('click',async e=>{
+    const b=e.currentTarget;b.disabled=true;
+    try{
+      await window.go.main.App.RequestClaim(p.username);
+      delete profileCache[p.username];
+      b.outerHTML=`<div class="pc-claim-sent">${icon('schedule')}Asked — the server owner will confirm it's you.</div>`;
+    }catch(err){b.disabled=false;toast('Couldn\u2019t ask: '+err,true);}
+  });
   card.querySelector('.pc-logout')?.addEventListener('click',()=>{closeProfilePopup();switchAccount();});
   const menu=card.querySelector('.pc-status-menu');
   if(menu)renderStatusMenu(menu);
@@ -6317,7 +6347,7 @@ async function openProfilePopup(user,anchor){
       data={username:user,bio:mine?.bio||'',banner:mine?.banner||'',tint:mine?.tint||'',pfp:pfp||'',memberSince:prof?.member_since||'',online,presence,own:true,globalNick:mine?.nickname||''};
     }else{
       const [prof,pfp]=await Promise.all([getUserProfile(user),getUserPfp(user)]);
-      data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',tint:prof?.tint||'',pfp,memberSince:prof?.member_since||'',online,presence,own:false};
+      data={username:user,bio:prof?.bio||'',banner:prof?.banner||'',tint:prof?.tint||'',pfp,memberSince:prof?.member_since||'',online,presence,own:false,imported:prof?.imported||null};
     }
   }catch(err){
     if(profilePopupFor===user)profilePopupFor=null;
@@ -6732,6 +6762,8 @@ function reactionEmojiHTML(emoji){
 function reactionTitle(r){
   const e=EMOJI_BY_CHAR.get(r.emoji.replace(/\uFE0F/g,''));
   const names=(r.users||[]).map(u=>u===state.username?'You':displayName(u));
+  // Imported reactions came without names.
+  if(r.imported)names.push(`${r.imported} ${r.imported===1?'person':'people'} on Discord`);
   const who=names.length<=3?names.join(names.length===2?' and ':', ').replace(/, ([^,]*)$/,' and $1')
     :`${names.slice(0,3).join(', ')} and ${names.length-3} other${names.length-3===1?'':'s'}`;
   const c=r.emoji.startsWith('c:')&&CUSTOM_BY_ID.get(r.emoji.slice(2).toLowerCase());
@@ -6773,9 +6805,10 @@ function applyReaction(msg,emoji,user,on){
   let r=msg.reactions.find(x=>x.emoji===emoji);
   if(on){
     if(!r){r={emoji,count:0,users:[]};msg.reactions.push(r);}
-    if(!r.users.includes(user)){r.users.push(user);r.count=r.users.length;}
+    if(!r.users.includes(user)){r.users.push(user);r.count=r.users.length+(r.imported||0);}
   }else if(r){
-    r.users=r.users.filter(u=>u!==user);r.count=r.users.length;
+    // (imported: reactions that came with imported history, without names)
+    r.users=r.users.filter(u=>u!==user);r.count=r.users.length+(r.imported||0);
     if(!r.count)msg.reactions=msg.reactions.filter(x=>x!==r);
   }
 }
@@ -10498,6 +10531,8 @@ function initSpellcheck(){
 window.addEventListener('load',()=>{const r=setInterval(()=>{if(window.runtime&&window.go){clearInterval(r);init();}},50);});
 
 function init(){
+  // Imported history added or claimed: names on cards may have changed.
+  window.runtime.EventsOn('chat:history_changed',()=>{for(const k of Object.keys(profileCache))delete profileCache[k];});
   window.runtime.EventsOn('chat:history',payload=>{
     const msgs=Array.isArray(payload)?payload:(payload?.messages??[]);
     const boardId=payload?.board_id??null;

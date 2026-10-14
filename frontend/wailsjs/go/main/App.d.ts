@@ -178,6 +178,8 @@ export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
 export function ReorderServers(arg1:Array<string>):Promise<Array<main.SavedServer>>;
 
+export function RequestClaim(arg1:string):Promise<void>;
+
 export function RequestScreenKeyframe(arg1:string):Promise<void>;
 
 export function RequestVideoKeyframe(arg1:string):Promise<void>;

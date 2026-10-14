@@ -112,6 +112,7 @@ type textCrypto struct {
 	files     map[string]*fileEntry  // stored file name → its key and details (filecrypt.go)
 	msgFiles  map[string][]fileMeta  // message id → its encrypted attachments
 	pendingT  *time.Timer
+	historyT  *time.Timer // a coming reload of the open channel (historyChanged)
 	tickStop  chan struct{}
 
 	// The server, over HTTP (swapped out in tests).
@@ -300,9 +301,20 @@ func openBox(id textIdentity, senderID string, senderEnc [32]byte, board string,
 // its encrypted attachments — where each is, what it really is, and its key
 // (filecrypt.go).
 type textPlain struct {
-	U string     `json:"u"`
-	T string     `json:"t"`
-	A []fileMeta `json:"a,omitempty"`
+	U string      `json:"u"`
+	T string      `json:"t"`
+	A []fileMeta  `json:"a,omitempty"`
+	I *textImport `json:"i,omitempty"`
+}
+
+// textImport marks a message brought over from elsewhere by chriscord-import:
+// where from, and who wrote it there. Such a message is checked against the
+// message's imported_from instead of its username — the username changes
+// when a member claims that person, the original author doesn't.
+type textImport struct {
+	S  string `json:"s"`  // "discord"
+	ID string `json:"id"` // their id there
+	N  string `json:"n"`  // their name there
 }
 
 func textAAD(board string, gen int) []byte {
@@ -605,16 +617,17 @@ func (t *textCrypto) sealWith(board, text string, files []fileMeta) (string, err
 // openContent decrypts one message's content for showing. state is "" for
 // a plain (unencrypted) message, "ok", "locked" (no key yet), "error" or
 // "forged" (it says it's from someone other than who the server says).
-func (t *textCrypto) openContent(board, author, content string) (string, string) {
-	text, state, _ := t.openFull(board, author, content)
+func (t *textCrypto) openContent(board, author, importedFrom, content string) (string, string) {
+	text, state, _, _ := t.openFull(board, author, importedFrom, content)
 	return text, state
 }
 
-// openFull is openContent plus the message's encrypted attachments.
-func (t *textCrypto) openFull(board, author, content string) (string, string, []fileMeta) {
+// openFull is openContent plus the message's encrypted attachments, and
+// for imported history who wrote it originally.
+func (t *textCrypto) openFull(board, author, importedFrom, content string) (string, string, []fileMeta, *textImport) {
 	gen, blob, ok := parseText(content)
 	if !ok {
-		return content, "", nil
+		return content, "", nil, nil
 	}
 	key := t.key(board, gen)
 	if key == nil {
@@ -638,16 +651,24 @@ func (t *textCrypto) openFull(board, author, content string) (string, string, []
 		t.mu.Lock()
 		t.locked[board] = true
 		t.mu.Unlock()
-		return textLockedMsg, "locked", nil
+		return textLockedMsg, "locked", nil, nil
 	}
 	p, err := openText(key, board, gen, blob)
 	if err != nil {
-		return textBrokenMsg, "error", nil
+		return textBrokenMsg, "error", nil, nil
+	}
+	if p.I != nil {
+		// Imported: it has to be shown as that same person's (whoever
+		// has claimed them since).
+		if !strings.EqualFold(importedFrom, p.I.S+":"+p.I.ID) {
+			return fmt.Sprintf("⚠ Imported as %s's, but not shown as theirs: %s", p.I.N, p.T), "forged", p.A, p.I
+		}
+		return p.T, "ok", p.A, p.I
 	}
 	if author != "" && p.U != author {
-		return fmt.Sprintf("⚠ Written by %s, not %s: %s", p.U, author, p.T), "forged", p.A
+		return fmt.Sprintf("⚠ Written by %s, not %s: %s", p.U, author, p.T), "forged", p.A, nil
 	}
-	return p.T, "ok", p.A
+	return p.T, "ok", p.A, nil
 }
 
 // open decrypts a message (and the preview of the one it replies to) in place.
@@ -662,10 +683,14 @@ func (t *textCrypto) open(m *ChatMessage) {
 	}
 	t.mu.Unlock()
 	var files []fileMeta
-	m.Content, m.E2EE, files = t.openFull(m.BoardID, m.Username, m.Content)
+	var imp *textImport
+	m.Content, m.E2EE, files, imp = t.openFull(m.BoardID, m.Username, m.ImportedFrom, m.Content)
+	if imp != nil {
+		m.ImportedName = imp.N
+	}
 	m.Attachments = t.showAttachments(m.ID, m.Attachments, m.E2EE, files)
 	if m.Reply != nil {
-		m.Reply.Content, _ = t.openContent(m.BoardID, m.Reply.Username, m.Reply.Content)
+		m.Reply.Content, _ = t.openContent(m.BoardID, m.Reply.Username, m.Reply.ImportedFrom, m.Reply.Content)
 		// The start of it, as the server used to send (it can't shorten an
 		// encrypted one without breaking it).
 		if r := []rune(m.Reply.Content); len(r) > 200 {
@@ -685,7 +710,7 @@ func (t *textCrypto) openEdit(id, board, content string) (string, string) {
 	t.mu.Lock()
 	author := t.msgUser[id]
 	t.mu.Unlock()
-	text, state, files := t.openFull(board, author, content)
+	text, state, files, _ := t.openFull(board, author, "", content)
 	if state == "ok" || state == "forged" {
 		t.showAttachments(id, nil, state, files) // keep what an edit carries over
 	}
@@ -699,6 +724,33 @@ func (t *textCrypto) boardOf(msgID string) string {
 	if b, ok := t.msgBoard[msgID]; ok {
 		return b
 	}
+	return t.curBoard
+}
+
+// historyChanged: the server says messages changed under the page —
+// imported history arrived, or an imported person was claimed. If that's
+// the channel on screen, it's loaded again once things settle (an import
+// sends this after every batch).
+func (t *textCrypto) historyChanged(board string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.curBoard == "" || (board != "" && board != t.curBoard) {
+		return
+	}
+	if t.historyT != nil {
+		t.historyT.Stop()
+	}
+	t.historyT = time.AfterFunc(2*time.Second, func() {
+		if cur := t.current(); cur != "" {
+			_ = t.app.SubscribeBoard(cur)
+		}
+	})
+}
+
+// current is the board the page is showing.
+func (t *textCrypto) current() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.curBoard
 }
 
