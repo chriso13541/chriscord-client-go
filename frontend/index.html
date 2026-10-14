@@ -780,6 +780,12 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 #voice-user-menu .vum-item input { width:16px; height:16px; accent-color:var(--red); margin:0; pointer-events:none; }
 #voice-user-menu .vum-label { padding:8px 6px 2px; font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); }
 #voice-user-menu .slider-row { padding:2px 6px 4px; }
+#voice-user-menu .vum-sep { height:1px; background:var(--border); margin:6px 2px; }
+#voice-user-menu .vum-move span { display:inline-flex; align-items:center; gap:6px; }
+#voice-user-menu .vum-move .ic { width:16px; height:16px; color:var(--text-muted); }
+#voice-user-menu .vum-danger { color:var(--red); }
+#voice-user-menu .vum-danger:hover { background:var(--red); color:#fff; }
+.voice-occupant-status .ic.server { opacity:.75; filter:drop-shadow(0 0 1px var(--red)); }
 #voice-user-menu .vum-reset { font-size:.75rem; color:var(--text-muted); padding:2px 6px 4px; cursor:pointer; }
 #voice-user-menu .vum-reset:hover { color:var(--text); text-decoration:underline; }
 .voice-occupant-status .ic.local { color:var(--red); }
@@ -3308,7 +3314,7 @@ async function doConnect(domain,serverKey,inviteCode=''){
   state.servers=await window.go.main.App.GetServers();
   const saved=state.servers.find(s=>s.domain===domain);
   state.serverName=saved?.custom_name||saved?.display_name||domain;state.serverOwner='';
-  state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
+  state.roles=[];state.memberRoles={};state.permsV2=false;state.myPerms=PERM_DEFAULT;
   state.nicknames={};state.globalNicknames={}; // this server's come with its member list
   CUSTOM_BY_ID=new Map();CUSTOM_BY_NAME=new Map();STICKER_BY_ID=new Map();closeStickerPicker();
   serverBannerAt=-1; // a different server: forget the last one's banner
@@ -3418,6 +3424,7 @@ function inviteCountdown(){
   el.textContent=`Expires in ${m}:${String(s).padStart(2,'0')}`;
 }
 async function makeInvite(){
+  if(!can(PERM.INVITE)){toast('You don\u2019t have permission to create invites on this server',true);return;}
   try{
     const r=await window.go.main.App.CreateInvite();
     invite={domain:state.domain,code:r.code,expires_at:r.expires_at,url:`${serverBase()}/invite/${r.code}`};
@@ -3468,8 +3475,8 @@ function renderServerInfo(){
     <div class="sip-body"><div class="sip-name">${esc(state.serverName)}</div>
     ${state.serverDescription?`<div class="sip-label">About</div><div class="sip-desc">${renderTextWithLinks(state.serverDescription)}</div>`:''}
     ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}
-    <div class="sip-label">Invite people</div>
-    <div class="sip-invite" id="sip-invite">${invite&&Date.parse(invite.expires_at)>Date.now()?inviteHTML():`<button class="btn btn-primary sip-invite-btn" id="sip-invite-make">${icon('person_add')}Create invite link</button><div class="sip-hint">Anyone with the link can join for ${INVITE_MINUTES} minutes. It doesn\u2019t contain the server\u2019s join key.</div>`}</div></div>`;
+    ${can(PERM.INVITE)?`<div class="sip-label">Invite people</div>
+    <div class="sip-invite" id="sip-invite">${invite&&Date.parse(invite.expires_at)>Date.now()?inviteHTML():`<button class="btn btn-primary sip-invite-btn" id="sip-invite-make">${icon('person_add')}Create invite link</button><div class="sip-hint">Anyone with the link can join for ${INVITE_MINUTES} minutes. It doesn\u2019t contain the server\u2019s join key.</div>`}</div>`:''}</div>`;
   wireInvite(pop);
   const banner=pop.querySelector('.sip-banner'),ic=pop.querySelector('.sip-icon');
   const fallback=avatarColour(state.domain||state.serverName||'?');
@@ -3675,6 +3682,9 @@ function renderSidebar(){
             const key=`${board.id}:${user}`;
             const speaking=!!state.voiceSpeaking[key];
             const status=state.voiceMuteStatus[key]||{muted:false,deafened:false};
+            // Server-muted (or no Speak permission) / server-deafened by a
+            // moderator: the same icons, marked so they read differently.
+            const sMuted=!!state.voiceServerMuted?.has(user),sDeaf=!!state.voiceServerDeafened?.has(user);
             // Nothing beside a name normally; red icons only when muted or
             // deafened (see below).
             const statusIcons=
@@ -3682,7 +3692,8 @@ function renderSidebar(){
               (user!==state.username&&getUserAudio(user).muted?`<span title="Muted by you" style="display:inline-flex">${icon('volume_off','local')}</span>`:'')+
               // Muted: the crossed-out mic. Deafened (which is also muted):
               // the mic and, to its right, the crossed-out headset.
-              ((status.muted||status.deafened)?icon('mic_off','off'):'')+(status.deafened?icon('headset_off','off'):'')+
+              (sMuted?`<span title="Server muted" style="display:inline-flex">${icon('mic_off','off server')}</span>`:(status.muted||status.deafened)?icon('mic_off','off'):'')+
+              (sDeaf?`<span title="Server deafened" style="display:inline-flex">${icon('headset_off','off server')}</span>`:status.deafened?icon('headset_off','off'):'')+
               (state.voiceVideo?.has(user)||(user===state.username&&cam.on&&state.voiceHere===board.id)?`<span title="Camera on" style="display:inline-flex">${icon('videocam','cam')}</span>`:'')+
               (state.voiceScreens?.has(user)||(user===state.username&&scr.on&&state.voiceHere===board.id)?`<span class="vs-live" title="Sharing their screen">LIVE</span>`:'');
             row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${dnHTML(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
@@ -3825,6 +3836,8 @@ async function toggleMute(){
     if(await window.go.main.App.IsDeafened()){await toggleDeafen();return;}
     const muted=await window.go.main.App.ToggleMute();
     setMuteButtonState(muted);
+    if(!muted&&state.voiceServerMuted?.has(state.username))
+      toast(can(PERM.SPEAK)?'You\u2019re server muted \u2014 nobody can hear you until a moderator lifts it.':'You don\u2019t have permission to speak in voice on this server.',true);
     if(myVoiceBoard())playSound(muted?'mute':'unmute');
   }catch(err){toast('Failed to toggle mute: '+err,true);}
 }
@@ -4303,7 +4316,7 @@ function initSidebarDrag(){
   const list=document.getElementById('room-list');
   sbDropLine=document.createElement('div');sbDropLine.className='sb-drop-line hidden';document.body.appendChild(sbDropLine);
   list.addEventListener('pointerdown',e=>{
-    if(e.button!==0||!isServerOwner())return;
+    if(e.button!==0||!(isServerOwner()||can(PERM.CHANNELS)))return;
     const el=e.target.closest('.room-header,.board-item,.voice-item');
     if(!el||!list.contains(el))return;
     sbDrag.src=el.classList.contains('room-header')
@@ -5606,7 +5619,7 @@ function buildMsgEl(msg,grouped){
   }
 
   // Async link preview (fire and forget)
-  if(msg.content)maybeRenderPreviews(div,msg.content);
+  if(msg.content&&userCan(msg.username,PERM.EMBED))maybeRenderPreviews(div,msg.content);
 
   // 3-dot menu — on every message now, since anyone can Pin
   div.querySelector('.msg-more-btn').addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
@@ -6202,7 +6215,7 @@ function formatMemberSince(iso){
 function buildProfileCard(p){
   const shown=p.shownName??displayName(p.username);
   // Your own card, opened in a server: you can set your nickname for it here.
-  const nickEditor=p.own&&p.editButton!==false&&!!state.domain;
+  const nickEditor=p.own&&p.editButton!==false&&!!state.domain&&can(PERM.NICK);
   const serverNick=state.nicknames?.[p.username]||'';
   const card=document.createElement('div');card.className='profile-card';
   if(p.tint){card.classList.add('has-tint');card.style.setProperty('--pc-tint',p.tint);}
@@ -6608,7 +6621,8 @@ function openVoiceUserMenu(user,x,y){
     <div class="vum-item" id="vum-mute"><span>Mute</span><input type="checkbox" ${ua.muted?'checked':''} tabindex="-1"></div>
     <div class="vum-label">User Volume</div>
     <div class="slider-row"><input type="range" id="vum-volume" min="0" max="200" step="1" value="${Math.round(ua.volume*100)}"><span class="slider-val" id="vum-volume-val">${Math.round(ua.volume*100)}%</span></div>
-    <div class="vum-reset" id="vum-reset">Reset to 100%</div>`;
+    <div class="vum-reset" id="vum-reset">Reset to 100%</div>${voiceModHTML(user)}`;
+  wireVoiceMod(menu,user);
   const av=menu.querySelector('.user-avatar');setAvatarFallback(av,user);applyUserAvatar(av,user);
   menu.querySelector('#vum-mute').addEventListener('click',()=>{
     const muted=!getUserAudio(user).muted;
@@ -6622,6 +6636,46 @@ function openVoiceUserMenu(user,x,y){
   const z=uiScale(),r=menu.getBoundingClientRect(),m=8;
   const px=Math.max(m,Math.min(innerWidth-r.width-m,x)),py=Math.max(m,Math.min(innerHeight-r.height-m,y));
   menu.style.left=px/z+'px';menu.style.top=py/z+'px';
+}
+// Moderating someone in a call — server mute/deafen, move, disconnect —
+// when your roles allow it and theirs are lower (the server checks too).
+function voiceBoardOf(user){
+  for(const [b,users] of Object.entries(state.voiceChannels||{}))if((users||[]).includes(user))return b;
+  return null;
+}
+function voiceBoardsList(){
+  const out=[];
+  for(const r of state.rooms||[])if(r.room_type==='voice')for(const b of state.boardsByRoom[r.id]||[])out.push(b);
+  return out;
+}
+function voiceModHTML(user){
+  if(!state.permsV2||!outranks(user)||!voiceBoardOf(user))return '';
+  const mute=can(PERM.MUTE),deaf=can(PERM.DEAFEN),move=can(PERM.MOVE);
+  if(!mute&&!deaf&&!move)return '';
+  const here=voiceBoardOf(user);
+  const dests=move?voiceBoardsList().filter(b=>b.id!==here):[];
+  return `<div class="vum-sep"></div>`+
+    (mute?`<div class="vum-item" id="vum-smute"><span>Server Mute</span><input type="checkbox" ${state.voiceServerMuted?.has(user)?'checked':''} tabindex="-1"></div>`:'')+
+    (deaf?`<div class="vum-item" id="vum-sdeaf"><span>Server Deafen</span><input type="checkbox" ${state.voiceServerDeafened?.has(user)?'checked':''} tabindex="-1"></div>`:'')+
+    (dests.length?`<div class="vum-label">Move To</div>`+dests.map(b=>`<div class="vum-item vum-move" data-board="${esc(b.id)}"><span>${icon('volume_up')} ${esc(b.name)}</span></div>`).join(''):'')+
+    (move?`<div class="vum-item vum-danger" id="vum-disconnect"><span>Disconnect</span></div>`:'');
+}
+function wireVoiceMod(menu,user){
+  const run=async(fn,label)=>{try{await fn();}catch(err){toast(`Couldn\u2019t ${label}: ${err}`,true);}};
+  menu.querySelector('#vum-smute')?.addEventListener('click',()=>{
+    const on=!state.voiceServerMuted?.has(user);menu.querySelector('#vum-smute input').checked=on;
+    run(()=>window.go.main.App.ServerMuteMember(user,on),on?'server mute them':'lift the server mute');
+  });
+  menu.querySelector('#vum-sdeaf')?.addEventListener('click',()=>{
+    const on=!state.voiceServerDeafened?.has(user);menu.querySelector('#vum-sdeaf input').checked=on;
+    run(()=>window.go.main.App.ServerDeafenMember(user,on),on?'server deafen them':'lift the server deafen');
+  });
+  menu.querySelectorAll('.vum-move').forEach(el=>el.addEventListener('click',()=>{
+    closeVoiceUserMenu();run(()=>window.go.main.App.MoveMember(user,el.dataset.board),'move them');
+  }));
+  menu.querySelector('#vum-disconnect')?.addEventListener('click',()=>{
+    closeVoiceUserMenu();run(()=>window.go.main.App.MoveMember(user,''),'disconnect them');
+  });
 }
 function closeVoiceUserMenu(){
   voiceMenuFor=null;
@@ -6780,7 +6834,7 @@ function buildEmojiPicker(){
   for(const e of window.EMOJI_DATA||[])byGroup[e[3]]?.push(e);
   const renderAll=()=>{
     const recent=getRecentEmoji();
-    const customs=visibleCustomEmojis(),manage=can(PERM.EMOJI);
+    const customs=visibleCustomEmojis(),manage=can(PERM.EMOJI)||canCreateExpr();
     const serverSec=(customs.length||manage)?`<div class="ep-section" data-sec="server"><div class="ep-section-title">${esc(state.serverName||'Server')}${manage?'<button type="button" class="ep-manage">Manage</button>':''}</div>`+
       ((customs.length||manage)?`<div class="ep-grid">${customs.map(customButton).join('')}${manage?addEmojiTile():''}</div>`:'')+
       (!customs.length?`<div class="ep-none">${manage?'No custom emoji yet \u2014 add some with the + above.':'No custom emoji yet.'}</div>`:'')+'</div>':'';
@@ -6832,8 +6886,8 @@ function buildEmojiPicker(){
     prevImg.src=emojiSrc(em[0]);prevImg.style.visibility='visible';prevName.textContent=`:${em[2]}:`;
   });
   main.addEventListener('click',e=>{
-    if(e.target.closest('.ep-manage')){closeEmojiPicker();openEmojiManager(null,'emoji');return;}
-    if(e.target.closest('.ep-add')){closeEmojiPicker();openEmojiManager(null,'emoji');return;}
+    if(e.target.closest('.ep-manage')){closeEmojiPicker();openExpressions('emoji');return;}
+    if(e.target.closest('.ep-add')){closeEmojiPicker();openExpressions('emoji');return;}
     const b=e.target.closest('.ep-grid button');if(b)pickEmoji(b.dataset.hex,e.shiftKey);
   });
   // Right-click a server emoji to rename, hide or delete it.
@@ -6978,6 +7032,13 @@ const EXPR={
   },
 };
 const emMgr={kind:'emoji'};
+// Create Expressions: add new emoji/stickers (the Add window), without
+// Manage Expressions' renaming and deleting (the manager).
+const canCreateExpr=()=>can(PERM.CREATE_EXPR);
+function openExpressions(kind){
+  if(can(PERM.EMOJI))openEmojiManager(null,kind);
+  else startAddEmoji(kind);
+}
 // focusId: start renaming that one. kind: which tab ('emoji' / 'sticker').
 function openEmojiManager(focusId,kind){
   if(!can(PERM.EMOJI))return;
@@ -7070,7 +7131,7 @@ const addEmoji={kind:'emoji',items:[]}; // {path,file,name,size,preview,error}
 const fmtSize=n=>n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(0)} KB`:`${(n/1048576).toFixed(1)} MB`;
 const addOpen=()=>!document.getElementById('modal-emoji-add').classList.contains('hidden');
 async function startAddEmoji(kind){
-  if(!can(PERM.EMOJI)){toast('You don\u2019t have permission to manage emoji and stickers on this server',true);return;}
+  if(!can(PERM.EMOJI)&&!canCreateExpr()){toast('You don\u2019t have permission to add emoji and stickers on this server',true);return;}
   kind=addOpen()?addEmoji.kind:(kind||emMgr.kind);
   let paths;
   try{paths=await window.go.main.App.PickImageFiles(EXPR[kind].pickTitle)||[];}
@@ -7458,6 +7519,7 @@ const codecLabel=cfg=>!cfg?'':cfg.codec.startsWith('avc1')?(cfg.hardwareAccelera
 async function toggleCamera(){
   if(cam.on||cam.starting){const was=cam.on;stopCamera();if(was)playSound('webcam_stop');return;}
   if(!inMyCall()){toast('Join a voice channel to turn on your camera',true);return;}
+  if(!can(PERM.VIDEO)){toast('You don\u2019t have permission to use video on this server',true);return;}
   if(!camSupported()&&!useNative()){toast('Cameras aren\u2019t supported in this version of the app\u2019s web view',true);return;}
   cam.starting=true;updateCameraButton();
   try{await startCamera();playSound('webcam_start');}
@@ -8144,6 +8206,7 @@ async function toggleScreenShare(){
 }
 async function openScreenPicker(){
   if(!inMyCall()){toast('Join a voice channel to share your screen',true);return;}
+  if(!can(PERM.VIDEO)){toast('You don\u2019t have permission to share your screen on this server',true);return;}
   const info=await window.go.main.App.ScreenShareInfo().catch(err=>({available:false,reason:String(err)}));
   if(!info?.available){toast(info?.reason||'Screen sharing isn’t available here',true);return;}
   document.querySelector('#sp-tabs [data-tab="window"]').classList.toggle('hidden',!info.windows);
@@ -8752,7 +8815,7 @@ function renderStickerPicker(){
     search.addEventListener('input',renderStickerPicker);
     search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();main.querySelector('.sp-grid button[data-id]')?.click();}});
     main.addEventListener('click',e=>{
-      if(e.target.closest('.sp-add,.sp-manage')){closeStickerPicker();openEmojiManager(null,'sticker');return;}
+      if(e.target.closest('.sp-add,.sp-manage')){closeStickerPicker();openExpressions('sticker');return;}
       const b=e.target.closest('button[data-id]');if(b)sendSticker(b.dataset.id,e.shiftKey);
     });
     main.addEventListener('mouseover',e=>{
@@ -8774,7 +8837,7 @@ function renderStickerPicker(){
     if(typeof attachElastic==='function')attachElastic(main);
   }
   const q=p.querySelector('.ep-search').value.trim().toLowerCase(),main=p.querySelector('.sp-main');
-  const manage=can(PERM.EMOJI);
+  const manage=can(PERM.EMOJI)||canCreateExpr();
   const list=visibleStickers().filter(st=>!q||st.name.toLowerCase().includes(q));
   const tile=st=>`<button type="button" data-id="${esc(st.id)}" title="${esc(st.name)}"><img class="${st.animated?'emoji-anim':''}" src="${stickerSrc(st.id)}" alt="${esc(st.name)}" loading="lazy" draggable="false"></button>`;
   if(!visibleStickers().length){
@@ -9930,9 +9993,31 @@ function initPanelResize(){
 // "shown separately" role) and what you're allowed to do. The server
 // enforces permissions itself; the app just hides or disables what you
 // can't use so you're not offered it.
-const PERM={SEND:1,ATTACH:2,REACT:4,MANAGE:8,CONNECT:16,KICK:32,BAN:64,PIN:128,ADMIN:256,EMOJI:512};
-state.roles=[];state.memberRoles={};state.myPerms=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN;
+const PERM={SEND:1,ATTACH:2,REACT:4,MANAGE:8,CONNECT:16,KICK:32,BAN:64,PIN:128,ADMIN:256,EMOJI:512,
+  CREATE_EXPR:1<<10,VIEW:1<<11,HISTORY:1<<12,INVITE:1<<13,NICK:1<<14,MANAGE_NICKS:1<<15,EMBED:1<<16,
+  SPEAK:1<<17,VIDEO:1<<18,MUTE:1<<19,DEAFEN:1<<20,MOVE:1<<21,CHANNELS:1<<22};
+const PERM_ALL=(1<<23)-1;
+const PERM_DEFAULT=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN|PERM.VIEW|PERM.HISTORY|PERM.INVITE|PERM.NICK|PERM.EMBED|PERM.SPEAK|PERM.VIDEO;
+// Servers from before these permissions existed didn't limit any of them:
+// treat them as allowed there (the moderation ones they can't do at all).
+const PERM_LEGACY_FREE=PERM.VIEW|PERM.HISTORY|PERM.INVITE|PERM.NICK|PERM.EMBED|PERM.SPEAK|PERM.VIDEO;
+state.roles=[];state.memberRoles={};state.permsV2=false;state.myPerms=PERM_DEFAULT;
 const can=p=>(state.myPerms&p)===p;
+// What someone else's roles allow — to decide whether their links expand,
+// and (with outranks) whether you're offered moderating them.
+function permsOf(user){
+  if(user&&user===state.serverOwner)return PERM_ALL;
+  if(!state.roles.length)return PERM_DEFAULT;
+  const ids=new Set(state.memberRoles[user]||[]);let p=0;
+  for(const r of state.roles)if(r.is_default||ids.has(r.id))p|=r.permissions;
+  if(!state.permsV2)p|=PERM_LEGACY_FREE;
+  return (p&PERM.ADMIN)?PERM_ALL:p;
+}
+const userCan=(user,p)=>(permsOf(user)&p)===p;
+const topRolePos=user=>user===state.serverOwner?Infinity:Math.max(-1,...rolesOf(user).filter(r=>!r.is_default).map(r=>r.position));
+// Whether you're above them: the owner is above everyone; otherwise your
+// highest role has to be higher than theirs (the server checks the same).
+const outranks=user=>!!state.username&&user!==state.username&&user!==state.serverOwner&&topRolePos(state.username)>topRolePos(user);
 function rolesOf(user){const ids=state.memberRoles[user]||[];return state.roles.filter(r=>ids.includes(r.id));} // highest first
 const nameColor=user=>rolesOf(user).find(r=>r.color)?.color||'';
 const hoistRole=user=>rolesOf(user).find(r=>r.hoist)||null;
@@ -9942,7 +10027,10 @@ async function loadRoles(){
   if(state.domain!==domain)return;
   state.roles=(d.roles||[]).sort((a,b)=>b.position-a.position);
   state.memberRoles=d.members||{};
+  state.permsV2=(d.permissions_version||0)>=2;
   state.myPerms=d.my_permissions??state.myPerms;
+  if(!state.permsV2)state.myPerms|=PERM_LEGACY_FREE;
+  if(state.myPerms&PERM.ADMIN)state.myPerms=PERM_ALL;
   refreshMemberList();
   document.querySelectorAll('.msg-username[data-user]').forEach(el=>{el.style.color=nameColor(el.dataset.user)||'';});
   applyPermissionUI();
@@ -9961,12 +10049,39 @@ function applyPermissionUI(){
 // Right-click a member: profile, and kick/ban if your roles allow it.
 function memberMenu(user,e){
   const me=user===state.username,owner=user===state.serverOwner;
+  const nick=me?can(PERM.NICK):(state.permsV2&&can(PERM.MANAGE_NICKS)&&outranks(user));
   return [
     {label:'View Profile',icon:'person',action:()=>openProfilePopup(user,e.target.closest('.member-row')||e.target)},
+    nick?{label:'Change Nickname',icon:'edit',action:()=>changeNicknameDialog(user)}:null,
     (!me&&!owner&&(can(PERM.KICK)||can(PERM.BAN)))?'-':null,
     (!me&&!owner&&can(PERM.KICK))?{label:`Kick ${user}`,icon:'person_remove',danger:true,action:()=>confirmRemove(user,false)}:null,
     (!me&&!owner&&can(PERM.BAN))?{label:`Ban ${user}`,icon:'block',danger:true,action:()=>confirmRemove(user,true)}:null,
   ];
+}
+// Set someone's nickname on this server (your own, or — with Manage
+// Nicknames — someone below you).
+function changeNicknameDialog(user){
+  const me=user===state.username;
+  const ov=document.createElement('div');ov.className='modal-overlay';
+  ov.innerHTML=`<div class="modal"><h2>Change Nickname</h2>
+    <p style="color:var(--text-muted);margin:0 0 12px">${me?'Your nickname on this server.':`${esc(user)}\u2019s nickname on this server.`} Leave it blank to reset it.</p>
+    <div class="form-group"><label>Nickname</label><input type="text" maxlength="${NICK_MAX}" id="nick-val" autocomplete="off" spellcheck="false"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="nick-cancel">Cancel</button><button class="btn btn-primary" id="nick-go">Save</button></div></div>`;
+  document.body.appendChild(ov);
+  const input=ov.querySelector('#nick-val');input.value=state.nicknames?.[user]||'';input.focus();input.select();
+  const close=()=>ov.remove();
+  ov.querySelector('#nick-cancel').onclick=close;ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+  const go=async()=>{
+    const v=cleanNickname(input.value);
+    if([...v].length>NICK_MAX){toast(`Nicknames can be at most ${NICK_MAX} characters`,true);return;}
+    try{
+      if(me)await window.go.main.App.SetServerNickname(v);
+      else await window.go.main.App.SetMemberNickname(user,v);
+      close();
+    }catch(err){toast('Couldn\u2019t change the nickname: '+err,true);}
+  };
+  ov.querySelector('#nick-go').onclick=go;
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();go();}});
 }
 function confirmRemove(user,ban){
   const ov=document.createElement('div');ov.className='modal-overlay';
@@ -10464,6 +10579,8 @@ function init(){
     state.voiceChannels=next;
     state.voiceReconnecting=payload?.reconnecting||{};
     state.screenWindow=payload?.screen_window||{};
+    state.voiceServerMuted=new Set(payload?.server_muted||[]);
+    state.voiceServerDeafened=new Set(payload?.server_deafened||[]);
     onScreenState(payload?.screen_on);
     onVideoState(payload?.video_on);
     voiceSnapshotWaiters.splice(0).forEach(w=>w());
@@ -10478,6 +10595,15 @@ function init(){
   // the one place speaking shows now.)
   window.runtime.EventsOn('voice:speaking',speaking=>{
     if(state.voiceHere)setSpeakingIndicator(state.voiceHere,state.username,speaking);
+  });
+  // A moderator moved you to another voice channel: join it.
+  window.runtime.EventsOn('voice:move',async e=>{
+    state.voiceHere=null;voiceRejoin=null;
+    for(const k of Object.keys(state.voiceSpeaking||{}))delete state.voiceSpeaking[k];
+    const b=voiceBoardsList().find(x=>x.id===e?.board_id);
+    toast(`${e?.by?displayName(e.by):'A moderator'} moved you to ${b?b.name:'another voice channel'}.`);
+    updateVoiceConnectedBar();renderSidebar();
+    if(e?.board_id)await toggleVoiceChannel(e.board_id);
   });
   // You joined the call from another device: this one has hung up.
   window.runtime.EventsOn('voice:moved',()=>{

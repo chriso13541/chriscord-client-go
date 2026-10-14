@@ -1040,6 +1040,8 @@ type serverMsg struct {
 	VideoOn       []string            `json:"video_on"`    // voice_state: who has their camera on
 	ScreenOn      []string            `json:"screen_on"`   // voice_state: who's sharing their screen
 	ScreenWindow  map[string]string   `json:"screen_window"` // voice_state: sharers whose window is "background" or "minimized"
+	ServerMuted    []string           `json:"server_muted"`    // voice_state: not heard (no Speak, or server-muted)
+	ServerDeafened []string           `json:"server_deafened"` // voice_state: server-deafened
 	SDP           string              `json:"sdp"`
 	Candidate     string              `json:"candidate"`
 	SDPMid        string              `json:"sdp_mid"`
@@ -1074,7 +1076,7 @@ type historyEvent struct {
 type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"` }
 type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }
 type typingEvent struct { Username string `json:"username"`; Typing bool `json:"typing"` }
-type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"`; VideoOn []string `json:"video_on"`; ScreenOn []string `json:"screen_on"`; ScreenWindow map[string]string `json:"screen_window"` }
+type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"`; VideoOn []string `json:"video_on"`; ScreenOn []string `json:"screen_on"`; ScreenWindow map[string]string `json:"screen_window"`; ServerMuted []string `json:"server_muted"`; ServerDeafened []string `json:"server_deafened"` }
 
 // MuteState is one person's mute/deafen in a voice_state update.
 type MuteState struct {
@@ -1257,6 +1259,12 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.voiceMuted.Store(false)
 			a.voiceDeafened.Store(false)
 			runtime.EventsEmit(a.ctx, "voice:removed", msg.DeniedMsg)
+		case "voice_move":
+			// A moderator moved us to another voice channel: the server has
+			// already taken us out of this one; the page joins the other.
+			a.stopVoiceSession()
+			a.e2ee.end()
+			runtime.EventsEmit(a.ctx, "voice:move", map[string]string{"board_id": msg.BoardID, "by": msg.By})
 		case "voice_moved":
 			// This account joined the call from another device: this one
 			// hangs up (the server has already moved the call there).
@@ -1299,7 +1307,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "rooms:updated")
 		case "voice_state":
 			a.e2ee.updateRoster(msg.Channels)
-			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels, Reconnecting: msg.Reconnecting, MuteStates: msg.MuteStates, VideoOn: msg.VideoOn, ScreenOn: msg.ScreenOn, ScreenWindow: msg.ScreenWindow})
+			runtime.EventsEmit(a.ctx, "voice:state", voiceStateEvent{Channels: msg.Channels, Reconnecting: msg.Reconnecting, MuteStates: msg.MuteStates, VideoOn: msg.VideoOn, ScreenOn: msg.ScreenOn, ScreenWindow: msg.ScreenWindow, ServerMuted: msg.ServerMuted, ServerDeafened: msg.ServerDeafened})
 		case "voice_e2ee":
 			a.handleVoiceE2EE(raw)
 		case "voice_answer":
