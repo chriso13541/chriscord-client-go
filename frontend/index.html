@@ -199,6 +199,7 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .voice-occupant-row .other-device { display:inline-flex; color:var(--text-muted); } .voice-occupant-row .other-device .ic { width:14px; height:14px; }
 #voice-connected-bar .voice-bar-btn.muted { color:var(--red); }
 #voice-connected-bar .voice-bar-btn.muted:hover { color:var(--red-light); }
+#voice-connected-bar .voice-bar-btn.server, #voice-connected-bar .voice-bar-btn.server:hover { color:#c77dff; }
 #voice-leave-btn:hover { color:var(--red) !important; }
 #voice-connected-name { display:flex; align-items:center; gap:5px; min-width:0; margin-right:auto; }
 /* Dropped mid-call and expected back: faded, name in red (like Discord). */
@@ -434,6 +435,7 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .vs-tile .vs-flags { display:inline-flex; gap:3px; color:#f47373; }
 .vs-tile .vs-flags:empty { display:none; }
 .vs-tile .vs-flags .ic { width:15px; height:15px; }
+.vs-tile .vs-flags .ic.server { color:#c77dff; }
 #toggle-members-btn { margin-left:4px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; font-weight:600; padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:5px; transition:background .15s,color .15s; white-space:nowrap; }
 #toggle-members-btn:hover { background:var(--bg-light); color:var(--text); }
 #toggle-members-btn.active { color:var(--accent); }
@@ -785,7 +787,9 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 #voice-user-menu .vum-move .ic { width:16px; height:16px; color:var(--text-muted); }
 #voice-user-menu .vum-danger { color:var(--red); }
 #voice-user-menu .vum-danger:hover { background:var(--red); color:#fff; }
-.voice-occupant-status .ic.server { opacity:.75; filter:drop-shadow(0 0 1px var(--red)); }
+/* Muted or deafened by a moderator (or no Speak permission): purple, so it's
+   clear it isn't your own mute. Your own goes back to red once it's lifted. */
+.voice-occupant-status .ic.off.server { color:#c77dff; }
 #voice-user-menu .vum-reset { font-size:.75rem; color:var(--text-muted); padding:2px 6px 4px; cursor:pointer; }
 #voice-user-menu .vum-reset:hover { color:var(--text); text-decoration:underline; }
 .voice-occupant-status .ic.local { color:var(--red); }
@@ -3803,19 +3807,31 @@ function updateVoiceConnectedBar(){
   window.go.main.App.IsMuted().then(setMuteButtonState).catch(()=>{});
   window.go.main.App.IsDeafened().then(setDeafenButtonState).catch(()=>{});
 }
+// The bar's mic and headset: red when you've muted/deafened yourself,
+// purple while a moderator has server-muted/deafened you (whatever your own
+// setting) — back to your own state when it's lifted. "muted" stays your
+// own setting; "server" is just how it's drawn.
 function setMuteButtonState(muted){
   const btn=document.getElementById('voice-mute-btn');
   if(!btn)return;
-  btn.title=muted?'Unmute microphone':'Mute microphone';
-  btn.classList.toggle('muted',muted);
-  btn.innerHTML=icon(muted?'mic_off':'mic');
+  if(typeof muted==='boolean')btn.classList.toggle('muted',muted);
+  muted=btn.classList.contains('muted');
+  const server=!!state.voiceHere&&!!state.voiceServerMuted?.has(state.username);
+  btn.classList.toggle('server',server);
+  btn.title=server?(can(PERM.SPEAK)?'Server muted by a moderator':'You don\u2019t have permission to speak here')+(muted?' (you\u2019re also muted)':''):muted?'Unmute microphone':'Mute microphone';
+  const html=icon(muted||server?'mic_off':'mic');
+  if(btn.innerHTML!==html)btn.innerHTML=html;
 }
 function setDeafenButtonState(deafened){
   const btn=document.getElementById('voice-deafen-btn');
   if(!btn)return;
-  btn.title=deafened?'Undeafen':'Deafen';
-  btn.classList.toggle('muted',deafened);
-  btn.innerHTML=icon(deafened?'headset_off':'headphones');
+  if(typeof deafened==='boolean')btn.classList.toggle('muted',deafened);
+  deafened=btn.classList.contains('muted');
+  const server=!!state.voiceHere&&!!state.voiceServerDeafened?.has(state.username);
+  btn.classList.toggle('server',server);
+  btn.title=server?'Server deafened by a moderator'+(deafened?' (you\u2019re also deafened)':''):deafened?'Undeafen':'Deafen';
+  const html=icon(deafened||server?'headset_off':'headphones');
+  if(btn.innerHTML!==html)btn.innerHTML=html;
 }
 async function toggleDeafen(){
   try{
@@ -7960,7 +7976,8 @@ function renderVideoStage(){
     const ms=state.voiceMuteStatus?.[`${board}:${u}`];
     const flags=tile.querySelector('.vs-flags');
     if(flags){
-      const html=ms?.deafened?icon('mic_off')+icon('headset_off'):ms?.muted?icon('mic_off'):'';
+      const sm=!!state.voiceServerMuted?.has(u),sd=!!state.voiceServerDeafened?.has(u);
+      const html=(sm?icon('mic_off','server'):(ms?.muted||ms?.deafened)?icon('mic_off'):'')+(sd?icon('headset_off','server'):ms?.deafened?icon('headset_off'):'');
       if(flags.innerHTML!==html)flags.innerHTML=html;
     }
     if(kind==='avatar'){
@@ -10581,6 +10598,7 @@ function init(){
     state.screenWindow=payload?.screen_window||{};
     state.voiceServerMuted=new Set(payload?.server_muted||[]);
     state.voiceServerDeafened=new Set(payload?.server_deafened||[]);
+    setMuteButtonState();setDeafenButtonState();renderVideoStage();
     onScreenState(payload?.screen_on);
     onVideoState(payload?.video_on);
     voiceSnapshotWaiters.splice(0).forEach(w=>w());
