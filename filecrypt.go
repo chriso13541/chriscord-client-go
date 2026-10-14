@@ -22,6 +22,7 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
@@ -42,6 +43,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/chacha20poly1305"
@@ -338,18 +340,55 @@ func (a *App) uploadEncrypted(domain, token, filename string, src io.Reader) (*U
 		pw.Close()
 	}()
 
-	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/upload", pr)
+	// No limit on how long the whole upload takes (a big file on a slow
+	// connection can take hours); it's given up on only if it stops moving:
+	// nothing sent for uploadStall, or no answer uploadAnswerWait after the
+	// last byte.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	body := &uploadWatch{r: pr}
+	body.touch()
+	stalled := make(chan string, 1)
+	go func() {
+		t := time.NewTicker(5 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				idle, done := body.idle()
+				switch {
+				case !done && idle > uploadStall:
+					stalled <- "the connection stopped sending"
+					cancel()
+					return
+				case done && idle > uploadAnswerWait:
+					stalled <- "the server didn't answer after the file was sent"
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	req, err := http.NewRequestWithContext(ctx, "POST", normaliseHTTP(domain)+"/api/upload", body)
 	if err != nil {
 		pr.CloseWithError(err)
 		return nil, err
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	req.Header.Set("X-Session-Token", token)
-	client := &http.Client{Timeout: 10 * 60 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		pr.CloseWithError(err)
+		select {
+		case why := <-stalled:
+			return nil, fmt.Errorf("upload failed: %s", why)
+		default:
+		}
 		return nil, fmt.Errorf("upload failed: %w", err)
 	}
+	cancel() // answered: the watchdog's job is done (the body below is small)
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		var e map[string]string
@@ -376,6 +415,37 @@ func (a *App) uploadEncrypted(domain, token, filename string, src io.Reader) (*U
 		return nil, err
 	}
 	return &UploadResult{URL: local, Filename: filename, Mime: m.Mime}, nil
+}
+
+const (
+	uploadStall      = 2 * time.Minute  // most an upload may go without sending anything
+	uploadAnswerWait = 10 * time.Minute // most to wait for the server's answer once it's all sent
+)
+
+// uploadWatch notes when the upload last moved, and when it finished.
+type uploadWatch struct {
+	r    io.Reader
+	last atomic.Int64 // unix nanoseconds of the last read that got data
+	done atomic.Bool
+}
+
+func (p *uploadWatch) touch() { p.last.Store(time.Now().UnixNano()) }
+
+func (p *uploadWatch) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	if n > 0 {
+		p.touch()
+	}
+	if err == io.EOF {
+		p.done.Store(true)
+		p.touch()
+	}
+	return n, err
+}
+
+// idle: how long since it last moved, and whether it's all been sent.
+func (p *uploadWatch) idle() (time.Duration, bool) {
+	return time.Since(time.Unix(0, p.last.Load())), p.done.Load()
 }
 
 // ── Showing (the page's /e2ee-file/ requests) ─────────────────────────────────
