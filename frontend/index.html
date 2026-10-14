@@ -3697,7 +3697,7 @@ function renderSidebar(){
               // Muted: the crossed-out mic. Deafened (which is also muted):
               // the mic and, to its right, the crossed-out headset.
               (sMuted?`<span title="Server muted" style="display:inline-flex">${icon('mic_off','off server')}</span>`:(status.muted||status.deafened)?icon('mic_off','off'):'')+
-              (sDeaf?`<span title="Server deafened" style="display:inline-flex">${icon('headset_off','off server')}</span>`:status.deafened?icon('headset_off','off'):'')+
+              (sDeaf?`<span title="${userCan(user,PERM.LISTEN)?'Server deafened':'Can\u2019t hear others (no Listen permission)'}" style="display:inline-flex">${icon('headset_off','off server')}</span>`:status.deafened?icon('headset_off','off'):'')+
               (state.voiceVideo?.has(user)||(user===state.username&&cam.on&&state.voiceHere===board.id)?`<span title="Camera on" style="display:inline-flex">${icon('videocam','cam')}</span>`:'')+
               (state.voiceScreens?.has(user)||(user===state.username&&scr.on&&state.voiceHere===board.id)?`<span class="vs-live" title="Sharing their screen">LIVE</span>`:'');
             row.innerHTML=`<span class="voice-occupant-avatar${speaking?' speaking':''}" data-pfp-user="${esc(user)}" style="background-color:${avatarColour(user)}">${esc(user[0].toUpperCase())}</span><span class="voice-occupant-name">${dnHTML(user)}</span><span class="voice-occupant-status" title="${status.deafened?'Deafened':status.muted?'Muted':''}">${statusIcons}</span>`;
@@ -3829,7 +3829,7 @@ function setDeafenButtonState(deafened){
   deafened=btn.classList.contains('muted');
   const server=!!state.voiceHere&&!!state.voiceServerDeafened?.has(state.username);
   btn.classList.toggle('server',server);
-  btn.title=server?'Server deafened by a moderator'+(deafened?' (you\u2019re also deafened)':''):deafened?'Undeafen':'Deafen';
+  btn.title=server?(can(PERM.LISTEN)?'Server deafened by a moderator':'You don\u2019t have permission to hear others here')+(deafened?' (you\u2019re also deafened)':''):deafened?'Undeafen':'Deafen';
   const html=icon(deafened||server?'headset_off':'headphones');
   if(btn.innerHTML!==html)btn.innerHTML=html;
 }
@@ -10012,12 +10012,14 @@ function initPanelResize(){
 // can't use so you're not offered it.
 const PERM={SEND:1,ATTACH:2,REACT:4,MANAGE:8,CONNECT:16,KICK:32,BAN:64,PIN:128,ADMIN:256,EMOJI:512,
   CREATE_EXPR:1<<10,VIEW:1<<11,HISTORY:1<<12,INVITE:1<<13,NICK:1<<14,MANAGE_NICKS:1<<15,EMBED:1<<16,
-  SPEAK:1<<17,VIDEO:1<<18,MUTE:1<<19,DEAFEN:1<<20,MOVE:1<<21,CHANNELS:1<<22};
-const PERM_ALL=(1<<23)-1;
-const PERM_DEFAULT=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN|PERM.VIEW|PERM.HISTORY|PERM.INVITE|PERM.NICK|PERM.EMBED|PERM.SPEAK|PERM.VIDEO;
+  SPEAK:1<<17,VIDEO:1<<18,MUTE:1<<19,DEAFEN:1<<20,MOVE:1<<21,CHANNELS:1<<22,LISTEN:1<<23};
+const PERM_ALL=(1<<24)-1;
+const PERM_DEFAULT=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN|PERM.VIEW|PERM.HISTORY|PERM.INVITE|PERM.NICK|PERM.EMBED|PERM.SPEAK|PERM.VIDEO|PERM.LISTEN;
 // Servers from before these permissions existed didn't limit any of them:
 // treat them as allowed there (the moderation ones they can't do at all).
-const PERM_LEGACY_FREE=PERM.VIEW|PERM.HISTORY|PERM.INVITE|PERM.NICK|PERM.EMBED|PERM.SPEAK|PERM.VIDEO;
+const PERM_LEGACY_FREE=PERM.VIEW|PERM.HISTORY|PERM.INVITE|PERM.NICK|PERM.EMBED|PERM.SPEAK|PERM.VIDEO|PERM.LISTEN;
+// What a server that does have those (version 2) but not Listen (version 3) leaves free.
+const legacyFree=()=>!state.permsV2?PERM_LEGACY_FREE:state.permsVersion<3?PERM.LISTEN:0;
 state.roles=[];state.memberRoles={};state.permsV2=false;state.myPerms=PERM_DEFAULT;
 const can=p=>(state.myPerms&p)===p;
 // What someone else's roles allow — to decide whether their links expand,
@@ -10027,7 +10029,7 @@ function permsOf(user){
   if(!state.roles.length)return PERM_DEFAULT;
   const ids=new Set(state.memberRoles[user]||[]);let p=0;
   for(const r of state.roles)if(r.is_default||ids.has(r.id))p|=r.permissions;
-  if(!state.permsV2)p|=PERM_LEGACY_FREE;
+  p|=legacyFree();
   return (p&PERM.ADMIN)?PERM_ALL:p;
 }
 const userCan=(user,p)=>(permsOf(user)&p)===p;
@@ -10044,9 +10046,10 @@ async function loadRoles(){
   if(state.domain!==domain)return;
   state.roles=(d.roles||[]).sort((a,b)=>b.position-a.position);
   state.memberRoles=d.members||{};
-  state.permsV2=(d.permissions_version||0)>=2;
+  state.permsVersion=d.permissions_version||0;
+  state.permsV2=state.permsVersion>=2;
   state.myPerms=d.my_permissions??state.myPerms;
-  if(!state.permsV2)state.myPerms|=PERM_LEGACY_FREE;
+  state.myPerms|=legacyFree();
   if(state.myPerms&PERM.ADMIN)state.myPerms=PERM_ALL;
   refreshMemberList();
   document.querySelectorAll('.msg-username[data-user]').forEach(el=>{el.style.color=nameColor(el.dataset.user)||'';});
