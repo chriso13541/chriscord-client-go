@@ -9067,6 +9067,13 @@ function initStickerPicker(){
 // with its name (and, for a server emoji, where it's from); hovering a
 // reaction shows its emoji big with who reacted. Replaces the plain
 // tooltip. The pickers have their own preview footer instead.
+// What the emoji card is for (and so not the plain tooltip): a reaction
+// chip, or an emoji outside the pickers.
+function emojiCardTarget(target){
+  const el=target?.closest?.('.reaction:not(.add):not(.more)')||target?.closest?.('img.emoji');
+  if(!el||el.closest('#emoji-picker,#sticker-picker,#emoji-suggest,.modal'))return null;
+  return el;
+}
 function initEmojiCard(){
   const card=document.createElement('div');card.id='emoji-card';document.body.appendChild(card);
   let timer=null,cur=null;
@@ -9097,10 +9104,10 @@ function initEmojiCard(){
   };
   document.addEventListener('mouseover',e=>{
     // A reaction chip wins over the emoji inside it (it says who reacted).
-    const el=e.target.closest?.('.reaction:not(.add):not(.more)')||e.target.closest?.('img.emoji');
+    const el=emojiCardTarget(e.target);
     if(el===cur)return;
     hide();
-    if(!el||el.closest('#emoji-picker,#sticker-picker,#emoji-suggest,.modal'))return;
+    if(!el)return;
     // Keep the plain tooltip from showing on top of the card.
     if(el.title){el.dataset.tip=el.title;el.removeAttribute('title');}
     cur=el;timer=setTimeout(()=>{if(cur===el&&el.isConnected)show(el);},250);
@@ -9741,6 +9748,9 @@ function initTooltips(){
   document.addEventListener('mouseover',e=>{
     const el=e.target.closest?.('[title],[data-tip]');
     if(!el){if(tipEl)hideTooltip();return;}
+    // Emoji and reactions get the bigger emoji card instead (initEmojiCard).
+    const card=emojiCardTarget(e.target);
+    if(card&&(card===el||card.contains(el))){if(tipEl)hideTooltip();return;}
     if(el.hasAttribute('title')){
       const t=el.getAttribute('title');el.removeAttribute('title');
       if(t){el.dataset.tip=t;if(!el.hasAttribute('aria-label')&&!el.textContent.trim())el.setAttribute('aria-label',t);}
