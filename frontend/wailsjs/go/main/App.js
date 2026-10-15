@@ -34,6 +34,58 @@ export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
 
+export function CloudChangeEmail(arg1) {
+  return window['go']['main']['App']['CloudChangeEmail'](arg1);
+}
+
+export function CloudChangePassword(arg1,arg2) {
+  return window['go']['main']['App']['CloudChangePassword'](arg1,arg2);
+}
+
+export function CloudChangeUsername(arg1) {
+  return window['go']['main']['App']['CloudChangeUsername'](arg1);
+}
+
+export function CloudForget() {
+  return window['go']['main']['App']['CloudForget']();
+}
+
+export function CloudLink(arg1,arg2,arg3) {
+  return window['go']['main']['App']['CloudLink'](arg1,arg2,arg3);
+}
+
+export function CloudNewRecoveryKey(arg1) {
+  return window['go']['main']['App']['CloudNewRecoveryKey'](arg1);
+}
+
+export function CloudRecover(arg1,arg2,arg3) {
+  return window['go']['main']['App']['CloudRecover'](arg1,arg2,arg3);
+}
+
+export function CloudResendVerification() {
+  return window['go']['main']['App']['CloudResendVerification']();
+}
+
+export function CloudSignIn(arg1,arg2) {
+  return window['go']['main']['App']['CloudSignIn'](arg1,arg2);
+}
+
+export function CloudStatus() {
+  return window['go']['main']['App']['CloudStatus']();
+}
+
+export function CloudStatusQuick() {
+  return window['go']['main']['App']['CloudStatusQuick']();
+}
+
+export function CloudSyncNow() {
+  return window['go']['main']['App']['CloudSyncNow']();
+}
+
+export function CloudUnlink(arg1) {
+  return window['go']['main']['App']['CloudUnlink'](arg1);
+}
+
 export function Connect(arg1, arg2) {
   return window['go']['main']['App']['Connect'](arg1, arg2);
 }

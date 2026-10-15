@@ -47,6 +47,7 @@ func saveServers(servers []SavedServer) {
 	}
 	os.MkdirAll(chriscordConfigDir(), 0700) // ensure the directory exists before writing into it
 	os.WriteFile(serversFilePath(), data, 0644)
+	theCloud.changed() // an online account syncs its server list (cloud.go)
 }
 
 func upsertServer(servers []SavedServer, s SavedServer) []SavedServer {

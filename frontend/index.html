@@ -89,6 +89,32 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
 .error-msg { background:rgba(240,71,71,.12); border:1px solid var(--red); border-radius:6px; padding:8px 12px; font-size:.85rem; color:var(--red); margin-bottom:12px; }
 
+/* ONLINE ACCOUNT (Settings > Account, the sign-in screen) */
+.cloud-status { display:flex; align-items:center; gap:12px; padding:14px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
+.cloud-status > .ic { width:22px; height:22px; color:var(--text-muted); flex-shrink:0; }
+.cloud-status.on > .ic { color:var(--green); }
+.cloud-status.err > .ic { color:var(--yellow); }
+.cloud-status-text { flex:1; min-width:0; font-size:.92rem; color:var(--text-strong); line-height:1.35; overflow-wrap:anywhere; }
+.cloud-status-text small { display:block; color:var(--text-muted); font-size:.78rem; }
+.cloud-status .settings-secondary-btn { margin-top:0; white-space:nowrap; }
+#settings-tab-account .cloud-section .settings-label { margin-top:26px; } /* beats .settings-label:first-of-type */
+.cloud-section .settings-hint { margin-top:6px; }
+.cloud-row { display:flex; gap:8px; align-items:flex-start; }
+.cloud-row .form-group { flex:1; margin-bottom:0; }
+.cloud-row .settings-secondary-btn { margin-top:0; height:38px; white-space:nowrap; }
+.cloud-section .form-group { margin-bottom:8px; }
+.cloud-badge { display:inline-block; font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:10px; margin-left:6px; letter-spacing:0; text-transform:none; vertical-align:1px; }
+.cloud-badge.ok { background:color-mix(in srgb, var(--green) 18%, transparent); color:var(--green); }
+.cloud-badge.warn { background:color-mix(in srgb, var(--yellow) 18%, transparent); color:var(--yellow); }
+.cloud-msg { font-size:.82rem; margin-top:8px; }
+.cloud-msg.ok { color:var(--green); } .cloud-msg.bad { color:var(--red); }
+.cloud-danger .settings-label { color:var(--red); }
+#cloud-del-btn:hover { background:var(--red); border-color:var(--red); color:#fff; }
+#modal-recovery { z-index:550; }
+.recovery-key { font-family:Consolas,monospace; font-size:.84rem; white-space:nowrap; overflow-x:auto; color:var(--text-strong); background:var(--bg-darkest); border:1px solid var(--border); border-radius:8px; padding:14px 10px; text-align:center; user-select:all; margin-bottom:10px; }
+#recover-key { font-family:Consolas,monospace; }
+.gate-tabs .gate-tab { padding:8px 4px; white-space:nowrap; }
+
 /* CHAT SCREEN */
 #screen-chat { display:flex; height:100%; }
 
@@ -1591,6 +1617,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="gate-tabs">
         <div class="gate-tab active" id="tab-create">Create Account</div>
         <div class="gate-tab" id="tab-import">Import Account</div>
+        <div class="gate-tab" id="tab-online">Sign In Online</div>
       </div>
 
       <div id="onboard-create">
@@ -1617,6 +1644,26 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         </div>
         <div class="form-group"><label>Passphrase</label><input id="import-passphrase" type="password" placeholder="The passphrase this key was created with" autocomplete="off"></div>
         <button class="btn btn-primary" id="import-account-btn" style="width:100%;margin-top:6px">Import Account</button>
+      </div>
+
+      <!-- An account made online (on chriscord.app) from another computer -->
+      <div id="onboard-online" class="hidden">
+        <div id="online-signin">
+          <div class="error-msg hidden" id="online-error"></div>
+          <div class="form-group"><label>Username</label><input id="online-username" type="text" placeholder="Your chriscord.app username" maxlength="32" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Password</label><input id="online-password" type="password" placeholder="Your chriscord.app password" autocomplete="off"><div class="hint">For an account you made online on another computer. The password also becomes this computer's passphrase for it.</div></div>
+          <button class="btn btn-primary" id="online-signin-btn" style="width:100%;margin-top:6px">Sign In</button>
+          <div class="gate-link">Forgot your password? <a id="online-recover-link">Use your recovery key</a></div>
+        </div>
+        <div id="online-recover" class="hidden">
+          <div class="error-msg hidden" id="recover-error"></div>
+          <div class="form-group"><label>Username</label><input id="recover-username" type="text" placeholder="Your chriscord.app username" maxlength="32" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Recovery Key</label><input id="recover-key" type="text" placeholder="ABCD-EFGH-…" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>New Password</label><input id="recover-password" type="password" placeholder="At least 10 characters" autocomplete="off"></div>
+          <div class="form-group"><label>Confirm New Password</label><input id="recover-password-confirm" type="password" placeholder="Type it again" autocomplete="off"><div class="hint">You'll get a new recovery key too — the one you used stops working.</div></div>
+          <button class="btn btn-primary" id="recover-btn" style="width:100%;margin-top:6px">Recover Account</button>
+          <div class="gate-link"><a id="online-signin-link">Back to sign in with a password</a></div>
+        </div>
       </div>
       <div class="gate-link hidden" id="onboard-back"><a id="onboard-back-link">Back to sign in</a></div>
     </div>
@@ -1751,6 +1798,17 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="modal-recovery">
+  <div class="modal">
+    <h2>Save Your Recovery Key</h2>
+    <p>If you forget your chriscord.app password, this key is the only way back into your online account. Nobody can reset it for you, because nobody else can open your data. It's only shown this once.</p>
+    <div class="recovery-key" id="recovery-key-text"></div>
+    <div class="profile-btn-row" style="margin-bottom:16px"><button class="settings-secondary-btn" id="recovery-copy-btn" type="button" style="margin-top:0"><svg class="ic" aria-hidden="true"><use href="#ic-content_copy"/></svg>Copy</button></div>
+    <label class="check-row"><input type="checkbox" id="recovery-saved"> I've saved it somewhere safe</label>
+    <div class="modal-actions"><button class="btn btn-primary" id="recovery-done-btn" disabled>Done</button></div>
+  </div>
+</div>
+
 <div id="screen-chat" class="hidden">
   <div id="sidebar">
     <div class="resize-handle" id="sidebar-resize" title="Drag to resize · double-click to reset"></div>
@@ -1861,6 +1919,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <button id="settings-close-btn" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
   <div id="settings-tabs">
     <div class="settings-tab active" data-tab="profile">Profile</div>
+    <div class="settings-tab" data-tab="account">Account</div>
     <div class="settings-tab" data-tab="appearance">Appearance</div>
     <div class="settings-tab" data-tab="voice">Voice &amp; Video</div>
     <div class="settings-tab" data-tab="screenshare">Screen Sharing</div>
@@ -1937,6 +1996,64 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <div id="profile-editor-preview">
           <label class="settings-label">Preview</label>
           <div id="profile-preview-slot"></div>
+        </div>
+      </div>
+    </div>
+    <div id="settings-tab-account" class="settings-tab-pane">
+      <h2>Account</h2>
+      <div class="cloud-status" id="cloud-status" aria-live="polite"></div>
+
+      <!-- Offline: make it online -->
+      <div id="cloud-offline" class="hidden cloud-section">
+        <p class="settings-hint" style="margin-top:14px">This account lives only on this computer. Making it online lets you sign in on your other computers with a password, keeps your profile, appearance and saved servers in sync, and lists your username with your public key on chriscord.app, so people can check it's really you.</p>
+        <p class="settings-hint" style="margin-top:8px">Everything that syncs is encrypted on this computer first. chriscord.app can't read it and never sees your password. Your email is only for a confirmation link.</p>
+        <div class="error-msg hidden" id="cloud-link-error" style="margin-top:18px"></div>
+        <label class="settings-label" for="cloud-link-username">Username</label>
+        <div class="form-group"><input id="cloud-link-username" type="text" maxlength="32" autocomplete="off" spellcheck="false"><div class="hint">2–32 letters, numbers, _ . or -. You can change it later; your key stays the same.</div></div>
+        <label class="settings-label" for="cloud-link-email">Email</label>
+        <div class="form-group"><input id="cloud-link-email" type="email" autocomplete="off" spellcheck="false"></div>
+        <label class="settings-label" for="cloud-link-password">Password</label>
+        <div class="form-group"><input id="cloud-link-password" type="password" placeholder="At least 10 characters" autocomplete="new-password"></div>
+        <div class="form-group"><input id="cloud-link-password2" type="password" placeholder="Type it again" autocomplete="new-password"><div class="hint">For signing in on other computers. This computer keeps using your passphrase.</div></div>
+        <button class="btn btn-primary" id="cloud-link-btn" style="margin-top:10px">Make Account Online</button>
+      </div>
+
+      <!-- The service doesn't have it any more -->
+      <div id="cloud-gone" class="hidden">
+        <p class="settings-hint" style="margin-top:14px">chriscord.app doesn't have this account any more. Online accounts whose email isn't confirmed within a week are removed. The account on this computer is fine.</p>
+        <button class="settings-secondary-btn" id="cloud-forget-btn">Keep It Offline</button>
+      </div>
+
+      <!-- Online -->
+      <div id="cloud-online" class="hidden cloud-section">
+        <label class="settings-label" for="cloud-username">Username</label>
+        <div class="cloud-row"><div class="form-group"><input id="cloud-username" type="text" maxlength="32" autocomplete="off" spellcheck="false"></div><button class="settings-secondary-btn" id="cloud-username-btn" type="button">Change</button></div>
+        <p class="settings-hint">Your public key never changes, so the people who know you keep knowing it's you. Servers you've already joined keep the name you joined them with.</p>
+        <div class="cloud-msg hidden" id="cloud-username-msg"></div>
+
+        <label class="settings-label" for="cloud-email">Email<span id="cloud-email-badge"></span></label>
+        <div class="cloud-row"><div class="form-group"><input id="cloud-email" type="email" autocomplete="off" spellcheck="false"></div><button class="settings-secondary-btn" id="cloud-email-btn" type="button">Change</button></div>
+        <p class="settings-hint" id="cloud-email-hint"></p>
+        <button class="settings-secondary-btn hidden" id="cloud-resend-btn" type="button" style="margin-top:8px">Send the Link Again</button>
+        <div class="cloud-msg hidden" id="cloud-email-msg"></div>
+
+        <label class="settings-label" for="cloud-pw-current">Password</label>
+        <div class="form-group"><input id="cloud-pw-current" type="password" placeholder="Current password" autocomplete="current-password"></div>
+        <div class="form-group"><input id="cloud-pw-new" type="password" placeholder="New password (at least 10 characters)" autocomplete="new-password"></div>
+        <div class="form-group"><input id="cloud-pw-new2" type="password" placeholder="New password again" autocomplete="new-password"></div>
+        <button class="settings-secondary-btn" id="cloud-pw-btn" type="button" style="margin-top:2px">Change Password</button>
+        <div class="cloud-msg hidden" id="cloud-pw-msg"></div>
+
+        <label class="settings-label" for="cloud-rec-password">Recovery Key</label>
+        <p class="settings-hint" style="margin:0 0 8px">Lost yours? Make a new one. The old one stops working.</p>
+        <div class="cloud-row"><div class="form-group"><input id="cloud-rec-password" type="password" placeholder="Your password" autocomplete="current-password"></div><button class="settings-secondary-btn" id="cloud-rec-btn" type="button">New Recovery Key</button></div>
+        <div class="cloud-msg hidden" id="cloud-rec-msg"></div>
+
+        <div class="cloud-danger">
+          <label class="settings-label" for="cloud-del-password">Delete Online Account</label>
+          <p class="settings-hint" style="margin:0 0 8px">Removes it from chriscord.app and stops syncing. The account on this computer stays exactly as it is, offline.</p>
+          <div class="cloud-row"><div class="form-group"><input id="cloud-del-password" type="password" placeholder="Your password" autocomplete="current-password"></div><button class="settings-secondary-btn" id="cloud-del-btn" type="button">Delete</button></div>
+          <div class="cloud-msg hidden" id="cloud-del-msg"></div>
         </div>
       </div>
     </div>
@@ -2319,10 +2436,11 @@ async function switchAccount(){
 }
 
 function setGateTab(tab){
-  document.getElementById('tab-create').classList.toggle('active',tab==='create');
-  document.getElementById('tab-import').classList.toggle('active',tab==='import');
-  document.getElementById('onboard-create').classList.toggle('hidden',tab!=='create');
-  document.getElementById('onboard-import').classList.toggle('hidden',tab!=='import');
+  for(const t of ['create','import','online']){
+    document.getElementById('tab-'+t).classList.toggle('active',tab===t);
+    document.getElementById('onboard-'+t).classList.toggle('hidden',tab!==t);
+  }
+  if(tab==='online'){showOnlineView('signin');document.getElementById('online-username').focus();}
 }
 
 // Called once an account is unlocked/created/imported — same next step
@@ -2487,6 +2605,211 @@ async function saveExport(){
     toast(`Account key exported as ${finalPath.split(/[\\/]/).pop()}.`);
   }catch(err){errEl.textContent=String(err);errEl.classList.remove('hidden');}
   finally{btn.disabled=false;}
+}
+
+// ── ONLINE ACCOUNT (chriscord.app) ───────────────────────────────
+// Optional: an account can be made online (Settings > Account), then
+// signed in to on other computers with a password, or a recovery key if
+// that's forgotten. The app does all the encryption (cloud.go); these are
+// just the screens.
+const cloudErr=err=>{const m=String(err).replace(/^Error: /,'');return m.charAt(0).toUpperCase()+m.slice(1);};
+function agoText(unix){
+  const s=Math.max(0,Date.now()/1000-unix);
+  if(s<60)return 'just now';
+  if(s<3600)return `${Math.floor(s/60)} min ago`;
+  if(s<86400)return `${Math.floor(s/3600)} h ago`;
+  return new Date(unix*1000).toLocaleDateString();
+}
+// The recovery key, shown once. Resolves when it's been saved.
+let recoveryDone=null;
+function showRecoveryKey(key){
+  if(!key)return Promise.resolve();
+  document.getElementById('recovery-key-text').textContent=key;
+  const box=document.getElementById('recovery-saved');box.checked=false;
+  document.getElementById('recovery-done-btn').disabled=true;
+  document.getElementById('modal-recovery').classList.remove('hidden');
+  return new Promise(res=>{recoveryDone=res;});
+}
+function closeRecoveryKey(){
+  document.getElementById('modal-recovery').classList.add('hidden');
+  document.getElementById('recovery-key-text').textContent='';
+  const r=recoveryDone;recoveryDone=null;r?.();
+}
+async function copyRecoveryKey(){
+  try{await navigator.clipboard.writeText(document.getElementById('recovery-key-text').textContent);toast('Recovery key copied');}
+  catch{toast('Couldn\u2019t copy \u2014 select the key and copy it by hand',true);}
+}
+
+function showOnlineView(view){
+  document.getElementById('online-signin').classList.toggle('hidden',view!=='signin');
+  document.getElementById('online-recover').classList.toggle('hidden',view!=='recover');
+  if(view==='recover'){
+    const u=document.getElementById('recover-username');
+    if(!u.value)u.value=document.getElementById('online-username').value;
+    (u.value?document.getElementById('recover-key'):u).focus();
+  }
+}
+async function submitOnlineSignIn(){
+  const username=document.getElementById('online-username').value.trim();
+  const pass=document.getElementById('online-password').value;
+  const errEl=document.getElementById('online-error'),btn=document.getElementById('online-signin-btn');
+  const fail=t=>{errEl.textContent=t;errEl.classList.remove('hidden');};
+  if(!username)return fail('Enter your username.');
+  if(!pass)return fail('Enter your password.');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
+  try{
+    const acct=await window.go.main.App.CloudSignIn(username,pass);
+    document.getElementById('online-password').value='';
+    await enterApp(acct);
+    toast(`Signed in as ${acct.username}. Your profile, appearance and servers came with you.`);
+  }catch(err){fail(cloudErr(err));}
+  finally{btn.disabled=false;btn.textContent='Sign In';}
+}
+async function submitRecover(){
+  const username=document.getElementById('recover-username').value.trim();
+  const key=document.getElementById('recover-key').value.trim();
+  const pass=document.getElementById('recover-password').value,pass2=document.getElementById('recover-password-confirm').value;
+  const errEl=document.getElementById('recover-error'),btn=document.getElementById('recover-btn');
+  const fail=t=>{errEl.textContent=t;errEl.classList.remove('hidden');};
+  if(!username)return fail('Enter your username.');
+  if(!key)return fail('Enter your recovery key.');
+  if(pass.length<10)return fail('Use at least 10 characters for your new password.');
+  if(pass!==pass2)return fail('The new passwords don\u2019t match.');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
+  try{
+    const res=await window.go.main.App.CloudRecover(username,key,pass);
+    for(const id of ['recover-key','recover-password','recover-password-confirm'])document.getElementById(id).value='';
+    await showRecoveryKey(res.recovery_key);
+    await enterApp(res.account);
+    toast('You\u2019re back in, with a new password and a new recovery key.');
+  }catch(err){fail(cloudErr(err));}
+  finally{btn.disabled=false;btn.textContent='Recover Account';}
+}
+
+// Settings > Account. refresh=false uses what the app already knows
+// (for the status line while a sync runs), true asks chriscord.app.
+async function renderCloudSettings(refresh=true){
+  let st=null;
+  try{st=await (refresh?window.go.main.App.CloudStatus():window.go.main.App.CloudStatusQuick());}catch{}
+  if(!st)return;
+  const host=String(st.server||'chriscord.app').replace(/^https?:\/\//,'');
+  const show=(id,on)=>document.getElementById(id).classList.toggle('hidden',!on);
+  const live=st.online&&!st.gone;
+  show('cloud-offline',!st.online);show('cloud-online',live);show('cloud-gone',st.online&&st.gone);
+  let ic='devices',cls='',main,sub;
+  if(!st.online){main='Offline';sub='This account is only on this computer.';}
+  else if(st.gone){ic='warning';cls='err';main='Not online any more';sub=`${host} doesn\u2019t have this account.`;}
+  else if(st.syncing){ic='sync';cls='on';main=`Online as ${st.username}`;sub='Syncing\u2026';}
+  else if(st.error){ic='warning';cls='err';main=`Online as ${st.username}`;sub=`Couldn\u2019t sync: ${st.error}`;}
+  else{ic='verified_user';cls='on';main=`Online as ${st.username}`;sub=st.last_sync?`Synced ${agoText(st.last_sync)} with ${host}`:`Not synced yet`;}
+  const box=document.getElementById('cloud-status');
+  box.className='cloud-status '+cls;
+  box.innerHTML=`${icon(ic)}<div class="cloud-status-text">${esc(main)}<small>${esc(sub)}</small></div>`+(live?'<button class="settings-secondary-btn" id="cloud-sync-btn" type="button">Sync Now</button>':'');
+  document.getElementById('cloud-sync-btn')?.addEventListener('click',async e=>{
+    e.currentTarget.disabled=true;
+    try{await window.go.main.App.CloudSyncNow();}catch(err){toast('Couldn\u2019t sync: '+cloudErr(err),true);}
+    renderCloudSettings(false);
+  });
+  if(!st.online){
+    const u=document.getElementById('cloud-link-username');
+    if(!u.value)u.value=(st.local_username||'').replace(/[^A-Za-z0-9_.-]/g,'').slice(0,32);
+  }else if(live){
+    const u=document.getElementById('cloud-username');if(document.activeElement!==u)u.value=st.username||'';
+    const e=document.getElementById('cloud-email');if(document.activeElement!==e)e.value=st.email||'';
+    document.getElementById('cloud-email-badge').innerHTML=!st.email?'':st.email_verified?'<span class="cloud-badge ok">Confirmed</span>':'<span class="cloud-badge warn">Not confirmed</span>';
+    const hint=document.getElementById('cloud-email-hint');
+    if(st.email&&!st.email_verified)hint.textContent=`Open the link sent to ${st.email}.`+(st.verify_by?` Until you do, the online account is removed on ${new Date(st.verify_by*1000).toLocaleDateString()} (the one on this computer stays).`:'');
+    else hint.textContent='Only used to confirm this account is yours. Never shown to anyone.';
+    show('cloud-resend-btn',!!st.email&&!st.email_verified);
+  }
+}
+// Runs one Settings > Account action, showing how it went under its button.
+async function cloudAction(btnId,msgId,fn,okText){
+  const btn=document.getElementById(btnId),msg=document.getElementById(msgId);
+  btn.disabled=true;msg.classList.add('hidden');
+  try{
+    await fn();
+    if(okText){msg.textContent=okText;msg.className='cloud-msg ok';}
+    return true;
+  }catch(err){msg.textContent=cloudErr(err);msg.className='cloud-msg bad';return false;}
+  finally{btn.disabled=false;}
+}
+const cloudVal=id=>document.getElementById(id).value;
+const cloudClear=(...ids)=>ids.forEach(id=>{document.getElementById(id).value='';});
+// The name in "Signed in as …" follows a rename.
+async function refreshSignedInName(){
+  try{
+    const v=await window.go.main.App.GetAccountInfo();
+    if(!v)return;
+    state.account={...(state.account||{}),...v};
+    const strong=document.querySelector('#signed-in-as strong');if(strong)strong.textContent=v.username;
+  }catch{}
+}
+async function submitCloudLink(){
+  const u=cloudVal('cloud-link-username').trim(),e=cloudVal('cloud-link-email').trim(),p=cloudVal('cloud-link-password'),p2=cloudVal('cloud-link-password2');
+  const errEl=document.getElementById('cloud-link-error'),btn=document.getElementById('cloud-link-btn');
+  const fail=t=>{errEl.textContent=t;errEl.classList.remove('hidden');};
+  if(!u)return fail('Choose a username.');
+  if(!e)return fail('Enter your email address.');
+  if(p.length<10)return fail('Use at least 10 characters for your password.');
+  if(p!==p2)return fail('The passwords don\u2019t match.');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
+  try{
+    const key=await window.go.main.App.CloudLink(u,e,p);
+    cloudClear('cloud-link-password','cloud-link-password2');
+    await showRecoveryKey(key);
+    await refreshSignedInName();
+    toast(`You\u2019re online as ${u}. Check ${e} for a confirmation link.`);
+  }catch(err){fail(cloudErr(err));}
+  finally{btn.disabled=false;btn.textContent='Make Account Online';renderCloudSettings();}
+}
+async function cloudChangeUsername(){
+  const name=cloudVal('cloud-username').trim();
+  if(await cloudAction('cloud-username-btn','cloud-username-msg',()=>window.go.main.App.CloudChangeUsername(name),`You\u2019re now ${name}.`)){
+    await refreshSignedInName();renderCloudSettings(false);
+  }
+}
+async function cloudChangeEmail(){
+  const email=cloudVal('cloud-email').trim();
+  if(await cloudAction('cloud-email-btn','cloud-email-msg',()=>window.go.main.App.CloudChangeEmail(email),`Sent a confirmation link to ${email}.`))renderCloudSettings();
+}
+async function cloudResend(){
+  await cloudAction('cloud-resend-btn','cloud-email-msg',()=>window.go.main.App.CloudResendVerification(),'Sent it again. It can take a minute, and check your spam folder.');
+}
+async function cloudChangePassword(){
+  const cur=cloudVal('cloud-pw-current'),p=cloudVal('cloud-pw-new'),p2=cloudVal('cloud-pw-new2');
+  await cloudAction('cloud-pw-btn','cloud-pw-msg',async()=>{
+    if(!cur)throw new Error('Enter your current password.');
+    if(p.length<10)throw new Error('Use at least 10 characters for the new password.');
+    if(p!==p2)throw new Error('The new passwords don\u2019t match.');
+    await window.go.main.App.CloudChangePassword(cur,p);
+    cloudClear('cloud-pw-current','cloud-pw-new','cloud-pw-new2');
+  },'Password changed. Your other computers stay signed in; new ones need the new password.');
+}
+async function cloudNewRecovery(){
+  let key='';
+  if(await cloudAction('cloud-rec-btn','cloud-rec-msg',async()=>{key=await window.go.main.App.CloudNewRecoveryKey(cloudVal('cloud-rec-password'));cloudClear('cloud-rec-password');},'')){
+    await showRecoveryKey(key);
+    const msg=document.getElementById('cloud-rec-msg');msg.textContent='New recovery key made. The old one no longer works.';msg.className='cloud-msg ok';
+  }
+}
+async function cloudDelete(){
+  if(!confirm('Delete your online account from chriscord.app?\n\nYour account on this computer stays, offline. Other computers you signed in on keep their copy too, but stop syncing.'))return;
+  if(await cloudAction('cloud-del-btn','cloud-del-msg',async()=>{await window.go.main.App.CloudUnlink(cloudVal('cloud-del-password'));cloudClear('cloud-del-password');},'')){
+    toast('Your online account was deleted. This account is offline again.');renderCloudSettings();
+  }
+}
+// Something synced in from another computer.
+async function onCloudSynced(e){
+  if(e?.settings)await loadClientSettings();
+  if(e?.servers)await loadServers();
+  if(e?.profile){
+    await refreshSignedInName();
+    // Reload the profile editor only if nothing's being edited there.
+    if(!document.getElementById('settings-modal').classList.contains('hidden')&&document.getElementById('profile-save-btn').disabled){
+      loadCurrentPfp();loadProfileEditor();
+    }
+  }
 }
 
 // ── URL detection ────────────────────────────────────────────────
@@ -4018,6 +4341,7 @@ function switchSettingsTab(name){
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
   if(name==='about')renderAbout();
   if(name==='system')renderSystemSettings();
+  if(name==='account')renderCloudSettings();
 }
 
 // ── SETTINGS > SYSTEM ────────────────────────────────────────────
@@ -11170,6 +11494,31 @@ function init(){
   document.getElementById('import-account-btn').addEventListener('click',submitImportAccount);
   ['create-username','create-passphrase','create-passphrase-confirm'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')submitCreateAccount();});});
   document.getElementById('import-passphrase').addEventListener('keydown',e=>{if(e.key==='Enter')submitImportAccount();});
+  document.getElementById('tab-online').addEventListener('click',()=>setGateTab('online'));
+  document.getElementById('online-signin-btn').addEventListener('click',submitOnlineSignIn);
+  ['online-username','online-password'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')submitOnlineSignIn();});});
+  document.getElementById('online-recover-link').addEventListener('click',()=>showOnlineView('recover'));
+  document.getElementById('online-signin-link').addEventListener('click',()=>showOnlineView('signin'));
+  document.getElementById('recover-btn').addEventListener('click',submitRecover);
+  ['recover-username','recover-key','recover-password','recover-password-confirm'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')submitRecover();});});
+  document.getElementById('recovery-copy-btn').addEventListener('click',copyRecoveryKey);
+  document.getElementById('recovery-saved').addEventListener('change',e=>{document.getElementById('recovery-done-btn').disabled=!e.target.checked;});
+  document.getElementById('recovery-done-btn').addEventListener('click',closeRecoveryKey);
+  document.getElementById('cloud-link-btn').addEventListener('click',submitCloudLink);
+  document.getElementById('cloud-link-password2').addEventListener('keydown',e=>{if(e.key==='Enter')submitCloudLink();});
+  document.getElementById('cloud-username-btn').addEventListener('click',cloudChangeUsername);
+  document.getElementById('cloud-username').addEventListener('keydown',e=>{if(e.key==='Enter')cloudChangeUsername();});
+  document.getElementById('cloud-email-btn').addEventListener('click',cloudChangeEmail);
+  document.getElementById('cloud-email').addEventListener('keydown',e=>{if(e.key==='Enter')cloudChangeEmail();});
+  document.getElementById('cloud-resend-btn').addEventListener('click',cloudResend);
+  document.getElementById('cloud-pw-btn').addEventListener('click',cloudChangePassword);
+  document.getElementById('cloud-pw-new2').addEventListener('keydown',e=>{if(e.key==='Enter')cloudChangePassword();});
+  document.getElementById('cloud-rec-btn').addEventListener('click',cloudNewRecovery);
+  document.getElementById('cloud-rec-password').addEventListener('keydown',e=>{if(e.key==='Enter')cloudNewRecovery();});
+  document.getElementById('cloud-del-btn').addEventListener('click',cloudDelete);
+  document.getElementById('cloud-forget-btn').addEventListener('click',async()=>{try{await window.go.main.App.CloudForget();}catch{}renderCloudSettings(false);});
+  window.runtime?.EventsOn('cloud:synced',onCloudSynced);
+  window.runtime?.EventsOn('cloud:status',()=>{if(document.getElementById('settings-tab-account').classList.contains('active')&&!document.getElementById('settings-modal').classList.contains('hidden'))renderCloudSettings(false);});
 
   document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
   document.getElementById('msg-input').addEventListener('input',e=>{autoResize(e.target);noteTyping(e.target.value);});

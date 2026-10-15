@@ -18,6 +18,32 @@ export function CaptureEncoders():Promise<Array<main.EncoderChoice>>;
 
 export function CheckForUpdates():Promise<main.UpdateStatus>;
 
+export function CloudChangeEmail(arg1:string):Promise<void>;
+
+export function CloudChangePassword(arg1:string,arg2:string):Promise<void>;
+
+export function CloudChangeUsername(arg1:string):Promise<void>;
+
+export function CloudForget():Promise<void>;
+
+export function CloudLink(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function CloudNewRecoveryKey(arg1:string):Promise<string>;
+
+export function CloudRecover(arg1:string,arg2:string,arg3:string):Promise<main.CloudRecoverResult>;
+
+export function CloudResendVerification():Promise<void>;
+
+export function CloudSignIn(arg1:string,arg2:string):Promise<main.AccountView>;
+
+export function CloudStatus():Promise<main.CloudStatusView>;
+
+export function CloudStatusQuick():Promise<main.CloudStatusView>;
+
+export function CloudSyncNow():Promise<void>;
+
+export function CloudUnlink(arg1:string):Promise<void>;
+
 export function Connect(arg1:string,arg2:string):Promise<void>;
 
 export function ConvertVideoForPlayback(arg1:string,arg2:string):Promise<string>;

@@ -57,12 +57,16 @@ type App struct {
 	e2ee             *callCrypto
 	// text is end-to-end encryption for messages (textcrypt.go).
 	text             *textCrypto
+	// cloud is the optional chriscord.app online account (cloud.go).
+	cloud            *cloudClient
 }
 
 func NewApp() *App {
 	a := &App{}
 	a.e2ee = newCallCrypto(a)
 	a.text = newTextCrypto(a)
+	a.cloud = newCloudClient(a)
+	theCloud = a.cloud
 	return a
 }
 
@@ -166,6 +170,7 @@ func (a *App) ImportAccount(sourcePath, passphrase string) (*AccountView, error)
 	// servers straight back out of the file.
 	a.servers = loadServers()
 	a.mu.Unlock()
+	a.cloud.afterUnlock()
 	view := acct.View()
 	if _, err := os.Stat(filepath.Join(accountsDir(), acct.Slug, clientSettingsFile)); err == nil && bundleHasClientSettings(sourcePath, passphrase) {
 		view.ImportedSettings = true
@@ -181,6 +186,7 @@ func (a *App) UnlockAccount(passphrase string) (*AccountView, error) {
 	acct, err := UnlockActiveAccount(passphrase)
 	if err != nil { return nil, err }
 	a.mu.Lock(); a.account = acct; a.mu.Unlock()
+	a.cloud.afterUnlock()
 	return acct.View(), nil
 }
 
@@ -225,6 +231,7 @@ func (a *App) AutoLogin() *AccountView {
 	a.mu.Lock()
 	a.account = acct
 	a.mu.Unlock()
+	a.cloud.afterUnlock()
 	log.Printf("account: signed in automatically as %s", acct.Slug)
 	return acct.View()
 }
@@ -285,6 +292,7 @@ func (a *App) LogOut() {
 	a.StopScreenShare()
 	a.StopCamera()
 	a.Disconnect()
+	a.cloud.signOut()
 	a.mu.Lock()
 	if a.account != nil {
 		// Logging out also stops this computer keeping you signed in;
@@ -391,7 +399,13 @@ func (a *App) SaveClientSettings(settingsJSON string) error {
 	if slug == "" { return fmt.Errorf("no account unlocked") }
 	if !json.Valid([]byte(settingsJSON)) { return fmt.Errorf("settings aren't valid JSON") }
 	if len(settingsJSON) > 16<<20 { return fmt.Errorf("settings are too large") }
-	return os.WriteFile(filepath.Join(accountsDir(), slug, clientSettingsFile), []byte(settingsJSON), 0600)
+	path := filepath.Join(accountsDir(), slug, clientSettingsFile)
+	if old, err := os.ReadFile(path); err == nil && string(old) == settingsJSON {
+		return nil // unchanged: don't make it look like a newer edit to sync
+	}
+	if err := os.WriteFile(path, []byte(settingsJSON), 0600); err != nil { return err }
+	a.cloud.changed()
+	return nil
 }
 
 // GetClientSettings returns this account's stored settings JSON, or "".
@@ -547,6 +561,7 @@ func (a *App) SaveProfilePicture(dataURL string) error {
 	}
 	a.mu.Unlock()
 	a.sendPfpInfo(updatedAt) // tell the server right away, rather than waiting for the next reconnect
+	a.cloud.changed()
 	return nil
 }
 
@@ -694,6 +709,7 @@ func (a *App) SaveProfile(bio, banner, tint, nickname string) error {
 	}
 	a.mu.Unlock()
 	a.sendProfileInfo(updatedAt)
+	a.cloud.changed()
 	return nil
 }
 
@@ -981,27 +997,39 @@ func (a *App) connect(domain, serverKey, invite string) error {
 	base := normaliseHTTP(domain)
 	pubHex := hex.EncodeToString(a.account.PublicKey)
 
-	// 1. Get a nonce bound to our public key.
-	nonce, err := requestChallenge(base, pubHex)
-	if err != nil { return err }
-
-	// 2. Sign the *raw* nonce bytes (the server hex-decodes before verifying),
-	// not the hex string itself.
-	nonceBytes, err := hex.DecodeString(nonce)
-	if err != nil { return fmt.Errorf("server sent a malformed nonce: %w", err) }
-	signature := ed25519.Sign(a.account.PrivateKey, nonceBytes)
-
-	// 3. Join with the signed nonce.
-	joinBody := map[string]interface{}{
-		"username":   a.account.Username,
-		"public_key": pubHex,
-		"nonce":      nonce,
-		"signature":  hex.EncodeToString(signature),
-	}
-	if serverKey != "" { joinBody["server_key"] = serverKey }
-	if invite != "" { joinBody["invite"] = invite }
+	// A server knows a key by the name it first joined with. After the
+	// username is changed (an online account can rename), servers joined
+	// before keep the old one: the server says which, and we join as that.
+	username := a.account.Username
 	var joinResp JoinResponse
-	if err := postJSON(base+"/api/join", joinBody, &joinResp); err != nil { return err }
+	for attempt := 0; ; attempt++ {
+		// 1. Get a nonce bound to our public key.
+		nonce, err := requestChallenge(base, pubHex)
+		if err != nil { return err }
+
+		// 2. Sign the *raw* nonce bytes (the server hex-decodes before verifying),
+		// not the hex string itself.
+		nonceBytes, err := hex.DecodeString(nonce)
+		if err != nil { return fmt.Errorf("server sent a malformed nonce: %w", err) }
+		signature := ed25519.Sign(a.account.PrivateKey, nonceBytes)
+
+		// 3. Join with the signed nonce.
+		joinBody := map[string]interface{}{
+			"username":   username,
+			"public_key": pubHex,
+			"nonce":      nonce,
+			"signature":  hex.EncodeToString(signature),
+		}
+		if serverKey != "" { joinBody["server_key"] = serverKey }
+		if invite != "" { joinBody["invite"] = invite }
+		err = postJSON(base+"/api/join", joinBody, &joinResp)
+		if err == nil { break }
+		if registered := registeredAs(err.Error()); attempt == 0 && registered != "" && registered != username {
+			username = registered
+			continue
+		}
+		return err
+	}
 
 	a.domain      = domain
 	a.token       = joinResp.Token
