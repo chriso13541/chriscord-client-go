@@ -73,6 +73,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.startUpdateWatcher()
 	go a.placeWindowAtStart()
+	a.startGameWatcher()
 }
 
 // onSecondInstanceLaunch runs when Chriscord is started while it's already
@@ -1005,6 +1006,7 @@ func (a *App) connect(domain, serverKey, invite string) error {
 	a.token       = joinResp.Token
 	a.username    = joinResp.Username
 	a.fingerprint = joinResp.Fingerprint
+	encPresence.Store(joinResp.EncryptedPresence)
 
 	displayName := domain
 	if info, err := a.GetServerInfo(domain); err == nil { displayName = info.Name }
@@ -1017,12 +1019,22 @@ func (a *App) connect(domain, serverKey, invite string) error {
 	})
 	saveServers(a.servers)
 
-	wsURL := httpToWS(base) + "/ws?token=" + a.token + "&status=" + url.QueryEscape(a.currentPresence())
+	// With encrypted statuses the server isn't told yours, not even here.
+	status := a.currentPresence()
+	if joinResp.EncryptedPresence {
+		status = "online"
+	}
+	wsURL := httpToWS(base) + "/ws?token=" + a.token + "&status=" + url.QueryEscape(status)
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil { return fmt.Errorf("websocket failed: %w", err) }
 	watchConnection(conn)
 	a.ws = conn
 	go a.wsReader(conn)
+	if joinResp.EncryptedPresence {
+		a.startPresence() // your status, sealed (presence.go)
+	} else {
+		go a.announceGame() // what you're playing, to this server too
+	}
 	// Message encryption: publish this account's key, share keys others need.
 	// In its own goroutine: it needs a.mu, which connect holds until it returns.
 	go a.text.begin()
@@ -1045,6 +1057,9 @@ type serverMsg struct {
 	// global ones from their profiles (username → nickname, only those set).
 	Nicknames       map[string]string `json:"nicknames"`
 	GlobalNicknames map[string]string `json:"global_nicknames"`
+	Activities      map[string]Activity `json:"activities"` // users: what people are playing
+	PresenceBlobs   map[string]string   `json:"presence_blobs"` // users: everyone's encrypted status (presence.go)
+	Blob            string              `json:"blob"`           // presence: someone's encrypted status
 	DeniedMsg     string              `json:"message"` // on "action_denied": what you weren't allowed to do
 	Banned        bool                `json:"banned"` // on "kicked"
 	Reason        string              `json:"reason"` // on "kicked"
@@ -1091,7 +1106,9 @@ type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
 }
-type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"` }
+type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"`; Activities map[string]Activity `json:"activities"` }
+// Activity is what someone's playing (users messages): the game and since when.
+type Activity struct { Name string `json:"name"`; Since string `json:"since"` }
 type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }
 type typingEvent struct { Username string `json:"username"`; Typing bool `json:"typing"` }
 type voiceStateEvent struct { Channels map[string][]string `json:"channels"`; Reconnecting map[string][]string `json:"reconnecting"`; MuteStates map[string]MuteState `json:"mute_states"`; VideoOn []string `json:"video_on"`; ScreenOn []string `json:"screen_on"`; ScreenWindow map[string]string `json:"screen_window"`; ServerMuted []string `json:"server_muted"`; ServerDeafened []string `json:"server_deafened"` }
@@ -1272,8 +1289,14 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			// imported person claimed): the open channel loads again.
 			a.text.historyChanged(msg.BoardID)
 			runtime.EventsEmit(a.ctx, "chat:history_changed", msg.BoardID)
+		case "presence":
+			a.presenceBlob(msg.Username, msg.Blob)
 		case "users":
-			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner, Nicknames: msg.Nicknames, GlobalNicknames: msg.GlobalNicknames})
+			if encPresence.Load() {
+				a.presenceUsers(msg)
+				break
+			}
+			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner, Nicknames: msg.Nicknames, GlobalNicknames: msg.GlobalNicknames, Activities: msg.Activities})
 		case "voice_removed":
 			// No longer allowed in the voice channel we were in (a role or
 			// channel change): the server has taken us out; hang up here.
@@ -1570,6 +1593,10 @@ func (a *App) SetPresence(status string) error {
 		return fmt.Errorf("unknown status %q", status)
 	}
 	a.presence.Store(status)
+	if encPresence.Load() {
+		a.presenceChanged() // inside the next status blob
+		return nil
+	}
 	a.sendWS(map[string]interface{}{"type": "set_status", "status": status})
 	return nil
 }
@@ -1577,6 +1604,11 @@ func (a *App) SetPresence(status string) error {
 // SendTyping tells the server you started (true) or stopped (false)
 // typing. The server doesn't pass it on while you're invisible.
 func (a *App) SendTyping(typing bool) {
+	// The server can't tell you're invisible any more, so it's up to here
+	// not to give it away.
+	if typing && encPresence.Load() && a.currentPresence() == "invisible" {
+		return
+	}
 	a.sendWS(map[string]interface{}{"type": "typing", "typing": typing})
 }
 

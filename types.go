@@ -43,6 +43,8 @@ type JoinResponse struct {
 	Token       string `json:"token"`
 	Username    string `json:"username"`
 	Fingerprint string `json:"fingerprint"`
+	// The server takes statuses as encrypted blobs (presence.go).
+	EncryptedPresence bool `json:"encrypted_presence"`
 }
 
 // AccountView is what's safe to expose to the frontend for the active

@@ -29,6 +29,7 @@ type windowPrefs struct {
 	MinimizeToTray bool            `json:"minimize_to_tray"`
 	StartMinimized bool            `json:"start_minimized"`
 	Placement      *savedPlacement `json:"placement,omitempty"`
+	ShareGame      *bool           `json:"share_game,omitempty"` // "Playing …" (games.go); unset: on
 }
 
 // savedPlacement: the window's normal (not maximised) rectangle in screen
@@ -140,8 +141,11 @@ func (a *App) hideToTray() {
 // showWindow brings the window back (the tray icon, or starting Chriscord
 // again while it's running).
 func (a *App) showWindow() {
+	// WindowShow brings it back as it was — maximised stays maximised, and
+	// a minimised window is restored to how it was before. (Not
+	// WindowUnminimise as well: that's a plain "restore", which also
+	// un-maximises.)
 	runtime.WindowShow(a.ctx)
-	runtime.WindowUnminimise(a.ctx)
 	if pendingMaximise.Swap(false) {
 		runtime.WindowMaximise(a.ctx)
 	}

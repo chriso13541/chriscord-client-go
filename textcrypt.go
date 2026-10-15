@@ -798,6 +798,10 @@ func (t *textCrypto) retryLocked() {
 		t.mu.Lock()
 		delete(t.locked, b)
 		t.mu.Unlock()
+		if b == presenceKeyID {
+			t.app.presenceKeysArrived() // statuses that couldn't be opened yet
+			continue
+		}
 		if b == cur {
 			_ = t.app.SubscribeBoard(b) // the server sends the history again, now readable
 		}

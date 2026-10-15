@@ -1309,6 +1309,17 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .sr-img.loading { width:120px; height:80px; background:var(--bg-mid); }
 .members-section-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); padding:8px 6px 4px; }
 .member-row { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:4px; }
+/* "Playing …" under the name: the name and it stack beside the avatar. */
+.member-row:has(.member-activity) { display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-rows:auto auto; column-gap:8px; row-gap:0; }
+.member-row:has(.member-activity) > .user-avatar { grid-row:1 / span 2; align-self:center; }
+.member-row:has(.member-activity) > .member-name { grid-column:2; grid-row:1; }
+.member-row:has(.member-activity) > [data-presence-user] { grid-column:3; grid-row:1 / span 2; align-self:center; }
+.member-activity { grid-column:2; grid-row:2; font-size:.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; line-height:1.25; }
+.member-activity b { font-weight:600; color:var(--text); }
+.pc-playing { margin-top:10px; padding:8px 10px; border-radius:8px; background:var(--bg-dark, rgba(0,0,0,.2)); display:flex; align-items:center; gap:10px; }
+.pc-playing .ic { width:22px; height:22px; color:var(--green); flex:none; }
+.pc-playing-name { font-weight:600; color:var(--text-strong, var(--text)); font-size:.88rem; }
+.pc-playing-time { font-size:.75rem; color:var(--text-muted); }
 .member-row:hover { background:var(--bg-light); }
 .member-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .member-dot.online { background:var(--green); }
@@ -1400,6 +1411,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
      fill set so it follows the text colour. -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="ic-audio_file" viewBox="0 -960 960 960"><path d="M430-200q38 0 64-26t26-64v-150h120v-80H480v155q-11-8-23.5-11.5T430-380q-38 0-64 26t-26 64q0 38 26 64t64 26ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ic-sports_esports" viewBox="0 -960 960 960"><path d="M182-200q-51 0-79-35.5T82-322l42-300q9-60 53.5-99T282-760h396q60 0 104.5 39t53.5 99l42 300q7 51-21 86.5T778-200q-21 0-39-7.5T706-230l-90-90H344l-90 90q-14 15-32 22.5t-40 7.5Zm16-86 114-114h336l114 114q2 2 16 6 11 0 17.5-6.5T800-304l-44-308q-4-29-26-48.5T678-680H282q-30 0-52 19.5T204-612l-44 308q-2 11 4.5 17.5T182-280q2 0 16-6Zm482-154q17 0 28.5-11.5T720-480q0-17-11.5-28.5T680-520q-17 0-28.5 11.5T640-480q0 17 11.5 28.5T680-440Zm-80-120q17 0 28.5-11.5T640-600q0-17-11.5-28.5T600-640q-17 0-28.5 11.5T560-600q0 17 11.5 28.5T600-560ZM310-440h60v-70h70v-60h-70v-70h-60v70h-70v60h70v70Zm170-40Z"/></symbol>
   <symbol id="ic-code" viewBox="0 -960 960 960"><path d="M320-240 80-480l240-240 57 57-184 184 183 183-56 56Zm320 0-57-57 184-184-183-183 56-56 240 240-240 240Z"/></symbol>
   <symbol id="ic-draft" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-folder_zip" viewBox="0 -960 960 960"><path d="M640-480v-80h80v80h-80Zm0 80h-80v-80h80v80Zm0 80v-80h80v80h-80ZM447-640l-80-80H160v480h400v-80h80v80h160v-400H640v80h-80v-80H447ZM160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Zm0-80v-480 480Z"/></symbol>
@@ -1984,6 +1996,9 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <label class="settings-label">Window</label>
       <label class="check-row"><input type="checkbox" id="sys-tray"> Minimize to tray</label>
       <p class="settings-hint" style="margin-top:0" id="sys-tray-hint">Closing the window keeps Chriscord running — still in your call, still getting messages — with an icon by the clock. Click it to open Chriscord again; right-click it to quit.</p>
+      <label class="settings-label">Activity</label>
+      <label class="check-row"><input type="checkbox" id="sys-game"> Show what game you’re playing</label>
+      <p class="settings-hint" style="margin-top:0" id="sys-game-hint">Shows “Playing …” by your name while a game is open. Only games count — installed through Steam, Epic, GOG, the Xbox app, EA, Ubisoft, Riot or Battle.net, or a few well-known ones — never your browser or other apps.</p>
     </div>
 
     <div id="settings-tab-about" class="settings-tab-pane">
@@ -3946,6 +3961,16 @@ async function renderSystemSettings(){
   tray.checked=!!w.minimize_to_tray;min.checked=!!w.start_minimized;
   tray.disabled=min.disabled=!w.supported;
   if(!w.supported)document.getElementById('sys-tray-hint').textContent='The tray is only available on Windows for now.';
+  let g={supported:false,enabled:false,current:''};
+  try{g=await window.go.main.App.GetGameActivity();}catch{}
+  const game=document.getElementById('sys-game');
+  game.checked=!!g.enabled;game.disabled=!g.supported;
+  if(!g.supported)document.getElementById('sys-game-hint').textContent='Finding what you\u2019re playing is only available on Windows for now.';
+}
+async function onGameToggle(e){
+  const box=e.currentTarget;
+  try{await window.go.main.App.SetShareGameActivity(box.checked);settingsSaved();}
+  catch(err){box.checked=!box.checked;toast('Couldn\u2019t change that: '+String(err).replace(/^Error: /,''),true);}
 }
 async function onWindowSettingToggle(e){
   const box=e.currentTarget;
@@ -4536,6 +4561,7 @@ function ensureMembersPanelOpen(){
 function renderMembers(payload){
   const online=payload?.online??[],all=payload?.all??[];
   state.onlineUsers=online;state.userStatuses=payload?.statuses||{};
+  state.activities=payload?.activities||{};
   if(payload&&'nicknames' in payload){state.nicknames=payload.nicknames||{};state.globalNicknames=payload.global_nicknames||{};}
   if(payload&&'owner' in payload)state.serverOwner=payload.owner||'';
   const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
@@ -4543,7 +4569,7 @@ function renderMembers(payload){
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${dnHTML(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span><span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${dnHTML(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span>${isOnline&&state.activities?.[name]?.name?`<span class="member-activity" title="Playing ${esc(state.activities[name].name)}">Playing <b>${esc(state.activities[name].name)}</b></span>`:''}<span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
@@ -6284,6 +6310,14 @@ function importedProfileHTML(p){
     ${im.requested?`<div class="pc-claim-sent">${icon('schedule')}You've asked — the server owner will confirm it's you.</div>`
       :`<button class="pc-edit pc-claim" type="button">${icon('verified_user')}This is me</button>`}</div>`;
 }
+// "Playing …" on a profile card, with how long for.
+function playingHTML(user){
+  const a=state.activities?.[user];
+  if(!a?.name||!(state.onlineUsers||[]).includes(user))return '';
+  const mins=Math.max(0,Math.floor((Date.now()-Date.parse(a.since))/60000));
+  const dur=isNaN(mins)?'':mins<1?'Just started':mins<60?`For ${mins} minute${mins===1?'':'s'}`:`For ${Math.floor(mins/60)} hour${Math.floor(mins/60)===1?'':'s'}${mins%60?` ${mins%60} min`:''}`;
+  return `<div class="pc-playing">${icon('sports_esports')}<div><div class="pc-label" style="margin:0">Playing</div><div class="pc-playing-name">${esc(a.name)}</div>${dur?`<div class="pc-playing-time">${dur}</div>`:''}</div></div>`;
+}
 function buildProfileCard(p){
   const shown=p.shownName??displayName(p.username);
   // Your own card, opened in a server: you can set your nickname for it here.
@@ -6298,6 +6332,7 @@ function buildProfileCard(p){
       <div class="pc-name"${p.shownName==null?` data-dn="${esc(p.username)}"`:''}>${esc(shown)}</div>
       ${shown!==p.username?`<div class="pc-username">${esc(p.username)}</div>`:''}
       ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
+      ${playingHTML(p.username)}
       ${p.imported?importedProfileHTML(p):`<div class="pc-section"><div class="pc-label">About Me</div>
         <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>`}
       ${nickEditor?`<div class="pc-section pc-nick"><div class="pc-label">Server Nickname</div>
@@ -10932,6 +10967,7 @@ function init(){
   document.getElementById('sys-startup').addEventListener('change',onStartupToggle);
   document.getElementById('sys-tray').addEventListener('change',onWindowSettingToggle);
   document.getElementById('sys-start-min').addEventListener('change',onWindowSettingToggle);
+  document.getElementById('sys-game').addEventListener('change',onGameToggle);
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
     localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');
