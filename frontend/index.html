@@ -646,6 +646,10 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .msg-audio { width:320px; margin-top:6px; display:block; }
 .msg-file-chip { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:8px 12px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--text); font-size:.85rem; transition:border-color .15s; user-select:text; }
 .msg-file-chip:hover { border-color:var(--accent); }
+.msg-file-chip.missing { cursor:default; border-style:dashed; opacity:.75; }
+.msg-file-chip.missing:hover { border-color:var(--border); }
+.msg-file-chip.missing .fname { font-weight:500; color:var(--text-muted); text-decoration:line-through; }
+.msg-file-chip.missing .miss-label { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); }
 .msg-file-chip .fname { font-weight:600; color:var(--text-strong); }
 /* "Download all N files": under a message's attachments when it has
    several; quieter than a file chip so it doesn't compete with them. */
@@ -5502,14 +5506,14 @@ function buildSearchResultRow(msg){
   const colour=avatarColour(msg.username),initial=msg.username[0].toUpperCase();
   const time=formatTime(msg.created_at),hoverTime=esc(formatHoverTime(msg.created_at));
   const attachments=msg.attachments||[];
-  const images=attachments.filter(a=>a.mime?.startsWith('image/'));
-  const files=attachments.filter(a=>!a.mime?.startsWith('image/'));
+  const images=attachments.filter(a=>!a.missing&&a.mime?.startsWith('image/'));
+  const files=attachments.filter(a=>a.missing||!a.mime?.startsWith('image/'));
   const row=document.createElement('div');row.className='search-result-row';
   row.innerHTML=`
     <div class="sr-head"><div class="sr-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div><span class="sr-user">${dnHTML(msg.username)}</span><span class="sr-channel">#${esc(msg.board_name)}</span><span class="sr-time" title="${hoverTime}">${time}</span></div>
     ${msg.content?`<div class="sr-content">${emojify(esc(msg.content))}</div>`:''}
     ${images.length?`<div class="sr-images${images.length>1?' multi':''}"></div>`:''}
-    ${files.map(a=>`<div class="sr-attach" title="${esc(a.name||'File')}">${icon(fileTypeIcon(a.name,a.mime))}<span>${esc(a.name||'File')}</span></div>`).join('')}`;
+    ${files.map(a=>`<div class="sr-attach" title="${esc(a.name||'File')}${a.missing?' (not found)':''}">${icon(a.missing?'error':fileTypeIcon(a.name,a.mime))}<span>${esc(a.name||'File')}${a.missing?' (not found)':''}</span></div>`).join('')}`;
   // Image previews use the same session image cache as the chat, so a
   // picture that's already on screen isn't downloaded again. Clicking one
   // opens it in the image viewer; clicking anywhere else on the row still
@@ -5583,9 +5587,10 @@ function buildMsgEl(msg,grouped){
 
   const body=div.querySelector('.msg-body');
 
-  // Attachments
-  const images=attachments.filter(a=>a.mime?.startsWith('image/'));
-  const others=attachments.filter(a=>!a.mime?.startsWith('image/'));
+  // Attachments. Imported ones the export didn't have show as "not found".
+  const present=attachments.filter(a=>!a.missing);
+  const images=present.filter(a=>a.mime?.startsWith('image/'));
+  const others=present.filter(a=>!a.mime?.startsWith('image/'));
 
   // Image grid
   if(images.length){
@@ -5617,8 +5622,15 @@ function buildMsgEl(msg,grouped){
     }
   });
 
+  attachments.filter(a=>a.missing).forEach(a=>{
+    const chip=document.createElement('div');chip.className='msg-file-chip missing';
+    chip.title='This attachment wasn\u2019t in the Discord export, so it couldn\u2019t be brought over.';
+    chip.innerHTML=`${icon('error','file-ic')}<span class="fname">${esc(a.name||'File')}</span><span class="miss-label">not found</span>`;
+    body.appendChild(chip);
+  });
+
   // Several files of ours: one button to get them all as a zip.
-  const zippable=attachments.filter(isServerFile);
+  const zippable=present.filter(isServerFile);
   if(zippable.length>=2){
     const zipBtn=document.createElement('button');zipBtn.type='button';zipBtn.className='msg-zip-chip';
     zipBtn.dataset.tip=`Download all ${zippable.length} files as one .zip`;
@@ -9538,7 +9550,7 @@ function messageMenu(msgEl,msg,e){
   const link=e.target.closest('a.msg-link');
   const img=e.target.closest('.grid-img');
   const selection=String(window.getSelection()||'').trim();
-  const attachments=msg.attachments||[];
+  const attachments=(msg.attachments||[]).filter(a=>!a.missing);
   const imgAttach=img?attachments.filter(a=>a.mime?.startsWith('image/'))[[...msgEl.querySelectorAll('.grid-img')].indexOf(img)]:null;
   return [
     selection?{label:'Copy',icon:'content_copy',action:()=>copyText(selection)}:null,

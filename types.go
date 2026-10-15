@@ -88,6 +88,9 @@ type Attachment struct {
 	// Spoiler: shown blurred until clicked. omitempty, so servers from
 	// before spoilers just see an ordinary attachment.
 	Spoiler bool `json:"spoiler,omitempty"`
+	// Missing: set by this app for an imported attachment the export
+	// didn't have (filecrypt.go) — shown as "not found", nothing to load.
+	Missing bool `json:"missing,omitempty"`
 }
 
 type ChatMessage struct {

@@ -69,6 +69,10 @@ type fileMeta struct {
 	Size    int64  `json:"z"` // plaintext bytes
 	Key     string `json:"k"` // base64
 	Spoiler bool   `json:"s,omitempty"`
+	// Missing: an imported attachment the export didn't include
+	// (chriscord-import) — there's no file, just its name, shown as
+	// "not found".
+	Missing bool `json:"x,omitempty"`
 }
 
 type fileEntry struct {
@@ -261,6 +265,11 @@ func (t *textCrypto) showAttachments(msgID string, plain []Attachment, state str
 	}
 	kept := make([]fileMeta, 0, len(files))
 	for _, f := range files {
+		if f.Missing {
+			kept = append(kept, f) // (kept through edits, like the rest)
+			out = append(out, Attachment{Name: f.Name, Mime: f.Mime, Spoiler: f.Spoiler, Missing: true})
+			continue
+		}
 		local, err := t.remember(f)
 		if err != nil {
 			log.Printf("e2ee: an attachment in %s: %v", msgID, err)
@@ -284,6 +293,9 @@ func (t *textCrypto) sealMessage(board, text string, atts []Attachment) (string,
 	var files []fileMeta
 	out := make([]Attachment, 0, len(atts))
 	for _, a := range atts {
+		if a.Missing {
+			continue // a "not found" placeholder: nothing to send
+		}
 		e := t.fileFor(a.URL)
 		if e == nil {
 			if strings.HasPrefix(a.URL, fileLocalPrefix) {

@@ -363,3 +363,19 @@ func TestBrowserDownloadLinks(t *testing.T) {
 		t.Fatal("unknown token accepted")
 	}
 }
+
+// An imported attachment the export didn't have: shown as "not found".
+func TestMissingAttachmentShown(t *testing.T) {
+	a := &App{}
+	a.text = newTextCrypto(a)
+	out := a.text.showAttachments("m1", nil, "ok", []fileMeta{
+		{Name: "photo.png", Mime: "image/png", Missing: true},
+		{URL: "/api/files/x.e2ee", Name: "ok.txt", Mime: "text/plain", Size: 1, Key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+	})
+	if len(out) != 2 || !out[0].Missing || out[0].URL != "" || out[0].Name != "photo.png" || out[1].Missing {
+		t.Fatalf("%+v", out)
+	}
+	if got := len(a.text.msgFiles["m1"]); got != 2 {
+		t.Errorf("kept for edits: %d", got)
+	}
+}

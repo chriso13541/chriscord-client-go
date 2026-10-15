@@ -93,6 +93,7 @@ export namespace main {
 	    name: string;
 	    mime: string;
 	    spoiler?: boolean;
+	    missing?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Attachment(source);
@@ -104,6 +105,7 @@ export namespace main {
 	        this.name = source["name"];
 	        this.mime = source["mime"];
 	        this.spoiler = source["spoiler"];
+	        this.missing = source["missing"];
 	    }
 	}
 	export class Board {
