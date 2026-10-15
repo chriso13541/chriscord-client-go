@@ -81,6 +81,11 @@ func main() {
 			UniqueId:               singleInstanceID,
 			OnSecondInstanceLaunch: app.onSecondInstanceLaunch,
 		},
+		// Hidden until it's been put back where it was last time (on its
+		// monitor, maximised or not — window_windows.go), so it doesn't
+		// flash up on the primary monitor first.
+		StartHidden:   goruntime.GOOS == "windows",
+		OnBeforeClose: app.beforeClose, // minimize to tray (window.go)
 		OnStartup: app.startup,
 		OnShutdown: app.shutdown, // leave any call and close cleanly when the window closes
 		Bind: []interface{}{

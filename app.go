@@ -72,6 +72,7 @@ func (a *App) startup(ctx context.Context) {
 		runtime.LogWarningf(ctx, "portaudio init failed, voice audio won't work: %v", err)
 	}
 	a.startUpdateWatcher()
+	go a.placeWindowAtStart()
 }
 
 // onSecondInstanceLaunch runs when Chriscord is started while it's already
@@ -81,8 +82,7 @@ func (a *App) onSecondInstanceLaunch(options.SecondInstanceData) {
 	if a.ctx == nil {
 		return // still starting up; the window is about to appear anyway
 	}
-	runtime.WindowUnminimise(a.ctx)
-	runtime.WindowShow(a.ctx) // restores it if minimised and brings it to the front
+	a.showWindow() // from the tray, or restored if minimised, and to the front
 	a.updates.onSecondLaunch()
 }
 

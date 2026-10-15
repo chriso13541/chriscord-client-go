@@ -336,6 +336,6 @@ func (a *App) RestartToUpdate() error {
 		return fmt.Errorf("couldn't start the updater: %w", err)
 	}
 	cmd.Process.Release()
-	runtime.Quit(a.ctx) // leaves any call and closes cleanly (see shutdown)
+	a.quitApp() // leaves any call and closes cleanly (see shutdown) — not to the tray
 	return nil
 }

@@ -1979,6 +1979,11 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <label class="settings-label">Startup</label>
       <label class="check-row"><input type="checkbox" id="sys-startup"> Open Chriscord when you sign in to Windows</label>
       <p class="settings-hint" style="margin-top:0" id="sys-startup-hint">It opens through the Chriscord launcher, so it's up to date when it starts. This is the same switch as Chriscord in Task Manager's Startup apps.</p>
+      <label class="check-row"><input type="checkbox" id="sys-start-min"> Start minimized</label>
+      <p class="settings-hint" style="margin-top:0">When Chriscord opens at sign-in, it starts in the tray (or minimized to the taskbar, without Minimize to tray) instead of popping up.</p>
+      <label class="settings-label">Window</label>
+      <label class="check-row"><input type="checkbox" id="sys-tray"> Minimize to tray</label>
+      <p class="settings-hint" style="margin-top:0" id="sys-tray-hint">Closing the window keeps Chriscord running — still in your call, still getting messages — with an icon by the clock. Click it to open Chriscord again; right-click it to quit.</p>
     </div>
 
     <div id="settings-tab-about" class="settings-tab-pane">
@@ -3935,6 +3940,18 @@ async function renderSystemSettings(){
   try{st=await window.go.main.App.GetOpenOnStartup();}catch{}
   box.disabled=!st.supported;box.checked=!!st.enabled;
   if(!st.supported)hint.textContent='Opening at sign-in is only available on Windows for now.';
+  let w={supported:false,minimize_to_tray:false,start_minimized:false};
+  try{w=await window.go.main.App.GetWindowSettings();}catch{}
+  const tray=document.getElementById('sys-tray'),min=document.getElementById('sys-start-min');
+  tray.checked=!!w.minimize_to_tray;min.checked=!!w.start_minimized;
+  tray.disabled=min.disabled=!w.supported;
+  if(!w.supported)document.getElementById('sys-tray-hint').textContent='The tray is only available on Windows for now.';
+}
+async function onWindowSettingToggle(e){
+  const box=e.currentTarget;
+  const tray=document.getElementById('sys-tray'),min=document.getElementById('sys-start-min');
+  try{await window.go.main.App.SetWindowSettings(tray.checked,min.checked);settingsSaved();}
+  catch(err){box.checked=!box.checked;toast('Couldn\u2019t change that: '+String(err).replace(/^Error: /,''),true);}
 }
 async function onStartupToggle(e){
   const box=e.currentTarget,on=box.checked;
@@ -9962,7 +9979,8 @@ async function initTitlebar(){
   };
   document.getElementById('tb-min').addEventListener('click',()=>window.runtime.WindowMinimise());
   max.addEventListener('click',()=>{window.runtime.WindowToggleMaximise();setTimeout(syncMax,150);});
-  document.getElementById('tb-close').addEventListener('click',()=>window.runtime.Quit()); // shuts down cleanly (leaves any call)
+  // To the tray with Minimize to tray on; otherwise shuts down cleanly (leaves any call).
+  document.getElementById('tb-close').addEventListener('click',()=>window.go.main.App.CloseWindow().catch(()=>window.runtime.Quit()));
   // Double-clicking the bar maximises / restores, like a normal window.
   bar.addEventListener('dblclick',e=>{if(!e.target.closest('.tb-controls')){window.runtime.WindowToggleMaximise();setTimeout(syncMax,150);}});
   window.addEventListener('resize',()=>{clearTimeout(syncMax.t);syncMax.t=setTimeout(syncMax,100);});
@@ -10912,6 +10930,8 @@ function init(){
   }
   document.querySelectorAll('.settings-tab').forEach(t=>t.addEventListener('click',()=>switchSettingsTab(t.dataset.tab)));
   document.getElementById('sys-startup').addEventListener('change',onStartupToggle);
+  document.getElementById('sys-tray').addEventListener('change',onWindowSettingToggle);
+  document.getElementById('sys-start-min').addEventListener('change',onWindowSettingToggle);
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
     localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');
