@@ -1322,18 +1322,75 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .pc-playing-name { font-weight:600; color:var(--text-strong, var(--text)); font-size:.88rem; }
 .pc-playing-time { font-size:.75rem; color:var(--text-muted); }
 /* Settings > System > Your games */
-#sys-games-list { display:flex; flex-direction:column; gap:6px; margin:4px 0 8px; }
-.sys-game-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; align-items:center; padding:8px 10px; border-radius:8px; background:var(--bg-darkest); border:1px solid var(--border); }
-.sys-game-row input { width:100%; padding:5px 8px; border-radius:5px; border:1px solid transparent; background:transparent; color:var(--text-strong, var(--text)); font-size:.88rem; font-weight:600; outline:none; }
+#sys-games-list { display:flex; flex-direction:column; gap:6px; margin:6px 0 10px; }
+.sys-game-row { display:grid; grid-template-columns:32px minmax(0,1fr) auto auto; gap:0 10px; align-items:center; padding:8px 10px; border-radius:8px; background:var(--bg-darkest); border:1px solid var(--border); }
+.sys-game-row.hidden-game { opacity:.6; }
+.game-ic { width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center; background:var(--bg-mid); color:var(--text-muted); flex:none; overflow:hidden; }
+.game-ic img { width:32px; height:32px; object-fit:contain; }
+.game-ic .ic { width:20px; height:20px; }
+.sys-game-main { min-width:0; display:flex; flex-direction:column; }
+.sys-game-row input { width:100%; padding:3px 6px; margin-left:-6px; border-radius:5px; border:1px solid transparent; background:transparent; color:var(--text-strong, var(--text)); font-size:.88rem; font-weight:600; outline:none; }
 .sys-game-row input:hover { border-color:var(--border); }
 .sys-game-row input:focus { border-color:var(--accent); background:var(--bg-mid); }
-.sys-game-path { grid-column:1; font-size:.72rem; color:var(--text-muted); padding:0 9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl; text-align:left; }
-.sys-game-row .sys-game-remove { grid-column:2; grid-row:1 / span 2; display:inline-flex; padding:6px; border:none; border-radius:6px; background:transparent; color:var(--text-muted); cursor:pointer; }
-.sys-game-row .sys-game-remove:hover { background:var(--red); color:#fff; }
-.sys-game-row .sys-game-remove .ic { width:18px; height:18px; }
-.sys-games-add { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
-.sys-games-add select { flex:1; min-width:180px; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.86rem; }
-.sys-games-empty { font-size:.82rem; color:var(--text-muted); padding:2px 2px 6px; }
+.sys-game-path { font-size:.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl; text-align:left; }
+.sys-game-row .game-btn { display:inline-flex; padding:6px; border:none; border-radius:6px; background:transparent; color:var(--text-muted); cursor:pointer; }
+.sys-game-row .game-btn:hover { background:var(--bg-light); color:var(--text-strong, var(--text)); }
+.sys-game-row .game-btn.danger:hover { background:var(--red); color:#fff; }
+.sys-game-row .game-btn .ic { width:18px; height:18px; }
+.sys-games-empty { font-size:.82rem; color:var(--text-muted); padding:10px; border:1px dashed var(--border); border-radius:8px; text-align:center; }
+.sys-games-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:14px; }
+.sys-games-head .settings-label { margin:0; }
+.sys-games-head .settings-secondary-btn { display:inline-flex; align-items:center; margin:0; }
+.sys-now { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; background:var(--bg-darkest); border:1px solid var(--border); font-size:.85rem; color:var(--text-muted); margin:4px 0 6px; }
+.sys-now .ic { width:20px; height:20px; color:var(--green); }
+.sys-now b { color:var(--text-strong, var(--text)); }
+.sys-now.idle .ic { color:var(--text-muted); }
+/* Add a game */
+#game-add .modal { width:480px; padding:22px 24px; }
+#game-add h2 { margin:0 0 4px; }
+.ga-search { display:flex; align-items:center; gap:8px; padding:0 10px; margin:12px 0 8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-darkest); }
+.ga-search .ic { width:18px; height:18px; color:var(--text-muted); }
+.ga-search input { flex:1; padding:9px 0; border:none; background:transparent; color:var(--text-strong, var(--text)); font-size:.9rem; outline:none; }
+.ga-list { max-height:min(340px, 50vh); overflow-y:auto; display:flex; flex-direction:column; gap:2px; margin:0 -6px; padding:0 6px; }
+.ga-item { display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; border:none; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer; width:100%; }
+.ga-item:hover, .ga-item:focus-visible { background:var(--bg-light); outline:none; }
+.ga-item .ga-text { min-width:0; flex:1; display:flex; flex-direction:column; }
+.ga-item .ga-name { font-weight:600; font-size:.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ga-item .ga-sub { font-size:.74rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ga-badge { flex:none; font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:2px 6px; border-radius:4px; background:var(--bg-mid); color:var(--text-muted); }
+.ga-badge.found { background:rgba(35,165,90,.18); color:var(--green); }
+.ga-empty { padding:18px 8px; text-align:center; color:var(--text-muted); font-size:.85rem; }
+.ga-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
+.ga-browse { background:none; border:none; color:var(--accent); font:inherit; font-size:.85rem; cursor:pointer; padding:4px 0; }
+.ga-browse:hover { text-decoration:underline; }
+.ga-confirm { display:flex; align-items:center; gap:12px; margin:14px 0 6px; }
+.ga-confirm .game-ic, .ga-confirm .game-ic img { width:44px; height:44px; }
+.ga-confirm .form-group { flex:1; margin:0; }
+.ga-path { font-size:.74rem; color:var(--text-muted); word-break:break-all; margin:2px 0 0; }
+/* Custom status */
+.member-activity .emoji, .pc-custom .emoji, .pc-status-custom .emoji { width:1.15em; height:1.15em; vertical-align:-.2em; margin-right:3px; }
+.pc-custom { margin-top:8px; padding:6px 10px; border-radius:8px; background:rgba(0,0,0,.18); font-size:.86rem; color:var(--text); word-break:break-word; }
+.pc-status-custom { display:flex; align-items:center; gap:8px; width:100%; padding:8px; margin-bottom:4px; border:none; border-bottom:1px solid var(--border); border-radius:6px 6px 0 0; background:none; color:var(--text); font:inherit; font-size:.85rem; text-align:left; cursor:pointer; }
+.pc-status-custom:hover { background:var(--bg-light); }
+.pc-status-custom .cs-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pc-status-custom .cs-text.placeholder { color:var(--text-muted); }
+.pc-status-custom .ic { width:18px; height:18px; color:var(--text-muted); }
+.pc-status-custom .cs-clear { display:inline-flex; padding:2px; border-radius:4px; }
+.pc-status-custom .cs-clear:hover { background:var(--red); }
+.pc-status-custom .cs-clear:hover .ic { color:#fff; }
+#custom-status .modal { width:440px; }
+.cs-row { display:flex; gap:8px; align-items:stretch; }
+.cs-emoji-btn { flex:none; width:42px; border-radius:6px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+.cs-emoji-btn:hover { border-color:var(--accent); }
+.cs-emoji-btn .ic { width:22px; height:22px; }
+.cs-emoji-btn .emoji { width:24px; height:24px; }
+.cs-row input { flex:1; }
+#cs-clear-after { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
+.cs-preview { display:flex; align-items:center; gap:10px; padding:10px; border-radius:8px; background:var(--bg-darkest); margin:4px 0 12px; font-size:.85rem; }
+.cs-preview .cs-pv-text { min-width:0; display:flex; flex-direction:column; }
+.cs-preview .cs-pv-name { font-weight:600; color:var(--text-strong, var(--text)); }
+.cs-preview .cs-pv-status { color:var(--text-muted); font-size:.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cs-preview .cs-pv-status .emoji { width:1.1em; height:1.1em; vertical-align:-.2em; margin-right:3px; }
 .member-row:hover { background:var(--bg-light); }
 .member-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .member-dot.online { background:var(--green); }
@@ -2013,10 +2070,10 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <label class="settings-label">Activity</label>
       <label class="check-row"><input type="checkbox" id="sys-game"> Show what game you’re playing</label>
       <p class="settings-hint" style="margin-top:0" id="sys-game-hint">Shows “Playing …” by your name while a game is open. Only games count — installed through Steam, Epic, GOG, the Xbox app, EA, Ubisoft, Riot or Battle.net, or a few well-known ones — never your browser or other apps.</p>
-      <label class="settings-label">Your games</label>
-      <p class="settings-hint" style="margin-top:0">Add any program as a game — one that isn’t found by itself, or to call it something else. While it’s open, that’s what “Playing …” shows.</p>
+      <div class="sys-now idle" id="sys-now"><svg class="ic" aria-hidden="true"><use href="#ic-sports_esports"/></svg><span>Nothing detected right now.</span></div>
+      <div class="sys-games-head"><label class="settings-label">Your games</label><button class="settings-secondary-btn" type="button" id="sys-games-add"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg>Add a game</button></div>
+      <p class="settings-hint" style="margin:4px 0 0">Add a program that isn’t found by itself, call a game something else, or hide one you’d rather not show (the eye).</p>
       <div id="sys-games-list"></div>
-      <div class="sys-games-add"><select id="sys-games-open"><option value="">Pick a program that’s open…</option></select><button class="settings-secondary-btn" type="button" id="sys-games-browse">Browse…</button></div>
     </div>
 
     <div id="settings-tab-about" class="settings-tab-pane">
@@ -3984,41 +4041,99 @@ async function renderSystemSettings(){
   const game=document.getElementById('sys-game');
   game.checked=!!g.enabled;game.disabled=!g.supported;
   if(!g.supported)document.getElementById('sys-game-hint').textContent='Finding what you\u2019re playing is only available on Windows for now.';
-  document.getElementById('sys-games-open').disabled=document.getElementById('sys-games-browse').disabled=!g.supported;
+  document.getElementById('sys-games-add').disabled=!g.supported;
+  renderNowPlaying(g.supported?g.current:null);
   try{renderCustomGames(await window.go.main.App.GetCustomGames());}catch{}
-  if(g.supported)refreshOpenPrograms();
 }
-// Your games: programs you've added (games.go), each renamable.
+// What's detected right now (Settings > System), kept current.
+function renderNowPlaying(name){
+  const el=document.getElementById('sys-now');if(!el)return;
+  el.classList.toggle('idle',!name);
+  el.innerHTML=icon('sports_esports')+(name===null?'<span>Finding games is only available on Windows for now.</span>'
+    :name?`<span>Playing <b>${esc(name)}</b> right now</span>`:'<span>No game detected right now.</span>');
+}
+// Your games (games.go): each with its icon, a name you can change, an eye
+// to hide it (never shown as what you're playing), and remove.
+const gameIconHTML=src=>`<span class="game-ic">${src?`<img src="${esc(src)}" alt="">`:icon('sports_esports')}</span>`;
 function renderCustomGames(list){
   const box=document.getElementById('sys-games-list');
   if(!box)return;
-  if(!list?.length){box.innerHTML='<div class="sys-games-empty">None added yet.</div>';return;}
-  box.innerHTML=list.map(g=>`<div class="sys-game-row" data-path="${esc(g.path)}"><input type="text" maxlength="128" value="${esc(g.name)}" spellcheck="false" title="What \u201cPlaying \u2026\u201d shows"><button type="button" class="sys-game-remove" title="Remove">${icon('close')}</button><div class="sys-game-path" title="${esc(g.path)}">\u200e${esc(g.path)}</div></div>`).join('');
+  if(!list?.length){box.innerHTML='<div class="sys-games-empty">No games added. Most are found by themselves — add one here if it isn’t.</div>';return;}
+  box.innerHTML=list.map(g=>`<div class="sys-game-row${g.hidden?' hidden-game':''}" data-path="${esc(g.path)}">${gameIconHTML(g.icon)}
+    <div class="sys-game-main"><input type="text" maxlength="128" value="${esc(g.name)}" spellcheck="false" aria-label="Name"><div class="sys-game-path" title="${esc(g.path)}">‎${esc(g.path)}</div></div>
+    <button type="button" class="game-btn game-hide" title="${g.hidden?'Hidden — never shown as what you’re playing. Click to show it.':'Shown while it’s open. Click to hide it.'}">${icon(g.hidden?'visibility_off':'visibility')}</button>
+    <button type="button" class="game-btn danger game-remove" title="Remove">${icon('close')}</button></div>`).join('');
   box.querySelectorAll('.sys-game-row').forEach(row=>{
     const path=row.dataset.path,input=row.querySelector('input');
-    const save=async()=>{
-      const name=input.value.trim();
-      try{renderCustomGames(await window.go.main.App.AddCustomGame(path,name));settingsSaved();}
-      catch(err){toast('Couldn\u2019t rename it: '+err,true);}
-    };
-    input.addEventListener('change',save);
+    input.addEventListener('change',async()=>{
+      try{renderCustomGames(await window.go.main.App.AddCustomGame(path,input.value.trim()));settingsSaved();}
+      catch(err){toast('Couldn’t rename it: '+err,true);}
+    });
     input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur();}});
-    row.querySelector('.sys-game-remove').addEventListener('click',async()=>{
+    row.querySelector('.game-hide').addEventListener('click',async()=>{
+      try{renderCustomGames(await window.go.main.App.SetCustomGameHidden(path,!row.classList.contains('hidden-game')));settingsSaved();}
+      catch(err){toast('Couldn’t change that: '+err,true);}
+    });
+    row.querySelector('.game-remove').addEventListener('click',async()=>{
       try{renderCustomGames(await window.go.main.App.RemoveCustomGame(path));settingsSaved();}
-      catch(err){toast('Couldn\u2019t remove it: '+err,true);}
+      catch(err){toast('Couldn’t remove it: '+err,true);}
     });
   });
 }
-async function refreshOpenPrograms(){
-  const sel=document.getElementById('sys-games-open');
-  if(!sel)return;
-  let ps=[];try{ps=await window.go.main.App.OpenPrograms()||[];}catch{}
-  sel.innerHTML='<option value="">Pick a program that\u2019s open\u2026</option>'+ps.map(p=>`<option value="${esc(p.path)}" data-name="${esc(p.name)}" title="${esc(p.path)}">${esc(p.name)}${p.title&&p.title!==p.name?` \u2014 ${esc(p.title.slice(0,60))}`:''}</option>`).join('');
-}
-async function addCustomGame(path,name){
-  if(!path)return;
-  try{renderCustomGames(await window.go.main.App.AddCustomGame(path,name||''));settingsSaved();}
-  catch(err){toast('Couldn\u2019t add it: '+err,true);}
+// Add a game: pick from what's open (searchable, with icons, and what each
+// is already found as), or browse for a program; then confirm its name.
+async function openAddGame(){
+  document.getElementById('game-add')?.remove();
+  const ov=document.createElement('div');ov.className='modal-overlay';ov.id='game-add';
+  ov.innerHTML=`<div class="modal"><h2>Add a game</h2><p class="settings-hint" style="margin:0">Choose one that’s open now — start the game first if it isn’t.</p>
+    <div class="ga-step1"><label class="ga-search">${icon('search')}<input type="text" placeholder="Search open programs" spellcheck="false"></label>
+      <div class="ga-list"><div class="ga-empty">Looking…</div></div>
+      <div class="ga-foot"><button type="button" class="ga-browse">Not open? Browse for it…</button><button class="btn btn-ghost ga-cancel" type="button">Cancel</button></div></div>
+    <div class="ga-step2 hidden"><div class="ga-confirm"><span class="ga-ic"></span><div class="form-group"><label>Show it as</label><input type="text" maxlength="128" class="ga-name" spellcheck="false"></div></div>
+      <p class="ga-path"></p>
+      <div class="modal-actions"><button class="btn btn-ghost ga-back" type="button">Back</button><button class="btn btn-primary ga-add" type="button">Add game</button></div></div></div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+  ov.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();close();}});
+  ov.querySelector('.ga-cancel').onclick=close;
+  const search=ov.querySelector('.ga-search input'),listEl=ov.querySelector('.ga-list');
+  let added=new Set();
+  try{added=new Set((await window.go.main.App.GetCustomGames()||[]).map(g=>g.path.toLowerCase()));}catch{}
+  let progs=[];
+  const draw=()=>{
+    const q=search.value.trim().toLowerCase();
+    const shown=progs.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.title||'').toLowerCase().includes(q)||p.path.toLowerCase().includes(q));
+    if(!shown.length){listEl.innerHTML=`<div class="ga-empty">${progs.length?'Nothing open matches.':'No programs with a window open.'}</div>`;return;}
+    listEl.innerHTML=shown.map((p,i)=>{
+      const badge=added.has(p.path.toLowerCase())?'<span class="ga-badge">Added</span>':p.detected?`<span class="ga-badge found" title="Already shown as ${esc(p.detected)} without adding it">Found</span>`:'';
+      return `<button type="button" class="ga-item" data-i="${progs.indexOf(p)}">${gameIconHTML(p.icon)}<span class="ga-text"><span class="ga-name">${esc(p.name)}</span><span class="ga-sub">${esc(p.detected?`Shown as ${p.detected}`:(p.title&&p.title!==p.name?p.title:p.path))}</span></span>${badge}</button>`;
+    }).join('');
+    listEl.querySelectorAll('.ga-item').forEach(b=>b.addEventListener('click',()=>{const p=progs[+b.dataset.i];confirm_(p.path,p.detected||p.name,p.icon);}));
+  };
+  const confirm_=(path,name,iconSrc)=>{
+    ov.querySelector('.ga-step1').classList.add('hidden');ov.querySelector('.ga-step2').classList.remove('hidden');
+    ov.querySelector('.ga-ic').innerHTML=gameIconHTML(iconSrc);
+    ov.querySelector('.ga-path').textContent=path;
+    const n=ov.querySelector('.ga-name');n.value=name||'';n.focus();n.select();
+    const go=async()=>{
+      try{renderCustomGames(await window.go.main.App.AddCustomGame(path,n.value.trim()));settingsSaved();close();toast(`Added ${n.value.trim()||'it'}.`);}
+      catch(err){toast('Couldn’t add it: '+err,true);}
+    };
+    ov.querySelector('.ga-add').onclick=go;
+    n.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go();}};
+  };
+  ov.querySelector('.ga-back').onclick=()=>{ov.querySelector('.ga-step2').classList.add('hidden');ov.querySelector('.ga-step1').classList.remove('hidden');search.focus();};
+  ov.querySelector('.ga-browse').onclick=async()=>{
+    let path='';try{path=await window.go.main.App.PickGameProgram();}catch{}
+    if(!path)return;
+    const base=path.split(/[\\/]/).pop().replace(/\.exe$/i,'');
+    confirm_(path,base,'');
+  };
+  search.addEventListener('input',draw);
+  search.focus();
+  try{progs=await window.go.main.App.OpenPrograms()||[];}catch{}
+  if(ov.isConnected)draw();
 }
 async function onGameToggle(e){
   const box=e.currentTarget;
@@ -4615,6 +4730,7 @@ function renderMembers(payload){
   const online=payload?.online??[],all=payload?.all??[];
   state.onlineUsers=online;state.userStatuses=payload?.statuses||{};
   state.activities=payload?.activities||{};
+  state.customStatuses=payload?.custom||{};
   if(payload&&'nicknames' in payload){state.nicknames=payload.nicknames||{};state.globalNicknames=payload.global_nicknames||{};}
   if(payload&&'owner' in payload)state.serverOwner=payload.owner||'';
   const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
@@ -4622,7 +4738,7 @@ function renderMembers(payload){
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${dnHTML(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span>${isOnline&&state.activities?.[name]?.name?`<span class="member-activity" title="Playing ${esc(state.activities[name].name)}">Playing <b>${esc(state.activities[name].name)}</b></span>`:''}<span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${dnHTML(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span>${isOnline?memberActivityHTML(name):''}<span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
@@ -6363,6 +6479,19 @@ function importedProfileHTML(p){
     ${im.requested?`<div class="pc-claim-sent">${icon('schedule')}You've asked — the server owner will confirm it's you.</div>`
       :`<button class="pc-edit pc-claim" type="button">${icon('verified_user')}This is me</button>`}</div>`;
 }
+// The line under a name in the member list: their custom status, else
+// what they're playing.
+function customStatusHTML(cs){
+  if(!cs||(!cs.text&&!cs.emoji))return '';
+  return (cs.emoji?reactionEmojiHTML(cs.emoji):'')+esc(cs.text||'');
+}
+function memberActivityHTML(user){
+  const cs=state.customStatuses?.[user];
+  if(cs&&(cs.text||cs.emoji))return `<span class="member-activity" title="${esc((cs.emoji?cs.emoji+' ':'')+(cs.text||''))}">${customStatusHTML(cs)}</span>`;
+  const a=state.activities?.[user];
+  if(a?.name)return `<span class="member-activity" title="Playing ${esc(a.name)}">Playing <b>${esc(a.name)}</b></span>`;
+  return '';
+}
 // "Playing …" on a profile card, with how long for.
 function playingHTML(user){
   const a=state.activities?.[user];
@@ -6385,6 +6514,7 @@ function buildProfileCard(p){
       <div class="pc-name"${p.shownName==null?` data-dn="${esc(p.username)}"`:''}>${esc(shown)}</div>
       ${shown!==p.username?`<div class="pc-username">${esc(p.username)}</div>`:''}
       ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
+      ${(state.onlineUsers||[]).includes(p.username)&&state.customStatuses?.[p.username]&&(state.customStatuses[p.username].text||state.customStatuses[p.username].emoji)?`<div class="pc-custom">${customStatusHTML(state.customStatuses[p.username])}</div>`:''}
       ${playingHTML(p.username)}
       ${p.imported?importedProfileHTML(p):`<div class="pc-section"><div class="pc-label">About Me</div>
         <div class="pc-bio${p.bio?'':' empty'}">${p.bio?renderTextWithLinks(p.bio):(p.own?'You haven\'t written a bio yet.':'No bio yet.')}</div></div>`}
@@ -7089,6 +7219,12 @@ function pickEmoji(hex,keepOpen){
   // What a pick inserts / reacts with: the character, or for a custom
   // emoji ":name:" in the box (made a token on send) and "c:<id>" as a reaction.
   const text=c?`:${c.name}:`:e[1],reaction=c?`c:${c.id}`:e[1];
+  if(emojiPickerTarget.type==='callback'){
+    emojiPickerTarget.onPick?.(c?null:e[1],c);
+    if(!c)noteRecentEmoji(hex);
+    closeEmojiPicker();
+    return;
+  }
   if(emojiPickerTarget.type==='reaction'){
     toggleReaction(emojiPickerTarget.msg,reaction,true);
     noteRecentEmoji(hex);
@@ -7113,6 +7249,11 @@ function openEmojiPicker(target={type:'input'}){
   const p=document.getElementById('emoji-picker');
   if(!emojiPickerBuilt)buildEmojiPicker();
   emojiPickerTarget=target;
+  // Picking for a dialog (custom status): over the dialog, so out of the
+  // message box's area and on top. Back home for the message box.
+  const home=p._home||(p._home=p.parentElement);
+  if(target.type==='callback'){if(p.parentElement!==document.body)document.body.appendChild(p);p.style.zIndex='460';}
+  else{if(p.parentElement!==home)home.appendChild(p);p.style.zIndex='';}
   positionEmojiPicker(p,target);
   const search=p.querySelector('.ep-search');search.value='';
   p.renderAll();                                   // refresh Frequently Used
@@ -7126,7 +7267,7 @@ function openEmojiPicker(target={type:'input'}){
 // beside the button that opened it, kept fully on-screen (in screen px,
 // converted for Ctrl +/- zoom like the other popups).
 function positionEmojiPicker(p,target){
-  if(target.type!=='reaction'||!target.anchor){
+  if(target.type==='input'||!target.anchor){
     p.style.position='';p.style.left='';p.style.top='';p.style.right='';p.style.bottom='';p.style.marginBottom='';
     return;
   }
@@ -9167,6 +9308,9 @@ function refreshPresenceBadges(){
   if(state.username)document.querySelectorAll('[data-presence-user-self]').forEach(el=>{el.innerHTML=presenceBadge(userPresence(state.username));});
 }
 function renderStatusMenu(menu){
+  const cs=myCustomStatus;
+  const has=cs&&(cs.text||cs.emoji);
+  const csBtn=`<button type="button" class="pc-status-custom">${has&&cs.emoji?reactionEmojiHTML(cs.emoji):icon('mood')}<span class="cs-text${has?'':' placeholder'}">${has?esc(cs.text||''):'Set a custom status'}</span>${has?`<span class="cs-clear" title="Clear custom status">${icon('close')}</span>`:''}</button>`;
   const opts=[['online','Online',''],['idle','Away','Until you set Online again'],['invisible','Invisible','Shown as offline to everyone']];
   menu.innerHTML=opts.map(([v,label,sub])=>`<button type="button" class="pc-status-opt" data-status="${v}">${presenceBadge(v)}
     <span class="opt-text"><span>${label}</span>${sub?`<span class="opt-sub">${sub}</span>`:''}</span>
@@ -9174,6 +9318,75 @@ function renderStatusMenu(menu){
   menu.querySelectorAll('.pc-status-opt').forEach(b=>b.addEventListener('click',e=>{
     e.stopPropagation();setPresencePref(b.dataset.status);renderStatusMenu(menu);
   }));
+  menu.insertAdjacentHTML('afterbegin',csBtn);
+  const cb=menu.querySelector('.pc-status-custom');
+  cb.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(e.target.closest('.cs-clear')){setMyCustomStatus('','','').then(()=>renderStatusMenu(menu));return;}
+    closeProfilePopup();openCustomStatusDialog();
+  });
+}
+// ── CUSTOM STATUS ────────────────────────────────────────────────
+// A line of your own (and an emoji) by your name, cleared when you like.
+// It goes inside your encrypted status (customstatus.go, presence.go).
+let myCustomStatus=null;
+async function loadMyCustomStatus(){try{myCustomStatus=await window.go.main.App.GetCustomStatus();}catch{myCustomStatus=null;}}
+async function setMyCustomStatus(text,emoji,expires){
+  try{myCustomStatus=await window.go.main.App.SetCustomStatus(text,emoji,expires);}
+  catch(err){toast('Couldn\u2019t set your status: '+err,true);}
+}
+const CS_CLEAR=[['','Don\u2019t clear'],['30','30 minutes'],['60','1 hour'],['240','4 hours'],['today','Today'],['week','This week']];
+function csExpiry(v){
+  if(!v)return '';
+  const d=new Date();
+  if(v==='today'){d.setHours(23,59,59,0);}
+  else if(v==='week'){d.setDate(d.getDate()+(7-d.getDay())%7);d.setHours(23,59,59,0);}
+  else d.setTime(d.getTime()+(+v)*60000);
+  return d.toISOString().replace(/\.\d{3}Z$/,'Z');
+}
+async function openCustomStatusDialog(){
+  document.getElementById('custom-status')?.remove();
+  await loadMyCustomStatus();
+  let supported=true;try{supported=await window.go.main.App.CustomStatusSupported();}catch{}
+  const cur=myCustomStatus||{text:'',emoji:''};
+  let emoji=cur.emoji||'';
+  const ov=document.createElement('div');ov.className='modal-overlay';ov.id='custom-status';
+  ov.innerHTML=`<div class="modal"><h2>Set a custom status</h2>
+    <div class="cs-preview"><div class="user-avatar" data-pfp-user="${esc(state.username)}" style="width:32px;height:32px"></div><div class="cs-pv-text"><span class="cs-pv-name">${esc(displayName(state.username))}</span><span class="cs-pv-status"></span></div></div>
+    <div class="form-group"><label>What\u2019s up?</label><div class="cs-row"><button type="button" class="cs-emoji-btn" title="Choose an emoji"></button><input type="text" maxlength="128" id="cs-text" placeholder="Support has arrived!" spellcheck="true"></div></div>
+    <div class="form-group"><label>Clear after</label><select id="cs-clear-after">${CS_CLEAR.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>
+    ${supported?'':'<p class="settings-hint" style="margin:-4px 0 10px">This server is on an older version, so it won\u2019t be shown here \u2014 only on servers that encrypt statuses.</p>'}
+    <p class="settings-hint" style="margin:-4px 0 12px">Encrypted like the rest of your status: the server can\u2019t read it.</p>
+    <div class="modal-actions">${cur.text||cur.emoji?'<button class="btn btn-ghost cs-remove" type="button" style="margin-right:auto">Clear status</button>':''}<button class="btn btn-ghost cs-cancel" type="button">Cancel</button><button class="btn btn-primary cs-save" type="button">Save</button></div></div>`;
+  document.body.appendChild(ov);
+  const av=ov.querySelector('.user-avatar');setAvatarFallback(av,state.username);applyUserAvatar(av,state.username);
+  const text=ov.querySelector('#cs-text'),btn=ov.querySelector('.cs-emoji-btn'),pv=ov.querySelector('.cs-pv-status');
+  text.value=cur.text||'';
+  const draw=()=>{
+    btn.innerHTML=emoji?reactionEmojiHTML(emoji):icon('add_reaction');
+    pv.innerHTML=customStatusHTML({text:text.value.trim(),emoji})||'<span style="opacity:.6">No status</span>';
+  };
+  draw();
+  text.addEventListener('input',draw);
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    openEmojiPicker({type:'callback',anchor:btn,onPick:(ch,custom)=>{
+      if(custom){toast('Server emoji can\u2019t go in a status (it\u2019s shown on all your servers) \u2014 pick a standard one.',true);return;}
+      emoji=ch;draw();text.focus();
+    }});
+  });
+  btn.addEventListener('contextmenu',e=>{e.preventDefault();emoji='';draw();}); // right-click: no emoji
+  const close=()=>{closeEmojiPicker();ov.remove();};
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+  ov.querySelector('.cs-cancel').onclick=close;
+  ov.querySelector('.cs-remove')?.addEventListener('click',async()=>{await setMyCustomStatus('','','');close();});
+  const save=async()=>{
+    await setMyCustomStatus(text.value.trim(),emoji,csExpiry(ov.querySelector('#cs-clear-after').value));
+    close();
+  };
+  ov.querySelector('.cs-save').onclick=save;
+  text.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save();}else if(e.key==='Escape'){e.stopPropagation();close();}});
+  text.focus();text.select();
 }
 // Activity tracking for automatic away.
 function noteActivity(){
@@ -11031,17 +11244,10 @@ function init(){
   document.getElementById('sys-tray').addEventListener('change',onWindowSettingToggle);
   document.getElementById('sys-start-min').addEventListener('change',onWindowSettingToggle);
   document.getElementById('sys-game').addEventListener('change',onGameToggle);
-  const openSel=document.getElementById('sys-games-open');
-  openSel.addEventListener('mouseenter',refreshOpenPrograms); // what's open now, before it's opened
-  openSel.addEventListener('change',async()=>{
-    const opt=openSel.selectedOptions[0];
-    if(opt?.value)await addCustomGame(opt.value,opt.dataset.name);
-    openSel.value='';
-  });
-  document.getElementById('sys-games-browse').addEventListener('click',async()=>{
-    let path='';try{path=await window.go.main.App.PickGameProgram();}catch{}
-    if(path)addCustomGame(path,'');
-  });
+  document.getElementById('sys-games-add').addEventListener('click',openAddGame);
+  window.runtime.EventsOn('game:changed',name=>renderNowPlaying(name||''));
+  loadMyCustomStatus();
+  window.runtime.EventsOn('customstatus:changed',()=>{myCustomStatus=null;});
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
     localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');

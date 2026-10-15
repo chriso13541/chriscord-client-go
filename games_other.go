@@ -19,3 +19,5 @@ func programName(path string) string {
 	base := filepath.Base(path)
 	return strings.TrimSuffix(base, filepath.Ext(base))
 }
+
+func programIcon(string) string { return "" }

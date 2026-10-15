@@ -124,41 +124,71 @@ func (a *App) announceGame() {
 
 // CustomGame is a program you've added, and what to call it.
 type CustomGame struct {
-	Path string `json:"path"`
-	Name string `json:"name"`
+	Path   string `json:"path"`
+	Name   string `json:"name"`
+	Hidden bool   `json:"hidden,omitempty"` // never shown as what you're playing
+	Icon   string `json:"icon,omitempty"`   // (for the page; not saved)
 }
 
 // RunningProgram is a program with a window open (to pick one to add).
 type RunningProgram struct {
-	Path  string `json:"path"`
-	Name  string `json:"name"`
-	Title string `json:"title"` // its window's title
+	Path     string `json:"path"`
+	Name     string `json:"name"`
+	Title    string `json:"title"`    // its window's title
+	Detected string `json:"detected"` // the game it's found as on its own ("" if none)
+	Icon     string `json:"icon"`     // its icon, a PNG data URL ("" if none)
 }
 
-// customGameNames: lowercase path → name, for detectGame.
+// customGameNames: lowercase path → name ("" for one you've hidden), for
+// detectGame.
 func customGameNames() map[string]string {
 	out := map[string]string{}
 	for _, g := range loadWindowPrefs().CustomGames {
-		out[strings.ToLower(g.Path)] = g.Name
+		if g.Hidden {
+			out[strings.ToLower(g.Path)] = ""
+		} else {
+			out[strings.ToLower(g.Path)] = g.Name
+		}
 	}
 	return out
 }
 
 func (a *App) GetCustomGames() []CustomGame {
 	gs := loadWindowPrefs().CustomGames
-	if gs == nil {
-		gs = []CustomGame{}
+	out := make([]CustomGame, 0, len(gs))
+	for _, g := range gs {
+		g.Icon = programIcon(g.Path)
+		out = append(out, g)
 	}
-	return gs
+	return out
 }
 
-// OpenPrograms lists the programs with a window open, to add one.
+// OpenPrograms lists the programs with a window open, to add one: each
+// with its icon and, if it's a game found on its own, as what.
 func (a *App) OpenPrograms() []RunningProgram {
 	ps := openPrograms()
 	if ps == nil {
 		ps = []RunningProgram{}
 	}
+	for i := range ps {
+		ps[i].Detected = identifyGame(ps[i].Path, ps[i].Title)
+		ps[i].Icon = programIcon(ps[i].Path)
+	}
 	return ps
+}
+
+// SetCustomGameHidden: hidden ones are never shown as what you're playing
+// (a detected game you'd rather keep to yourself, say).
+func (a *App) SetCustomGameHidden(path string, hidden bool) ([]CustomGame, error) {
+	err := updateWindowPrefs(func(p *windowPrefs) {
+		for i, g := range p.CustomGames {
+			if strings.EqualFold(g.Path, path) {
+				p.CustomGames[i].Hidden = hidden
+			}
+		}
+	})
+	go a.checkGame()
+	return a.GetCustomGames(), err
 }
 
 // PickGameProgram asks for a program file to add.
@@ -200,6 +230,7 @@ func (a *App) AddCustomGame(path, name string) ([]CustomGame, error) {
 		for i, g := range p.CustomGames {
 			if strings.EqualFold(g.Path, path) {
 				p.CustomGames[i].Name = name
+				p.CustomGames[i].Icon = ""
 				return
 			}
 		}

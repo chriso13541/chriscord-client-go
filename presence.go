@@ -31,9 +31,12 @@ import (
 )
 
 const (
-	presenceKeyID    = "@presence"
-	presenceEvery    = 60 * time.Second
-	presencePadTo    = 384             // every status is this long (bytes of JSON) before sealing
+	presenceKeyID = "@presence"
+	presenceEvery = 60 * time.Second
+	// Every status is padded to this many bytes before sealing (the whole
+	// sealed message, name and all), so they're all the same size whatever's
+	// in them. Room for the longest: a 128-character game and custom status.
+	presencePadTo    = 1800
 	presenceNewGrace = 3 * time.Second // someone just connected: their status should arrive by then
 	// How long a fetched status key is used before checking with the server
 	// again (whether someone's left and it needs replacing).
@@ -48,10 +51,12 @@ type presencePlain struct {
 	S string `json:"s"`           // "online" | "idle" | "invisible"
 	G string `json:"g,omitempty"` // game
 	T string `json:"t,omitempty"` // playing since (RFC 3339)
+	C string `json:"c,omitempty"` // custom status text
+	E string `json:"e,omitempty"` // custom status emoji
 	P string `json:"p"`           // padding
 }
 
-type peerPresence struct{ status, game, since string }
+type peerPresence struct{ status, game, since, custom, emoji string }
 
 var presenceState struct {
 	mu        sync.Mutex
@@ -140,10 +145,19 @@ func (a *App) publishPresence() {
 		p.T = gameState.since.UTC().Format(time.RFC3339)
 	}
 	gameState.mu.Unlock()
-	data, _ := json.Marshal(p)
-	if n := presencePadTo - len(data); n > 0 {
-		p.P = strings.Repeat(" ", n)
-		data, _ = json.Marshal(p)
+	if cs := a.activeCustomStatus(); cs != nil {
+		p.C, p.E = cs.Text, cs.Emoji
+	}
+	data := presenceJSON(p)
+	// Pad so the sealed message is always presencePadTo bytes: measured
+	// as it'll be sealed (inside the message with your name), since that's
+	// what the server sees the size of.
+	if id, ok := a.text.identity(); ok {
+		outer, _ := json.Marshal(textPlain{U: id.me, T: string(data)})
+		if n := presencePadTo - len(outer); n > 0 {
+			p.P = strings.Repeat(" ", n)
+			data = presenceJSON(p)
+		}
 	}
 	// The key as fetched in the last few minutes, if there is one — a fresh
 	// look at the server each minute (who's a member, does it need a new
@@ -159,6 +173,16 @@ func (a *App) publishPresence() {
 		return // no key yet / not connected: the next one tries again
 	}
 	a.sendWS(map[string]interface{}{"type": "presence", "blob": blob})
+}
+
+// presenceJSON: the status as JSON, without HTML escaping (so "<" stays one
+// byte and the size is predictable).
+func presenceJSON(p presencePlain) []byte {
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	enc.Encode(p)
+	return []byte(strings.TrimRight(b.String(), "\n"))
 }
 
 // presenceUsers handles a "users" message on a server with encrypted
@@ -221,13 +245,10 @@ func (a *App) openPresence(user, blob string) bool {
 	default:
 		p.S = "online"
 	}
-	game := []rune(strings.TrimSpace(p.G))
-	if len(game) > 128 {
-		game = game[:128]
-	}
 	presenceState.mu.Lock()
 	if presenceState.peers != nil {
-		presenceState.peers[user] = peerPresence{status: p.S, game: string(game), since: p.T}
+		presenceState.peers[user] = peerPresence{status: p.S, game: cleanGameName(p.G), since: p.T,
+			custom: cleanGameName(p.C), emoji: cleanEmoji(p.E)}
 	}
 	presenceState.mu.Unlock()
 	return true
@@ -267,7 +288,7 @@ func (a *App) emitUsers() {
 		return
 	}
 	ev := usersEvent{All: m.All, Owner: m.Owner, Nicknames: m.Nicknames, GlobalNicknames: m.GlobalNicknames,
-		Statuses: map[string]string{}, Activities: map[string]Activity{}}
+		Statuses: map[string]string{}, Activities: map[string]Activity{}, Custom: map[string]CustomStatusView{}}
 	waiting := false
 	for _, u := range m.Online {
 		p, known := presenceState.peers[u]
@@ -293,6 +314,9 @@ func (a *App) emitUsers() {
 		ev.Statuses[u] = p.status
 		if p.game != "" {
 			ev.Activities[u] = Activity{Name: p.game, Since: p.since}
+		}
+		if p.custom != "" || p.emoji != "" {
+			ev.Custom[u] = CustomStatusView{Text: p.custom, Emoji: p.emoji}
 		}
 	}
 	presenceState.mu.Unlock()

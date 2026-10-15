@@ -1106,7 +1106,7 @@ type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
 }
-type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"`; Activities map[string]Activity `json:"activities"` }
+type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"`; Activities map[string]Activity `json:"activities"`; Custom map[string]CustomStatusView `json:"custom"` }
 // Activity is what someone's playing (users messages): the game and since when.
 type Activity struct { Name string `json:"name"`; Since string `json:"since"` }
 type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }

@@ -31,6 +31,7 @@ type windowPrefs struct {
 	Placement      *savedPlacement `json:"placement,omitempty"`
 	ShareGame      *bool           `json:"share_game,omitempty"` // "Playing …" (games.go); unset: on
 	CustomGames    []CustomGame    `json:"custom_games,omitempty"` // programs you've added yourself (games.go)
+	CustomStatus   *CustomStatus   `json:"custom_status,omitempty"` // customstatus.go
 }
 
 // savedPlacement: the window's normal (not maximised) rectangle in screen

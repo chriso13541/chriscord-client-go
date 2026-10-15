@@ -88,7 +88,7 @@ func detectGame(current string) string {
 		g, mine := custom[strings.ToLower(path)]
 		if !mine {
 			g = identifyGame(path, title)
-		}
+		} // (one you've hidden is "", so it's skipped)
 		if g == "" {
 			continue
 		}
