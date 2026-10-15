@@ -11,7 +11,11 @@ import (
 
 const gameDetectionSupported = false
 
-func detectGame(string) string { return "" }
+func detectGame(string) (string, uint32) { return "", 0 }
+
+func startForegroundWatch(func()) bool { return false }
+func processAlive(uint32) bool         { return false }
+func watchGameExit(uint32, func())     {}
 
 func openPrograms() []RunningProgram { return nil }
 

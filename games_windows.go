@@ -8,6 +8,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -63,7 +64,7 @@ func processPath(pid uint32) string {
 
 // detectGame: the game you're playing now ("" for none). current is the
 // one being shown, kept when several are open.
-func detectGame(current string) string {
+func detectGame(current string) (string, uint32) {
 	gameWinMu.Lock()
 	gameWinPIDs = map[uint32]string{}
 	pEnumWindows.Call(gameEnumCB, 0)
@@ -79,6 +80,7 @@ func detectGame(current string) string {
 	seen := map[string]bool{}
 	var found []string
 	foreground := ""
+	pidOf := map[string]uint32{}
 	for pid, title := range pids {
 		path := processPath(pid)
 		if path == "" {
@@ -95,13 +97,104 @@ func detectGame(current string) string {
 		if pid == fgPID {
 			foreground = g
 		}
+		if _, ok := pidOf[g]; !ok || pid == fgPID {
+			pidOf[g] = pid
+		}
 		if !seen[g] {
 			seen[g] = true
 			found = append(found, g)
 		}
 	}
 	sort.Strings(found)
-	return chooseGame(found, foreground, current)
+	g := chooseGame(found, foreground, current)
+	return g, pidOf[g]
+}
+
+// ── Watching for changes ──────────────────────────────────────────────────────
+
+var (
+	pSetWinEventHook     = user32.NewProc("SetWinEventHook")
+	pWaitForSingleObject = kernel32.NewProc("WaitForSingleObject")
+	pGetExitCodeProcess  = kernel32.NewProc("GetExitCodeProcess")
+	foregroundKick       func()
+	foregroundCB         = syscall.NewCallback(func(hook, event, hwnd, idObject, idChild, thread, when uintptr) uintptr {
+		if foregroundKick != nil {
+			foregroundKick()
+		}
+		return 0
+	})
+)
+
+// startForegroundWatch calls kick whenever the window in front changes
+// (Windows tells us: SetWinEventHook, no checking on a timer). False if it
+// couldn't be set up.
+func startForegroundWatch(kick func()) bool {
+	foregroundKick = kick
+	ready := make(chan bool, 1)
+	go func() {
+		goruntime.LockOSThread() // the hook's messages come to this thread
+		const eventSystemForeground = 0x0003
+		const winEventOutOfContext = 0x0000
+		h, _, _ := pSetWinEventHook.Call(eventSystemForeground, eventSystemForeground, 0, foregroundCB, 0, 0, winEventOutOfContext)
+		ready <- h != 0
+		if h == 0 {
+			return
+		}
+		var m twMsg
+		for {
+			r, _, _ := twGetMessageW.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
+			if int32(r) <= 0 {
+				return
+			}
+			twTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
+			twDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
+		}
+	}()
+	return <-ready
+}
+
+const (
+	processSynchronize   = 0x00100000
+	processQueryLimitedI = 0x1000
+	stillActive          = 259
+)
+
+// processAlive: the process is still running.
+func processAlive(pid uint32) bool {
+	h, _, _ := pOpenProcess.Call(processQueryLimitedI, 0, uintptr(pid))
+	if h == 0 {
+		return false
+	}
+	defer pCloseHandle.Call(h)
+	var code uint32
+	if r, _, _ := pGetExitCodeProcess.Call(h, uintptr(unsafe.Pointer(&code))); r == 0 {
+		return false
+	}
+	return code == stillActive
+}
+
+// watchGameExit calls kick when the game's process ends — or stops
+// watching once it's no longer the game being shown.
+func watchGameExit(pid uint32, kick func()) {
+	h, _, _ := pOpenProcess.Call(processSynchronize|processQueryLimitedI, 0, uintptr(pid))
+	if h == 0 {
+		return
+	}
+	defer pCloseHandle.Call(h)
+	const waitObject0 = 0
+	for {
+		r, _, _ := pWaitForSingleObject.Call(h, 5000)
+		if r == waitObject0 {
+			kick()
+			return
+		}
+		gameState.mu.Lock()
+		still := gameState.pid == pid
+		gameState.mu.Unlock()
+		if !still {
+			return
+		}
+	}
 }
 
 // openPrograms: the programs with a window open now (for "Add a game"),

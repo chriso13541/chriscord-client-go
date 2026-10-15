@@ -20,6 +20,7 @@ type CustomStatus struct {
 	Text    string `json:"text"`
 	Emoji   string `json:"emoji"`
 	Expires string `json:"expires"`
+	SetAt   string `json:"set_at,omitempty"` // when it was set (with two devices, the newer one shows)
 }
 
 // CustomStatusView is someone's custom status, as the member list shows it.
@@ -66,7 +67,7 @@ func (a *App) GetCustomStatus() *CustomStatus { return a.activeCustomStatus() }
 // SetCustomStatus sets yours ("" text and emoji clears it). expires is an
 // RFC 3339 time, or "" for never.
 func (a *App) SetCustomStatus(text, emoji, expires string) (*CustomStatus, error) {
-	cs := &CustomStatus{Text: cleanGameName(text), Emoji: cleanEmoji(emoji)}
+	cs := &CustomStatus{Text: cleanGameName(text), Emoji: cleanEmoji(emoji), SetAt: time.Now().UTC().Format(time.RFC3339)}
 	if expires != "" {
 		if t, err := time.Parse(time.RFC3339, expires); err == nil {
 			cs.Expires = t.UTC().Format(time.RFC3339)

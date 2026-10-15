@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1060,6 +1061,8 @@ type serverMsg struct {
 	Activities      map[string]Activity `json:"activities"` // users: what people are playing
 	PresenceBlobs   map[string]string   `json:"presence_blobs"` // users: everyone's encrypted status (presence.go)
 	Blob            string              `json:"blob"`           // presence: someone's encrypted status
+	Conn            uint64              `json:"conn"`           // presence: which of their devices sent it
+	PresenceDevices map[string]map[string]string `json:"presence_devices"` // users: each device's status blob, per person
 	DeniedMsg     string              `json:"message"` // on "action_denied": what you weren't allowed to do
 	Banned        bool                `json:"banned"` // on "kicked"
 	Reason        string              `json:"reason"` // on "kicked"
@@ -1290,7 +1293,9 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.text.historyChanged(msg.BoardID)
 			runtime.EventsEmit(a.ctx, "chat:history_changed", msg.BoardID)
 		case "presence":
-			a.presenceBlob(msg.Username, msg.Blob)
+			a.presenceBlob(msg.Username, strconv.FormatUint(msg.Conn, 10), msg.Blob)
+		case "presence_gone":
+			a.presenceGone(msg.Username, strconv.FormatUint(msg.Conn, 10))
 		case "users":
 			if encPresence.Load() {
 				a.presenceUsers(msg)

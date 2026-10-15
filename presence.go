@@ -53,18 +53,28 @@ type presencePlain struct {
 	T string `json:"t,omitempty"` // playing since (RFC 3339)
 	C string `json:"c,omitempty"` // custom status text
 	E string `json:"e,omitempty"` // custom status emoji
+	K string `json:"k,omitempty"` // when the custom status was set (RFC 3339)
+	V bool   `json:"v,omitempty"` // this device is in a call
 	P string `json:"p"`           // padding
 }
 
 type peerPresence struct{ status, game, since, custom, emoji string }
 
+// devicePresence is one of someone's devices' status. Someone signed in on
+// two computers has two, and the member list shows one person: see
+// mergeDevices.
+type devicePresence struct {
+	status, game, since, custom, emoji, customAt string
+	inCall                                       bool
+}
+
 var presenceState struct {
 	mu        sync.Mutex
-	peers     map[string]peerPresence // username → their opened status
-	blobs     map[string]string       // username → their latest blob (to open again once the key arrives)
-	firstSeen map[string]time.Time    // when each online person was first listed
-	lastUsers *serverMsg              // the last "users" message, to show again with statuses applied
-	kick      chan struct{}           // publish soon (something changed)
+	peers     map[string]map[string]devicePresence // username → device → its opened status
+	blobs     map[string]map[string]string         // username → device → its latest blob (to open again once the key arrives)
+	firstSeen map[string]time.Time                 // when each online person was first listed
+	lastUsers *serverMsg                           // the last "users" message, to show again with statuses applied
+	kick      chan struct{}                        // publish soon (something changed)
 	stop      chan struct{}
 	jobs      chan func() // opening blobs, one at a time, off the reader
 }
@@ -94,8 +104,8 @@ func (a *App) startPresence() {
 	stop := make(chan struct{})
 	kick := make(chan struct{}, 1)
 	presenceState.stop, presenceState.kick = stop, kick
-	presenceState.peers = map[string]peerPresence{}
-	presenceState.blobs = map[string]string{}
+	presenceState.peers = map[string]map[string]devicePresence{}
+	presenceState.blobs = map[string]map[string]string{}
 	presenceState.firstSeen = map[string]time.Time{}
 	presenceState.lastUsers = nil
 	presenceState.mu.Unlock()
@@ -146,8 +156,9 @@ func (a *App) publishPresence() {
 	}
 	gameState.mu.Unlock()
 	if cs := a.activeCustomStatus(); cs != nil {
-		p.C, p.E = cs.Text, cs.Emoji
+		p.C, p.E, p.K = cs.Text, cs.Emoji, cs.SetAt
 	}
+	p.V = a.InVoiceCall()
 	data := presenceJSON(p)
 	// Pad so the sealed message is always presencePadTo bytes: measured
 	// as it'll be sealed (inside the message with your name), since that's
@@ -207,29 +218,63 @@ func (a *App) presenceUsers(msg serverMsg) {
 			}
 		}
 		presenceState.lastUsers = &m
+		// Who has which devices now: the list is the whole truth, so a
+		// device that's gone (and its status) is dropped.
+		devices := m.PresenceDevices
+		if devices == nil { // a server from before devices: one each
+			devices = map[string]map[string]string{}
+			for u, b := range m.PresenceBlobs {
+				devices[u] = map[string]string{"": b}
+			}
+		}
+		for u, have := range presenceState.peers {
+			for d := range have {
+				if _, ok := devices[u][d]; !ok {
+					delete(have, d)
+					delete(presenceState.blobs[u], d)
+				}
+			}
+		}
 		presenceState.mu.Unlock()
-		for u, blob := range m.PresenceBlobs {
-			a.openPresence(u, blob)
+		for u, ds := range devices {
+			for d, blob := range ds {
+				a.openPresence(u, d, blob)
+			}
 		}
 		a.emitUsers()
 	})
 }
 
-// presenceBlob handles someone's new status blob.
-func (a *App) presenceBlob(user, blob string) {
+// presenceBlob handles someone's new status blob, from one of their devices.
+func (a *App) presenceBlob(user, device, blob string) {
 	presenceJob(func() {
-		if a.openPresence(user, blob) {
+		if a.openPresence(user, device, blob) {
 			a.emitUsers()
 		}
 	})
 }
 
+// presenceGone: one of someone's devices disconnected (they're still on
+// another): its status no longer counts.
+func (a *App) presenceGone(user, device string) {
+	presenceJob(func() {
+		presenceState.mu.Lock()
+		delete(presenceState.peers[user], device)
+		delete(presenceState.blobs[user], device)
+		presenceState.mu.Unlock()
+		a.emitUsers()
+	})
+}
+
 // openPresence opens one blob into peers; false if it couldn't be (no key
 // yet, or not theirs), leaving what was known.
-func (a *App) openPresence(user, blob string) bool {
+func (a *App) openPresence(user, device, blob string) bool {
 	presenceState.mu.Lock()
 	if presenceState.blobs != nil {
-		presenceState.blobs[user] = blob
+		if presenceState.blobs[user] == nil {
+			presenceState.blobs[user] = map[string]string{}
+		}
+		presenceState.blobs[user][device] = blob
 	}
 	presenceState.mu.Unlock()
 	text, state := a.text.openContent(presenceKeyID, user, "", blob)
@@ -247,11 +292,76 @@ func (a *App) openPresence(user, blob string) bool {
 	}
 	presenceState.mu.Lock()
 	if presenceState.peers != nil {
-		presenceState.peers[user] = peerPresence{status: p.S, game: cleanGameName(p.G), since: p.T,
-			custom: cleanGameName(p.C), emoji: cleanEmoji(p.E)}
+		if presenceState.peers[user] == nil {
+			presenceState.peers[user] = map[string]devicePresence{}
+		}
+		presenceState.peers[user][device] = devicePresence{status: p.S, game: cleanGameName(p.G), since: p.T,
+			custom: cleanGameName(p.C), emoji: cleanEmoji(p.E), customAt: p.K, inCall: p.V}
 	}
 	presenceState.mu.Unlock()
 	return true
+}
+
+// mergeDevices makes one status out of someone's devices':
+//   - What they're playing comes from the device that's playing something
+//     (and of those, the one in a call); with none playing, nothing.
+//   - Their custom status is the most recently set one.
+//   - Invisible on any device hides them; otherwise online if any device
+//     is, else away.
+func mergeDevices(devs map[string]devicePresence) (peerPresence, bool) {
+	if len(devs) == 0 {
+		return peerPresence{}, false
+	}
+	var out peerPresence
+	anyOnline, anyInvisible := false, false
+	var best *devicePresence
+	bestKey := ""
+	score := func(d *devicePresence) int {
+		n := 0
+		if d.game != "" {
+			n += 2
+		}
+		if d.inCall {
+			n++
+		}
+		return n
+	}
+	var newestCustom *devicePresence
+	for k := range devs {
+		d := devs[k]
+		switch d.status {
+		case "invisible":
+			anyInvisible = true
+		case "online":
+			anyOnline = true
+		}
+		// A tie (both playing, neither in a call): the game started first,
+		// so it doesn't flip between them each time one sends its status.
+		if best == nil || score(&d) > score(best) ||
+			(score(&d) == score(best) && (d.since < best.since || (d.since == best.since && k < bestKey))) {
+			dd := d
+			best, bestKey = &dd, k
+		}
+		if d.custom != "" || d.emoji != "" {
+			if newestCustom == nil || d.customAt > newestCustom.customAt {
+				dd := d
+				newestCustom = &dd
+			}
+		}
+	}
+	switch {
+	case anyInvisible:
+		out.status = "invisible"
+	case anyOnline:
+		out.status = "online"
+	default:
+		out.status = "idle"
+	}
+	out.game, out.since = best.game, best.since
+	if newestCustom != nil {
+		out.custom, out.emoji = newestCustom.custom, newestCustom.emoji
+	}
+	return out, true
 }
 
 // presenceKeysArrived: the status key reached this app (someone shared it)
@@ -259,16 +369,19 @@ func (a *App) openPresence(user, blob string) bool {
 func (a *App) presenceKeysArrived() {
 	presenceJob(func() {
 		presenceState.mu.Lock()
-		waiting := map[string]string{}
-		for u, b := range presenceState.blobs {
-			if _, ok := presenceState.peers[u]; !ok {
-				waiting[u] = b
+		type w struct{ user, device, blob string }
+		var waiting []w
+		for u, ds := range presenceState.blobs {
+			for d, b := range ds {
+				if _, ok := presenceState.peers[u][d]; !ok {
+					waiting = append(waiting, w{u, d, b})
+				}
 			}
 		}
 		presenceState.mu.Unlock()
 		opened := false
-		for u, b := range waiting {
-			opened = a.openPresence(u, b) || opened
+		for _, x := range waiting {
+			opened = a.openPresence(x.user, x.device, x.blob) || opened
 		}
 		if opened {
 			a.emitUsers()
@@ -291,7 +404,7 @@ func (a *App) emitUsers() {
 		Statuses: map[string]string{}, Activities: map[string]Activity{}, Custom: map[string]CustomStatusView{}}
 	waiting := false
 	for _, u := range m.Online {
-		p, known := presenceState.peers[u]
+		p, known := mergeDevices(presenceState.peers[u])
 		if !known {
 			if time.Since(presenceState.firstSeen[u]) < presenceNewGrace {
 				waiting = true

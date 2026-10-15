@@ -449,6 +449,7 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 	a.voiceMu.Lock()
 	a.voice = session
 	a.voiceMu.Unlock()
+	a.presenceChanged() // "in a call" is part of your status (which device's shows)
 
 	// The offer goes out first, so ICE and DTLS get going on the server
 	// while the sound devices open — opening them can take a second or
@@ -513,6 +514,7 @@ func (a *App) stopVoiceSession() {
 	a.voiceMu.Unlock()
 	if session != nil {
 		session.close()
+		a.presenceChanged()
 	}
 }
 

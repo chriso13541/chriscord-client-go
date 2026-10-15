@@ -28,8 +28,20 @@ const gameCheckEvery = 15 * time.Second
 var gameState struct {
 	mu      sync.Mutex
 	current string    // the game being reported now ("" for none)
+	pid     uint32    // its process (0 if not known)
 	since   time.Time // when it started
 	started bool
+}
+
+// gameKick asks for a look now: the window in front changed, the game
+// closed, or a setting changed.
+var gameKick = make(chan struct{}, 1)
+
+func kickGameCheck() {
+	select {
+	case gameKick <- struct{}{}:
+	default:
+	}
 }
 
 // shareGames: whether to report your game (on unless turned off).
@@ -67,11 +79,35 @@ func (a *App) startGameWatcher() {
 	}
 	gameState.started = true
 	gameState.mu.Unlock()
+	// How it looks (games_windows.go):
+	//   - Not playing anything: every gameCheckEvery, and whenever the
+	//     window in front changes (so a game you start shows straight away).
+	//   - Playing: nothing on a timer. It looks again only when the window
+	//     in front changes, and clears when the game's program closes — and
+	//     while that program's still running, it's still what you're playing,
+	//     even if one look misses its window.
+	hooked := startForegroundWatch(kickGameCheck)
 	go func() {
 		time.Sleep(5 * time.Second) // let the window and connection settle first
 		for {
 			a.checkGame()
-			time.Sleep(gameCheckEvery)
+			gameState.mu.Lock()
+			playing := gameState.current != ""
+			gameState.mu.Unlock()
+			if playing && hooked {
+				<-gameKick
+			} else {
+				select {
+				case <-gameKick:
+				case <-time.After(gameCheckEvery):
+				}
+			}
+			// Let a burst of window switches settle into one look.
+			time.Sleep(time.Second)
+			select {
+			case <-gameKick:
+			default:
+			}
 		}
 	}()
 }
@@ -81,20 +117,34 @@ var gameCheckMu sync.Mutex
 func (a *App) checkGame() {
 	gameCheckMu.Lock()
 	defer gameCheckMu.Unlock()
-	name := ""
+	name, pid := "", uint32(0)
 	gameState.mu.Lock()
-	cur := gameState.current
+	cur, curPID := gameState.current, gameState.pid
 	gameState.mu.Unlock()
 	if shareGames() {
-		name = detectGame(cur)
+		name, pid = detectGame(cur)
+		// Its window wasn't seen this time (minimised, going fullscreen, a
+		// loading screen) but the game's still running: still playing it.
+		if name == "" && cur != "" && curPID != 0 && processAlive(curPID) {
+			name, pid = cur, curPID
+		}
 	}
 	if name == cur {
+		if pid != 0 && pid != curPID { // the same game, a new process (restarted)
+			gameState.mu.Lock()
+			gameState.pid = pid
+			gameState.mu.Unlock()
+			go watchGameExit(pid, kickGameCheck)
+		}
 		return
 	}
 	gameState.mu.Lock()
-	gameState.current = name
+	gameState.current, gameState.pid = name, pid
 	gameState.since = time.Now()
 	gameState.mu.Unlock()
+	if pid != 0 {
+		go watchGameExit(pid, kickGameCheck) // clears it the moment the game closes
+	}
 	if encPresence.Load() {
 		a.presenceChanged() // inside the next status blob (presence.go)
 	} else {
