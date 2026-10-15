@@ -1790,6 +1790,10 @@ func (a *App) UploadFileWithProgress(filePath, jobID string) (*UploadResult, err
 	file, err := os.Open(filePath)
 	if err != nil { return nil, fmt.Errorf("could not open file: %w", err) }
 	defer file.Close()
+	// Too big for this server: say so now, not after uploading most of it.
+	if st, err := file.Stat(); err == nil {
+		if err := a.checkUploadSize(filepath.Base(filePath), st.Size()); err != nil { return nil, err }
+	}
 	var f io.Reader = file
 	if st, err := file.Stat(); err == nil && jobID != "" {
 		f = &progressReader{r: file, total: st.Size(), report: func(pct int) {
@@ -1843,6 +1847,9 @@ func (a *App) UploadFileData(filename, dataBase64 string) (*UploadResult, error)
 	name := strings.TrimLeft(filepath.Base(strings.ReplaceAll(filename, "\\", "/")), ".")
 	if name == "" || name == "/" {
 		name = "pasted-file"
+	}
+	if err := a.checkUploadSize(name, int64(len(data))); err != nil {
+		return nil, err
 	}
 	dir, err := os.MkdirTemp("", "chriscord-paste-")
 	if err != nil {

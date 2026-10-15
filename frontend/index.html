@@ -4791,7 +4791,7 @@ function renderAttachQueue(){
     const tile=document.createElement('div');tile.className='attach-tile '+item.status;
     const status=item.status==='converting'?`${icon('progress_activity','spin')}${esc(item.convertStage||'Converting')}${item.convertPct?` ${item.convertPct}%`:''}`
       :item.status==='pending'?`${icon('progress_activity','spin')}Uploading${item.uploadPct!=null?` ${item.uploadPct}%`:''}`
-      :item.status==='error'?`${icon('error')}Failed`:'';
+      :item.status==='error'?`${icon('error')}${esc(item.errorText||'Failed')}`:'';
     tile.innerHTML=`<div class="tile-thumb">${status?`<span class="tile-status">${status}</span>`:''}</div><span class="chip-name" title="${esc(item.filename)}">${esc(item.filename)}</span><button class="chip-spoiler" type="button" title="${item.spoiler?'Unmark spoiler':'Mark as spoiler'}" aria-pressed="${!!item.spoiler}">${icon(item.spoiler?'visibility_off':'visibility')}</button><button class="chip-remove" data-id="${item.id}" title="Remove">${icon('close')}</button>`;
     if(item.spoiler)tile.classList.add('spoiler-on');
     const thumb=tile.querySelector('.tile-thumb');
@@ -4839,8 +4839,20 @@ async function loadVideoThumb(item){
   }catch(err){console.warn('video thumbnail failed:',err);}
 }
 
+// A file that's more than the server takes: its tile says so, and nothing
+// is uploaded (uploadlimit.go). Videos that get converted first are checked
+// after, at upload — the converted copy is usually much smaller.
+const TOO_LARGE=/takes files up to/;
+function markTooLarge(id,msg){
+  const item=state.attachQueue.find(a=>a.id===id);
+  if(item){item.status='error';item.errorText='Too large';}
+  toast(String(msg).replace(/^Error: /,''),true);
+  renderAttachQueue();
+}
 async function queueFiles(filePaths){
-  for(const path of filePaths){
+  let tooBig=[];
+  try{tooBig=await window.go.main.App.CheckUploadFiles(filePaths)||[];}catch{}
+  for(const [i,path] of filePaths.entries()){
     const id=++attachIdCounter;
     const filename=path.replace(/\\/g,'/').split('/').pop();
     state.attachQueue.push({id,filename,path,url:null,mime:null,status:'pending',preview:null});
@@ -4855,8 +4867,10 @@ async function queueFiles(filePaths){
     }
     // Videos are converted first if other people's apps might not be able to
     // play them (see transcode.go) — then the converted copy is uploaded.
+    const willConvert=videoConvertOn&&CONVERTIBLE_VIDEO.test(filename);
+    if(tooBig[i]&&!willConvert){markTooLarge(id,tooBig[i]);continue;}
     let uploadPath=path,converted=null;
-    if(videoConvertOn&&CONVERTIBLE_VIDEO.test(filename)){
+    if(willConvert){
       const item=state.attachQueue.find(a=>a.id===id);
       if(item){item.status='converting';item.convertPct=0;item.convertStage='Checking video';renderAttachQueue();}
       try{
@@ -4879,6 +4893,8 @@ async function queueFiles(filePaths){
         if(PREVIEWABLE_VIDEO.test(item.filename)||item.mime?.startsWith('video/'))loadVideoThumb(item);
       }
     }catch(err){
+      if(converted)window.go.main.App.DiscardConverted(converted);
+      if(TOO_LARGE.test(String(err))){markTooLarge(id,err);continue;}
       const item=state.attachQueue.find(a=>a.id===id);
       if(item)item.status='error';
       toast('Upload failed: '+err,true);
@@ -4925,6 +4941,7 @@ async function queueBlobs(files){
         if(PREVIEWABLE_VIDEO.test(item.filename)||item.mime?.startsWith('video/'))loadVideoThumb(item);
       }
     }catch(err){
+      if(TOO_LARGE.test(String(err))){markTooLarge(id,err);continue;}
       const item=state.attachQueue.find(a=>a.id===id);
       if(item)item.status='error';
       toast('Upload failed: '+err,true);

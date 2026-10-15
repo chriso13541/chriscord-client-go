@@ -33,6 +33,7 @@ type ServerInfo struct {
 	IconUpdatedAt   int64  `json:"icon_updated_at"`   // 0 = no icon (coloured letter)
 	Theme           *ServerTheme `json:"theme"`       // nil = the server uses the default look
 	Owner           string `json:"owner"`             // crowned member, "" if none
+	MaxUploadMB     *uint64 `json:"max_upload_mb"`    // largest file it takes (0: no limit; nil: an older server that doesn't say)
 }
 
 type ChallengeResponse struct {
