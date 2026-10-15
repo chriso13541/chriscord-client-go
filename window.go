@@ -30,6 +30,7 @@ type windowPrefs struct {
 	StartMinimized bool            `json:"start_minimized"`
 	Placement      *savedPlacement `json:"placement,omitempty"`
 	ShareGame      *bool           `json:"share_game,omitempty"` // "Playing …" (games.go); unset: on
+	CustomGames    []CustomGame    `json:"custom_games,omitempty"` // programs you've added yourself (games.go)
 }
 
 // savedPlacement: the window's normal (not maximised) rectangle in screen

@@ -1314,12 +1314,26 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .member-row:has(.member-activity) > .user-avatar { grid-row:1 / span 2; align-self:center; }
 .member-row:has(.member-activity) > .member-name { grid-column:2; grid-row:1; }
 .member-row:has(.member-activity) > [data-presence-user] { grid-column:3; grid-row:1 / span 2; align-self:center; }
-.member-activity { grid-column:2; grid-row:2; font-size:.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; line-height:1.25; }
+.member-activity { grid-column:2; grid-row:2; font-size:.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; line-height:1.45; padding-bottom:1px; }
+.member-row:has(.member-activity) > .member-name { line-height:1.3; }
 .member-activity b { font-weight:600; color:var(--text); }
 .pc-playing { margin-top:10px; padding:8px 10px; border-radius:8px; background:var(--bg-dark, rgba(0,0,0,.2)); display:flex; align-items:center; gap:10px; }
 .pc-playing .ic { width:22px; height:22px; color:var(--green); flex:none; }
 .pc-playing-name { font-weight:600; color:var(--text-strong, var(--text)); font-size:.88rem; }
 .pc-playing-time { font-size:.75rem; color:var(--text-muted); }
+/* Settings > System > Your games */
+#sys-games-list { display:flex; flex-direction:column; gap:6px; margin:4px 0 8px; }
+.sys-game-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; align-items:center; padding:8px 10px; border-radius:8px; background:var(--bg-darkest); border:1px solid var(--border); }
+.sys-game-row input { width:100%; padding:5px 8px; border-radius:5px; border:1px solid transparent; background:transparent; color:var(--text-strong, var(--text)); font-size:.88rem; font-weight:600; outline:none; }
+.sys-game-row input:hover { border-color:var(--border); }
+.sys-game-row input:focus { border-color:var(--accent); background:var(--bg-mid); }
+.sys-game-path { grid-column:1; font-size:.72rem; color:var(--text-muted); padding:0 9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl; text-align:left; }
+.sys-game-row .sys-game-remove { grid-column:2; grid-row:1 / span 2; display:inline-flex; padding:6px; border:none; border-radius:6px; background:transparent; color:var(--text-muted); cursor:pointer; }
+.sys-game-row .sys-game-remove:hover { background:var(--red); color:#fff; }
+.sys-game-row .sys-game-remove .ic { width:18px; height:18px; }
+.sys-games-add { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+.sys-games-add select { flex:1; min-width:180px; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.86rem; }
+.sys-games-empty { font-size:.82rem; color:var(--text-muted); padding:2px 2px 6px; }
 .member-row:hover { background:var(--bg-light); }
 .member-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .member-dot.online { background:var(--green); }
@@ -1999,6 +2013,10 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <label class="settings-label">Activity</label>
       <label class="check-row"><input type="checkbox" id="sys-game"> Show what game you’re playing</label>
       <p class="settings-hint" style="margin-top:0" id="sys-game-hint">Shows “Playing …” by your name while a game is open. Only games count — installed through Steam, Epic, GOG, the Xbox app, EA, Ubisoft, Riot or Battle.net, or a few well-known ones — never your browser or other apps.</p>
+      <label class="settings-label">Your games</label>
+      <p class="settings-hint" style="margin-top:0">Add any program as a game — one that isn’t found by itself, or to call it something else. While it’s open, that’s what “Playing …” shows.</p>
+      <div id="sys-games-list"></div>
+      <div class="sys-games-add"><select id="sys-games-open"><option value="">Pick a program that’s open…</option></select><button class="settings-secondary-btn" type="button" id="sys-games-browse">Browse…</button></div>
     </div>
 
     <div id="settings-tab-about" class="settings-tab-pane">
@@ -3966,6 +3984,41 @@ async function renderSystemSettings(){
   const game=document.getElementById('sys-game');
   game.checked=!!g.enabled;game.disabled=!g.supported;
   if(!g.supported)document.getElementById('sys-game-hint').textContent='Finding what you\u2019re playing is only available on Windows for now.';
+  document.getElementById('sys-games-open').disabled=document.getElementById('sys-games-browse').disabled=!g.supported;
+  try{renderCustomGames(await window.go.main.App.GetCustomGames());}catch{}
+  if(g.supported)refreshOpenPrograms();
+}
+// Your games: programs you've added (games.go), each renamable.
+function renderCustomGames(list){
+  const box=document.getElementById('sys-games-list');
+  if(!box)return;
+  if(!list?.length){box.innerHTML='<div class="sys-games-empty">None added yet.</div>';return;}
+  box.innerHTML=list.map(g=>`<div class="sys-game-row" data-path="${esc(g.path)}"><input type="text" maxlength="128" value="${esc(g.name)}" spellcheck="false" title="What \u201cPlaying \u2026\u201d shows"><button type="button" class="sys-game-remove" title="Remove">${icon('close')}</button><div class="sys-game-path" title="${esc(g.path)}">\u200e${esc(g.path)}</div></div>`).join('');
+  box.querySelectorAll('.sys-game-row').forEach(row=>{
+    const path=row.dataset.path,input=row.querySelector('input');
+    const save=async()=>{
+      const name=input.value.trim();
+      try{renderCustomGames(await window.go.main.App.AddCustomGame(path,name));settingsSaved();}
+      catch(err){toast('Couldn\u2019t rename it: '+err,true);}
+    };
+    input.addEventListener('change',save);
+    input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur();}});
+    row.querySelector('.sys-game-remove').addEventListener('click',async()=>{
+      try{renderCustomGames(await window.go.main.App.RemoveCustomGame(path));settingsSaved();}
+      catch(err){toast('Couldn\u2019t remove it: '+err,true);}
+    });
+  });
+}
+async function refreshOpenPrograms(){
+  const sel=document.getElementById('sys-games-open');
+  if(!sel)return;
+  let ps=[];try{ps=await window.go.main.App.OpenPrograms()||[];}catch{}
+  sel.innerHTML='<option value="">Pick a program that\u2019s open\u2026</option>'+ps.map(p=>`<option value="${esc(p.path)}" data-name="${esc(p.name)}" title="${esc(p.path)}">${esc(p.name)}${p.title&&p.title!==p.name?` \u2014 ${esc(p.title.slice(0,60))}`:''}</option>`).join('');
+}
+async function addCustomGame(path,name){
+  if(!path)return;
+  try{renderCustomGames(await window.go.main.App.AddCustomGame(path,name||''));settingsSaved();}
+  catch(err){toast('Couldn\u2019t add it: '+err,true);}
 }
 async function onGameToggle(e){
   const box=e.currentTarget;
@@ -10968,6 +11021,17 @@ function init(){
   document.getElementById('sys-tray').addEventListener('change',onWindowSettingToggle);
   document.getElementById('sys-start-min').addEventListener('change',onWindowSettingToggle);
   document.getElementById('sys-game').addEventListener('change',onGameToggle);
+  const openSel=document.getElementById('sys-games-open');
+  openSel.addEventListener('mouseenter',refreshOpenPrograms); // what's open now, before it's opened
+  openSel.addEventListener('change',async()=>{
+    const opt=openSel.selectedOptions[0];
+    if(opt?.value)await addCustomGame(opt.value,opt.dataset.name);
+    openSel.value='';
+  });
+  document.getElementById('sys-games-browse').addEventListener('click',async()=>{
+    let path='';try{path=await window.go.main.App.PickGameProgram();}catch{}
+    if(path)addCustomGame(path,'');
+  });
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
     localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');
