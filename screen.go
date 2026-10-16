@@ -59,6 +59,7 @@ type ScreenStart struct {
 	Preview    bool   `json:"preview"`    // frames back to the page as screen:preview
 	Audio      bool   `json:"audio"`      // share its sound too
 	HideBorder bool   `json:"hideBorder"` // no yellow capture border — always set by StartScreenShare; false only for its fallback
+	Title      string `json:"title"`      // a window's title, for "Sharing …" by your name (activity.go); "" for a screen
 	GDI        bool   `json:"-"`          // a whole screen copied with plain GDI — StartScreenShare's last resort (screenGDIFallback)
 }
 
@@ -176,6 +177,14 @@ func shareSize(w, h, height int) (int, int) {
 // already running). It returns the label of the encoder in use once the
 // first frame is out, or why it couldn't start.
 func (a *App) StartScreenShare(opts ScreenStart) (string, error) {
+	label, err := a.startScreenShare(opts)
+	if err == nil {
+		a.sharingStarted(opts)
+	}
+	return label, err
+}
+
+func (a *App) startScreenShare(opts ScreenStart) (string, error) {
 	// Always without the yellow capture border where Windows allows it
 	// (Desktop Duplication for screens, a PrintWindow copy for windows on
 	// Windows 10, the borderless setting on Windows 11).
@@ -607,6 +616,7 @@ func (a *App) SetScreenShareAudio(on bool) error {
 
 // StopScreenShare stops sharing (no-op if not sharing).
 func (a *App) StopScreenShare() {
+	defer a.sharingStopped()
 	a.stopScreenLow()
 	screenMu.Lock()
 	screenGen++

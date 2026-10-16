@@ -35,8 +35,9 @@ const (
 	presenceEvery = 60 * time.Second
 	// Every status is padded to this many bytes before sealing (the whole
 	// sealed message, name and all), so they're all the same size whatever's
-	// in them. Room for the longest: a 128-character game and custom status.
-	presencePadTo    = 1800
+	// in them. Room for the longest: a 128-character game, custom status
+	// and shared window's title.
+	presencePadTo    = 2400
 	presenceNewGrace = 3 * time.Second // someone just connected: their status should arrive by then
 	// How long a fetched status key is used before checking with the server
 	// again (whether someone's left and it needs replacing).
@@ -55,16 +56,18 @@ type presencePlain struct {
 	E string `json:"e,omitempty"` // custom status emoji
 	K string `json:"k,omitempty"` // when the custom status was set (RFC 3339)
 	V bool   `json:"v,omitempty"` // this device is in a call
+	W string `json:"w,omitempty"` // the window this device is sharing in the call (activity.go)
 	P string `json:"p"`           // padding
 }
 
-type peerPresence struct{ status, game, since, custom, emoji string }
+type peerPresence struct{ status, game, since, custom, emoji, window string }
 
 // devicePresence is one of someone's devices' status. Someone signed in on
 // two computers has two, and the member list shows one person: see
 // mergeDevices.
 type devicePresence struct {
 	status, game, since, custom, emoji, customAt string
+	window                                       string // the window they're sharing ("" for none, or a whole screen)
 	inCall                                       bool
 }
 
@@ -159,6 +162,9 @@ func (a *App) publishPresence() {
 		p.C, p.E, p.K = cs.Text, cs.Emoji, cs.SetAt
 	}
 	p.V = a.InVoiceCall()
+	if p.V {
+		p.W = sharingWindowTitle()
+	}
 	data := presenceJSON(p)
 	// Pad so the sealed message is always presencePadTo bytes: measured
 	// as it'll be sealed (inside the message with your name), since that's
@@ -296,7 +302,7 @@ func (a *App) openPresence(user, device, blob string) bool {
 			presenceState.peers[user] = map[string]devicePresence{}
 		}
 		presenceState.peers[user][device] = devicePresence{status: p.S, game: cleanGameName(p.G), since: p.T,
-			custom: cleanGameName(p.C), emoji: cleanEmoji(p.E), customAt: p.K, inCall: p.V}
+			custom: cleanGameName(p.C), emoji: cleanEmoji(p.E), customAt: p.K, inCall: p.V, window: cleanGameName(p.W)}
 	}
 	presenceState.mu.Unlock()
 	return true
@@ -341,6 +347,9 @@ func mergeDevices(devs map[string]devicePresence) (peerPresence, bool) {
 			(score(&d) == score(best) && (d.since < best.since || (d.since == best.since && k < bestKey))) {
 			dd := d
 			best, bestKey = &dd, k
+		}
+		if d.window != "" {
+			out.window = d.window // the device that's sharing
 		}
 		if d.custom != "" || d.emoji != "" {
 			if newestCustom == nil || d.customAt > newestCustom.customAt {
@@ -401,7 +410,7 @@ func (a *App) emitUsers() {
 		return
 	}
 	ev := usersEvent{All: m.All, Owner: m.Owner, Nicknames: m.Nicknames, GlobalNicknames: m.GlobalNicknames,
-		Statuses: map[string]string{}, Activities: map[string]Activity{}, Custom: map[string]CustomStatusView{}}
+		Statuses: map[string]string{}, Activities: map[string]Activity{}, Custom: map[string]CustomStatusView{}, Sharing: map[string]string{}}
 	waiting := false
 	for _, u := range m.Online {
 		p, known := mergeDevices(presenceState.peers[u])
@@ -430,6 +439,9 @@ func (a *App) emitUsers() {
 		}
 		if p.custom != "" || p.emoji != "" {
 			ev.Custom[u] = CustomStatusView{Text: p.custom, Emoji: p.emoji}
+		}
+		if p.window != "" {
+			ev.Sharing[u] = p.window
 		}
 	}
 	presenceState.mu.Unlock()

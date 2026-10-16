@@ -3948,6 +3948,7 @@ function initServerInfo(){
 }
 // Re-draws the member list from the last payload (e.g. the crown moved).
 let lastUsersPayload=null;
+let lastLiveKey='';
 function refreshMemberList(){if(lastUsersPayload)renderMembers({...lastUsersPayload,owner:state.serverOwner});}
 
 // Kicked or banned from the admin panel: leave, and don't auto-reconnect
@@ -5063,6 +5064,7 @@ function renderMembers(payload){
   state.onlineUsers=online;state.userStatuses=payload?.statuses||{};
   state.activities=payload?.activities||{};
   state.customStatuses=payload?.custom||{};
+  state.sharing=payload?.sharing||{};
   if(payload&&'nicknames' in payload){state.nicknames=payload.nicknames||{};state.globalNicknames=payload.global_nicknames||{};}
   if(payload&&'owner' in payload)state.serverOwner=payload.owner||'';
   const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
@@ -6834,17 +6836,48 @@ function customStatusHTML(cs){
   if(!cs||(!cs.text&&!cs.emoji))return '';
   return (cs.emoji?reactionEmojiHTML(cs.emoji):'')+esc(cs.text||'');
 }
+// What someone's doing, for the line under their name and their profile
+// card, most telling first: sharing in a call, playing a game, in a call.
+// Who's in a call and sharing comes from voice_state; the shared window's
+// title from their encrypted status (activity.go).
+function voiceBoardOf(user){
+  for(const [id,users] of Object.entries(state.voiceChannels||{}))if((users||[]).includes(user))return id;
+  return '';
+}
+function voiceBoardName(id){
+  for(const list of Object.values(state.boardsByRoom||{}))for(const b of list||[])if(b.id===id)return b.name||'';
+  return '';
+}
+function liveActivity(user){
+  const board=voiceBoardOf(user);
+  if(board&&state.voiceScreens?.has(user)){
+    const w=state.sharing?.[user];
+    return w?{kind:'window',verb:'Sharing',name:w}:{kind:'screen',text:'Sharing their screen'};
+  }
+  const a=state.activities?.[user];
+  if(a?.name)return {kind:'game',verb:'Playing',name:a.name,since:a.since};
+  if(board)return {kind:'voice',text:'In voice',channel:voiceBoardName(board)};
+  return null;
+}
 function memberActivityHTML(user){
   const cs=state.customStatuses?.[user];
   if(cs&&(cs.text||cs.emoji))return `<span class="member-activity" title="${esc((cs.emoji?cs.emoji+' ':'')+(cs.text||''))}">${customStatusHTML(cs)}</span>`;
-  const a=state.activities?.[user];
-  if(a?.name)return `<span class="member-activity" title="Playing ${esc(a.name)}">Playing <b>${esc(a.name)}</b></span>`;
-  return '';
+  const a=liveActivity(user);
+  if(!a)return '';
+  if(a.name)return `<span class="member-activity" title="${esc(a.verb+' '+a.name)}">${a.verb} <b>${esc(a.name)}</b></span>`;
+  return `<span class="member-activity" title="${esc(a.text+(a.channel?' \u2014 '+a.channel:''))}">${esc(a.text)}</span>`;
 }
 // "Playing …" on a profile card, with how long for.
 function playingHTML(user){
-  const a=state.activities?.[user];
-  if(!a?.name||!(state.onlineUsers||[]).includes(user))return '';
+  if(!(state.onlineUsers||[]).includes(user))return '';
+  const a=liveActivity(user);
+  if(!a)return '';
+  if(a.kind!=='game'){
+    const ic=a.kind==='voice'?'headphones':'screen_share';
+    const label=a.kind==='voice'?'In voice':'Sharing';
+    const what=a.kind==='window'?a.name:a.kind==='screen'?'Their screen':(a.channel||'A voice channel');
+    return `<div class="pc-playing">${icon(ic)}<div><div class="pc-label" style="margin:0">${label}</div><div class="pc-playing-name">${esc(what)}</div></div></div>`;
+  }
   const mins=Math.max(0,Math.floor((Date.now()-Date.parse(a.since))/60000));
   const dur=isNaN(mins)?'':mins<1?'Just started':mins<60?`For ${mins} minute${mins===1?'':'s'}`:`For ${Math.floor(mins/60)} hour${Math.floor(mins/60)===1?'':'s'}${mins%60?` ${mins%60} min`:''}`;
   return `<div class="pc-playing">${icon('sports_esports')}<div><div class="pc-label" style="margin:0">Playing</div><div class="pc-playing-name">${esc(a.name)}</div>${dur?`<div class="pc-playing-time">${dur}</div>`:''}</div></div>`;
@@ -8963,7 +8996,7 @@ async function goLive(src,height,fps,audio){
   try{
     scr.audio='';
     const label=await window.go.main.App.StartScreenShare({id:src.id,height,fps,audio,encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,
-      hideBorder:true});
+      hideBorder:true,title:src.kind==='window'?(src.name||''):''});
     Object.assign(scr,{on:true,source:src,height,fps,label,wantAudio:audio});
     dropRemoteVideo(SELF_SCR); // a switched share starts its preview afresh
     if(!was){
@@ -9024,7 +9057,8 @@ async function resumeScreenShare(s){
   try{
     scr.audio='';
     const label=await window.go.main.App.StartScreenShare({id:s.source.id,height:s.height,fps:s.fps,audio:s.audio,
-      encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,hideBorder:true});
+      encoder:localStorage.getItem('camEncoder')||'auto',preview:scr.preview,hideBorder:true,
+      title:s.source.kind==='window'?(s.source.name||''):''});
     if(!inMyCall()){window.go.main.App.StopScreenShare().catch(()=>{});return;} // hung up meanwhile
     Object.assign(scr,{on:true,source:s.source,height:s.height,fps:s.fps,label,wantAudio:s.audio});
     dropRemoteVideo(SELF_SCR);
@@ -11368,6 +11402,10 @@ function init(){
     setMuteButtonState();setDeafenButtonState();renderVideoStage();
     onScreenState(payload?.screen_on);
     onVideoState(payload?.video_on);
+    // "In voice" / "Sharing …" under names: redraw the member list when who's
+    // in a call or sharing changes (not on every voice_state).
+    const liveKey=JSON.stringify([next,payload?.screen_on||[]]);
+    if(liveKey!==lastLiveKey){lastLiveKey=liveKey;refreshMemberList();}
     voiceSnapshotWaiters.splice(0).forEach(w=>w());
     renderSidebar();
     updateVoiceConnectedBar();
