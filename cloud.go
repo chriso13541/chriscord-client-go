@@ -25,7 +25,9 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -547,9 +549,16 @@ type cloudClient struct {
 	gone     bool   // the service says this account isn't online any more
 	linked   string // the unlocked account's slug, if it's online
 	applying atomic.Bool
+	feedStop context.CancelFunc // the live change feed (feed below), if running
+
+	keys *keyCheck // directory checks on other people's keys (keycheck.go)
 }
 
-func newCloudClient(a *App) *cloudClient { return &cloudClient{app: a} }
+func newCloudClient(a *App) *cloudClient {
+	c := &cloudClient{app: a}
+	c.keys = newKeyCheck(c)
+	return c
+}
 
 // theCloud lets saveServers (storage.go) report changes.
 var theCloud *cloudClient
@@ -596,6 +605,7 @@ func (c *cloudClient) afterUnlock() {
 	if acct != nil && isOnlineAccount(acct.Slug) {
 		c.setLinked(acct.Slug)
 		go c.syncInBackground()
+		c.startFeed(acct.Slug)
 	}
 }
 
@@ -616,12 +626,21 @@ func (c *cloudClient) signOut() {
 		c.timer = nil
 	}
 	c.mu.Unlock()
+	c.stopFeed()
 	if sess != nil {
 		go cloudCall(sess.server, "POST", "/logout", sess.token, map[string]string{}, nil)
 		for i := range sess.accountKey {
 			sess.accountKey[i] = 0
 		}
 	}
+}
+
+// accountOf reads a session's account details, which Status and Sync
+// refresh while other operations are using the session.
+func (c *cloudClient) accountOf(s *cloudSession) cloudAccount {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return s.account
 }
 
 // session signs in with the account key, or reuses the current session.
@@ -770,7 +789,7 @@ func (c *cloudClient) syncLocked() (err error) {
 		}
 		res := mergeVault(local, remote, st.Base)
 		c.applyLocal(acct.Slug, res)
-		c.applyUsername(acct.Slug, sess.account.Username)
+		c.applyUsername(acct.Slug, c.accountOf(sess).Username)
 
 		newVersion := version
 		if blob == nil || !sameVault(res.merged, remote) {
@@ -793,7 +812,7 @@ func (c *cloudClient) syncLocked() (err error) {
 			newVersion = v
 		}
 		st.VaultVersion, st.LastSync, st.Base = newVersion, time.Now().UTC(), baseOf(res.merged)
-		st.Username = sess.account.Username
+		st.Username = c.accountOf(sess).Username
 		if err := writeCloudState(acct.Slug, st); err != nil {
 			return err
 		}
@@ -1000,6 +1019,7 @@ func (c *cloudClient) Link(username, email, password string) (string, error) {
 	if err := c.syncLocked(); err != nil {
 		log.Printf("cloud: first upload failed (will retry): %v", err)
 	}
+	c.startFeed(acct.Slug)
 	return recShown, nil
 }
 
@@ -1083,6 +1103,7 @@ func (c *cloudClient) adopt(server string, sess *cloudSession, priv ed25519.Priv
 	if err := c.syncLocked(); err != nil {
 		log.Printf("cloud: sync after sign-in failed: %v", err)
 	}
+	c.startFeed(slug)
 	return acct, nil
 }
 
@@ -1263,7 +1284,7 @@ func (c *cloudClient) ChangePassword(current, next string) error {
 	if err != nil {
 		return err
 	}
-	oldAuth, err := currentAuth(st.Server, sess.account.Username, current)
+	oldAuth, err := currentAuth(st.Server, c.accountOf(sess).Username, current)
 	if err != nil {
 		return err
 	}
@@ -1289,7 +1310,7 @@ func (c *cloudClient) NewRecoveryKey(password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	authHex, err := currentAuth(st.Server, sess.account.Username, password)
+	authHex, err := currentAuth(st.Server, c.accountOf(sess).Username, password)
 	if err != nil {
 		return "", err
 	}
@@ -1333,7 +1354,7 @@ func (c *cloudClient) Unlink(password string) error {
 	if err != nil {
 		return err
 	}
-	authHex, err := currentAuth(st.Server, sess.account.Username, password)
+	authHex, err := currentAuth(st.Server, c.accountOf(sess).Username, password)
 	if err != nil {
 		return err
 	}
@@ -1355,6 +1376,7 @@ func (c *cloudClient) forget(slug string) {
 	c.mu.Lock()
 	c.sess, c.gone, c.lastErr, c.linked = nil, false, "", ""
 	c.mu.Unlock()
+	c.stopFeed()
 	c.emit("cloud:status", nil)
 }
 
@@ -1489,4 +1511,146 @@ func registeredAs(msg string) string {
 		return ""
 	}
 	return rest[:j]
+}
+
+// ── The live change feed ───────────────────────────────────────────────────
+//
+// While an online account is unlocked, the app keeps one connection open
+// to chriscord.app's event stream (GET /vault/events). When another
+// computer uploads, the service says "the vault is at version N" and this
+// app syncs — so changes show up within a second or two, without
+// checking on a timer. The events carry nothing readable. If the
+// connection drops, it comes back with a growing wait (2s up to 2 min),
+// and the first event on every connection is the current version, so
+// nothing is missed while it was down.
+
+// feedHTTP has no overall timeout: the stream stays open.
+var feedHTTP = &http.Client{}
+
+func (c *cloudClient) startFeed(slug string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	c.mu.Lock()
+	if c.feedStop != nil {
+		c.feedStop()
+	}
+	c.feedStop = cancel
+	c.mu.Unlock()
+	go c.runFeed(ctx, slug)
+}
+
+func (c *cloudClient) stopFeed() {
+	c.mu.Lock()
+	if c.feedStop != nil {
+		c.feedStop()
+		c.feedStop = nil
+	}
+	c.mu.Unlock()
+}
+
+func (c *cloudClient) runFeed(ctx context.Context, slug string) {
+	wait := 2 * time.Second
+	for ctx.Err() == nil {
+		started := time.Now()
+		err := c.feedOnce(ctx, slug)
+		if ctx.Err() != nil {
+			return
+		}
+		c.mu.Lock()
+		gone := c.gone
+		c.mu.Unlock()
+		if gone {
+			return // deleted online: nothing more will come
+		}
+		if time.Since(started) > time.Minute {
+			wait = 2 * time.Second // it was up a good while: just reconnect
+		}
+		if err != nil {
+			log.Printf("cloud: change feed: %v (again in %s)", err, wait)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		if wait *= 2; wait > 2*time.Minute {
+			wait = 2 * time.Minute
+		}
+	}
+}
+
+// feedOnce holds one connection to the event stream until it ends.
+func (c *cloudClient) feedOnce(ctx context.Context, slug string) error {
+	acct := c.unlocked()
+	if acct == nil || acct.Slug != slug {
+		return errors.New("signed out")
+	}
+	st, err := readCloudState(slug)
+	if err != nil {
+		return errors.New("not online")
+	}
+	sess, err := c.session(acct, st)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", st.Server+"/api/v1/vault/events", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+sess.token)
+	req.Header.Set("Accept", "text/event-stream")
+	resp, err := feedHTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		c.mu.Lock()
+		if c.sess == sess {
+			c.sess = nil // expired: sign in again next time round
+		}
+		c.mu.Unlock()
+		return errors.New("session expired")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("the service answered %d", resp.StatusCode)
+	}
+	sc := bufio.NewScanner(resp.Body)
+	sc.Buffer(make([]byte, 4096), 64<<10)
+	var event, data string
+	for sc.Scan() {
+		line := sc.Text()
+		switch {
+		case strings.HasPrefix(line, "event:"):
+			event = strings.TrimSpace(line[len("event:"):])
+		case strings.HasPrefix(line, "data:"):
+			data = strings.TrimSpace(line[len("data:"):])
+		case line == "":
+			if event != "" {
+				c.onFeedEvent(slug, event, data)
+			}
+			event, data = "", ""
+		}
+	}
+	return sc.Err()
+}
+
+func (c *cloudClient) onFeedEvent(slug, event, data string) {
+	switch event {
+	case "vault":
+		var v struct {
+			Version int64 `json:"version"`
+		}
+		json.Unmarshal([]byte(data), &v)
+		if st, err := readCloudState(slug); err == nil && v.Version <= st.VaultVersion {
+			return // our own upload, or nothing new
+		}
+		c.syncInBackground()
+	case "account":
+		c.syncInBackground() // picks up a rename and refreshes Settings → Account
+	case "deleted":
+		c.mu.Lock()
+		c.gone = true
+		c.mu.Unlock()
+		c.emit("cloud:status", nil)
+	}
 }

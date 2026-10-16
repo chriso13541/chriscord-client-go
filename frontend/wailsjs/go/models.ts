@@ -460,6 +460,32 @@ export namespace main {
 	        this.video = source["video"];
 	    }
 	}
+	export class MemberIdentityView {
+	    known: boolean;
+	    self: boolean;
+	    fingerprint: string;
+	    directory: string;
+	    name: string;
+	    note: string;
+	    problem: string;
+	    changed: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberIdentityView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.known = source["known"];
+	        this.self = source["self"];
+	        this.fingerprint = source["fingerprint"];
+	        this.directory = source["directory"];
+	        this.name = source["name"];
+	        this.note = source["note"];
+	        this.problem = source["problem"];
+	        this.changed = source["changed"];
+	    }
+	}
 	export class MessageZip {
 	    url: string;
 	    name: string;

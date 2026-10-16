@@ -310,6 +310,10 @@ export function LogOut() {
   return window['go']['main']['App']['LogOut']();
 }
 
+export function MemberIdentity(arg1) {
+  return window['go']['main']['App']['MemberIdentity'](arg1);
+}
+
 export function MoveBoard(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveBoard'](arg1, arg2, arg3);
 }

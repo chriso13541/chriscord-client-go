@@ -759,6 +759,14 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .pc-nick-hint { font-size:.72rem; color:var(--text-muted); margin-top:6px; line-height:1.35; }
 .es-row .es-handle { color:var(--text-muted); font-size:.8em; margin-left:4px; }
 .pc-section { margin-top:12px; padding:10px 12px; background:var(--bg-dark); border-radius:8px; }
+/* "Who is this, really": their key, and what chriscord.app says (keycheck.go) */
+.pc-identity .pc-id-row { display:flex; align-items:flex-start; gap:6px; font-size:.84rem; color:var(--text); line-height:1.35; }
+.pc-identity .pc-id-row .ic { width:16px; height:16px; flex-shrink:0; margin-top:1px; color:var(--text-muted); }
+.pc-identity.ok .pc-id-row .ic { color:var(--green); }
+.pc-identity.bad { background:color-mix(in srgb, var(--red) 14%, var(--bg-dark)); }
+.pc-identity.bad .pc-id-row, .pc-identity.bad .pc-id-row .ic { color:var(--red-light); }
+.pc-id-fp { font-family:Consolas,monospace; font-size:.76rem; color:var(--text-muted); margin-top:5px; letter-spacing:.02em; }
+.pc-id-note { font-size:.76rem; color:var(--text-muted); margin-top:3px; }
 .pc-label { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:4px; }
 .pc-bio { font-size:.85rem; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
 .pc-bio.empty { color:var(--text-muted); font-style:italic; }
@@ -6951,6 +6959,33 @@ async function openProfilePopup(user,anchor){
   pop.innerHTML='';pop.appendChild(buildProfileCard(data));
   pop.classList.remove('hidden');
   positionProfilePopup(pop,anchorRect,place);
+  if(!data.imported)loadIdentitySection(user,pop,anchorRect,place);
+}
+// The key behind a profile, and what chriscord.app says about it, added
+// to the card once it's known (a directory lookup can take a moment).
+async function loadIdentitySection(user,pop,anchorRect,place){
+  let v=null;
+  try{v=await window.go.main.App.MemberIdentity(user);}catch{}
+  if(!v?.known||profilePopupFor!==user)return;
+  const body=pop.querySelector('.pc-body');if(!body)return;
+  body.insertAdjacentHTML('beforeend',identityHTML(v));
+  positionProfilePopup(pop,anchorRect,place);
+}
+function identityHTML(v){
+  // Every branch escapes its own text: names and problems come from
+  // chriscord.app, which this card doesn't take on trust.
+  let cls='',ic='lock',html;
+  if(v.changed){cls='bad';ic='gpp_maybe';html=esc('Their key changed while you\u2019ve been here. If they didn\u2019t make a new account, someone may be pretending to be them \u2014 check with them.');}
+  else if(v.directory==='problem'){cls='bad';ic='gpp_maybe';html=esc(v.problem||'chriscord.app\u2019s record for this key doesn\u2019t check out.');}
+  else if(v.directory==='verified'){cls='ok';ic='verified_user';html=`${v.self?'You are':'Verified as'} <b>${esc(v.name)}</b> on chriscord.app`;}
+  else if(v.directory==='unlisted'){html='Not on chriscord.app';}
+  else if(v.directory==='error'){ic='info';html='Couldn\u2019t check chriscord.app right now';}
+  else{html=v.self?'Your key':esc('Compare this key with them to be sure it\u2019s them');}
+  const note=v.note?esc(v.note.charAt(0).toUpperCase()+v.note.slice(1))+'.':'';
+  return `<div class="pc-section pc-identity ${cls}"><div class="pc-label">Identity</div>
+    <div class="pc-id-row">${icon(ic)}<span>${html}</span></div>
+    ${note?`<div class="pc-id-note">${note}</div>`:''}
+    <div class="pc-id-fp" title="The start of their public key. It never changes, and is the same on every server.">Key ${esc(v.fingerprint)}</div></div>`;
 }
 // Beside whatever was clicked: left of the member list, right of names in
 // the chat/sidebar, above your own panel bottom-left. If the preferred side
@@ -11518,6 +11553,9 @@ function init(){
   document.getElementById('cloud-del-btn').addEventListener('click',cloudDelete);
   document.getElementById('cloud-forget-btn').addEventListener('click',async()=>{try{await window.go.main.App.CloudForget();}catch{}renderCloudSettings(false);});
   window.runtime?.EventsOn('cloud:synced',onCloudSynced);
+  // Someone's key changed, or chriscord.app's record of it doesn't check out
+  // (keycheck.go). Stays up until it's been read.
+  window.runtime?.EventsOn('identity:warning',e=>{if(e?.message)toast(e.message,true,{label:'OK',fn:()=>{}},true);});
   window.runtime?.EventsOn('cloud:status',()=>{if(document.getElementById('settings-tab-account').classList.contains('active')&&!document.getElementById('settings-modal').classList.contains('hidden'))renderCloudSettings(false);});
 
   document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});

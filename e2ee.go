@@ -662,6 +662,7 @@ func pinIdentity(domain, user, idHex string) bool {
 	}
 	old, seen := pins[domain][user]
 	if seen && old == idHex {
+		noteIdentity(domain, user, idHex, "") // the directory check (keycheck.go)
 		return true
 	}
 	pins[domain][user] = idHex
@@ -669,5 +670,6 @@ func pinIdentity(domain, user, idHex string) bool {
 		os.MkdirAll(chriscordConfigDir(), 0700)
 		os.WriteFile(path, data, 0600)
 	}
+	noteIdentity(domain, user, idHex, old) // warns if it changed (keycheck.go)
 	return !seen
 }

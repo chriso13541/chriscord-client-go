@@ -156,6 +156,8 @@ export function ListShareSources():Promise<Array<main.ShareSource>>;
 
 export function LogOut():Promise<void>;
 
+export function MemberIdentity(arg1:string):Promise<main.MemberIdentityView>;
+
 export function MoveBoard(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function MoveRooms(arg1:Array<string>):Promise<void>;
