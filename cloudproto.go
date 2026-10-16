@@ -344,3 +344,73 @@ func NormalizeEmail(email string) (string, error) {
 	}
 	return email, nil
 }
+
+// ── The directory's public log ─────────────────────────────────────────────
+//
+// Every register, rename, delete and expiry the directory records goes into
+// one append-only log, each entry hash-chained to the one before. The
+// service signs the newest entry's hash (the "head") with its own log key.
+// Apps keep their own copy of the log, check every new entry chains onto
+// what they already have, and compare heads with each other (inside the
+// encrypted statuses on chat servers). So the directory can't rewrite or
+// drop history, and can't show different people different histories,
+// without the apps noticing. Its signature over the head proves which log
+// it was; the chain proves what's in it.
+
+// LogEntry is one entry in the directory's log.
+type LogEntry struct {
+	Seq       int64  `json:"seq"`
+	PublicKey string `json:"public_key"`
+	Event     string `json:"event"` // register | rename | delete | expired
+	Username  string `json:"username"`
+	Nonce     string `json:"nonce"`
+	Signature string `json:"signature"` // the key's own ("expired": none)
+	At        int64  `json:"at"`
+	Prev      string `json:"prev"` // the previous entry's hash (LogGenesis for the first)
+	Hash      string `json:"hash"`
+}
+
+// LogGenesis is what the first entry chains onto.
+var LogGenesis = strings.Repeat("0", 64)
+
+// LogEntryHash is an entry's hash: everything in it, and the hash before.
+func LogEntryHash(e LogEntry) string {
+	h := sha256.Sum256(CloudSigMessage("log-entry", strconv.FormatInt(e.Seq, 10), strings.ToLower(e.PublicKey), e.Event,
+		e.Username, e.Nonce, e.Signature, strconv.FormatInt(e.At, 10), strings.ToLower(e.Prev)))
+	return hex.EncodeToString(h[:])
+}
+
+// LogEntrySigned checks the key's own signature on an entry: a name it
+// claimed, or its own deletion. ("expired" entries are the service's own
+// doing — an unconfirmed account lapsing — and carry none.)
+func LogEntrySigned(e LogEntry) bool {
+	switch e.Event {
+	case "register", "rename":
+		return VerifyCloudSig(e.PublicKey, e.Signature, CloudSigMessage("claim", e.Nonce, e.PublicKey, e.Username))
+	case "delete":
+		return VerifyCloudSig(e.PublicKey, e.Signature, CloudSigMessage("delete", e.Nonce, e.PublicKey))
+	case "expired":
+		return e.Signature == ""
+	}
+	return false
+}
+
+// LogHead is the service's signed statement "my log ends at entry Seq,
+// whose hash is Hash", as of Time.
+type LogHead struct {
+	Seq       int64  `json:"seq"`
+	Hash      string `json:"hash"`
+	Time      int64  `json:"time"`
+	Key       string `json:"key"` // the log key (hex Ed25519)
+	Signature string `json:"signature"`
+}
+
+func LogHeadMessage(seq int64, hash string, t int64) []byte {
+	return CloudSigMessage("log-head", "", strconv.FormatInt(seq, 10), strings.ToLower(hash), strconv.FormatInt(t, 10))
+}
+
+// Valid checks the head's signature against its own key (whether that key
+// is the right one is the caller's to decide: see the app's translog.go).
+func (h LogHead) Valid() bool {
+	return VerifyCloudSig(h.Key, h.Signature, LogHeadMessage(h.Seq, h.Hash, h.Time))
+}

@@ -36,8 +36,8 @@ const (
 	// Every status is padded to this many bytes before sealing (the whole
 	// sealed message, name and all), so they're all the same size whatever's
 	// in them. Room for the longest: a 128-character game, custom status
-	// and shared window's title.
-	presencePadTo    = 2400
+	// and shared window's title, and a signed directory log head.
+	presencePadTo    = 2800
 	presenceNewGrace = 3 * time.Second // someone just connected: their status should arrive by then
 	// How long a fetched status key is used before checking with the server
 	// again (whether someone's left and it needs replacing).
@@ -57,6 +57,7 @@ type presencePlain struct {
 	K string `json:"k,omitempty"` // when the custom status was set (RFC 3339)
 	V bool   `json:"v,omitempty"` // this device is in a call
 	W string `json:"w,omitempty"` // the window this device is sharing in the call (activity.go)
+	L string `json:"l,omitempty"` // the newest chriscord.app log head this app has checked (translog.go)
 	P string `json:"p"`           // padding
 }
 
@@ -161,6 +162,7 @@ func (a *App) publishPresence() {
 	if cs := a.activeCustomStatus(); cs != nil {
 		p.C, p.E, p.K = cs.Text, cs.Emoji, cs.SetAt
 	}
+	p.L = ownLogHead()
 	p.V = a.InVoiceCall()
 	if p.V {
 		p.W = sharingWindowTitle()
@@ -296,6 +298,7 @@ func (a *App) openPresence(user, device, blob string) bool {
 	default:
 		p.S = "online"
 	}
+	noteLogHead(user, p.L) // compare it with this app's copy of the log
 	presenceState.mu.Lock()
 	if presenceState.peers != nil {
 		if presenceState.peers[user] == nil {

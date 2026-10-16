@@ -1392,7 +1392,9 @@ type CloudStatusView struct {
 	VaultSize     int64  `json:"vault_size"`
 	Syncing       bool   `json:"syncing"`
 	Error         string `json:"error"`
-	Gone          bool   `json:"gone"` // the service doesn't have it any more
+	Gone          bool   `json:"gone"`        // the service doesn't have it any more
+	LogSeq        int64  `json:"log_seq"`     // how far this app has checked the directory's public log
+	LogProblem    string `json:"log_problem"` // why that log can't be trusted, if it can't
 	LocalUsername string `json:"local_username"`
 }
 
@@ -1432,6 +1434,7 @@ func (c *cloudClient) Status(refresh bool) CloudStatusView {
 		v.Username, v.Email, v.EmailVerified, v.VerifyBy, v.VaultSize = a.Username, a.Email, a.EmailVerified, a.VerifyBy, a.VaultSize
 	}
 	v.Syncing, v.Error, v.Gone = c.syncing, c.lastErr, c.gone
+	v.LogSeq, v.LogProblem = c.keys.log.Seq(), c.keys.log.Problem()
 	return v
 }
 
@@ -1548,6 +1551,9 @@ func (c *cloudClient) stopFeed() {
 }
 
 func (c *cloudClient) runFeed(ctx context.Context, slug string) {
+	if s := c.keys.server(); s != "" {
+		c.keys.log.sync(s, true) // bring the directory log up to date (translog.go)
+	}
 	wait := 2 * time.Second
 	for ctx.Err() == nil {
 		started := time.Now()

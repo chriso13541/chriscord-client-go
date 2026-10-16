@@ -99,3 +99,36 @@ func TestCloudProtoBindings(t *testing.T) {
 		t.Error("a cheap KDF was accepted")
 	}
 }
+
+func TestLogProto(t *testing.T) {
+	e := LogEntry{Seq: 1, PublicKey: strings.Repeat("ab", 32), Event: "register", Username: "chris", Nonce: "n", Signature: "s", At: 100, Prev: LogGenesis}
+	if got := LogEntryHash(e); got != "0fc1a46227936ea0f6a67a880ceb449606e0537a24ed1c03eb10591af7c198c1" {
+		t.Errorf("LogEntryHash = %s", got)
+	}
+	if got := string(LogHeadMessage(5, "ABCD", 7)); got != "chriscord-cloud-v1/log-head\x00\x005\x00abcd\x007" {
+		t.Errorf("LogHeadMessage = %q", got)
+	}
+	pk, sk, _ := ed25519.GenerateKey(rand.Reader)
+	h := LogHead{Seq: 5, Hash: "abcd", Time: 7, Key: hex.EncodeToString(pk)}
+	h.Signature = hex.EncodeToString(ed25519.Sign(sk, LogHeadMessage(h.Seq, h.Hash, h.Time)))
+	if !h.Valid() {
+		t.Error("a signed head didn't verify")
+	}
+	h.Seq = 6
+	if h.Valid() {
+		t.Error("a changed head verified")
+	}
+	// Entries: the key's own signature, or none for "expired".
+	e2 := LogEntry{PublicKey: hex.EncodeToString(pk), Event: "register", Username: "chris", Nonce: "n"}
+	e2.Signature = hex.EncodeToString(ed25519.Sign(sk, CloudSigMessage("claim", "n", e2.PublicKey, "chris")))
+	if !LogEntrySigned(e2) {
+		t.Error("a claim didn't verify")
+	}
+	e2.Username = "someone"
+	if LogEntrySigned(e2) {
+		t.Error("a claim for another name verified")
+	}
+	if !LogEntrySigned(LogEntry{Event: "expired"}) || LogEntrySigned(LogEntry{Event: "expired", Signature: "x"}) || LogEntrySigned(LogEntry{Event: "made-up"}) {
+		t.Error("expired / unknown events")
+	}
+}

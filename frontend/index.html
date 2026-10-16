@@ -2710,6 +2710,10 @@ async function renderCloudSettings(refresh=true){
   else if(st.syncing){ic='sync';cls='on';main=`Online as ${st.username}`;sub='Syncing\u2026';}
   else if(st.error){ic='warning';cls='err';main=`Online as ${st.username}`;sub=`Couldn\u2019t sync: ${st.error}`;}
   else{ic='verified_user';cls='on';main=`Online as ${st.username}`;sub=st.last_sync?`Synced ${agoText(st.last_sync)} with ${host}`:`Not synced yet`;}
+  // The directory's public log (translog.go): how far this app has checked
+  // it, or why it can't be trusted.
+  if(live&&st.log_problem){ic='warning';cls='err';sub=`${host}\u2019s public log doesn\u2019t check out: ${st.log_problem}`;}
+  else if(live&&st.log_seq>0&&!st.syncing&&!st.error)sub+=` \u00b7 public log checked to entry ${st.log_seq}`;
   const box=document.getElementById('cloud-status');
   box.className='cloud-status '+cls;
   box.innerHTML=`${icon(ic)}<div class="cloud-status-text">${esc(main)}<small>${esc(sub)}</small></div>`+(live?'<button class="settings-secondary-btn" id="cloud-sync-btn" type="button">Sync Now</button>':'');

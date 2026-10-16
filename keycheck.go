@@ -56,6 +56,8 @@ type dirHistory struct {
 	Nonce     string `json:"nonce"`
 	Signature string `json:"signature"`
 	At        int64  `json:"at"`
+	Prev      string `json:"prev"` // its place in the public log (translog.go)
+	Hash      string `json:"hash"`
 }
 
 type dirEntry struct {
@@ -86,11 +88,15 @@ type keyCheck struct {
 	changes map[string]string // domain\x00user → the new key, for keys that changed this session
 	warned  map[string]bool   // warnings already shown (domain\x00user\x00key)
 	namesMu sync.Mutex        // chriscord_directory_names.json
+
+	log *transLog // this app's copy of the directory's public log (translog.go)
 }
 
 func newKeyCheck(c *cloudClient) *keyCheck {
-	return &keyCheck{c: c, cache: map[string]*keyVerdict{}, waiting: map[string][]chan struct{}{},
+	k := &keyCheck{c: c, cache: map[string]*keyVerdict{}, waiting: map[string][]chan struct{}{},
 		changes: map[string]string{}, warned: map[string]bool{}}
+	k.log = newTransLog(k)
+	return k
 }
 
 // server is chriscord.app (or wherever this online account lives), or ""
@@ -290,6 +296,21 @@ func checkHistory(pub string, e *dirEntry) string {
 // judge turns a directory entry into a verdict, including the
 // remembered-name check.
 func (k *keyCheck) judge(server, pub string, e *dirEntry) *keyVerdict {
+	// First, the directory's answer has to match its own public log (as
+	// this app has checked it): same entries, nothing hidden or added.
+	logOK := false
+	if err := k.log.sync(server, false); err == nil {
+		m := k.log.matches(pub, e)
+		if m != "" && k.log.sync(server, true) == nil { // the answer may be newer than this app's copy
+			m = k.log.matches(pub, e)
+		}
+		if m != "" {
+			return &keyVerdict{Status: "problem", Problem: "chriscord.app " + m + "."}
+		}
+		logOK = true
+	} else if p := k.log.Problem(); p != "" {
+		return &keyVerdict{Status: "problem", Problem: "chriscord.app's public log doesn't check out: " + p}
+	} // else: couldn't reach the log; the checks below still apply
 	if e == nil {
 		return &keyVerdict{Status: "unlisted"}
 	}
@@ -323,8 +344,17 @@ func (k *keyCheck) judge(server, pub string, e *dirEntry) *keyVerdict {
 		}
 	default:
 		// The name was on another key before. Fine only if that key gave
-		// it up itself (or its unconfirmed account lapsed).
-		if prev, err := dirLookup(server, []string{old}); err == nil {
+		// it up itself (or its unconfirmed account lapsed): from the log
+		// when it's been checked, otherwise by asking.
+		if logOK {
+			recs := k.log.recordsFor(old)
+			if n := len(recs); n > 0 && (recs[n-1].Event == "delete" || recs[n-1].Event == "expired") {
+				names[nameKey] = pub
+				saveDirNames(names)
+				v.Note = "this name belonged to someone else before (they deleted that account)"
+				return v
+			}
+		} else if prev, err := dirLookup(server, []string{old}); err == nil {
 			if pe := prev[old]; pe != nil && !pe.Online && checkHistory(old, pe) == "" {
 				names[nameKey] = pub
 				saveDirNames(names)
