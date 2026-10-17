@@ -6537,6 +6537,54 @@ function startEdit(msgEl,msg){
 }
 
 // ── SEND ──────────────────────────────────────────────────────────
+// ── SENT HISTORY ─────────────────────────────────────────────────
+// Up and Down in the message box step back and forward through what you've
+// sent, like a terminal: Up on the first line goes to the one before, Down
+// on the last line comes back, and past the newest you get back what you
+// were typing. One list per server (and per account), the last SENT_MAX,
+// kept only on this computer. Typing over a recalled message starts a new
+// one rather than changing the list.
+const SENT_MAX=50;
+const sentKey=()=>state.domain?`sentHistory:${state.account?.fingerprint||''}:${state.domain.toLowerCase()}`:'';
+let sentNav=null; // while stepping: {key, list, i, draft}
+function loadSent(key){try{const l=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(l)?l:[];}catch{return [];}}
+function rememberSent(text){
+  const key=sentKey();sentNav=null;
+  if(!key||!text)return;
+  const list=loadSent(key);
+  if(list[list.length-1]!==text)list.push(text); // the same again isn't a new entry
+  try{localStorage.setItem(key,JSON.stringify(list.slice(-SENT_MAX)));}catch{}
+}
+function showRecalled(ta,text){
+  ta.value=text;autoResize(ta);renderComposerHighlight();
+  ta.setSelectionRange(text.length,text.length);
+}
+function onSentHistoryKey(e){
+  if((e.key!=='ArrowUp'&&e.key!=='ArrowDown')||e.shiftKey||e.altKey||e.ctrlKey||e.metaKey||e.isComposing)return;
+  const ta=e.target,v=ta.value;
+  if(ta.selectionStart!==ta.selectionEnd)return;
+  const key=sentKey();if(!key)return;
+  if(sentNav&&sentNav.key!==key)sentNav=null; // another server's list
+  if(e.key==='ArrowUp'){
+    if(v.slice(0,ta.selectionStart).includes('\n'))return; // not on the first line: move the caret as usual
+    if(!sentNav){const list=loadSent(key);if(!list.length)return;sentNav={key,list,i:list.length,draft:v};}
+    e.preventDefault();
+    if(sentNav.i===0)return;
+    sentNav.i--;showRecalled(ta,sentNav.list[sentNav.i]);
+  }else{
+    if(!sentNav||v.slice(ta.selectionEnd).includes('\n'))return;
+    e.preventDefault();
+    sentNav.i++;
+    if(sentNav.i>=sentNav.list.length){const d=sentNav.draft;sentNav=null;showRecalled(ta,d);}
+    else showRecalled(ta,sentNav.list[sentNav.i]);
+  }
+}
+function initSentHistory(){
+  const ta=document.getElementById('msg-input');
+  ta.addEventListener('keydown',onSentHistoryKey);
+  ta.addEventListener('input',e=>{if(!e.isComposing)sentNav=null;}); // edited: it's a new message now
+}
+
 async function sendMessage(){
   const input=document.getElementById('msg-input');
   const typed=input.value.trim(),content=typedToTokens(typed);
@@ -6545,6 +6593,7 @@ async function sendMessage(){
   if(!state.selectedBoardId)return;
   if(state.attachQueue.some(a=>a.status==='converting')){toast('Still converting a video, please wait…');return;}
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
+  rememberSent(typed);
   input.value='';autoResize(input);closeEmojiSuggest();renderComposerHighlight();
   stopTyping(); // sent — back to the plain green circle
   const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime,...(a.spoiler?{spoiler:true}:{})}));
@@ -12075,6 +12124,7 @@ function init(){
   window.runtime?.EventsOn('cloud:status',()=>{if(document.getElementById('settings-tab-account').classList.contains('active')&&!document.getElementById('settings-modal').classList.contains('hidden'))renderCloudSettings(false);});
 
   document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
+  initSentHistory();
   document.getElementById('msg-input').addEventListener('input',e=>{autoResize(e.target);noteTyping(e.target.value);});
   document.getElementById('modal-add').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAddModal();});
   document.getElementById('modal-confirm-delete').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDeleteConfirm();});
