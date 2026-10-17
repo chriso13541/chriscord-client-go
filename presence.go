@@ -412,7 +412,7 @@ func (a *App) emitUsers() {
 		presenceState.mu.Unlock()
 		return
 	}
-	ev := usersEvent{All: m.All, Owner: m.Owner, Nicknames: m.Nicknames, GlobalNicknames: m.GlobalNicknames,
+	ev := usersEvent{All: m.All, Owner: m.Owner, Nicknames: m.Nicknames, GlobalNicknames: m.GlobalNicknames, Bots: m.Bots,
 		Statuses: map[string]string{}, Activities: map[string]Activity{}, Custom: map[string]CustomStatusView{}, Sharing: map[string]string{}}
 	waiting := false
 	for _, u := range m.Online {

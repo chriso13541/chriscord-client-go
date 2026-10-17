@@ -1086,6 +1086,7 @@ type serverMsg struct {
 	// global ones from their profiles (username → nickname, only those set).
 	Nicknames       map[string]string `json:"nicknames"`
 	GlobalNicknames map[string]string `json:"global_nicknames"`
+	Bots            map[string]BotTag `json:"bots"`       // users: who's a bot, and who made it (bots.go)
 	Activities      map[string]Activity `json:"activities"` // users: what people are playing
 	PresenceBlobs   map[string]string   `json:"presence_blobs"` // users: everyone's encrypted status (presence.go)
 	Blob            string              `json:"blob"`           // presence: someone's encrypted status
@@ -1137,7 +1138,7 @@ type historyEvent struct {
 	BoardID  string        `json:"board_id"`
 	Messages []ChatMessage `json:"messages"`
 }
-type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"`; Activities map[string]Activity `json:"activities"`; Custom map[string]CustomStatusView `json:"custom"`; Sharing map[string]string `json:"sharing"` }
+type usersEvent  struct { Online []string `json:"online"`; Statuses map[string]string `json:"statuses"`; All []string `json:"all"`; Owner string `json:"owner"`; Nicknames map[string]string `json:"nicknames"`; GlobalNicknames map[string]string `json:"global_nicknames"`; Activities map[string]Activity `json:"activities"`; Custom map[string]CustomStatusView `json:"custom"`; Sharing map[string]string `json:"sharing"`; Bots map[string]BotTag `json:"bots"` }
 // Activity is what someone's playing (users messages): the game and since when.
 type Activity struct { Name string `json:"name"`; Since string `json:"since"` }
 type kickedEvent struct { Banned bool `json:"banned"`; Reason string `json:"reason"` }
@@ -1329,7 +1330,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 				a.presenceUsers(msg)
 				break
 			}
-			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner, Nicknames: msg.Nicknames, GlobalNicknames: msg.GlobalNicknames, Activities: msg.Activities})
+			runtime.EventsEmit(a.ctx, "chat:users", usersEvent{Online: msg.Online, Statuses: msg.Presence, All: msg.All, Owner: msg.Owner, Nicknames: msg.Nicknames, GlobalNicknames: msg.GlobalNicknames, Activities: msg.Activities, Bots: msg.Bots})
 		case "voice_removed":
 			// No longer allowed in the voice channel we were in (a role or
 			// channel change): the server has taken us out; hang up here.
@@ -1357,6 +1358,9 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.voiceMuted.Store(false)
 			a.voiceDeafened.Store(false)
 			runtime.EventsEmit(a.ctx, "voice:moved", msg.BoardID)
+		case "bots_updated":
+			// A bot was added, changed or removed (bots.go): Server → Bots reloads.
+			runtime.EventsEmit(a.ctx, "server:bots")
 		case "roles_updated":
 			a.text.changed() // who can see which channel may have changed
 			runtime.EventsEmit(a.ctx, "server:roles")

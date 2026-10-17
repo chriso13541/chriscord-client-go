@@ -1,5 +1,158 @@
 export namespace main {
 	
+	export class BotCert {
+	    v: number;
+	    bot_key: string;
+	    name: string;
+	    description: string;
+	    maker_key: string;
+	    created: number;
+	    sig: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BotCert(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.v = source["v"];
+	        this.bot_key = source["bot_key"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.maker_key = source["maker_key"];
+	        this.created = source["created"];
+	        this.sig = source["sig"];
+	    }
+	}
+	export class BotLinkInfo {
+	    cert: BotCert;
+	    permissions: number;
+	    fingerprint: string;
+	    maker_fingerprint: string;
+	    maker_here: string;
+	    maker_name: string;
+	    maker_check: string;
+	    maker_note: string;
+	    mine: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new BotLinkInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cert = this.convertValues(source["cert"], BotCert);
+	        this.permissions = source["permissions"];
+	        this.fingerprint = source["fingerprint"];
+	        this.maker_fingerprint = source["maker_fingerprint"];
+	        this.maker_here = source["maker_here"];
+	        this.maker_name = source["maker_name"];
+	        this.maker_check = source["maker_check"];
+	        this.maker_note = source["maker_note"];
+	        this.mine = source["mine"];
+	    }
+			convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MyBot {
+	    cert: BotCert;
+	    permissions: number;
+	    revoked_at: number;
+	    add_link: string;
+	    fingerprint: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MyBot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cert = this.convertValues(source["cert"], BotCert);
+	        this.permissions = source["permissions"];
+	        this.revoked_at = source["revoked_at"];
+	        this.add_link = source["add_link"];
+	        this.fingerprint = source["fingerprint"];
+	    }
+			convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class NewBotResult {
+	    bot: MyBot;
+	    token: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NewBotResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bot = this.convertValues(source["bot"], MyBot);
+	        this.token = source["token"];
+	    }
+			convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RevokeResult {
+	    dropped: string[];
+	    told: number;
+	    failed: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RevokeResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dropped = source["dropped"];
+	        this.told = source["told"];
+	        this.failed = source["failed"];
+	    }
+	}
 	export class UpdateStatus {
 	    available: boolean;
 	    version: string;

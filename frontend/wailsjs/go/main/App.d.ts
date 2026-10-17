@@ -6,6 +6,8 @@ export function AccountAvatar(arg1:string):Promise<string>;
 
 export function ActiveAccount():Promise<main.AccountSummary>;
 
+export function AddBot(arg1:string,arg2:number,arg3:Array<string>,arg4:string):Promise<string>;
+
 export function AutoLogin():Promise<main.AccountView>;
 
 export function CameraModes(arg1:string):Promise<Array<main.CameraMode>>;
@@ -50,6 +52,8 @@ export function ConvertVideoForPlayback(arg1:string,arg2:string):Promise<string>
 
 export function CreateAccount(arg1:string,arg2:string,arg3:string):Promise<main.AccountView>;
 
+export function CreateBot(arg1:string,arg2:string,arg3:number):Promise<main.NewBotResult>;
+
 export function CreateInvite():Promise<main.InviteInfo>;
 
 export function DeleteEmoji(arg1:string):Promise<void>;
@@ -81,6 +85,8 @@ export function FetchServerThemeBackground():Promise<string>;
 export function FetchUserPfp(arg1:string):Promise<string>;
 
 export function FetchUserProfile(arg1:string):Promise<main.UserProfile>;
+
+export function ForgetBot(arg1:string):Promise<void>;
 
 export function GetAboutInfo():Promise<main.AboutInfo>;
 
@@ -152,9 +158,13 @@ export function ListAccounts():Promise<Array<main.AccountSummary>>;
 
 export function ListCameras():Promise<Array<main.CameraDevice>>;
 
+export function ListMyBots():Promise<Array<main.MyBot>>;
+
 export function ListShareSources():Promise<Array<main.ShareSource>>;
 
 export function LogOut():Promise<void>;
+
+export function MakerIdentity(arg1:string):Promise<main.BotLinkInfo>;
 
 export function MemberIdentity(arg1:string):Promise<main.MemberIdentityView>;
 
@@ -190,6 +200,8 @@ export function PushVideoFrame(arg1:string,arg2:number):Promise<void>;
 
 export function ReactToMessage(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function ReadBotLink(arg1:string):Promise<main.BotLinkInfo>;
+
 export function ReadImageAsDataURL(arg1:string):Promise<string>;
 
 export function ReadImageFiles(arg1:Array<string>):Promise<Array<main.EmojiFile>>;
@@ -201,6 +213,8 @@ export function ReconnectVoice(arg1:Array<string>):Promise<void>;
 export function RememberAccount(arg1:boolean):Promise<void>;
 
 export function RememberAvailable():Promise<boolean>;
+
+export function RemoveBot(arg1:string):Promise<void>;
 
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
@@ -215,6 +229,8 @@ export function RequestVideoKeyframe(arg1:string):Promise<void>;
 export function ResolveServerAddress(arg1:string):Promise<string>;
 
 export function RestartToUpdate():Promise<void>;
+
+export function RevokeBot(arg1:string):Promise<main.RevokeResult>;
 
 export function SaveAccountExport():Promise<string>;
 
@@ -233,6 +249,8 @@ export function SearchServerFiltered(arg1:string,arg2:string,arg3:string,arg4:st
 export function SendMessage(arg1:string,arg2:string,arg3:Array<main.Attachment>,arg4:string):Promise<void>;
 
 export function SendTyping(arg1:boolean):Promise<void>;
+
+export function ServerBots():Promise<string>;
 
 export function SetActiveAccount(arg1:string):Promise<void>;
 
@@ -289,6 +307,8 @@ export function ToggleDeafen():Promise<boolean>;
 export function ToggleMute():Promise<boolean>;
 
 export function UnlockAccount(arg1:string):Promise<main.AccountView>;
+
+export function UpdateBot(arg1:string,arg2:number,arg3:Array<string>):Promise<void>;
 
 export function UpdateEmoji(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 

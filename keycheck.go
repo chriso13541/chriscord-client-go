@@ -414,12 +414,22 @@ type MemberIdentityView struct {
 	Changed     bool   `json:"changed"` // their key changed on this server since this app started
 }
 
+// groupedFingerprint is the start of a key, for people to compare: 32 hex
+// characters (128 bits — too many to make a look-alike key for, unlike the
+// 16 shown before), in groups of four.
 func groupedFingerprint(pubHex string) string {
-	if len(pubHex) < 16 {
+	if len(pubHex) < 32 {
 		return pubHex
 	}
-	f := pubHex[:16]
-	return f[0:4] + " " + f[4:8] + " " + f[8:12] + " " + f[12:16]
+	f := pubHex[:32]
+	var b strings.Builder
+	for i := 0; i < len(f); i += 4 {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(f[i : i+4])
+	}
+	return b.String()
 }
 
 // MemberIdentity describes the key behind a member of the server you're on.

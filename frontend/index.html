@@ -110,7 +110,7 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .cloud-msg.ok { color:var(--green); } .cloud-msg.bad { color:var(--red); }
 .cloud-danger .settings-label { color:var(--red); }
 #cloud-del-btn:hover { background:var(--red); border-color:var(--red); color:#fff; }
-#modal-recovery { z-index:550; }
+#modal-recovery, .modal-overlay.over-settings { z-index:550; }
 .recovery-key { font-family:Consolas,monospace; font-size:.84rem; white-space:nowrap; overflow-x:auto; color:var(--text-strong); background:var(--bg-darkest); border:1px solid var(--border); border-radius:8px; padding:14px 10px; text-align:center; user-select:all; margin-bottom:10px; }
 #recover-key { font-family:Consolas,monospace; }
 .gate-tabs .gate-tab { padding:8px 4px; white-space:nowrap; }
@@ -176,6 +176,62 @@ body.resizing-panels, body.resizing-panels * { cursor:col-resize !important; use
 body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !important; }
 .btn-danger { background:var(--red); color:#fff; }
 .owner-crown { display:inline-flex; color:var(--yellow); flex-shrink:0; }
+/* BOTS: the tag by a bot's name, Settings > Bots, the server's bots window */
+.bot-tag { display:inline-flex; align-items:center; height:15px; padding:0 4px; margin-left:5px; border-radius:3px; background:var(--accent); color:#fff; font-size:.6rem; font-weight:800; letter-spacing:.04em; line-height:1; vertical-align:2px; flex-shrink:0; text-transform:uppercase; }
+.bot-form { margin-top:14px; padding:4px 16px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
+.bot-form .error-msg { margin-top:12px; }
+.bot-form textarea { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text-strong); font:inherit; font-size:.9rem; outline:none; resize:vertical; }
+.bot-form textarea:focus { border-color:var(--accent); }
+.bot-desc-count { float:right; font-weight:400; text-transform:none; }
+.bot-rules { margin-top:16px; font-size:.82rem; color:var(--text); line-height:1.45; }
+.bot-rules ul { margin:4px 0 0 18px; color:var(--text-muted); }
+.bot-form .profile-btn-row { display:flex; gap:8px; justify-content:flex-end; }
+.bp-group { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin:10px 0 4px; }
+.perm-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px 16px; }
+.perm-grid .check-row { margin:0; padding:3px 0; font-size:.85rem; }
+.check-row.off { opacity:.45; cursor:not-allowed; }
+.bot-card { padding:12px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg-mid); margin-top:10px; }
+.bot-card.revoked { opacity:.7; }
+.bot-card.intro { margin-top:0; }
+.bc-head { display:flex; align-items:flex-start; gap:10px; }
+.bc-head .bc-ic { width:22px; height:22px; color:var(--text-muted); flex-shrink:0; margin-top:1px; }
+.bc-title { min-width:0; flex:1; }
+.bc-name { font-weight:700; color:var(--text-strong); display:flex; align-items:center; flex-wrap:wrap; gap:2px; }
+.bc-name .cloud-badge { margin-left:8px; }
+.bc-online { width:8px; height:8px; border-radius:50%; background:var(--green); margin-left:8px; }
+.bc-sub { font-size:.78rem; color:var(--text-muted); margin-top:2px; line-height:1.4; }
+.bc-sub b { color:var(--text); }
+.bc-desc { font-size:.85rem; color:var(--text); margin-top:8px; line-height:1.45; overflow-wrap:anywhere; }
+.bc-desc.empty { color:var(--text-muted); font-style:italic; }
+.bc-line { font-size:.82rem; color:var(--text-muted); margin-top:6px; line-height:1.4; overflow-wrap:anywhere; }
+.bc-line b { color:var(--text); font-weight:600; }
+.bc-fp { font-family:Consolas,monospace; font-size:.74rem; color:var(--text-muted); margin-top:5px; }
+.bc-verified, .bc-problem { display:inline-flex; align-items:center; gap:3px; margin-left:4px; }
+.bc-verified { color:var(--green); } .bc-problem { color:var(--red-light); }
+.bc-verified .ic, .bc-problem .ic { width:14px; height:14px; }
+.bc-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.bc-actions .settings-secondary-btn { margin-top:0; display:inline-flex; align-items:center; gap:6px; }
+.bc-actions .settings-secondary-btn .ic { width:16px; height:16px; }
+.settings-secondary-btn.danger { color:var(--red-light); }
+.bots-modal { width:600px; max-height:calc(100vh - 60px); overflow-y:auto; }
+.bot-modal { width:520px; }
+.bots-modal .settings-label, .bots-modal .settings-label:first-of-type, .bot-modal .settings-label { margin-top:18px; }
+.sb-add { display:flex; gap:8px; margin-bottom:12px; }
+.sb-add input, .bots-modal .form-group input { flex:1; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text-strong); font-size:.88rem; outline:none; min-width:0; }
+.sb-add input:focus { border-color:var(--accent); }
+.sb-note { font-size:.8rem !important; margin:0 0 8px !important; }
+.chan-pick { max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:4px 12px 8px; background:var(--bg-darkest); }
+.chan-pick .cp-cat { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin:8px 0 2px; }
+.chan-pick .check-row { margin:0; padding:3px 0; font-size:.86rem; gap:8px; }
+.chan-pick .cp-ic { width:15px; height:15px; color:var(--text-muted); margin-right:-2px; }
+.token-box { font-family:Consolas,monospace; font-size:.76rem; word-break:break-all; color:var(--text-strong); background:var(--bg-darkest); border:1px solid var(--border); border-radius:8px; padding:12px; user-select:all; margin-bottom:10px; line-height:1.45; max-height:120px; overflow-y:auto; }
+.token-box.small { font-size:.7rem; max-height:70px; }
+.pc-botinfo .pc-id-row .ic { color:var(--accent); }
+.pc-bot-desc { font-size:.82rem; color:var(--text); margin-top:6px; line-height:1.4; overflow-wrap:anywhere; }
+.pc-bot-line { font-size:.78rem; color:var(--text-muted); margin-top:4px; overflow-wrap:anywhere; }
+.pc-bot-line b { color:var(--text); font-weight:600; }
+.sip-bots-btn { display:inline-flex; align-items:center; gap:6px; }
+.sip-bots-btn .ic { width:16px; height:16px; }
 .owner-crown .ic { width:14px; height:14px; }
 #room-list { flex:1; overflow-y:auto; padding:8px 0; }
 .room-header { padding:6px 8px 4px 12px; font-size:.79rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; border-radius:4px; margin:0 4px; }
@@ -1578,6 +1634,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
   <symbol id="ic-lock" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></symbol>
   <symbol id="ic-reply" viewBox="0 -960 960 960"><path d="M760-200v-160q0-50-35-85t-85-35H273l144 144-57 56-240-240 240-240 57 56-144 144h367q83 0 141.5 58.5T840-360v160h-80Z"/></symbol>
+  <symbol id="ic-smart_toy" viewBox="0 -960 960 960"><path d="M160-360q-50 0-85-35t-35-85q0-50 35-85t85-35v-80q0-33 23.5-56.5T240-760h120q0-50 35-85t85-35q50 0 85 35t35 85h120q33 0 56.5 23.5T800-680v80q50 0 85 35t35 85q0 50-35 85t-85 35v160q0 33-23.5 56.5T720-120H240q-33 0-56.5-23.5T160-200v-160Zm200-80q25 0 42.5-17.5T420-500q0-25-17.5-42.5T360-560q-25 0-42.5 17.5T300-500q0 25 17.5 42.5T360-440Zm240 0q25 0 42.5-17.5T660-500q0-25-17.5-42.5T600-560q-25 0-42.5 17.5T540-500q0 25 17.5 42.5T600-440ZM320-280h320v-80H320v80Zm-80 80h480v-480H240v480Zm240-240Z"/></symbol>
+  <symbol id="ic-key_off" viewBox="0 -960 960 960"><path d="M790-57 488-359q-32 54-87 86.5T280-240q-100 0-170-70T40-480q0-66 32.5-121t86.5-87L57-790l57-56 732 733-56 56Zm50-543 120 120-183 183-127-126 50-37 72 54 75-74-40-40H553l-80-80h367ZM280-320q51 0 90.5-27.5T428-419l-56-56-48.5-48.5L275-572l-56-56q-44 18-71.5 57.5T120-480q0 66 47 113t113 47Zm0-80q-33 0-56.5-23.5T200-480q0-33 23.5-56.5T280-560q33 0 56.5 23.5T360-480q0 33-23.5 56.5T280-400Z"/></symbol>
   <symbol id="ic-person_add" viewBox="0 -960 960 960"><path d="M720-400v-120H600v-80h120v-120h80v120h120v80H800v120h-80Zm-360-80q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
   <symbol id="ic-arrow_forward" viewBox="0 -960 960 960"><path d="M647-440H160v-80h487L423-744l57-56 320 320-320 320-57-56 224-224Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
@@ -1928,6 +1986,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <div id="settings-tabs">
     <div class="settings-tab active" data-tab="profile">Profile</div>
     <div class="settings-tab" data-tab="account">Account</div>
+    <div class="settings-tab" data-tab="bots">Bots</div>
     <div class="settings-tab" data-tab="appearance">Appearance</div>
     <div class="settings-tab" data-tab="voice">Voice &amp; Video</div>
     <div class="settings-tab" data-tab="screenshare">Screen Sharing</div>
@@ -2064,6 +2123,26 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
           <div class="cloud-msg hidden" id="cloud-del-msg"></div>
         </div>
       </div>
+    </div>
+    <div id="settings-tab-bots" class="settings-tab-pane">
+      <h2>Bots</h2>
+      <p class="settings-hint" style="margin-top:0">A bot is a program that joins servers with an identity of its own, like the music bot. Make one here and you get its <b>token</b>, for whoever runs it, and an <b>Add to server</b> link: someone with Manage Bots on a server adds it from the link and picks which channels it sees. It always shows as a bot, made by you, and never needs a server’s join key or owner key.</p>
+      <button class="btn btn-primary" id="bot-new-btn" type="button" style="margin-top:14px">New Bot</button>
+      <div id="bot-new-form" class="hidden bot-form">
+        <div class="error-msg hidden" id="bot-new-error"></div>
+        <label class="settings-label" for="bot-new-name">Name</label>
+        <div class="form-group"><input id="bot-new-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Music"><div class="hint">2–32 characters. A server can show it under another name if this one’s taken there.</div></div>
+        <label class="settings-label" for="bot-new-desc">Description <span class="bot-desc-count" id="bot-new-desc-count">0/190</span></label>
+        <div class="form-group"><textarea id="bot-new-desc" maxlength="190" rows="3" placeholder="Plays music in calls. Keeps the song queue in memory; downloads are deleted once played."></textarea><div class="hint">What it does, and what it keeps and for how long. People adding it read this.</div></div>
+        <label class="settings-label">What it asks for</label>
+        <div id="bot-new-perms"></div>
+        <p class="settings-hint" style="margin-top:6px">Whoever adds it decides; this is only what’s ticked to start with. It never gets Administrator or Manage Bots.</p>
+        <div class="bot-rules"><b>Making a bot, you agree to the bot rules:</b>
+          <ul><li>Its description says what it keeps.</li><li>It keeps only what its job needs, and doesn’t pass on what it reads.</li><li>When it’s removed from a server, it forgets that server.</li><li>It asks for no more than it needs.</li><li>Its token stays secret, and you revoke it the moment it might have leaked.</li></ul>
+          <label class="check-row" style="margin:8px 0 0"><input type="checkbox" id="bot-new-rules"> I’ll follow these</label></div>
+        <div class="profile-btn-row"><button class="settings-secondary-btn" id="bot-new-cancel" type="button">Cancel</button><button class="btn btn-primary" id="bot-new-create" type="button" disabled style="margin-top:14px">Make Bot</button></div>
+      </div>
+      <div id="my-bots"></div>
     </div>
     <div id="settings-tab-appearance" class="settings-tab-pane">
       <h2>Appearance</h2>
@@ -3921,8 +4000,10 @@ function renderServerInfo(){
     ${state.serverDescription?`<div class="sip-label">About</div><div class="sip-desc">${renderTextWithLinks(state.serverDescription)}</div>`:''}
     ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}
     ${can(PERM.INVITE)?`<div class="sip-label">Invite people</div>
-    <div class="sip-invite" id="sip-invite">${invite&&Date.parse(invite.expires_at)>Date.now()?inviteHTML():`<button class="btn btn-primary sip-invite-btn" id="sip-invite-make">${icon('person_add')}Create invite link</button><div class="sip-hint">Anyone with the link can join for ${INVITE_MINUTES} minutes. It doesn\u2019t contain the server\u2019s join key.</div>`}</div>`:''}</div>`;
+    <div class="sip-invite" id="sip-invite">${invite&&Date.parse(invite.expires_at)>Date.now()?inviteHTML():`<button class="btn btn-primary sip-invite-btn" id="sip-invite-make">${icon('person_add')}Create invite link</button><div class="sip-hint">Anyone with the link can join for ${INVITE_MINUTES} minutes. It doesn\u2019t contain the server\u2019s join key.</div>`}</div>`:''}
+    ${botsSupported()?`<div class="sip-label" style="margin-top:12px">Bots</div><button class="btn btn-ghost sip-bots-btn" id="sip-bots" type="button">${icon('smart_toy')}${can(PERM.BOTS)?'Manage Bots':'See Bots'}</button>`:''}</div>`;
   wireInvite(pop);
+  pop.querySelector('#sip-bots')?.addEventListener('click',e=>{e.stopPropagation();openServerBots();});
   const banner=pop.querySelector('.sip-banner'),ic=pop.querySelector('.sip-icon');
   const fallback=avatarColour(state.domain||state.serverName||'?');
   if(serverBannerURL)banner.style.backgroundImage=`url("${serverBannerURL}")`;
@@ -4355,6 +4436,7 @@ function switchSettingsTab(name){
   if(name==='about')renderAbout();
   if(name==='system')renderSystemSettings();
   if(name==='account')renderCloudSettings();
+  if(name==='bots'){botFormOpen=false;renderBotSettings();}
 }
 
 // ── SETTINGS > SYSTEM ────────────────────────────────────────────
@@ -5071,12 +5153,13 @@ function renderMembers(payload){
   state.sharing=payload?.sharing||{};
   if(payload&&'nicknames' in payload){state.nicknames=payload.nicknames||{};state.globalNicknames=payload.global_nicknames||{};}
   if(payload&&'owner' in payload)state.serverOwner=payload.owner||'';
+  state.bots=payload?.bots||{};
   const onlineSet=new Set(online),offline=all.filter(u=>!onlineSet.has(u));
   const onlineEl=document.getElementById('members-online'),offlineEl=document.getElementById('members-offline');
   onlineEl.innerHTML='';offlineEl.innerHTML='';
   function memberRow(name,isOnline){
     const row=document.createElement('div');row.className='member-row';row.dataset.user=name;const colour=avatarColour(name);
-    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${dnHTML(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span>${isOnline?memberActivityHTML(name):''}<span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
+    row.innerHTML=`<div class="user-avatar" data-pfp-user="${esc(name)}" style="background-color:${colour};width:24px;height:24px;font-size:.7rem;opacity:${isOnline?1:.5}">${name[0].toUpperCase()}</div><span class="member-name" style="opacity:${isOnline?1:.6}${nameColor(name)?`;color:${nameColor(name)}`:''}">${dnHTML(name)}${botTag(name)}${name===state.serverOwner?`<span class="owner-crown" title="Server owner">${icon('crown')}</span>`:''}</span>${isOnline?memberActivityHTML(name):''}<span data-presence-user="${esc(name)}" style="margin-left:auto;display:inline-flex">${presenceBadge(userPresence(name))}</span>`;
     applyUserAvatar(row.querySelector('.user-avatar'),name);
     return row;
   }
@@ -5441,6 +5524,7 @@ function openExternalURL(url){
   if(ml){openMessageLink(ml);return;} // a chriscord message link: jump, don't open a browser
   const inv=parseInviteLink(url);
   if(inv){confirmJoinInvite(inv);return;} // an invite link: offer to join
+  if(BOT_LINK.test(String(url).trim())){openAddBotLink(String(url).trim());return;} // a bot's Add to server link
   // Opened by the app's Go side, not Wails' BrowserOpenURL — that one turns
   // away links with characters like ( ) ! ~ or spaces, which real links have.
   window.go.main.App.OpenURL(url).catch(err=>toast('Couldn\u2019t open that link: '+err,true));
@@ -6117,7 +6201,7 @@ function importedTagHTML(msg){
 function buildSystemMsgEl(msg){
   const div=document.createElement('div');
   div.className='msg-group msg-system';div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
-  const name=`<span class="msg-username sys-name" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span>`;
+  const name=`<span class="msg-username sys-name" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span>${botTag(msg.username)}`;
   // A few friendly variations, picked by message id so everyone sees the same one.
   const lines=[n=>`${n} joined the server.`,n=>`Welcome, ${n}! Say hi.`,n=>`${n} just showed up.`,n=>`Everyone welcome ${n}!`,n=>`${n} hopped into the server.`];
   const pick=[...msg.id].reduce((a,c)=>a+c.charCodeAt(0),0)%lines.length;
@@ -6143,7 +6227,7 @@ function buildMsgEl(msg,grouped){
       : `<div class="msg-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
-        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span><span class="msg-time" title="${hoverTime}">${time}</span>`}
+        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span>${botTag(msg.username)}<span class="msg-time" title="${hoverTime}">${time}</span>`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}${importedTagHTML(msg)}
       </div>
       ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
@@ -6897,7 +6981,7 @@ function buildProfileCard(p){
     <div class="pc-banner"></div>
     <div class="pc-avatar-wrap"><div class="pc-avatar"></div><div class="pc-status" ${p.own?'data-presence-user-self':`data-presence-user="${esc(p.username)}"`}>${presenceBadge(p.presence||(p.online?'online':'offline'))}</div></div>
     <div class="pc-body">
-      <div class="pc-name"${p.shownName==null?` data-dn="${esc(p.username)}"`:''}>${esc(shown)}</div>
+      <div class="pc-name"${p.shownName==null?` data-dn="${esc(p.username)}"`:''}>${esc(shown)}</div>${isBot(p.username)&&!p.own?'<div class="pc-username">'+botTag(p.username)+'</div>':''}
       ${shown!==p.username?`<div class="pc-username">${esc(p.username)}</div>`:''}
       ${p.memberSince?`<div class="pc-since">Member since ${esc(formatMemberSince(p.memberSince))}</div>`:''}
       ${(state.onlineUsers||[]).includes(p.username)&&state.customStatuses?.[p.username]&&(state.customStatuses[p.username].text||state.customStatuses[p.username].emoji)?`<div class="pc-custom">${customStatusHTML(state.customStatuses[p.username])}</div>`:''}
@@ -6997,6 +7081,7 @@ async function openProfilePopup(user,anchor){
   pop.classList.remove('hidden');
   positionProfilePopup(pop,anchorRect,place);
   if(!data.imported)loadIdentitySection(user,pop,anchorRect,place);
+  if(isBot(user))loadBotSection(user,pop,anchorRect,place);
 }
 // The key behind a profile, and what chriscord.app says about it, added
 // to the card once it's known (a directory lookup can take a moment).
@@ -10805,8 +10890,8 @@ function initPanelResize(){
 // can't use so you're not offered it.
 const PERM={SEND:1,ATTACH:2,REACT:4,MANAGE:8,CONNECT:16,KICK:32,BAN:64,PIN:128,ADMIN:256,EMOJI:512,
   CREATE_EXPR:1<<10,VIEW:1<<11,HISTORY:1<<12,INVITE:1<<13,NICK:1<<14,MANAGE_NICKS:1<<15,EMBED:1<<16,
-  SPEAK:1<<17,VIDEO:1<<18,MUTE:1<<19,DEAFEN:1<<20,MOVE:1<<21,CHANNELS:1<<22,LISTEN:1<<23};
-const PERM_ALL=(1<<24)-1;
+  SPEAK:1<<17,VIDEO:1<<18,MUTE:1<<19,DEAFEN:1<<20,MOVE:1<<21,CHANNELS:1<<22,LISTEN:1<<23,BOTS:1<<24,IMPORT:1<<25};
+const PERM_ALL=(1<<26)-1;
 const PERM_DEFAULT=PERM.SEND|PERM.ATTACH|PERM.REACT|PERM.CONNECT|PERM.PIN|PERM.VIEW|PERM.HISTORY|PERM.INVITE|PERM.NICK|PERM.EMBED|PERM.SPEAK|PERM.VIDEO|PERM.LISTEN;
 // Servers from before these permissions existed didn't limit any of them:
 // treat them as allowed there (the moderation ones they can't do at all).
@@ -10909,6 +10994,335 @@ function confirmRemove(user,ban){
     try{await window.go.main.App.KickMember(user,ban,ov.querySelector('#rm-reason').value);close();toast(`${user} was ${ban?'banned':'kicked'}.`);}
     catch(err){toast(String(err),true);}
   };
+}
+
+// ── BOTS ─────────────────────────────────────────────────────────
+// Settings → Bots: the bots you've made (bots.go). Each is its own key with
+// a certificate your key signs; the app shows its token once and gives an
+// "Add to server" link. Server → Bots (from the server card): the bots on
+// this server. Anyone sees what each may do; people with Manage Bots add
+// them from their links, choose what they may do and which channels they
+// see, and remove them. The server checks all of it again (bots.rs).
+const BOT_PERMS=[
+  {bit:PERM.SEND,name:'Send Messages',group:'Text'},
+  {bit:PERM.EMBED,name:'Embed Links',group:'Text'},
+  {bit:PERM.ATTACH,name:'Attach Files',group:'Text'},
+  {bit:PERM.REACT,name:'Add Reactions',group:'Text'},
+  {bit:PERM.HISTORY,name:'Read Message History',group:'Text'},
+  {bit:PERM.PIN,name:'Pin Messages',group:'Text'},
+  {bit:PERM.MANAGE,name:'Manage Messages',group:'Text'},
+  {bit:PERM.CONNECT,name:'Connect',group:'Voice'},
+  {bit:PERM.SPEAK,name:'Speak',group:'Voice'},
+  {bit:PERM.LISTEN,name:'Listen',group:'Voice',about:'Hear people in calls. A bot that only plays sound doesn’t need it.'},
+  {bit:PERM.VIDEO,name:'Video',group:'Voice'},
+  {bit:PERM.NICK,name:'Change Nickname',group:'Other'},
+  {bit:PERM.IMPORT,name:'Import Messages',group:'Other',about:'Bring in history with the Discord importer. Only the server owner can give this.'},
+];
+const BOT_DEFAULT_ASK=PERM.SEND|PERM.EMBED|PERM.REACT|PERM.HISTORY;
+const BOT_LINK=/^https:\/\/chriscord\.app\/addbot#[A-Za-z0-9_-]+$/;
+state.bots={};
+const isBot=u=>!!state.bots?.[u];
+const botTag=u=>isBot(u)?'<span class="bot-tag" title="A bot — a program, not a person">BOT</span>':'';
+const botPermNames=p=>BOT_PERMS.filter(x=>(p&x.bit)===x.bit).map(x=>x.name);
+const botsSupported=()=>state.permsVersion>=4;
+
+function botPermsHTML(sel,allowed){
+  const groups=[...new Set(BOT_PERMS.map(p=>p.group))];
+  return groups.map(g=>`<div class="bp-group">${esc(g)}</div><div class="perm-grid">${BOT_PERMS.filter(p=>p.group===g).map(p=>{
+    const off=allowed!=null&&(allowed&p.bit)!==p.bit;
+    const tip=off?'You don’t have this permission yourself, so you can’t give it':(p.about||'');
+    return `<label class="check-row${off?' off':''}"${tip?` title="${esc(tip)}"`:''}><input type="checkbox" data-perm="${p.bit}"${(sel&p.bit)===p.bit&&!off?' checked':''}${off?' disabled':''}>${esc(p.name)}</label>`;
+  }).join('')}</div>`).join('');
+}
+function readPerms(root){let p=0;root.querySelectorAll('input[data-perm]:checked').forEach(i=>{p|=+i.dataset.perm;});return p;}
+const fmtDay=unix=>new Date(unix*1000).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+
+// ── Settings → Bots ──
+let botFormOpen=false;
+async function renderBotSettings(){
+  const list=document.getElementById('my-bots');
+  let bots=[];
+  try{bots=await window.go.main.App.ListMyBots()||[];}
+  catch(err){list.innerHTML=`<div class="error-msg">${esc(String(err))}</div>`;return;}
+  document.getElementById('bot-new-form').classList.toggle('hidden',!botFormOpen);
+  if(!bots.length){list.innerHTML=`<p class="settings-hint">You haven’t made any bots yet.</p>`;return;}
+  list.innerHTML=`<label class="settings-label" style="margin-top:26px">Your Bots</label>`+bots.map(b=>{
+    const c=b.cert,revoked=!!b.revoked_at,asks=botPermNames(b.permissions);
+    return `<div class="bot-card${revoked?' revoked':''}" data-key="${esc(c.bot_key)}">
+      <div class="bc-head">${icon('smart_toy','bc-ic')}<div class="bc-title"><div class="bc-name">${esc(c.name)}${revoked?'<span class="cloud-badge warn">Revoked</span>':''}</div>
+        <div class="bc-sub">Made ${esc(fmtDay(c.created))}${revoked?` · revoked ${esc(fmtDay(b.revoked_at))}`:''}</div></div></div>
+      ${c.description?`<div class="bc-desc">${esc(c.description)}</div>`:''}
+      <div class="bc-line"><b>Asks for:</b> ${asks.length?esc(asks.join(', ')):'nothing'}</div>
+      <div class="bc-fp" title="The start of the bot’s key">Key ${esc(b.fingerprint)}</div>
+      <div class="bc-actions">${revoked
+        ?`<button class="settings-secondary-btn" data-act="forget">${icon('delete')}Remove from List</button>`
+        :`<button class="settings-secondary-btn" data-act="link">${icon('link')}Copy Add to Server Link</button><button class="settings-secondary-btn danger" data-act="revoke">${icon('key_off')}Revoke</button>`}</div>
+    </div>`;}).join('');
+  list.querySelectorAll('.bot-card').forEach(card=>{
+    const b=bots.find(x=>x.cert.bot_key===card.dataset.key);
+    card.querySelector('[data-act="link"]')?.addEventListener('click',async e=>{await copyText(b.add_link);flashBtn(e.currentTarget,'Copied');});
+    card.querySelector('[data-act="revoke"]')?.addEventListener('click',()=>confirmRevokeBot(b));
+    card.querySelector('[data-act="forget"]')?.addEventListener('click',async()=>{
+      try{await window.go.main.App.ForgetBot(b.cert.bot_key);renderBotSettings();}catch(err){toast(String(err),true);}
+    });
+  });
+}
+function flashBtn(btn,text){
+  const was=btn.innerHTML;btn.innerHTML=`${icon('check')}${esc(text)}`;
+  setTimeout(()=>{if(btn.isConnected)btn.innerHTML=was;},1500);
+}
+function openBotForm(){
+  botFormOpen=true;
+  const f=document.getElementById('bot-new-form');
+  f.classList.remove('hidden');
+  document.getElementById('bot-new-name').value='';document.getElementById('bot-new-desc').value='';
+  document.getElementById('bot-new-perms').innerHTML=botPermsHTML(BOT_DEFAULT_ASK,null);
+  document.getElementById('bot-new-rules').checked=false;
+  document.getElementById('bot-new-error').classList.add('hidden');
+  updateBotDescCount();updateBotCreateBtn();
+  document.getElementById('bot-new-name').focus();
+}
+function closeBotForm(){botFormOpen=false;document.getElementById('bot-new-form').classList.add('hidden');}
+function updateBotDescCount(){
+  const n=[...document.getElementById('bot-new-desc').value].length;
+  document.getElementById('bot-new-desc-count').textContent=`${n}/190`;
+}
+function updateBotCreateBtn(){
+  const name=document.getElementById('bot-new-name').value.trim();
+  document.getElementById('bot-new-create').disabled=[...name].length<2||!document.getElementById('bot-new-rules').checked;
+}
+async function createBot(){
+  const name=document.getElementById('bot-new-name').value.trim();
+  const desc=document.getElementById('bot-new-desc').value.trim();
+  const perms=readPerms(document.getElementById('bot-new-perms'));
+  const err=document.getElementById('bot-new-error'),btn=document.getElementById('bot-new-create');
+  err.classList.add('hidden');btn.disabled=true;
+  try{
+    const r=await window.go.main.App.CreateBot(name,desc,perms);
+    closeBotForm();
+    await renderBotSettings();
+    showBotToken(r);
+  }catch(e){err.textContent=String(e).replace(/^Error: /,'');err.classList.remove('hidden');btn.disabled=false;}
+}
+// The token, shown once.
+function showBotToken(r){
+  const ov=document.createElement('div');ov.className='modal-overlay over-settings';
+  ov.innerHTML=`<div class="modal bot-modal">
+    <h2>${esc(r.bot.cert.name)} is ready</h2>
+    <p>This is the bot’s <b>token</b>. Whoever runs the bot puts it in its settings. It’s the bot’s whole identity: anyone with it can be your bot, and it’s only shown this once.</p>
+    <div class="token-box" id="bt-token">${esc(r.token)}</div>
+    <div class="profile-btn-row" style="margin-bottom:8px"><button class="settings-secondary-btn" id="bt-copy" type="button" style="margin-top:0">${icon('content_copy')}Copy Token</button></div>
+    <label class="settings-label">Add to server link</label>
+    <p style="margin-bottom:8px">Share this with whoever runs a server. Someone with <b>Manage Bots</b> opens it in chriscord to add the bot and choose what it can see. It doesn’t contain the token.</p>
+    <div class="token-box small" id="bt-link">${esc(r.bot.add_link)}</div>
+    <div class="profile-btn-row" style="margin-bottom:16px"><button class="settings-secondary-btn" id="bt-copy-link" type="button" style="margin-top:0">${icon('link')}Copy Link</button></div>
+    <label class="check-row"><input type="checkbox" id="bt-saved"> I’ve saved the token somewhere safe</label>
+    <div class="modal-actions"><button class="btn btn-primary" id="bt-done" disabled>Done</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#bt-copy').onclick=async e=>{await copyText(r.token);flashBtn(e.currentTarget,'Copied');};
+  ov.querySelector('#bt-copy-link').onclick=async e=>{await copyText(r.bot.add_link);flashBtn(e.currentTarget,'Copied');};
+  ov.querySelector('#bt-saved').onchange=e=>{ov.querySelector('#bt-done').disabled=!e.target.checked;};
+  ov.querySelector('#bt-done').onclick=()=>ov.remove();
+}
+function confirmRevokeBot(b){
+  const ov=document.createElement('div');ov.className='modal-overlay over-settings';
+  ov.innerHTML=`<div class="modal"><h2>Revoke ${esc(b.cert.name)}?</h2>
+    <p>Its token stops working for good. Every server you’ve saved is told; the ones that have it drop it straight away and won’t take it back. To run it again you’d make a new bot.</p>
+    <div class="error-msg hidden" id="rv-err"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="rv-no">Cancel</button><button class="btn btn-danger" id="rv-yes">Revoke</button></div></div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.querySelector('#rv-no').onclick=close;ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+  ov.querySelector('#rv-yes').onclick=async()=>{
+    const btn=ov.querySelector('#rv-yes');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+    try{
+      const r=await window.go.main.App.RevokeBot(b.cert.bot_key);
+      close();renderBotSettings();
+      const dropped=r.dropped?.length?` ${r.dropped.length===1?'One server':r.dropped.length+' servers'} dropped it.`:'';
+      const failed=r.failed?.length?` Couldn’t reach ${r.failed.map(d=>d).join(', ')} — it’ll still work there until it’s removed.`:'';
+      toast(`${b.cert.name} is revoked.${dropped}${failed}`,!!r.failed?.length);
+    }catch(e){const er=ov.querySelector('#rv-err');er.textContent=String(e).replace(/^Error: /,'');er.classList.remove('hidden');btn.disabled=false;btn.textContent='Revoke';}
+  };
+}
+
+// ── Server → Bots ──
+let serverBotsCache=null; // {domain, at, data}
+async function loadServerBots(force){
+  if(!force&&serverBotsCache&&serverBotsCache.domain===state.domain&&Date.now()-serverBotsCache.at<30000)return serverBotsCache.data;
+  const data=JSON.parse(await window.go.main.App.ServerBots()||'{}');
+  data.bots=data.bots||[];
+  serverBotsCache={domain:state.domain,at:Date.now(),data};
+  return data;
+}
+async function allBoards(){
+  for(const r of state.rooms||[]){
+    if(state.boardsByRoom[r.id])continue;
+    try{state.boardsByRoom[r.id]=await window.go.main.App.GetBoards(r.id)||[];}catch{state.boardsByRoom[r.id]=[];}
+  }
+  return (state.rooms||[]).map(r=>({room:r,boards:state.boardsByRoom[r.id]||[]})).filter(g=>g.boards.length);
+}
+const boardName=id=>{const b=findBoardLocal(id);return b?b.name:'';};
+function chanPickHTML(groups,checked){
+  return `<div class="chan-pick">${groups.map(g=>`<div class="cp-cat">${esc(g.room.name)}</div>${g.boards.map(b=>`<label class="check-row"><input type="checkbox" data-board="${esc(b.id)}"${checked.has(b.id)?' checked':''}>${icon(g.room.room_type==='voice'?'volume_up':'tag','cp-ic')}${esc(b.name)}</label>`).join('')}`).join('')||'<div class="bc-sub">No channels.</div>'}</div>`;
+}
+const readChans=root=>[...root.querySelectorAll('input[data-board]:checked')].map(i=>i.dataset.board);
+function makerHTML(info,tag){
+  // Each part escapes its own text (names come from servers and chriscord.app).
+  if(info?.mine)return 'Made by <b>you</b>';
+  const here=tag?.maker||info?.maker_here||'';
+  let who=here?`<b>${esc(here)}</b>`:'';
+  let v='';
+  if(info?.maker_check==='verified'){v=`<span class="bc-verified">${icon('verified_user')}${esc(info.maker_name)} on chriscord.app</span>`;if(!who)who=`<b>${esc(info.maker_name)}</b>`;}
+  else if(info?.maker_check==='problem')v=`<span class="bc-problem">${icon('gpp_maybe')}${esc(info.maker_note||'chriscord.app’s record for the maker doesn’t check out')}</span>`;
+  if(!who)who='someone who isn’t on this server';
+  const fp=info?.maker_fingerprint?`<div class="bc-fp" title="The start of the maker’s key">Maker’s key ${esc(info.maker_fingerprint)}</div>`:'';
+  return `Made by ${who}${v?' '+v:''}${fp}`;
+}
+let botsModal=null;
+async function openServerBots(view){
+  closeServerInfo();
+  if(!botsSupported()){toast('This server doesn’t have bots yet — it needs updating.',true);return;}
+  if(!botsModal){
+    const ov=document.createElement('div');ov.className='modal-overlay';
+    ov.innerHTML=`<div class="modal bots-modal"><h2>Bots on ${esc(state.serverName)}</h2><div id="sb-body"><span class="spinner"></span></div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('mousedown',e=>{if(e.target===ov)closeServerBots();});
+    botsModal=ov;
+  }
+  if(view?.link)return showAddBot(view.link);
+  return showBotList();
+}
+function closeServerBots(){botsModal?.remove();botsModal=null;}
+async function showBotList(force){
+  if(!botsModal)return;
+  const body=botsModal.querySelector('#sb-body');
+  let d;
+  try{d=await loadServerBots(force);await allBoards();}
+  catch(err){body.innerHTML=`<div class="error-msg">${esc(String(err).replace(/^Error: /,''))}</div><div class="modal-actions"><button class="btn btn-ghost" id="sb-close">Close</button></div>`;body.querySelector('#sb-close').onclick=closeServerBots;return;}
+  if(!botsModal)return;
+  const add=d.can_manage?`<div class="sb-add"><input type="text" id="sb-link" placeholder="Paste a bot’s Add to server link" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="sb-continue">Continue</button></div>
+    <div class="bc-sub" style="margin:-4px 0 10px">${d.bots.length} of ${d.cap} bot${d.cap===1?'':'s'}. A bot only ever gets what you choose, and never more than you can do yourself.</div>`:'';
+  body.innerHTML=`${add}<div class="sb-list">${d.bots.length?d.bots.map(b=>{
+      const can=botPermNames(b.permissions),chans=(b.channels||[]).map(boardName).filter(Boolean);
+      return `<div class="bot-card" data-key="${esc(b.public_key)}">
+        <div class="bc-head">${icon('smart_toy','bc-ic')}<div class="bc-title"><div class="bc-name">${esc(b.username)}<span class="bot-tag">BOT</span>${b.online?'<span class="bc-online" title="Connected"></span>':''}</div>
+          <div class="bc-sub bc-maker">${makerHTML(null,{maker:b.maker})}</div></div></div>
+        ${b.description?`<div class="bc-desc">${esc(b.description)}</div>`:''}
+        <div class="bc-line"><b>Can:</b> ${can.length?esc(can.join(', ')):'nothing yet'}</div>
+        <div class="bc-line"><b>Sees:</b> ${chans.length?chans.map(c=>`#${esc(c)}`).join(', '):'no channels'}${b.hidden_channels?` and ${b.hidden_channels} channel${b.hidden_channels===1?'':'s'} you can’t see`:''}</div>
+        ${b.client?`<div class="bc-fp">Runs ${esc(b.client)}</div>`:''}
+        ${d.can_manage?`<div class="bc-actions"><button class="settings-secondary-btn" data-act="edit">${icon('edit')}Change</button><button class="settings-secondary-btn danger" data-act="remove">${icon('person_remove')}Remove</button></div>`:''}
+      </div>`;}).join(''):'<p class="settings-hint" style="margin-top:4px">No bots here yet.</p>'}</div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="sb-close">Close</button></div>`;
+  body.querySelector('#sb-close').onclick=closeServerBots;
+  const cont=body.querySelector('#sb-continue');
+  if(cont){
+    const go=()=>{const v=body.querySelector('#sb-link').value.trim();if(v)showAddBot(v);};
+    cont.onclick=go;body.querySelector('#sb-link').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+  }
+  // Who made each bot: their name here or on chriscord.app, filled in as known.
+  body.querySelectorAll('.bot-card').forEach(card=>{
+    const b=d.bots.find(x=>x.public_key===card.dataset.key);
+    window.go.main.App.MakerIdentity(b.maker_key).then(info=>{const el=card.querySelector('.bc-maker');if(el)el.innerHTML=makerHTML(info,{maker:b.maker});}).catch(()=>{});
+    card.querySelector('[data-act="edit"]')?.addEventListener('click',()=>showEditBot(b,d));
+    card.querySelector('[data-act="remove"]')?.addEventListener('click',e=>{
+      const btn=e.currentTarget;
+      if(btn.dataset.sure){
+        btn.disabled=true;
+        window.go.main.App.RemoveBot(b.public_key).then(()=>{toast(`Removed ${b.username}`);showBotList(true);})
+          .catch(err=>{btn.disabled=false;toast(String(err).replace(/^Error: /,''),true);});
+        return;
+      }
+      btn.dataset.sure='1';btn.innerHTML=`${icon('person_remove')}Remove ${esc(b.username)}?`;
+      setTimeout(()=>{if(btn.isConnected&&!btn.disabled){delete btn.dataset.sure;btn.innerHTML=`${icon('person_remove')}Remove`;}},4000);
+    });
+  });
+}
+async function showAddBot(link){
+  const body=botsModal?.querySelector('#sb-body');if(!body)return;
+  body.innerHTML='<span class="spinner"></span>';
+  let info,d,groups;
+  try{[info,d,groups]=await Promise.all([window.go.main.App.ReadBotLink(link),loadServerBots(true),allBoards()]);}
+  catch(err){
+    body.innerHTML=`<div class="error-msg">${esc(String(err).replace(/^Error: /,''))}</div><div class="modal-actions"><button class="btn btn-ghost" id="sb-back">Back</button></div>`;
+    body.querySelector('#sb-back').onclick=()=>showBotList();return;
+  }
+  if(!d.can_manage){
+    body.innerHTML=`<p class="settings-hint" style="margin-top:0">Adding bots here needs the <b>Manage Bots</b> permission. Send the link to someone who has it, like the server owner.</p><div class="modal-actions"><button class="btn btn-ghost" id="sb-back">Back</button></div>`;
+    body.querySelector('#sb-back').onclick=()=>showBotList();return;
+  }
+  const c=info.cert;
+  const already=d.bots.find(b=>b.public_key===c.bot_key);
+  if(already){toast(`${already.username} is already here`);return showEditBot(already,d);}
+  body.innerHTML=`<div class="bot-card intro"><div class="bc-head">${icon('smart_toy','bc-ic')}<div class="bc-title"><div class="bc-name">${esc(c.name)}<span class="bot-tag">BOT</span></div>
+      <div class="bc-sub">${makerHTML(info,null)}</div></div></div>
+      ${c.description?`<div class="bc-desc">${esc(c.description)}</div>`:'<div class="bc-desc empty">It doesn’t say what it does or keeps.</div>'}
+      <div class="bc-fp">Bot’s key ${esc(info.fingerprint)}</div></div>
+    <label class="settings-label" for="sb-name">Name here</label>
+    <div class="form-group"><input type="text" id="sb-name" maxlength="32" value="${esc(c.name)}" autocomplete="off" spellcheck="false"></div>
+    <label class="settings-label">What it may do</label>
+    <p class="sb-note">Ticked: what it asks for. You can give it less, or more, but never what you can’t do yourself.</p>
+    <div id="sb-perms">${botPermsHTML(info.permissions&d.grantable,d.grantable)}</div>
+    <label class="settings-label">Channels it can see</label>
+    <p class="sb-note">None until you pick them. It can read everything in the ones you pick, so choose only what it needs: a music bot needs the voice channels to play in and one text channel for commands.</p>
+    ${chanPickHTML(groups,new Set())}
+    <div class="error-msg hidden" id="sb-err" style="margin-top:12px"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="sb-back">Back</button><button class="btn btn-primary" id="sb-add">Add Bot</button></div>`;
+  body.querySelector('#sb-back').onclick=()=>showBotList();
+  body.querySelector('#sb-add').onclick=async()=>{
+    const btn=body.querySelector('#sb-add'),err=body.querySelector('#sb-err');
+    btn.disabled=true;err.classList.add('hidden');
+    const name=body.querySelector('#sb-name').value.trim();
+    try{
+      const got=await window.go.main.App.AddBot(link,readPerms(body.querySelector('#sb-perms')),readChans(body),name===c.name?'':name);
+      toast(`Added ${got||name}. It can sign in now.`);
+      showBotList(true);
+    }catch(e){err.textContent=String(e).replace(/^Error: /,'');err.classList.remove('hidden');btn.disabled=false;}
+  };
+}
+async function showEditBot(b,d){
+  const body=botsModal?.querySelector('#sb-body');if(!body)return;
+  const groups=await allBoards();
+  body.innerHTML=`<div class="bot-card intro"><div class="bc-head">${icon('smart_toy','bc-ic')}<div class="bc-title"><div class="bc-name">${esc(b.username)}<span class="bot-tag">BOT</span></div>
+      <div class="bc-sub">Added by ${esc(b.added_by)} on ${esc(fmtDay(Date.parse(b.added_at)/1000))}</div></div></div></div>
+    <label class="settings-label">What it may do</label>
+    <p class="sb-note">You can only change what you can do yourself; the rest stays as it is.</p>
+    <div id="sb-perms">${botPermsHTML(b.permissions,d.grantable)}</div>
+    <label class="settings-label">Channels it can see</label>
+    ${b.hidden_channels?`<p class="sb-note">It also sees ${b.hidden_channels} channel${b.hidden_channels===1?'':'s'} you can’t; those stay as they are.</p>`:''}
+    ${chanPickHTML(groups,new Set(b.channels||[]))}
+    <div class="error-msg hidden" id="sb-err" style="margin-top:12px"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="sb-back">Back</button><button class="btn btn-primary" id="sb-save">Save</button></div>`;
+  body.querySelector('#sb-back').onclick=()=>showBotList();
+  body.querySelector('#sb-save').onclick=async()=>{
+    const btn=body.querySelector('#sb-save'),err=body.querySelector('#sb-err');
+    btn.disabled=true;err.classList.add('hidden');
+    try{await window.go.main.App.UpdateBot(b.public_key,readPerms(body.querySelector('#sb-perms')),readChans(body));toast(`Saved ${b.username}`);showBotList(true);}
+    catch(e){err.textContent=String(e).replace(/^Error: /,'');err.classList.remove('hidden');btn.disabled=false;}
+  };
+}
+// An Add to server link clicked in a chat (or pasted in the bots window).
+function openAddBotLink(url){
+  if(!state.domain){toast('Open the server you want to add the bot to, then click the link again.',true);return;}
+  openServerBots({link:url});
+}
+
+// On a bot's profile card: who made it, what it says it does, and what it
+// can do here.
+async function loadBotSection(user,pop,anchorRect,place){
+  const tag=state.bots?.[user];if(!tag)return;
+  let info=null,b=null;
+  try{info=await window.go.main.App.MakerIdentity(tag.maker_key);}catch{}
+  try{const d=await loadServerBots();b=d.bots.find(x=>x.username===user);await allBoards();}catch{}
+  if(profilePopupFor!==user)return;
+  const body=pop.querySelector('.pc-body');if(!body)return;
+  const can=b?botPermNames(b.permissions):[],chans=b?(b.channels||[]).map(boardName).filter(Boolean):[];
+  body.insertAdjacentHTML('beforeend',`<div class="pc-section pc-botinfo"><div class="pc-label">Bot</div>
+    <div class="pc-id-row">${icon('smart_toy')}<span>${makerHTML(info,tag)}</span></div>
+    ${tag.description?`<div class="pc-bot-desc">${esc(tag.description)}</div>`:''}
+    ${b?`<div class="pc-bot-line"><b>Can here:</b> ${can.length?esc(can.join(', ')):'nothing'}</div>
+    <div class="pc-bot-line"><b>Sees:</b> ${chans.length?chans.map(c=>'#'+esc(c)).join(', '):'no channels you can see'}</div>`:''}</div>`);
+  positionProfilePopup(pop,anchorRect,place);
 }
 
 // ── LIGHTBOX ──────────────────────────────────────────────────────
@@ -11368,6 +11782,7 @@ function init(){
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
   // Roles changed: colours/permissions, and which channels you can see.
   window.runtime.EventsOn('server:roles',()=>{loadRoles();refreshRoomsAndBoards();});
+  window.runtime.EventsOn('server:bots',()=>{serverBotsCache=null;if(botsModal&&botsModal.querySelector('.sb-list'))showBotList(true);});
   window.runtime.EventsOn('server:emojis',()=>loadCustomEmojis());
   window.runtime.EventsOn('server:stickers',()=>loadStickers());
   window.runtime.EventsOn('voice:removed',m=>{
@@ -11686,6 +12101,12 @@ function init(){
     window.addEventListener('touchend',onPfpDragEnd);
   }
   document.querySelectorAll('.settings-tab').forEach(t=>t.addEventListener('click',()=>switchSettingsTab(t.dataset.tab)));
+  document.getElementById('bot-new-btn').addEventListener('click',openBotForm);
+  document.getElementById('bot-new-cancel').addEventListener('click',closeBotForm);
+  document.getElementById('bot-new-create').addEventListener('click',createBot);
+  document.getElementById('bot-new-name').addEventListener('input',updateBotCreateBtn);
+  document.getElementById('bot-new-rules').addEventListener('change',updateBotCreateBtn);
+  document.getElementById('bot-new-desc').addEventListener('input',updateBotDescCount);
   document.getElementById('sys-startup').addEventListener('change',onStartupToggle);
   document.getElementById('sys-tray').addEventListener('change',onWindowSettingToggle);
   document.getElementById('sys-start-min').addEventListener('change',onWindowSettingToggle);

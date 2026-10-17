@@ -10,6 +10,10 @@ export function ActiveAccount() {
   return window['go']['main']['App']['ActiveAccount']();
 }
 
+export function AddBot(arg1,arg2,arg3,arg4) {
+  return window['go']['main']['App']['AddBot'](arg1,arg2,arg3,arg4);
+}
+
 export function AutoLogin() {
   return window['go']['main']['App']['AutoLogin']();
 }
@@ -98,6 +102,10 @@ export function CreateAccount(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateAccount'](arg1, arg2, arg3);
 }
 
+export function CreateBot(arg1,arg2,arg3) {
+  return window['go']['main']['App']['CreateBot'](arg1,arg2,arg3);
+}
+
 export function CreateInvite() {
   return window['go']['main']['App']['CreateInvite']();
 }
@@ -160,6 +168,10 @@ export function FetchUserPfp(arg1) {
 
 export function FetchUserProfile(arg1) {
   return window['go']['main']['App']['FetchUserProfile'](arg1);
+}
+
+export function ForgetBot(arg1) {
+  return window['go']['main']['App']['ForgetBot'](arg1);
 }
 
 export function GetAboutInfo() {
@@ -302,12 +314,20 @@ export function ListCameras() {
   return window['go']['main']['App']['ListCameras']();
 }
 
+export function ListMyBots() {
+  return window['go']['main']['App']['ListMyBots']();
+}
+
 export function ListShareSources() {
   return window['go']['main']['App']['ListShareSources']();
 }
 
 export function LogOut() {
   return window['go']['main']['App']['LogOut']();
+}
+
+export function MakerIdentity(arg1) {
+  return window['go']['main']['App']['MakerIdentity'](arg1);
 }
 
 export function MemberIdentity(arg1) {
@@ -378,6 +398,10 @@ export function ReactToMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['ReactToMessage'](arg1, arg2, arg3);
 }
 
+export function ReadBotLink(arg1) {
+  return window['go']['main']['App']['ReadBotLink'](arg1);
+}
+
 export function ReadImageAsDataURL(arg1) {
   return window['go']['main']['App']['ReadImageAsDataURL'](arg1);
 }
@@ -400,6 +424,10 @@ export function RememberAccount(arg1) {
 
 export function RememberAvailable() {
   return window['go']['main']['App']['RememberAvailable']();
+}
+
+export function RemoveBot(arg1) {
+  return window['go']['main']['App']['RemoveBot'](arg1);
 }
 
 export function RemoveServer(arg1) {
@@ -428,6 +456,10 @@ export function ResolveServerAddress(arg1) {
 
 export function RestartToUpdate() {
   return window['go']['main']['App']['RestartToUpdate']();
+}
+
+export function RevokeBot(arg1) {
+  return window['go']['main']['App']['RevokeBot'](arg1);
 }
 
 export function SaveAccountExport() {
@@ -464,6 +496,10 @@ export function SendMessage(arg1, arg2, arg3, arg4) {
 
 export function SendTyping(arg1) {
   return window['go']['main']['App']['SendTyping'](arg1);
+}
+
+export function ServerBots() {
+  return window['go']['main']['App']['ServerBots']();
 }
 
 export function SetActiveAccount(arg1) {
@@ -576,6 +612,10 @@ export function ToggleMute() {
 
 export function UnlockAccount(arg1) {
   return window['go']['main']['App']['UnlockAccount'](arg1);
+}
+
+export function UpdateBot(arg1,arg2,arg3) {
+  return window['go']['main']['App']['UpdateBot'](arg1,arg2,arg3);
 }
 
 export function UpdateEmoji(arg1, arg2, arg3) {
