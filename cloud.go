@@ -390,6 +390,11 @@ type cloudLoginResp struct {
 	Token      string       `json:"token"`
 	Account    cloudAccount `json:"account"`
 	WrappedKey string       `json:"wrapped_key"`
+	// A computer the account hasn't been used on: chriscord.app has emailed
+	// a link to confirm it, and this is what to wait on (waitApproval).
+	Approval  string `json:"approval"`
+	Email     string `json:"email"` // where it was sent, partly hidden
+	ExpiresIn int    `json:"expires_in"`
 }
 
 type cloudHTTPError struct {
@@ -541,15 +546,16 @@ type cloudClient struct {
 
 	opMu sync.Mutex // one cloud operation at a time
 
-	mu       sync.Mutex
-	sess     *cloudSession
-	timer    *time.Timer
-	syncing  bool
-	lastErr  string
-	gone     bool   // the service says this account isn't online any more
-	linked   string // the unlocked account's slug, if it's online
-	applying atomic.Bool
-	feedStop context.CancelFunc // the live change feed (feed below), if running
+	mu             sync.Mutex
+	sess           *cloudSession
+	timer          *time.Timer
+	syncing        bool
+	lastErr        string
+	gone           bool   // the service says this account isn't online any more
+	linked         string // the unlocked account's slug, if it's online
+	applying       atomic.Bool
+	feedStop       context.CancelFunc // the live change feed (feed below), if running
+	approvalCancel chan struct{}      // closed to stop waiting for a new-computer confirmation
 
 	keys *keyCheck // directory checks on other people's keys (keycheck.go)
 }
@@ -657,7 +663,9 @@ func (c *cloudClient) session(acct *Account, st *cloudState) (*cloudSession, err
 		return nil, err
 	}
 	var resp cloudLoginResp
-	err = cloudCall(st.Server, "POST", "/login/key", "", map[string]string{"public_key": pubHex, "nonce": nonce, "signature": sig}, &resp)
+	device, deviceName := thisDevice()
+	err = cloudCall(st.Server, "POST", "/login/key", "", map[string]string{"public_key": pubHex, "nonce": nonce, "signature": sig,
+		"device": device, "device_name": deviceName}, &resp)
 	if cloudStatus(err) == http.StatusNotFound {
 		c.mu.Lock()
 		c.gone = true
@@ -1000,10 +1008,12 @@ func (c *cloudClient) Link(username, email, password string) (string, error) {
 		Token   string       `json:"token"`
 		Account cloudAccount `json:"account"`
 	}
+	device, deviceName := thisDevice()
 	err = cloudCall(server, "POST", "/register", "", map[string]interface{}{
 		"username": username, "email": email, "public_key": pubHex, "nonce": nonce, "signature": sig, "claim_signature": claim,
 		"kdf": pw.kdf, "auth_key": authHex, "recovery_auth": recAuth,
 		"wrapped_password": pw.wrappedPassword, "wrapped_recovery": recWrapped, "wrapped_identity": idWrapped,
+		"device": device, "device_name": deviceName,
 	}, &resp)
 	if err != nil {
 		return "", err
@@ -1126,8 +1136,16 @@ func (c *cloudClient) SignIn(username, password string) (*Account, error) {
 		return nil, err
 	}
 	var resp cloudLoginResp
-	if err := cloudCall(server, "POST", "/login", "", map[string]string{"username": username, "auth_key": hex.EncodeToString(auth)}, &resp); err != nil {
+	device, deviceName := thisDevice()
+	if err := cloudCall(server, "POST", "/login", "", map[string]string{"username": username, "auth_key": hex.EncodeToString(auth),
+		"device": device, "device_name": deviceName}, &resp); err != nil {
 		return nil, err
+	}
+	if resp.Approval != "" {
+		// First time on this computer: wait for the email's link.
+		if resp, err = c.waitApproval(server, resp, device); err != nil {
+			return nil, err
+		}
 	}
 	accountKey, err := UnwrapAccountKey(wrap, resp.WrappedKey, resp.Account.PublicKey, WrapPassword)
 	if err != nil {
@@ -1139,6 +1157,101 @@ func (c *cloudClient) SignIn(username, password string) (*Account, error) {
 	}
 	sess := &cloudSession{server: server, pubHex: resp.Account.PublicKey, token: resp.Token, accountKey: accountKey, account: resp.Account}
 	return c.adopt(server, sess, priv, password, false)
+}
+
+// CloudApproval is what the page shows while a sign-in waits for its email.
+type CloudApproval struct {
+	Email     string `json:"email"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
+// waitApproval waits for a new-computer sign-in to be confirmed from the
+// email chriscord.app sent (or turned down, or the time to run out, or
+// CancelSignIn). The page is told so it can say where to look.
+func (c *cloudClient) waitApproval(server string, first cloudLoginResp, device string) (cloudLoginResp, error) {
+	cancel := make(chan struct{})
+	c.mu.Lock()
+	c.approvalCancel = cancel
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		if c.approvalCancel == cancel {
+			c.approvalCancel = nil
+		}
+		c.mu.Unlock()
+		c.emit("cloud:approval", nil)
+	}()
+	c.emit("cloud:approval", CloudApproval{Email: first.Email, ExpiresIn: first.ExpiresIn})
+	deadline := time.Now().Add(time.Duration(first.ExpiresIn+30) * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case <-cancel:
+			return cloudLoginResp{}, errors.New("sign-in cancelled")
+		case <-time.After(3 * time.Second):
+		}
+		var resp cloudLoginResp
+		err := cloudCall(server, "POST", "/login/approval", "", map[string]string{"approval": first.Approval, "device": device}, &resp)
+		if err != nil {
+			if cloudStatus(err) == 0 {
+				continue // a network blip: keep waiting
+			}
+			return cloudLoginResp{}, err
+		}
+		if resp.Token != "" {
+			return resp, nil
+		}
+	}
+	return cloudLoginResp{}, errors.New("the email wasn't confirmed in time — sign in again for a new one")
+}
+
+// CancelSignIn stops waiting for a new-computer confirmation.
+func (c *cloudClient) CancelSignIn() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.approvalCancel != nil {
+		close(c.approvalCancel)
+		c.approvalCancel = nil
+	}
+}
+
+// CloudDevice is a computer the online account has been used on.
+type CloudDevice struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	AddedAt  int64  `json:"added_at"`
+	LastSeen int64  `json:"last_seen"`
+}
+
+// Devices lists the computers the online account knows.
+func (c *cloudClient) Devices() ([]CloudDevice, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+	acct, st, _, err := c.online()
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Devices []CloudDevice `json:"devices"`
+	}
+	if err := c.call(acct, st, "GET", "/account/devices", nil, &out); err != nil {
+		return nil, err
+	}
+	if out.Devices == nil {
+		out.Devices = []CloudDevice{}
+	}
+	return out.Devices, nil
+}
+
+// RemoveDevice forgets a computer: a password sign-in there has to be
+// confirmed by email again.
+func (c *cloudClient) RemoveDevice(id int64) error {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+	acct, st, _, err := c.online()
+	if err != nil {
+		return err
+	}
+	return c.call(acct, st, "POST", "/account/devices/remove", map[string]int64{"id": id}, nil)
 }
 
 // Recover signs in with the recovery key, sets a new password, and makes
@@ -1160,7 +1273,9 @@ func (c *cloudClient) Recover(username, recoveryKey, newPassword string) (*Accou
 	recAuth, recWrap := RecoveryKeys(raw)
 	server := cloudServerURL()
 	var resp cloudLoginResp
-	if err := cloudCall(server, "POST", "/login/recovery", "", map[string]string{"username": strings.TrimSpace(username), "recovery_auth": hex.EncodeToString(recAuth)}, &resp); err != nil {
+	device, deviceName := thisDevice()
+	if err := cloudCall(server, "POST", "/login/recovery", "", map[string]string{"username": strings.TrimSpace(username), "recovery_auth": hex.EncodeToString(recAuth),
+		"device": device, "device_name": deviceName}, &resp); err != nil {
 		return nil, "", err
 	}
 	accountKey, err := UnwrapAccountKey(recWrap, resp.WrappedKey, resp.Account.PublicKey, WrapRecovery)
@@ -1482,9 +1597,12 @@ func (a *App) CloudChangePassword(current, next string) error {
 func (a *App) CloudNewRecoveryKey(password string) (string, error) {
 	return a.cloud.NewRecoveryKey(password)
 }
-func (a *App) CloudChangeEmail(email string) error { return a.cloud.ChangeEmail(email) }
-func (a *App) CloudResendVerification() error      { return a.cloud.ResendVerification() }
-func (a *App) CloudUnlink(password string) error   { return a.cloud.Unlink(password) }
+func (a *App) CloudChangeEmail(email string) error  { return a.cloud.ChangeEmail(email) }
+func (a *App) CloudResendVerification() error       { return a.cloud.ResendVerification() }
+func (a *App) CloudCancelSignIn()                   { a.cloud.CancelSignIn() }
+func (a *App) CloudDevices() ([]CloudDevice, error) { return a.cloud.Devices() }
+func (a *App) CloudRemoveDevice(id int64) error     { return a.cloud.RemoveDevice(id) }
+func (a *App) CloudUnlink(password string) error    { return a.cloud.Unlink(password) }
 
 // CloudForget makes this account offline on this computer without asking
 // chriscord.app (for when it's already gone from there).

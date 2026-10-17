@@ -107,6 +107,18 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 .cloud-badge.ok { background:color-mix(in srgb, var(--green) 18%, transparent); color:var(--green); }
 .cloud-badge.warn { background:color-mix(in srgb, var(--yellow) 18%, transparent); color:var(--yellow); }
 .cloud-msg { font-size:.82rem; margin-top:8px; }
+.approval-wait { display:flex; gap:12px; margin-top:6px; padding:14px; border:1px solid var(--border); border-radius:8px; background:var(--bg-mid); }
+.approval-wait .aw-ic { width:26px; height:26px; color:var(--accent); flex-shrink:0; }
+.approval-wait b { color:var(--text-strong); }
+.approval-wait p { font-size:.84rem; color:var(--text); line-height:1.45; margin:4px 0 0; }
+.approval-wait .aw-small { color:var(--text-muted); font-size:.78rem; }
+.approval-wait .settings-secondary-btn { margin-top:10px; }
+.cloud-device { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg-mid); margin-bottom:6px; }
+.cloud-device > .ic { width:20px; height:20px; color:var(--text-muted); flex-shrink:0; }
+.cloud-device .cd-text { flex:1; min-width:0; }
+.cloud-device .cd-name { font-size:.88rem; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cloud-device .cd-sub { font-size:.76rem; color:var(--text-muted); }
+.cloud-device .settings-secondary-btn { margin-top:0; }
 .cloud-msg.ok { color:var(--green); } .cloud-msg.bad { color:var(--red); }
 .cloud-danger .settings-label { color:var(--red); }
 #cloud-del-btn:hover { background:var(--red); border-color:var(--red); color:#fff; }
@@ -1636,6 +1648,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-reply" viewBox="0 -960 960 960"><path d="M760-200v-160q0-50-35-85t-85-35H273l144 144-57 56-240-240 240-240 57 56-144 144h367q83 0 141.5 58.5T840-360v160h-80Z"/></symbol>
   <symbol id="ic-smart_toy" viewBox="0 -960 960 960"><path d="M160-360q-50 0-85-35t-35-85q0-50 35-85t85-35v-80q0-33 23.5-56.5T240-760h120q0-50 35-85t85-35q50 0 85 35t35 85h120q33 0 56.5 23.5T800-680v80q50 0 85 35t35 85q0 50-35 85t-85 35v160q0 33-23.5 56.5T720-120H240q-33 0-56.5-23.5T160-200v-160Zm200-80q25 0 42.5-17.5T420-500q0-25-17.5-42.5T360-560q-25 0-42.5 17.5T300-500q0 25 17.5 42.5T360-440Zm240 0q25 0 42.5-17.5T660-500q0-25-17.5-42.5T600-560q-25 0-42.5 17.5T540-500q0 25 17.5 42.5T600-440ZM320-280h320v-80H320v80Zm-80 80h480v-480H240v480Zm240-240Z"/></symbol>
   <symbol id="ic-key_off" viewBox="0 -960 960 960"><path d="M790-57 488-359q-32 54-87 86.5T280-240q-100 0-170-70T40-480q0-66 32.5-121t86.5-87L57-790l57-56 732 733-56 56Zm50-543 120 120-183 183-127-126 50-37 72 54 75-74-40-40H553l-80-80h367ZM280-320q51 0 90.5-27.5T428-419l-56-56-48.5-48.5L275-572l-56-56q-44 18-71.5 57.5T120-480q0 66 47 113t113 47Zm0-80q-33 0-56.5-23.5T200-480q0-33 23.5-56.5T280-560q33 0 56.5 23.5T360-480q0 33-23.5 56.5T280-400Z"/></symbol>
+  <symbol id="ic-mark_email_unread" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h404q-4 20-4 40t4 40H160l320 200 146-91q14 13 30.5 22.5T691-572L480-440 160-640v400h640v-324q23-5 43-14t37-22v360q0 33-23.5 56.5T800-160H160Zm0-560v480-480Zm600 80q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></symbol>
+  <symbol id="ic-computer" viewBox="0 -960 960 960"><path d="M40-120v-80h880v80H40Zm120-120q-33 0-56.5-23.5T80-320v-440q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v440q0 33-23.5 56.5T800-240H160Zm0-80h640v-440H160v440Zm0 0v-440 440Z"/></symbol>
   <symbol id="ic-person_add" viewBox="0 -960 960 960"><path d="M720-400v-120H600v-80h120v-120h80v120h120v80H800v120h-80Zm-360-80q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM40-160v-112q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v112H40Zm80-80h480v-32q0-11-5.5-20T580-306q-54-27-109-40.5T360-360q-56 0-111 13.5T140-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T440-640q0-33-23.5-56.5T360-720q-33 0-56.5 23.5T280-640q0 33 23.5 56.5T360-560Zm0-80Zm0 400Z"/></symbol>
   <symbol id="ic-arrow_forward" viewBox="0 -960 960 960"><path d="M647-440H160v-80h487L423-744l57-56 320 320-320 320-57-56 224-224Z"/></symbol>
   <symbol id="ic-add" viewBox="0 -960 960 960"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></symbol>
@@ -1666,7 +1680,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
 <div id="screen-account-gate" class="hidden">
   <div class="gate-card">
-    <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your homelab, your rules.</p></div>
+    <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your server, your rules.</p></div>
 
     <!-- Shown when an account already exists locally and just needs unlocking -->
     <div id="gate-unlock" class="hidden">
@@ -1716,14 +1730,21 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div id="onboard-online" class="hidden">
         <div id="online-signin">
           <div class="error-msg hidden" id="online-error"></div>
-          <div class="form-group"><label>Username</label><input id="online-username" type="text" placeholder="Your chriscord.app username" maxlength="32" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Username or Email</label><input id="online-username" type="text" placeholder="Your chriscord.app username or email" maxlength="254" autocomplete="off" spellcheck="false"></div>
           <div class="form-group"><label>Password</label><input id="online-password" type="password" placeholder="Your chriscord.app password" autocomplete="off"><div class="hint">For an account you made online on another computer. The password also becomes this computer's passphrase for it.</div></div>
           <button class="btn btn-primary" id="online-signin-btn" style="width:100%;margin-top:6px">Sign In</button>
+          <div class="approval-wait hidden" id="online-approval" aria-live="polite">
+            <svg class="ic aw-ic" aria-hidden="true"><use href="#ic-mark_email_unread"/></svg>
+            <div class="aw-text"><b>Check your email</b>
+              <p>This account hasn’t been used on this computer before, so we’ve sent a link to <b id="approval-email">your email</b>. Open it and confirm it’s you, and this carries on by itself.</p>
+              <p class="aw-small" id="approval-time">The link works for 15 minutes.</p>
+              <button class="settings-secondary-btn" id="approval-cancel" type="button">Cancel</button></div>
+          </div>
           <div class="gate-link">Forgot your password? <a id="online-recover-link">Use your recovery key</a></div>
         </div>
         <div id="online-recover" class="hidden">
           <div class="error-msg hidden" id="recover-error"></div>
-          <div class="form-group"><label>Username</label><input id="recover-username" type="text" placeholder="Your chriscord.app username" maxlength="32" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Username or Email</label><input id="recover-username" type="text" placeholder="Your chriscord.app username or email" maxlength="254" autocomplete="off" spellcheck="false"></div>
           <div class="form-group"><label>Recovery Key</label><input id="recover-key" type="text" placeholder="ABCD-EFGH-…" autocomplete="off" spellcheck="false"></div>
           <div class="form-group"><label>New Password</label><input id="recover-password" type="password" placeholder="At least 10 characters" autocomplete="off"></div>
           <div class="form-group"><label>Confirm New Password</label><input id="recover-password-confirm" type="password" placeholder="Type it again" autocomplete="off"><div class="hint">You'll get a new recovery key too — the one you used stops working.</div></div>
@@ -1738,7 +1759,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
 <div id="screen-servers" class="hidden">
   <button class="settings-btn" id="settings-btn-servers" title="Settings"><svg class="ic" aria-hidden="true"><use href="#ic-settings"/></svg></button>
-  <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your homelab, your rules.</p></div>
+  <div class="servers-header"><h1>CHRISCORD</h1><p>Self-hosted chat — your server, your rules.</p></div>
   <div class="server-list" id="server-list"></div>
   <button class="btn-add-server" id="open-add-btn"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg> Add a Server</button>
   <p class="empty-hint hidden" id="no-servers-hint">No servers yet — add one above to get started.</p>
@@ -1749,7 +1770,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <div class="modal">
     <h2>Add a Server</h2>
     <div class="error-msg hidden" id="add-error"></div>
-    <div class="form-group"><label>Domain / IP — or an invite link</label><input id="f-domain" type="text" placeholder="chris-domain1.com  or  192.168.1.10:7070  or  an invite link" autocomplete="off"><div class="hint">The address of the homelab running chriscord-server (no need to type https:// — it tries https first, then http), or paste an invite link someone sent you and leave the key blank.</div></div>
+    <div class="form-group"><label>Domain / IP — or an invite link</label><input id="f-domain" type="text" placeholder="chat.example.com  or  192.168.1.10:7070  or  an invite link" autocomplete="off"><div class="hint">The address of the computer running chriscord-server (no need to type https:// — it tries https first, then http), or paste an invite link someone sent you and leave the key blank.</div></div>
     <div class="form-group"><label>Join Key <span style="font-weight:400;text-transform:none;letter-spacing:0">(leave blank if server is open)</span></label><input id="f-key" type="text" placeholder="e.g. a3f9bc12" autocomplete="off"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancel-add-btn">Cancel</button>
@@ -2116,6 +2137,10 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
         <div class="cloud-row"><div class="form-group"><input id="cloud-rec-password" type="password" placeholder="Your password" autocomplete="current-password"></div><button class="settings-secondary-btn" id="cloud-rec-btn" type="button">New Recovery Key</button></div>
         <div class="cloud-msg hidden" id="cloud-rec-msg"></div>
 
+        <label class="settings-label">Computers</label>
+        <p class="settings-hint" style="margin:0 0 8px">Where this account is used. Signing in with your password on any other computer needs a confirmation from your email first. Remove one you don’t use any more, or don’t recognise, and change your password.</p>
+        <div id="cloud-devices"></div>
+
         <div class="cloud-danger">
           <label class="settings-label" for="cloud-del-password">Delete Online Account</label>
           <p class="settings-hint" style="margin:0 0 8px">Removes it from chriscord.app and stops syncing. The account on this computer stays exactly as it is, offline.</p>
@@ -2126,14 +2151,14 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     </div>
     <div id="settings-tab-bots" class="settings-tab-pane">
       <h2>Bots</h2>
-      <p class="settings-hint" style="margin-top:0">A bot is a program that joins servers with an identity of its own, like the music bot. Make one here and you get its <b>token</b>, for whoever runs it, and an <b>Add to server</b> link: someone with Manage Bots on a server adds it from the link and picks which channels it sees. It always shows as a bot, made by you, and never needs a server’s join key or owner key.</p>
+      <p class="settings-hint" style="margin-top:0">A bot is a program that joins servers with an identity of its own, to play music in calls, answer commands, post reminders and so on. Make one here and you get its <b>token</b>, for whoever runs it, and an <b>Add to server</b> link: someone with Manage Bots on a server adds it from the link and picks which channels it sees. It always shows as a bot, made by you, and never needs a server’s join key or owner key.</p>
       <button class="btn btn-primary" id="bot-new-btn" type="button" style="margin-top:14px">New Bot</button>
       <div id="bot-new-form" class="hidden bot-form">
         <div class="error-msg hidden" id="bot-new-error"></div>
         <label class="settings-label" for="bot-new-name">Name</label>
-        <div class="form-group"><input id="bot-new-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Music"><div class="hint">2–32 characters. A server can show it under another name if this one’s taken there.</div></div>
+        <div class="form-group"><input id="bot-new-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="My Bot"><div class="hint">2–32 characters. A server can show it under another name if this one’s taken there.</div></div>
         <label class="settings-label" for="bot-new-desc">Description <span class="bot-desc-count" id="bot-new-desc-count">0/190</span></label>
-        <div class="form-group"><textarea id="bot-new-desc" maxlength="190" rows="3" placeholder="Plays music in calls. Keeps the song queue in memory; downloads are deleted once played."></textarea><div class="hint">What it does, and what it keeps and for how long. People adding it read this.</div></div>
+        <div class="form-group"><textarea id="bot-new-desc" maxlength="190" rows="3" placeholder="Answers commands in chat. Keeps nothing after it replies."></textarea><div class="hint">What it does, and what it keeps and for how long. People adding it read this.</div></div>
         <label class="settings-label">What it asks for</label>
         <div id="bot-new-perms"></div>
         <p class="settings-hint" style="margin-top:6px">Whoever adds it decides; this is only what’s ticked to start with. It never gets Administrator or Manage Bots.</p>
@@ -2741,7 +2766,7 @@ async function submitOnlineSignIn(){
   const pass=document.getElementById('online-password').value;
   const errEl=document.getElementById('online-error'),btn=document.getElementById('online-signin-btn');
   const fail=t=>{errEl.textContent=t;errEl.classList.remove('hidden');};
-  if(!username)return fail('Enter your username.');
+  if(!username)return fail('Enter your username or email.');
   if(!pass)return fail('Enter your password.');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';errEl.classList.add('hidden');
   try{
@@ -2749,8 +2774,22 @@ async function submitOnlineSignIn(){
     document.getElementById('online-password').value='';
     await enterApp(acct);
     toast(`Signed in as ${acct.username}. Your profile, appearance and servers came with you.`);
-  }catch(err){fail(cloudErr(err));}
-  finally{btn.disabled=false;btn.textContent='Sign In';}
+  }catch(err){if(!/sign-in cancelled/.test(String(err)))fail(cloudErr(err));}
+  finally{btn.disabled=false;btn.textContent='Sign In';showApproval(null);}
+}
+// A sign-in waiting for its "Is this you?" email (cloud.go, waitApproval).
+let approvalTimer=null;
+function showApproval(a){
+  const box=document.getElementById('online-approval');
+  clearInterval(approvalTimer);approvalTimer=null;
+  box.classList.toggle('hidden',!a);
+  document.getElementById('online-signin-btn').classList.toggle('hidden',!!a);
+  if(!a)return;
+  document.getElementById('approval-email').textContent=a.email||'your email';
+  const until=Date.now()+(a.expires_in||900)*1000,t=document.getElementById('approval-time');
+  const tick=()=>{const left=Math.max(0,until-Date.now()),m=Math.floor(left/60000),s=Math.floor(left/1000)%60;
+    t.textContent=left?`The link works for another ${m}:${String(s).padStart(2,'0')}.`:'The link has run out. Cancel and sign in again for a new one.';};
+  tick();approvalTimer=setInterval(tick,1000);
 }
 async function submitRecover(){
   const username=document.getElementById('recover-username').value.trim();
@@ -2758,7 +2797,7 @@ async function submitRecover(){
   const pass=document.getElementById('recover-password').value,pass2=document.getElementById('recover-password-confirm').value;
   const errEl=document.getElementById('recover-error'),btn=document.getElementById('recover-btn');
   const fail=t=>{errEl.textContent=t;errEl.classList.remove('hidden');};
-  if(!username)return fail('Enter your username.');
+  if(!username)return fail('Enter your username or email.');
   if(!key)return fail('Enter your recovery key.');
   if(pass.length<10)return fail('Use at least 10 characters for your new password.');
   if(pass!==pass2)return fail('The new passwords don\u2019t match.');
@@ -2810,9 +2849,27 @@ async function renderCloudSettings(refresh=true){
     document.getElementById('cloud-email-badge').innerHTML=!st.email?'':st.email_verified?'<span class="cloud-badge ok">Confirmed</span>':'<span class="cloud-badge warn">Not confirmed</span>';
     const hint=document.getElementById('cloud-email-hint');
     if(st.email&&!st.email_verified)hint.textContent=`Open the link sent to ${st.email}.`+(st.verify_by?` Until you do, the online account is removed on ${new Date(st.verify_by*1000).toLocaleDateString()} (the one on this computer stays).`:'');
-    else hint.textContent='Only used to confirm this account is yours. Never shown to anyone.';
+    else hint.textContent='Confirms it\u2019s you on a new computer, and you can sign in with it. Never shown to anyone.';
     show('cloud-resend-btn',!!st.email&&!st.email_verified);
+    if(refresh)renderCloudDevices();
   }
+}
+// Settings > Account > Computers: where this online account is used.
+async function renderCloudDevices(){
+  const box=document.getElementById('cloud-devices');if(!box)return;
+  let list;
+  try{list=await window.go.main.App.CloudDevices()||[];}catch(err){box.innerHTML=`<p class="settings-hint" style="margin:0">Couldn\u2019t load them: ${esc(cloudErr(err))}</p>`;return;}
+  if(!list.length){box.innerHTML='<p class="settings-hint" style="margin:0">None yet. This computer is added the next time it syncs.</p>';return;}
+  box.innerHTML=list.map(d=>`<div class="cloud-device" data-id="${d.id}">${icon('computer')}<div class="cd-text"><div class="cd-name">${esc(d.name)}</div>
+    <div class="cd-sub">Added ${esc(new Date(d.added_at*1000).toLocaleDateString())} \u00b7 last used ${esc(agoText(d.last_seen))}</div></div>
+    <button class="settings-secondary-btn" type="button">Remove</button></div>`).join('');
+  box.querySelectorAll('.cloud-device button').forEach(b=>b.addEventListener('click',async()=>{
+    const row=b.closest('.cloud-device');
+    if(!b.dataset.sure){b.dataset.sure='1';b.textContent='Remove?';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Remove';}},4000);return;}
+    b.disabled=true;
+    try{await window.go.main.App.CloudRemoveDevice(+row.dataset.id);renderCloudDevices();}
+    catch(err){b.disabled=false;toast('Couldn\u2019t remove it: '+cloudErr(err),true);}
+  }));
 }
 // Runs one Settings > Account action, showing how it went under its button.
 async function cloudAction(btnId,msgId,fn,okText){
@@ -11264,7 +11321,7 @@ async function showAddBot(link){
     <p class="sb-note">Ticked: what it asks for. You can give it less, or more, but never what you can’t do yourself.</p>
     <div id="sb-perms">${botPermsHTML(info.permissions&d.grantable,d.grantable)}</div>
     <label class="settings-label">Channels it can see</label>
-    <p class="sb-note">None until you pick them. It can read everything in the ones you pick, so choose only what it needs: a music bot needs the voice channels to play in and one text channel for commands.</p>
+    <p class="sb-note">None until you pick them. It can read everything in the ones you pick, so choose only what it needs: a bot that plays sound needs the voice channels it plays in, and a text channel for its commands.</p>
     ${chanPickHTML(groups,new Set())}
     <div class="error-msg hidden" id="sb-err" style="margin-top:12px"></div>
     <div class="modal-actions"><button class="btn btn-ghost" id="sb-back">Back</button><button class="btn btn-primary" id="sb-add">Add Bot</button></div>`;
@@ -12013,6 +12070,8 @@ function init(){
   // Someone's key changed, or chriscord.app's record of it doesn't check out
   // (keycheck.go). Stays up until it's been read.
   window.runtime?.EventsOn('identity:warning',e=>{if(e?.message)toast(e.message,true,{label:'OK',fn:()=>{}},true);});
+  window.runtime?.EventsOn('cloud:approval',a=>showApproval(a));
+  document.getElementById('approval-cancel')?.addEventListener('click',()=>window.go.main.App.CloudCancelSignIn());
   window.runtime?.EventsOn('cloud:status',()=>{if(document.getElementById('settings-tab-account').classList.contains('active')&&!document.getElementById('settings-modal').classList.contains('hidden'))renderCloudSettings(false);});
 
   document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});

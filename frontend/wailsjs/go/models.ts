@@ -24,6 +24,24 @@ export namespace main {
 	        this.sig = source["sig"];
 	    }
 	}
+	export class CloudDevice {
+	    id: number;
+	    name: string;
+	    added_at: number;
+	    last_seen: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CloudDevice(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.added_at = source["added_at"];
+	        this.last_seen = source["last_seen"];
+	    }
+	}
 	export class BotLinkInfo {
 	    cert: BotCert;
 	    permissions: number;

@@ -38,6 +38,10 @@ export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
 
+export function CloudCancelSignIn() {
+  return window['go']['main']['App']['CloudCancelSignIn']();
+}
+
 export function CloudChangeEmail(arg1) {
   return window['go']['main']['App']['CloudChangeEmail'](arg1);
 }
@@ -48,6 +52,10 @@ export function CloudChangePassword(arg1,arg2) {
 
 export function CloudChangeUsername(arg1) {
   return window['go']['main']['App']['CloudChangeUsername'](arg1);
+}
+
+export function CloudDevices() {
+  return window['go']['main']['App']['CloudDevices']();
 }
 
 export function CloudForget() {
@@ -64,6 +72,10 @@ export function CloudNewRecoveryKey(arg1) {
 
 export function CloudRecover(arg1,arg2,arg3) {
   return window['go']['main']['App']['CloudRecover'](arg1,arg2,arg3);
+}
+
+export function CloudRemoveDevice(arg1) {
+  return window['go']['main']['App']['CloudRemoveDevice'](arg1);
 }
 
 export function CloudResendVerification() {
