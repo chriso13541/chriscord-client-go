@@ -99,6 +99,7 @@ type VoiceSession struct {
 	captureStream *portaudio.Stream
 	captureBuf    []int16
 	vad           *voiceActivity // only touched from within the capture goroutine — no mutex needed
+	noise         micCleaner     // noise suppression (noise.go), same goroutine
 	// Points at the App's own voiceMuted flag, not an owned value — a
 	// roster-change refresh tears down and rebuilds this whole session,
 	// and muting shouldn't silently reset just because someone else
@@ -752,6 +753,7 @@ func (s *VoiceSession) startCapture(micName string) error {
 		}
 		s.captureStream = stream
 		started <- nil
+		defer s.noise.close()
 
 		encoded := make([]byte, 4000)
 		for {
@@ -782,6 +784,9 @@ func (s *VoiceSession) startCapture(micName string) error {
 				}
 				continue
 			}
+			// Background noise out first (when it's on), so the volume and
+			// the speaking detection below only hear your voice.
+			s.noise.process(s.captureBuf)
 			// Input gain + input sensitivity: the speaking ring and what's
 			// actually transmitted follow the same decision, so the ring
 			// lighting up means others really are hearing you. Below the
@@ -1218,6 +1223,8 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 		captureBuf := make([]int16, voiceFrameSize)
 		playBuf := make([]int16, voiceFrameSize)
 		vad := newVoiceActivity()
+		var noise micCleaner
+		defer noise.close()
 
 		inParams := portaudio.StreamParameters{
 			Input:           portaudio.StreamDeviceParameters{Device: inDevice, Channels: voiceChannels, Latency: inDevice.DefaultLowInputLatency},
@@ -1280,8 +1287,10 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 			if err := inStream.Read(); err != nil {
 				return
 			}
-			// Same gain and sensitivity as a real call, so the test sounds
-			// like what others would hear (silence while you're below it).
+			// Same noise suppression, gain and sensitivity as a real call,
+			// so the test sounds like what others would hear (silence while
+			// you're below it).
+			noise.process(captureBuf)
 			open, _, level, threshold := vad.process(captureBuf)
 			vad.emitLevel(a, level, threshold)
 			if !open {

@@ -306,6 +306,23 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .voice-occupant-row.reconnecting .voice-occupant-name { color:var(--red); }
 #voice-connected-bar.reconnecting { color:var(--red); }
 #voice-connected-bar #voice-video-btn.on { color:var(--green); }
+/* Noise suppression (noise.go): lit while it's on. */
+#voice-connected-bar #voice-noise-btn.on { color:var(--green); }
+#voice-connected-bar.elsewhere #voice-noise-btn { display:none; }
+#noise-pop { position:fixed; z-index:450; width:272px; padding:14px 14px 12px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); font-size:.84rem; }
+#noise-pop .np-head { display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text-strong); font-size:.92rem; }
+#noise-pop .np-head .ic { width:20px; height:20px; color:var(--accent); }
+#noise-pop .np-head span { flex:1; }
+#noise-pop .np-text { margin:8px 0 10px; color:var(--text-muted); line-height:1.45; }
+#noise-pop .np-by { display:flex; align-items:center; gap:4px; padding-top:9px; border-top:1px solid var(--border); font-size:.74rem; color:var(--text-muted); letter-spacing:.02em; }
+#noise-pop .np-by b { color:var(--text); }
+.np-switch { position:relative; display:inline-flex; cursor:pointer; flex-shrink:0; }
+.np-switch input { position:absolute; opacity:0; width:0; height:0; }
+.np-switch .np-track { width:38px; height:22px; border-radius:11px; background:var(--bg-light); border:1px solid var(--border); transition:background .15s; position:relative; }
+.np-switch .np-knob { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .15s; }
+.np-switch input:checked + .np-track { background:var(--green); border-color:var(--green); }
+.np-switch input:checked + .np-track .np-knob { transform:translateX(16px); }
+.np-switch input:focus-visible + .np-track { outline:2px solid var(--accent); outline-offset:2px; }
 #voice-connected-bar.elsewhere #voice-video-btn { display:none; }
 /* Call encryption (e2ee.go), in the menu on the connected channel's name:
    green lock when everyone's encrypted, yellow when someone isn't, grey
@@ -1680,6 +1697,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-progress_activity" viewBox="0 -960 960 960"><path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q17 0 28.5 11.5T520-840q0 17-11.5 28.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q133 0 226.5-93.5T800-480q0-17 11.5-28.5T840-520q17 0 28.5 11.5T880-480q0 82-31.5 155t-86 127.5q-54.5 54.5-127 86T480-80Z"/></symbol>
   <symbol id="ic-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
   <symbol id="ic-send" viewBox="0 -960 960 960"><path d="M120-160v-640l760 320-760 320Zm80-120 474-200-474-200v140l240 60-240 60v140Zm0 0v-400 400Z"/></symbol>
+  <symbol id="ic-graphic_eq" viewBox="0 -960 960 960"><path d="M280-240v-480h80v480h-80ZM440-80v-800h80v800h-80ZM120-400v-160h80v160h-80Zm480 160v-480h80v480h-80Zm160-160v-160h80v160h-80Z"/></symbol>
   <symbol id="ic-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
   <symbol id="ic-stop" viewBox="0 -960 960 960"><path d="M320-640v320-320Zm-80 400v-480h480v480H240Zm80-80h320v-320H320v320Z"/></symbol>
   <symbol id="ic-volume_up" viewBox="0 -960 960 960"><path d="M560-131v-82q90-26 145-100t55-168q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 127-78 224.5T560-131ZM120-360v-240h160l200-200v640L280-360H120Zm440 40v-322q47 22 73.5 66t26.5 96q0 51-26.5 94.5T560-320ZM400-606l-86 86H200v80h114l86 86v-252ZM300-480Z"/></symbol>
@@ -1920,6 +1938,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <span id="voice-connected-name"></span>
       <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
       <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
+      <button id="voice-noise-btn" class="voice-bar-btn" title="Noise suppression" aria-haspopup="dialog"><svg class="ic" aria-hidden="true"><use href="#ic-graphic_eq"/></svg></button>
       <button id="voice-video-btn" class="voice-bar-btn" title="Turn on camera"><svg class="ic" aria-hidden="true"><use href="#ic-videocam_off"/></svg></button>
       <button id="voice-screen-btn" class="voice-bar-btn" title="Share your screen"><svg class="ic" aria-hidden="true"><use href="#ic-screen_share"/></svg></button>
       <button id="voice-leave-btn" class="voice-bar-btn" title="Disconnect from voice"><svg class="ic" aria-hidden="true"><use href="#ic-call_end"/></svg></button>
@@ -2361,6 +2380,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="slider-row"><input type="range" id="input-gain" min="0" max="200" step="1"><span class="slider-val" id="input-gain-val">100%</span></div>
       <label class="check-row"><input type="checkbox" id="auto-gain"> Automatically adjust my volume</label>
       <p class="settings-hint" style="margin-top:0">Brings your voice to a steady, normal loudness for everyone else, however quiet your microphone is. Turn off to send exactly what Input Volume gives.</p>
+      <label class="check-row"><input type="checkbox" id="noise-suppression"> Noise suppression</label>
+      <p class="settings-hint" style="margin-top:0">Takes background noise — fans, keyboards, hum, traffic — out of your microphone on this computer, so people only hear your voice. Powered by RNNoise. Also the <svg class="ic" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><use href="#ic-graphic_eq"/></svg> button while you're in a call.</p>
       <label class="settings-label" for="output-volume">Output Volume</label>
       <div class="slider-row"><input type="range" id="output-volume" min="0" max="200" step="1"><span class="slider-val" id="output-volume-val">100%</span></div>
       <label class="check-row"><input type="checkbox" id="voice-smoothing"> Smooth out network hiccups</label>
@@ -2419,6 +2440,12 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 <div id="ctx-menu" class="hidden" role="menu"></div>
 <div id="server-info-pop" class="hidden" role="dialog" aria-label="About this server"></div>
 <div id="voice-user-menu" class="hidden"></div>
+<div id="noise-pop" class="hidden" role="dialog" aria-label="Noise suppression">
+  <div class="np-head"><svg class="ic" aria-hidden="true"><use href="#ic-graphic_eq"/></svg><span>Noise Suppression</span>
+    <label class="np-switch"><input type="checkbox" id="noise-pop-toggle"><span class="np-track"><span class="np-knob"></span></span></label></div>
+  <p class="np-text">Takes background noise — fans, keyboards, hum, traffic — out of your microphone, so people only hear your voice. It runs on this computer, before your voice is encrypted.</p>
+  <div class="np-by">Powered by <b>RNNoise</b></div>
+</div>
 <div id="toast"></div>
 
 <script src="emoji/emoji-data.js"></script>
@@ -7580,7 +7607,7 @@ function initProfileEditor(){
 // Input/output volume, input sensitivity (auto or a manual threshold in
 // dBFS) and per-user volume/mute. Saved in localStorage and pushed to the
 // Go side, which applies them to every audio frame (audio.go).
-const AUDIO_DEFAULTS={inputGain:1,outputVolume:1,autoSensitivity:true,thresholdDB:-50,autoGain:true,smoothing:true};
+const AUDIO_DEFAULTS={inputGain:1,outputVolume:1,autoSensitivity:true,thresholdDB:-50,autoGain:true,smoothing:true,noiseSuppression:true};
 function loadAudioSettings(){
   try{return {...AUDIO_DEFAULTS,...JSON.parse(localStorage.getItem('audioSettings')||'{}')};}catch{return {...AUDIO_DEFAULTS};}
 }
@@ -7592,6 +7619,38 @@ function pushAudioSettings(){
   const a=audioSettings;
   window.go?.main?.App?.SetAudioSettings(a.inputGain,a.outputVolume,a.autoSensitivity,a.thresholdDB,a.autoGain!==false)?.catch?.(()=>{});
   window.go?.main?.App?.SetVoiceSmoothing?.(a.smoothing!==false)?.catch?.(()=>{});
+  window.go?.main?.App?.SetNoiseSuppression?.(a.noiseSuppression!==false)?.catch?.(()=>{});
+  renderNoiseSuppression();
+}
+// Noise suppression (noise.go, RNNoise): the call's button, its popover and
+// the Settings switch all show the same thing.
+function setNoiseSuppression(on){audioSettings.noiseSuppression=!!on;pushAudioSettings();}
+function renderNoiseSuppression(){
+  const on=audioSettings.noiseSuppression!==false;
+  const btn=document.getElementById('voice-noise-btn');
+  if(btn){btn.classList.toggle('on',on);btn.title=`Noise suppression: ${on?'on':'off'} (RNNoise)`;}
+  const t=document.getElementById('noise-pop-toggle');if(t)t.checked=on;
+  const s=document.getElementById('noise-suppression');if(s)s.checked=on;
+}
+function closeNoisePop(){document.getElementById('noise-pop')?.classList.add('hidden');}
+function toggleNoisePop(){
+  const pop=document.getElementById('noise-pop'),btn=document.getElementById('voice-noise-btn');
+  if(!pop.classList.contains('hidden')){closeNoisePop();return;}
+  renderNoiseSuppression();
+  pop.classList.remove('hidden');
+  // Above the button, kept on screen.
+  const r=btn.getBoundingClientRect(),w=pop.offsetWidth,h=pop.offsetHeight;
+  pop.style.left=Math.max(8,Math.min(window.innerWidth-w-8,r.left+r.width/2-w/2))+'px';
+  pop.style.top=Math.max(8,r.top-h-8)+'px';
+}
+function initNoiseSuppressionUI(){
+  document.getElementById('voice-noise-btn').addEventListener('click',e=>{e.stopPropagation();toggleNoisePop();});
+  document.getElementById('noise-pop-toggle').addEventListener('change',e=>setNoiseSuppression(e.target.checked));
+  document.getElementById('noise-suppression').addEventListener('change',e=>setNoiseSuppression(e.target.checked));
+  document.addEventListener('mousedown',e=>{if(!e.target.closest('#noise-pop,#voice-noise-btn'))closeNoisePop();},true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeNoisePop();});
+  window.addEventListener('resize',closeNoisePop);
+  renderNoiseSuppression();
 }
 function setUserAudio(user,patch){
   const next={...getUserAudio(user),...patch};
@@ -12329,6 +12388,7 @@ function init(){
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
   document.getElementById('voice-deafen-btn').addEventListener('click',toggleDeafen);
   document.getElementById('voice-mute-btn').addEventListener('click',toggleMute);
+  initNoiseSuppressionUI();
   document.getElementById('voice-leave-btn').addEventListener('click',async()=>{
     if(voiceRejoinInFlight){voiceRejoinInFlight.cancelled=true;voiceRejoinInFlight=null;updateVoiceConnectedBar();playSound('leave');toast('You won\u2019t be put back in the call.');return;}
     if(voiceRejoin){

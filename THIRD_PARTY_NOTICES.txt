@@ -23,7 +23,7 @@ drag_indicator, edit, error, folder_open, folder_zip, fullscreen,
 fullscreen_exit, gpp_maybe, group, headphones, headset_off, image, info,
 keep, keep_off, link, lock, mic, mic_off, mood, more_horiz, movie,
 music_note, notifications, notifications_off, open_in_new, pause,
-person, person_add, picture_as_pdf, play_arrow, progress_activity,
+person, person_add, picture_as_pdf, play_arrow, progress_activity, graphic_eq,
 reply, schedule, search, select_all, send, settings, stop, tag,
 verified_user, video_file, volume_off, volume_up, zoom_in.
 
@@ -67,6 +67,20 @@ English (US) Hunspell dictionary
 - License: the permissive SCOWL terms — the full README, including every
   copyright and permission notice, is in
   frontend/licenses/en_US-dictionary-README.txt
+
+RNNoise (noise suppression)
+---------------------------
+
+- What: RNNoise 0.2 with its trained model, built into the app from source
+  (rnnoise/) to take background noise out of your microphone.
+- Source: https://github.com/xiph/rnnoise (release v0.2,
+  rnnoise-0.2.tar.gz, which includes the model as src/rnnoise_data.c)
+- Copyright: Jean-Marc Valin, Amazon, Mozilla, Xiph.Org Foundation, Mark
+  Borgerding (see rnnoise/COPYING)
+- License: BSD 3-clause — full text in rnnoise/COPYING
+- Modifications: only the files the library needs were copied; nnet.h no
+  longer prints a build warning about using SSE2. rnnoise.go (chriscord's
+  own) wraps it for Go.
 
 FFmpeg (video conversion)
 -------------------------
