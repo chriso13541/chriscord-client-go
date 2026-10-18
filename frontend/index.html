@@ -189,6 +189,7 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 .btn-danger { background:var(--red); color:#fff; }
 .owner-crown { display:inline-flex; color:var(--yellow); flex-shrink:0; }
 /* BOTS: the tag by a bot's name, Settings > Bots, the server's bots window */
+.bot-tag.plugin { background:#3ba55d; }
 .bot-tag { display:inline-flex; align-items:center; height:15px; padding:0 4px; margin-left:5px; border-radius:3px; background:var(--accent); color:#fff; font-size:.6rem; font-weight:800; letter-spacing:.04em; line-height:1; vertical-align:2px; flex-shrink:0; text-transform:uppercase; }
 .bot-form { margin-top:14px; padding:4px 16px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
 .bot-form .error-msg { margin-top:12px; }
@@ -1677,7 +1678,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
      fill set so it follows the text colour. -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="ic-audio_file" viewBox="0 -960 960 960"><path d="M430-200q38 0 64-26t26-64v-150h120v-80H480v155q-11-8-23.5-11.5T430-380q-38 0-64 26t-26 64q0 38 26 64t64 26ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
-  <symbol id="ic-sports_esports" viewBox="0 -960 960 960"><path d="M182-200q-51 0-79-35.5T82-322l42-300q9-60 53.5-99T282-760h396q60 0 104.5 39t53.5 99l42 300q7 51-21 86.5T778-200q-21 0-39-7.5T706-230l-90-90H344l-90 90q-14 15-32 22.5t-40 7.5Zm16-86 114-114h336l114 114q2 2 16 6 11 0 17.5-6.5T800-304l-44-308q-4-29-26-48.5T678-680H282q-30 0-52 19.5T204-612l-44 308q-2 11 4.5 17.5T182-280q2 0 16-6Zm482-154q17 0 28.5-11.5T720-480q0-17-11.5-28.5T680-520q-17 0-28.5 11.5T640-480q0 17 11.5 28.5T680-440Zm-80-120q17 0 28.5-11.5T640-600q0-17-11.5-28.5T600-640q-17 0-28.5 11.5T560-600q0 17 11.5 28.5T600-560ZM310-440h60v-70h70v-60h-70v-70h-60v70h-70v60h70v70Zm170-40Z"/></symbol>
+  <symbol id="ic-sports_esports" viewBox="0 -960 960 960"><path d="M182-200q-51 0-79-35.5T82-322l42-300q9-60 53.5-99T282-760h396q60 0 104.5 39t53.5 99l42 300q7 51-21 86.5T778-200q-21 0-39-7.5T706-230l-90-90H344l-90 90q-14 15-32 22.5t-40 7.5Zm16-86 114-114h336l114 114q2 2 16 6 11 0 17.5-6.5T800-304l-44-308q-4-29-26-48.5T678-680H282q-30 0-52 19.5T204-612l-44 308q-2 11 4.5 17.5T182-280q2 0 16-6Zm482-154q17 0 28.5-11.5T720-480q0-17-11.5-28.5T680-520q-17 0-28.5 11.5T640-480q0 17 11.5 28.5T680-440Zm-80-120q17 0 28.5-11.5T640-600q0-17-11.5-28.5T600-640q-17 0-28.5 11.5T560-600q0 17 11.5 28.5T600-560ZM310-440h60v-70h70v-60h-70v-70h-60v70h-70v60h70v70Zm170-40Z"/></symbol>
   <symbol id="ic-code" viewBox="0 -960 960 960"><path d="M320-240 80-480l240-240 57 57-184 184 183 183-56 56Zm320 0-57-57 184-184-183-183 56-56 240 240-240 240Z"/></symbol>
   <symbol id="ic-draft" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-folder_zip" viewBox="0 -960 960 960"><path d="M640-480v-80h80v80h-80Zm0 80h-80v-80h80v80Zm0 80v-80h80v80h-80ZM447-640l-80-80H160v480h400v-80h80v80h160v-400H640v80h-80v-80H447ZM160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Zm0-80v-480 480Z"/></symbol>
@@ -11759,7 +11760,8 @@ const BOT_DEFAULT_ASK=PERM.SEND|PERM.EMBED|PERM.REACT|PERM.HISTORY;
 const BOT_LINK=/^https:\/\/chriscord\.app\/addbot#[A-Za-z0-9_-]+$/;
 state.bots={};
 const isBot=u=>!!state.bots?.[u];
-const botTag=u=>isBot(u)?'<span class="bot-tag" title="A bot — a program, not a person">BOT</span>':'';
+const PLUGIN_TIP='A plugin — a program that runs on this server. Since it runs there, whoever runs the server can see what it sees.';
+const botTag=u=>!isBot(u)?'':state.bots?.[u]?.plugin?`<span class="bot-tag plugin" title="${PLUGIN_TIP}">PLUGIN</span>`:'<span class="bot-tag" title="A bot — a program, not a person">BOT</span>';
 const botPermNames=p=>BOT_PERMS.filter(x=>(p&x.bit)===x.bit).map(x=>x.name);
 const botsSupported=()=>state.permsVersion>=4;
 
@@ -11905,6 +11907,7 @@ function chanPickHTML(groups,checked){
 const readChans=root=>[...root.querySelectorAll('input[data-board]:checked')].map(i=>i.dataset.board);
 function makerHTML(info,tag){
   // Each part escapes its own text (names come from servers and chriscord.app).
+  if(tag?.plugin)return 'A plugin that <b>runs on this server</b>, installed by its owner';
   if(info?.mine)return 'Made by <b>you</b>';
   const here=tag?.maker||info?.maker_here||'';
   let who=here?`<b>${esc(here)}</b>`:'';
@@ -11942,13 +11945,13 @@ async function showBotList(force){
   body.innerHTML=`${add}<div class="sb-list">${d.bots.length?d.bots.map(b=>{
       const can=botPermNames(b.permissions),chans=(b.channels||[]).map(boardName).filter(Boolean);
       return `<div class="bot-card" data-key="${esc(b.public_key)}">
-        <div class="bc-head">${icon('smart_toy','bc-ic')}<div class="bc-title"><div class="bc-name">${esc(b.username)}<span class="bot-tag">BOT</span>${b.online?'<span class="bc-online" title="Connected"></span>':''}</div>
-          <div class="bc-sub bc-maker">${makerHTML(null,{maker:b.maker})}</div></div></div>
+        <div class="bc-head">${icon('smart_toy','bc-ic')}<div class="bc-title"><div class="bc-name">${esc(b.username)}${b.plugin?`<span class="bot-tag plugin" title="${PLUGIN_TIP}">PLUGIN</span>`:'<span class="bot-tag">BOT</span>'}${b.online?'<span class="bc-online" title="Connected"></span>':''}</div>
+          <div class="bc-sub bc-maker">${makerHTML(null,{maker:b.maker,plugin:b.plugin})}</div></div></div>
         ${b.description?`<div class="bc-desc">${esc(b.description)}</div>`:''}
         <div class="bc-line"><b>Can:</b> ${can.length?esc(can.join(', ')):'nothing yet'}</div>
         <div class="bc-line"><b>Sees:</b> ${chans.length?chans.map(c=>`#${esc(c)}`).join(', '):'no channels'}${b.hidden_channels?` and ${b.hidden_channels} channel${b.hidden_channels===1?'':'s'} you can’t see`:''}</div>
         ${b.client?`<div class="bc-fp">Runs ${esc(b.client)}</div>`:''}
-        ${d.can_manage?`<div class="bc-actions"><button class="settings-secondary-btn" data-act="edit">${icon('edit')}Change</button><button class="settings-secondary-btn danger" data-act="remove">${icon('person_remove')}Remove</button></div>`:''}
+        ${d.can_manage?`<div class="bc-actions"><button class="settings-secondary-btn" data-act="edit">${icon('edit')}Change</button>${b.plugin?'<span class="bc-sub">Removed by the owner, in the admin panel’s Plugins</span>':`<button class="settings-secondary-btn danger" data-act="remove">${icon('person_remove')}Remove</button>`}</div>`:''}
       </div>`;}).join(''):'<p class="settings-hint" style="margin-top:4px">No bots here yet.</p>'}</div>
     <div class="modal-actions"><button class="btn btn-ghost" id="sb-close">Close</button></div>`;
   body.querySelector('#sb-close').onclick=closeServerBots;
@@ -11960,7 +11963,7 @@ async function showBotList(force){
   // Who made each bot: their name here or on chriscord.app, filled in as known.
   body.querySelectorAll('.bot-card').forEach(card=>{
     const b=d.bots.find(x=>x.public_key===card.dataset.key);
-    window.go.main.App.MakerIdentity(b.maker_key).then(info=>{const el=card.querySelector('.bc-maker');if(el)el.innerHTML=makerHTML(info,{maker:b.maker});}).catch(()=>{});
+    if(!b.plugin)window.go.main.App.MakerIdentity(b.maker_key).then(info=>{const el=card.querySelector('.bc-maker');if(el)el.innerHTML=makerHTML(info,{maker:b.maker});}).catch(()=>{});
     card.querySelector('[data-act="edit"]')?.addEventListener('click',()=>showEditBot(b,d));
     card.querySelector('[data-act="remove"]')?.addEventListener('click',e=>{
       const btn=e.currentTarget;
@@ -12049,7 +12052,7 @@ function openAddBotLink(url){
 async function loadBotSection(user,pop,anchorRect,place){
   const tag=state.bots?.[user];if(!tag)return;
   let info=null,b=null;
-  try{info=await window.go.main.App.MakerIdentity(tag.maker_key);}catch{}
+  if(!tag.plugin)try{info=await window.go.main.App.MakerIdentity(tag.maker_key);}catch{}
   try{const d=await loadServerBots();b=d.bots.find(x=>x.username===user);await allBoards();}catch{}
   if(profilePopupFor!==user)return;
   const body=pop.querySelector('.pc-body');if(!body)return;
