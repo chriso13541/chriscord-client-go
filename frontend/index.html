@@ -6068,9 +6068,34 @@ function renderMessages(stickToBottom=true){
     c.appendChild(buildMsgEl(m,isGroupedWith(prevMsg,m)));
   });
   chatPinned=!!stickToBottom;
-  if(stickToBottom)c.scrollTop=c.scrollHeight;
-  else c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
+  if(stickToBottom){jumpAnchor=null;c.scrollTop=c.scrollHeight;}
+  else{
+    c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
+    keepAnchor();
+  }
 }
+// ── STAYING ON A MESSAGE YOU JUMPED TO ──
+// After jumping to a message (a search result, a reply), everything around
+// it is still loading — pictures, video players, file previews, the emoji
+// font — and anything above it that grows would push it out of view. So it's
+// held where it was put until you scroll yourself (or for 15 s).
+let jumpAnchor=null; // {id, offset (px from the top of the chat), until}
+function anchorJump(id){
+  const c=document.getElementById('messages'),el=c?.querySelector(`.msg-group[data-id="${CSS.escape(id)}"]`);
+  if(!el){jumpAnchor=null;return;}
+  jumpAnchor={id,offset:el.getBoundingClientRect().top-c.getBoundingClientRect().top,until:Date.now()+15000};
+}
+// Puts the anchored message back where it was; false if nothing's anchored.
+function keepAnchor(){
+  if(!jumpAnchor)return false;
+  if(Date.now()>jumpAnchor.until){jumpAnchor=null;return false;}
+  const c=document.getElementById('messages'),el=c?.querySelector(`.msg-group[data-id="${CSS.escape(jumpAnchor.id)}"]`);
+  if(!el){jumpAnchor=null;return false;}
+  const drift=(el.getBoundingClientRect().top-c.getBoundingClientRect().top)-jumpAnchor.offset;
+  if(Math.abs(drift)>=1)c.scrollTop+=drift/uiScale();
+  return true;
+}
+function releaseAnchor(){jumpAnchor=null;}
 // ── STAYING AT THE NEWEST MESSAGE ──
 // Scrolling to the bottom once, right after the messages are drawn, isn't
 // enough: plenty grows afterwards — pictures and video players load, link
@@ -6080,6 +6105,7 @@ function renderMessages(stickToBottom=true){
 // until you come back down.
 let chatPinned=true;
 function keepPinned(){
+  if(keepAnchor())return; // holding a jumped-to message in place instead
   const c=document.getElementById('messages');
   if(chatPinned&&c)c.scrollTop=c.scrollHeight;
 }
@@ -6090,10 +6116,15 @@ function initChatPinning(){
   // fire scroll events too, and mustn't be mistaken for you scrolling away.
   let lastTop=c.scrollTop;
   c.addEventListener('scroll',()=>{
-    if(c.scrollHeight-c.scrollTop-c.clientHeight<40)chatPinned=true;
+    // At the bottom of an older stretch of history isn't "at the newest".
+    if(c.scrollHeight-c.scrollTop-c.clientHeight<40)chatPinned=state.viewingLive!==false&&!jumpAnchor;
     else if(c.scrollTop<lastTop-2)chatPinned=false;
     lastTop=c.scrollTop;
   },{passive:true});
+  // Scrolling yourself lets go of a jumped-to message.
+  ['wheel','touchstart','mousedown'].forEach(ev=>c.addEventListener(ev,releaseAnchor,{passive:true}));
+  c.addEventListener('keydown',releaseAnchor);
+  document.addEventListener('keydown',e=>{if(['PageUp','PageDown','Home','End'].includes(e.key))releaseAnchor();});
   new ResizeObserver(keepPinned).observe(c); // window / side panels resized
   new MutationObserver(()=>requestAnimationFrame(keepPinned)).observe(c,{childList:true,subtree:true}); // previews, reactions…
   // Loads inside the chat that change heights (these don't bubble, so catch them on the way down).
@@ -6194,6 +6225,35 @@ async function loadOlderMessages(){
     renderMessages(false);
   }catch(err){spinner.remove();toast('Failed to load older messages: '+err,true);}
   finally{state.loadingOlder=false;}
+}
+
+// Scrolling down an older stretch of history (after a jump): the next
+// messages are added below, until it meets the newest and is live again.
+// (A window around the newest one loaded: works with any server.)
+async function loadNewerMessages(){
+  const boardId=state.selectedBoardId;
+  if(!boardId||state.viewingLive||state.loadingNewer||!state.messages.length)return;
+  state.loadingNewer=true;
+  const newest=state.messages[state.messages.length-1].id;
+  try{
+    const around=await window.go.main.App.GetMessagesAround(boardId,newest)||[];
+    if(boardId!==state.selectedBoardId||state.viewingLive)return;
+    const at=around.findIndex(m=>m.id===newest);
+    const newer=at>=0?around.slice(at+1):around.filter(m=>m.id>newest);
+    const have=new Set(state.messages.map(m=>m.id));
+    const add=newer.filter(m=>!have.has(m.id));
+    const c=document.getElementById('messages'),keep=c.scrollTop;
+    for(const m of add){
+      const prev=state.messages[state.messages.length-1];
+      state.messages.push(m);
+      if(!prev||dayKey(prev.created_at)!==dayKey(m.created_at))c.appendChild(buildDateSeparator(m.created_at));
+      c.appendChild(buildMsgEl(m,isGroupedWith(prev,m)));
+    }
+    c.scrollTop=keep; // what you're reading stays put; the new ones are below
+    if(newer.length<Math.floor(HISTORY_PAGE/2))state.viewingLive=true; // reached the newest
+    updateJumpToPresentVisibility();
+  }catch(err){toast('Failed to load newer messages: '+err,true);}
+  finally{state.loadingNewer=false;}
 }
 
 // ── SEARCH ───────────────────────────────────────────────────────
@@ -6646,10 +6706,18 @@ async function jumpToSearchResult(msg){
         catch{state.boardsByRoom[msg.room_id]=[];}
       }
     }
+    // Switching channels loads its newest messages (the "history" the
+    // server sends on subscribe). Wait for that before jumping, or it lands
+    // after the jump and replaces it — leaving you at the bottom, not at
+    // the message.
+    const loaded=new Promise(res=>{historyWaiters.push({board:msg.board_id,res});setTimeout(res,5000);});
     await selectBoard(msg.board_id,msg.board_name,msg.room_id);
+    await loaded;
+    if(state.selectedBoardId!==msg.board_id)return; // went somewhere else meanwhile
   }
   await jumpToMessageId(msg.id);
 }
+const historyWaiters=[]; // jumps waiting for a channel's first history (chat:history)
 // Loads a window centered on a specific message and scrolls it into view —
 // this is what actually lands on the message, rather than just the channel
 // it's in.
@@ -6676,7 +6744,7 @@ async function jumpToMessageId(messageId){
     const messagesAfterTarget=targetIdx===-1?AROUND_HALF:(around.length-1-targetIdx);
     state.viewingLive=messagesAfterTarget<AROUND_HALF;
 
-    renderMessages();
+    renderMessages(false);
     scrollToAndHighlight(messageId);
     updateJumpToPresentVisibility();
   }catch(err){toast('Failed to jump to message: '+err,true);}
@@ -6691,6 +6759,7 @@ function scrollToAndHighlight(messageId){
   if(!el){toast('That message has since been deleted.');return;}
   chatPinned=false; // looking at this message now, not the newest
   el.scrollIntoView({block:'center'});
+  anchorJump(messageId); // and it stays there while pictures and previews around it load
   el.classList.remove('msg-highlight'); void el.offsetWidth; // restart the animation if it's already mid-run
   el.classList.add('msg-highlight');
   el.addEventListener('animationend',()=>el.classList.remove('msg-highlight'),{once:true});
@@ -7428,7 +7497,8 @@ function attachMediaSource(el,rel,onUnplayable){
 function sizeLoadedImage(img){
   const c=document.getElementById('messages');
   if(!img.isConnected||!c||!c.contains(img)){img.classList.remove('loading');return;}
-  const wasNearBottom=(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
+  if(jumpAnchor){img.classList.remove('loading');keepAnchor();return;}
+  const wasNearBottom=chatPinned&&(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
   const before=img.getBoundingClientRect();
   img.classList.remove('loading');
   if(wasNearBottom){c.scrollTop=c.scrollHeight;return;}
@@ -12392,6 +12462,7 @@ function init(){
     state.viewingLive=true;
     renderMessages();
     updateJumpToPresentVisibility();
+    for(let i=historyWaiters.length-1;i>=0;i--)if(historyWaiters[i].board===state.selectedBoardId){historyWaiters[i].res();historyWaiters.splice(i,1);}
   });
   window.runtime.EventsOn('chat:message',msg=>{
     if(!msg)return;
@@ -12744,7 +12815,12 @@ function init(){
   initAudioSettingsUI();
   pushAllAudioSettings();
   initProfileEditor();
-  document.getElementById('messages').addEventListener('scroll',e=>{if(e.target.scrollTop<100)loadOlderMessages();updateJumpToPresentVisibility();});
+  document.getElementById('messages').addEventListener('scroll',e=>{
+    const c=e.target;
+    if(c.scrollTop<100)loadOlderMessages();
+    if(!state.viewingLive&&c.scrollHeight-c.scrollTop-c.clientHeight<300)loadNewerMessages();
+    updateJumpToPresentVisibility();
+  });
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
   document.getElementById('voice-deafen-btn').addEventListener('click',toggleDeafen);
   document.getElementById('voice-mute-btn').addEventListener('click',toggleMute);
