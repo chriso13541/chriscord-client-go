@@ -462,12 +462,19 @@ func (p *uploadWatch) idle() (time.Duration, bool) {
 
 // ── Showing (the page's /e2ee-file/ requests) ─────────────────────────────────
 
+var errNotConnected = errors.New("not connected to a server")
+
 // fetchBlob gets bytes from..to (inclusive) of an encrypted file from the
 // server (to < 0: through the end).
 func (a *App) fetchBlob(serverURL string, from, to int64) (io.ReadCloser, error) {
 	a.mu.Lock()
 	domain, token := a.domain, a.token
 	a.mu.Unlock()
+	if domain == "" {
+		// Between servers (or reconnecting): the page asked for a picture
+		// that was still loading. It asks again once it's back.
+		return nil, errNotConnected
+	}
 	req, err := http.NewRequest("GET", normaliseHTTP(domain)+serverURL, nil)
 	if err != nil {
 		return nil, err
@@ -566,6 +573,10 @@ func (a *App) serveE2EEFile(w http.ResponseWriter, r *http.Request) {
 	cStart := fileHeaderLen + first*(fileChunk+chacha20poly1305.Overhead)
 	cEnd := min(fileHeaderLen+(last+1)*(fileChunk+chacha20poly1305.Overhead), fileCipherSize(size)) - 1
 	body, err := a.fetchBlob(e.meta.URL, cStart, cEnd)
+	if errors.Is(err, errNotConnected) {
+		http.Error(w, "not connected", http.StatusServiceUnavailable)
+		return
+	}
 	if err != nil {
 		log.Printf("e2ee: fetching %s: %v", e.meta.URL, err)
 		http.Error(w, "couldn't fetch the file", http.StatusBadGateway)

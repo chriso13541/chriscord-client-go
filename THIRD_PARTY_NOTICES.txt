@@ -79,7 +79,8 @@ RNNoise (noise suppression)
   Borgerding (see rnnoise/COPYING)
 - License: BSD 3-clause — full text in rnnoise/COPYING
 - Modifications: only the files the library needs were copied; nnet.h no
-  longer prints a build warning about using SSE2. rnnoise.go (chriscord's
+  longer prints a build warning about using SSE2; os_support.h (which the
+  release leaves out, needed on ARM such as Apple Silicon) was added. rnnoise.go (chriscord's
   own) wraps it for Go.
 
 FFmpeg (video conversion)
