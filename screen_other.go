@@ -1,15 +1,14 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package main
 
 import "errors"
 
-// Sharing a screen from Linux (X11 through FFmpeg, Wayland through the
-// desktop portal) comes later; watching other people's screens works
-// everywhere.
+// Sharing a screen from macOS comes later (Linux: screen_linux.go);
+// watching other people's screens works everywhere.
 
 func screenShareUnavailable() string {
-	return "Sharing your screen from Linux isn't available yet — you can still watch other people's"
+	return "Sharing your screen from this system isn't available yet — you can still watch other people's"
 }
 func screenWindowsSupported() bool             { return false }
 func screenGDIFallback(string) bool            { return false }

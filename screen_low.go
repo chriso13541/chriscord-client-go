@@ -180,6 +180,7 @@ func (a *App) startScreenLow(main *nativeCamera, want screenLowSize) error {
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("couldn't start FFmpeg: %w", err)
 	}
+	boostCaptureProcess(cmd)
 	// Its own clock anchoring, on the main share's clock: both versions'
 	// pictures carry capture times the sound lines up with.
 	c := &nativeCamera{kind: "screenlow", cmd: cmd, done: make(chan struct{}), clock: &shareClock{epoch: main.clock.epoch}}

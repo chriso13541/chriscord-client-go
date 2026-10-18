@@ -14,9 +14,12 @@ import (
 
 func cameraInputFormat() string { return "dshow" }
 
-// Capture runs at normal priority (it's live), just without a console.
+// Capture runs without a console, a step above normal priority: it's live,
+// and a busy game shouldn't leave it waiting for the processor (a screen's
+// GPU priority is raised too, see gpu_priority_windows.go).
 func captureProcAttr(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true,
+		CreationFlags: 0x08000000 | 0x00008000} // CREATE_NO_WINDOW | ABOVE_NORMAL_PRIORITY_CLASS
 }
 
 // listCameraDevices asks DirectShow (through FFmpeg) for its cameras. Each

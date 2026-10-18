@@ -282,6 +282,7 @@ func (a *App) startScreen(opts ScreenStart) (string, error) {
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("couldn't start FFmpeg: %w", err)
 	}
+	boostCaptureProcess(cmd) // ahead of a game on the graphics card (gpu_priority_windows.go)
 	var running atomic.Bool // got going (a share that never started isn't picked back up)
 	c := &nativeCamera{kind: "screen", cmd: cmd, done: make(chan struct{}), clock: newShareClock(), opts: opts, w: w, h: h}
 	if feed != nil {

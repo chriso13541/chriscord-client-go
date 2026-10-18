@@ -107,8 +107,9 @@ else
   HW_ENC="h264_nvenc"
   EXE=ffmpeg
   EXTRA_LIBS=""
-  # Capture: webcams (V4L2), X11 screens (also XWayland windows).
-  CAPTURE="--enable-indev=v4l2,xcbgrab --enable-libxcb --enable-libxcb-shm --enable-libxcb-xfixes --enable-libxcb-shape --enable-filter=hwupload"
+  # Capture: webcams (V4L2), X11 screens (also XWayland windows). The
+  # rawvideo writer is for the share picker's small pictures of each screen.
+  CAPTURE="--enable-indev=v4l2,xcbgrab --enable-libxcb --enable-libxcb-shm --enable-libxcb-xfixes --enable-libxcb-shape --enable-filter=hwupload --enable-encoder=rawvideo --enable-muxer=rawvideo"
 fi
 
 echo "== nv-codec-headers"
@@ -201,6 +202,9 @@ if [ "$TARGET" = windows ]; then
 else
   echo "  webcams (v4l2):          $(have CONFIG_V4L2_INDEV)"
   echo "  X11 screens (xcbgrab):   $(have CONFIG_XCBGRAB_INDEV)"
+  echo "  mouse pointer (xfixes):  $(have CONFIG_LIBXCB_XFIXES)"
+  echo "  screen pictures (raw):   $(have CONFIG_RAWVIDEO_ENCODER)"
+  echo "  FLV writer (sharing):    $(have CONFIG_FLV_MUXER)"
   echo "  NVIDIA encoder:          $(have CONFIG_H264_NVENC_ENCODER)"
 fi
 cd ..
