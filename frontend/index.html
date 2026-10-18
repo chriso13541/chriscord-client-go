@@ -786,6 +786,50 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .msg-audio { width:320px; margin-top:6px; display:block; }
 .msg-file-chip { display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:8px 12px; background:var(--bg-light); border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--text); font-size:.85rem; transition:border-color .15s; user-select:text; }
 .msg-file-chip:hover { border-color:var(--accent); }
+/* Text and code files, shown in the chat (like Discord): the start of the
+   file, expandable, with copy, full view and download. */
+.text-file { margin-top:6px; width:min(560px,100%); border:1px solid var(--border); border-radius:8px; background:var(--bg-darkest); overflow:hidden; }
+.text-file .tf-head { display:flex; align-items:center; gap:8px; padding:7px 8px 7px 12px; background:var(--bg-light); border-bottom:1px solid var(--border); min-width:0; }
+.text-file .tf-head > .ic { width:18px; height:18px; color:var(--text-muted); flex-shrink:0; }
+.text-file .tf-name { font-weight:600; color:var(--text-strong); font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.text-file .tf-meta { font-size:.74rem; color:var(--text-muted); white-space:nowrap; }
+.text-file .tf-btns { margin-left:auto; display:flex; gap:2px; flex-shrink:0; }
+.tf-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:5px; display:flex; align-items:center; }
+.tf-btn:hover { background:var(--bg-mid); color:var(--text); }
+.tf-btn .ic { width:17px; height:17px; }
+.text-file .tf-body { position:relative; max-height:calc(9 * 1.5em + 16px); overflow:hidden; font-size:.8rem; }
+.text-file.open .tf-body { max-height:440px; overflow:auto; }
+.text-file .tf-body.short { max-height:none; }
+.text-file .tf-fade { position:absolute; left:0; right:0; bottom:0; height:40px; background:linear-gradient(transparent, var(--bg-darkest)); pointer-events:none; }
+.text-file.open .tf-fade, .text-file .tf-body.short .tf-fade { display:none; }
+.text-file .tf-more { display:block; width:100%; border:none; border-top:1px solid var(--border); background:var(--bg-light); color:var(--text-muted); font:inherit; font-size:.76rem; font-weight:600; padding:5px; cursor:pointer; }
+.text-file .tf-more:hover { color:var(--text); }
+.text-file .tf-note, #text-viewer .tf-note { padding:6px 12px; font-size:.74rem; color:var(--text-muted); border-top:1px solid var(--border); }
+.text-file .tf-status { padding:10px 12px; font-size:.8rem; color:var(--text-muted); }
+.tf-code { margin:0; padding:8px 0; font-family:Consolas,'Cascadia Mono','SF Mono',Menlo,monospace; line-height:1.5; color:var(--text); white-space:pre; counter-reset:ln; tab-size:4; }
+.tf-code .l { display:block; padding:0 12px 0 0; min-height:1.5em; }
+.tf-code .l::before { counter-increment:ln; content:counter(ln); display:inline-block; width:3.2em; padding-right:12px; margin-right:4px; text-align:right; color:var(--text-muted); opacity:.55; user-select:none; }
+.tf-code.wrap { white-space:pre-wrap; word-break:break-word; }
+.tf-code.wrap .l { padding-left:calc(3.2em + 16px); text-indent:calc(-3.2em - 16px); }
+.tf-code .k { color:#c792ea; } .tf-code .s { color:#c3e88d; } .tf-code .c { color:#7f8c98; font-style:italic; } .tf-code .n { color:#f78c6c; } .tf-code .t { color:#82aaff; }
+[data-theme="light"] .tf-code .k { color:#7b30d0; } [data-theme="light"] .tf-code .s { color:#2e7d32; } [data-theme="light"] .tf-code .c { color:#6a737d; } [data-theme="light"] .tf-code .n { color:#c2410c; } [data-theme="light"] .tf-code .t { color:#1d4ed8; }
+#text-viewer .modal.tv { width:min(1100px,94vw); max-width:none; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:88vh; }
+#text-viewer .tv-head { display:flex; align-items:center; gap:10px; padding:12px 12px 12px 18px; border-bottom:1px solid var(--border); background:var(--bg-mid); }
+#text-viewer .tv-head > .ic { width:20px; height:20px; color:var(--text-muted); }
+#text-viewer .tv-name { font-weight:700; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#text-viewer .tf-meta { font-size:.78rem; color:var(--text-muted); white-space:nowrap; }
+#text-viewer .tv-btns { margin-left:auto; display:flex; gap:4px; }
+#text-viewer .tv-btns .tf-btn .ic { width:19px; height:19px; }
+#text-viewer .tv-body { overflow:auto; background:var(--bg-darkest); font-size:.84rem; flex:1; min-height:120px; }
+#text-viewer .tf-btn.on { color:var(--accent); }
+/* A long paste: offered as a .txt file instead. */
+#paste-offer { display:flex; align-items:center; gap:8px; padding:8px 10px 8px 12px; margin:0 0 -6px; border-radius:8px 8px 0 0; background:var(--bg-dark); border:1px solid var(--border); border-bottom:none; font-size:.85rem; color:var(--text-muted); }
+#paste-offer .ic { width:16px; height:16px; flex-shrink:0; }
+#paste-offer b { color:var(--text-strong); }
+#paste-offer .po-go { margin-left:auto; border:none; border-radius:6px; padding:5px 10px; background:var(--accent); color:#fff; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+#paste-offer .po-go:hover { filter:brightness(1.1); }
+#paste-offer .rb-x { background:none; border:none; color:var(--text-muted); cursor:pointer; display:inline-flex; padding:2px; border-radius:50%; }
+#paste-offer .rb-x:hover { color:var(--text-strong); background:var(--bg-light); }
 .msg-file-chip.missing { cursor:default; border-style:dashed; opacity:.75; }
 .msg-file-chip.missing:hover { border-color:var(--border); }
 .msg-file-chip.missing .fname { font-weight:500; color:var(--text-muted); text-decoration:line-through; }
@@ -1830,6 +1874,14 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 </div>
 
 <!-- Screen share picker: a whole screen, or one application's window -->
+<div class="modal-overlay hidden" id="text-viewer">
+  <div class="modal tv" role="dialog" aria-label="File">
+    <div class="tv-head"><span class="tv-name"></span><span class="tf-meta"></span>
+      <span class="tv-btns"><button type="button" class="tf-btn tv-wrap" title="Wrap long lines"><svg class="ic" aria-hidden="true"><use href="#ic-description"/></svg></button><button type="button" class="tf-btn tv-copy" title="Copy"><svg class="ic" aria-hidden="true"><use href="#ic-content_copy"/></svg></button><button type="button" class="tf-btn tv-dl" title="Download"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button><button type="button" class="tf-btn tv-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></span></div>
+    <div class="tv-body"></div>
+    <div class="tf-note hidden"></div>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="modal-screen">
   <div class="modal screen-pick">
     <h2>Share your screen</h2>
@@ -2024,6 +2076,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
           <div id="sticker-picker" class="hidden" role="dialog" aria-label="Stickers"></div>
           <div id="emoji-suggest" class="hidden" role="listbox"></div>
           <div id="reply-bar" class="hidden"><svg class="ic" aria-hidden="true" style="width:16px;height:16px"><use href="#ic-reply"/></svg><span>Replying to <b id="reply-bar-name"></b></span><button class="rb-x" id="reply-bar-x" title="Cancel reply (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
+          <div id="paste-offer" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-description"/></svg><span>That's a long paste (<b class="po-len"></b> characters).</span><button type="button" class="po-go">Send as a .txt file</button><button type="button" class="rb-x" title="Keep it as a message"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
           <div id="attach-queue" class="empty"></div>
           <div id="input-wrap">
             <button id="attach-btn" disabled title="Attach files (or drag & drop)"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg></button>
@@ -5607,12 +5660,227 @@ async function queueBlobs(files){
     renderAttachQueue();
   }
 }
+// ── TEXT AND CODE FILES IN THE CHAT ──────────────────────────────
+// A .txt, .log, .json, source file… shows its first lines right in the
+// message (like Discord): expand it, copy it, open it full size, or
+// download it. Only the start of the file is fetched (a Range request, up
+// to TEXT_PREVIEW_MAX — encrypted files are decrypted by this app as they
+// come), and only once the message scrolls into view.
+const TEXT_PREVIEW_MAX=256*1024;
+const TEXT_PREVIEW_LINES=2000; // most lines drawn in the chat (the full view draws the rest)
+const TEXT_EXT=new Set(('txt text md markdown log csv tsv json jsonc json5 ndjson js mjs cjs jsx ts tsx go rs c h cc cpp cxx hpp hh cs java kt kts py pyw rb php '+
+  'sh bash zsh fish ps1 psm1 bat cmd lua sql toml yaml yml xml html htm css scss sass less ini cfg conf config env properties diff patch swift dart r pl pm '+
+  'vue svelte gradle dockerfile makefile mk cmake gitignore gitattributes editorconfig srt vtt tex nix zig hs ml ex exs erl clj scala groovy asm s v sv vhd '+
+  'proto graphql gql rst adoc org').split(' '));
+function textFileExt(name){
+  const n=String(name||'').toLowerCase().split('/').pop();
+  if(!n.includes('.'))return n; // Dockerfile, Makefile…
+  return n.split('.').pop();
+}
+function isTextPreviewable(a){
+  if(!a||a.spoiler||a.external||!a.url)return false;
+  if(TEXT_EXT.has(textFileExt(a.name)))return true;
+  const m=String(a.mime||'').toLowerCase();
+  return m.startsWith('text/')||/^application\/(json|xml|javascript|x-sh|x-yaml|yaml|toml|x-toml|sql)\b/.test(m);
+}
+const textPreviews=new Map(); // attachment url → Promise<{text,truncated,total}>
+function fetchTextPreview(a){
+  if(textPreviews.has(a.url))return textPreviews.get(a.url);
+  const p=(async()=>{
+    const res=await fetch(await getAttachLink(a.url),{headers:{Range:`bytes=0-${TEXT_PREVIEW_MAX-1}`}});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    let total=null;
+    const cr=/\/(\d+)\s*$/.exec(res.headers.get('Content-Range')||'');
+    if(cr)total=+cr[1];else if(res.status===200&&res.headers.get('Content-Length'))total=+res.headers.get('Content-Length');
+    const reader=res.body.getReader(),parts=[];let n=0;
+    while(n<TEXT_PREVIEW_MAX){const {done,value}=await reader.read();if(done)break;parts.push(value);n+=value.length;}
+    reader.cancel().catch(()=>{});
+    const buf=new Uint8Array(Math.min(n,TEXT_PREVIEW_MAX));let o=0;
+    for(const c of parts){if(o>=buf.length)break;const take=c.subarray(0,buf.length-o);buf.set(take,o);o+=take.length;}
+    if(buf.subarray(0,8192).includes(0))throw new Error('not a text file');
+    const truncated=total!=null?total>buf.length:n>buf.length;
+    let text=new TextDecoder('utf-8').decode(buf);
+    if(truncated)text=text.replace(/\uFFFD+$/,''); // a character cut in half at the end
+    return {text:text.replace(/\r\n?/g,'\n'),truncated,total};
+  })();
+  p.catch(()=>textPreviews.delete(a.url));
+  textPreviews.set(a.url,p);
+  while(textPreviews.size>60)textPreviews.delete(textPreviews.keys().next().value);
+  return p;
+}
+const fmtBytes=b=>b>=1048576?`${(b/1048576).toFixed(1)} MB`:b>=1024?`${Math.round(b/1024)} KB`:`${b} bytes`;
+
+// A small highlighter: comments, strings, numbers and keywords, for the
+// usual languages. Plain text (txt, log, md, csv) isn't coloured.
+const HL_PLAIN=new Set(['txt','text','log','md','markdown','csv','tsv','srt','vtt','rst','adoc','org','tex','diff','patch']);
+const HL_HASH=new Set(['py','pyw','rb','sh','bash','zsh','fish','ps1','psm1','yaml','yml','toml','ini','cfg','conf','config','env','properties','r','pl','pm','dockerfile','makefile','mk','cmake','gitignore','gitattributes','editorconfig','nix','ex','exs','graphql','gql']);
+const HL_DASH=new Set(['sql','lua','hs','elm']);
+const HL_MARKUP=new Set(['html','htm','xml','vue','svelte']);
+const HL_KEYWORDS=new Set(('if else elif for while do switch case default break continue return function func fn def class struct enum interface impl trait type '+
+  'const let var mut static pub public private protected package import from export as use mod module namespace new delete try catch except finally throw '+
+  'throws raise async await yield go defer chan select map range in of is not and or lambda with match where self this super true false null nil None True '+
+  'False undefined void int float double bool boolean string char byte long short unsigned extern include define struct union goto sizeof typeof '+
+  'instanceof echo local then end fi done esac elseif unless until begin rescue ensure and or not SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE '+
+  'CREATE TABLE DROP ALTER JOIN LEFT RIGHT INNER OUTER ON GROUP BY ORDER LIMIT AS AND OR NOT NULL PRIMARY KEY INDEX').split(' '));
+function highlightTokens(text,ext){
+  if(HL_PLAIN.has(ext))return [{t:text}];
+  const parts=[];
+  if(HL_MARKUP.has(ext))parts.push('(<!--[\\s\\S]*?(?:-->|$))');
+  else if(HL_HASH.has(ext))parts.push('(#[^\\n]*)');
+  else if(HL_DASH.has(ext))parts.push('(--[^\\n]*)');
+  else parts.push('(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?(?:\\*\\/|$))');
+  parts.push('("(?:[^"\\\\\\n]|\\\\.)*"?|\'(?:[^\'\\\\\\n]|\\\\.)*\'?|`[^`]*`?)'); // strings
+  parts.push('(\\b\\d[\\d_]*(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b|\\b0x[0-9a-fA-F]+\\b)'); // numbers
+  parts.push(HL_MARKUP.has(ext)?'(<\\/?[A-Za-z][\\w:-]*|\\/?>)':'(\\b[A-Za-z_][A-Za-z0-9_]*\\b)'); // tags / words
+  const re=new RegExp(parts.join('|'),'g');
+  const out=[];let last=0,m;
+  while((m=re.exec(text))){
+    if(m[0]==='') {re.lastIndex++;continue;}
+    if(m.index>last)out.push({t:text.slice(last,m.index)});
+    if(m[1]!==undefined)out.push({t:m[1],c:'c'});
+    else if(m[2]!==undefined)out.push({t:m[2],c:'s'});
+    else if(m[3]!==undefined)out.push({t:m[3],c:'n'});
+    else if(HL_MARKUP.has(ext))out.push({t:m[4],c:'t'});
+    else out.push({t:m[4],c:HL_KEYWORDS.has(m[4])?'k':null});
+    last=re.lastIndex;
+  }
+  if(last<text.length)out.push({t:text.slice(last)});
+  return out;
+}
+// Lines of highlighted HTML (a token running over several lines is split).
+function highlightLines(text,ext,maxLines=Infinity){
+  const lines=[''];
+  for(const tok of highlightTokens(text,ext)){
+    const pieces=tok.t.split('\n');
+    pieces.forEach((piece,i)=>{
+      if(i>0){if(lines.length>=maxLines)return;lines.push('');}
+      if(piece)lines[lines.length-1]+=tok.c?`<span class="${tok.c}">${esc(piece)}</span>`:esc(piece);
+    });
+    if(lines.length>=maxLines&&tok.t.includes('\n'))break;
+  }
+  if(lines.length>1&&lines[lines.length-1]==='')lines.pop(); // the file's last newline
+  return lines.slice(0,maxLines);
+}
+function codeHTML(lines,wrap){
+  return `<pre class="tf-code${wrap?' wrap':''}"><code>${lines.map(l=>`<span class="l">${l||' '}</span>`).join('')}</code></pre>`;
+}
+const textFileObserver=('IntersectionObserver' in window)?new IntersectionObserver(entries=>{
+  for(const e of entries)if(e.isIntersecting){textFileObserver.unobserve(e.target);e.target._loadText?.();}
+},{rootMargin:'400px'}):null;
+function buildTextFile(a){
+  const ext=textFileExt(a.name);
+  const el=document.createElement('div');el.className='text-file';
+  el.innerHTML=`<div class="tf-head">${icon(fileTypeIcon(a.name,a.mime))}<span class="tf-name" title="${esc(a.name||'')}">${esc(a.name||'File')}</span><span class="tf-meta"></span>
+    <span class="tf-btns"><button type="button" class="tf-btn tf-copy" title="Copy" disabled>${icon('content_copy')}</button><button type="button" class="tf-btn tf-full" title="View whole file" disabled>${icon('open_in_full')}</button><button type="button" class="tf-btn tf-dl" title="Download">${icon('download')}</button></span></div>
+    <div class="tf-status">Loading\u2026</div>`;
+  el.querySelector('.tf-dl').addEventListener('click',e=>{e.stopPropagation();downloadAttachment(a);});
+  el._loadText=async()=>{
+    let d;
+    try{d=await fetchTextPreview(a);}
+    catch(err){
+      // Not text after all, or it couldn't be fetched: the plain download chip.
+      const chip=document.createElement('div');chip.className='msg-file-chip';
+      chip.innerHTML=`${icon(fileTypeIcon(a.name,a.mime),'file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
+      chip.addEventListener('click',()=>downloadAttachment(a));
+      el.replaceWith(chip);return;
+    }
+    const lineCount=d.text?d.text.split('\n').length-(d.text.endsWith('\n')?1:0):0;
+    el.querySelector('.tf-meta').textContent=[d.total!=null?fmtBytes(d.total):'',`${lineCount.toLocaleString()}${d.truncated?'+':''} line${lineCount===1?'':'s'}`].filter(Boolean).join(' \u00b7 ');
+    const lines=highlightLines(d.text,ext,TEXT_PREVIEW_LINES);
+    const body=document.createElement('div');body.className='tf-body';
+    body.innerHTML=codeHTML(lines,HL_PLAIN.has(ext))+'<div class="tf-fade"></div>';
+    el.querySelector('.tf-status').replaceWith(body);
+    const short=lines.length<=9;
+    body.classList.toggle('short',short);
+    if(!short){
+      const more=document.createElement('button');more.type='button';more.className='tf-more';
+      const label=()=>{more.textContent=el.classList.contains('open')?'Collapse':`Expand \u2014 ${lineCount.toLocaleString()}${d.truncated?'+':''} lines`;};
+      label();
+      more.addEventListener('click',e=>{e.stopPropagation();el.classList.toggle('open');label();if(!el.classList.contains('open'))body.scrollTop=0;});
+      el.appendChild(more);
+    }
+    if(d.truncated||lineCount>TEXT_PREVIEW_LINES){
+      const note=document.createElement('div');note.className='tf-note';
+      note.textContent=d.truncated?`Showing the first ${fmtBytes(TEXT_PREVIEW_MAX)} \u2014 download it for the rest.`:`Showing the first ${TEXT_PREVIEW_LINES.toLocaleString()} lines \u2014 view the whole file for the rest.`;
+      el.appendChild(note);
+    }
+    const copy=el.querySelector('.tf-copy'),full=el.querySelector('.tf-full');
+    copy.disabled=full.disabled=false;
+    copy.addEventListener('click',async e=>{e.stopPropagation();await copyText(d.text);toast(d.truncated?'Copied the part that\u2019s shown':'Copied');});
+    full.addEventListener('click',e=>{e.stopPropagation();openTextViewer(a,d);});
+  };
+  if(textFileObserver)textFileObserver.observe(el);else el._loadText();
+  return el;
+}
+// The whole file (as far as it was fetched), full size.
+function openTextViewer(a,d){
+  const ext=textFileExt(a.name);
+  let wrap=HL_PLAIN.has(ext);
+  const ov=document.getElementById('text-viewer');
+  ov.querySelector('.tv-name').textContent=a.name||'File';
+  ov.querySelector('.tv-head > .ic')?.remove();
+  ov.querySelector('.tv-head').insertAdjacentHTML('afterbegin',icon(fileTypeIcon(a.name,a.mime)));
+  ov.querySelector('.tf-meta').textContent=d.total!=null?fmtBytes(d.total):'';
+  const body=ov.querySelector('.tv-body'),lines=highlightLines(d.text,ext);
+  const draw=()=>{body.innerHTML=codeHTML(lines,wrap);ov.querySelector('.tv-wrap').classList.toggle('on',wrap);};
+  draw();body.scrollTop=0;
+  ov.querySelector('.tf-note').classList.toggle('hidden',!d.truncated);
+  ov.querySelector('.tf-note').textContent=`Showing the first ${fmtBytes(TEXT_PREVIEW_MAX)} \u2014 download it for the rest.`;
+  ov.querySelector('.tv-wrap').onclick=()=>{wrap=!wrap;draw();};
+  ov.querySelector('.tv-copy').onclick=async()=>{await copyText(d.text);toast(d.truncated?'Copied the part that\u2019s shown':'Copied');};
+  ov.querySelector('.tv-dl').onclick=()=>downloadAttachment(a);
+  ov.classList.remove('hidden');
+}
+function closeTextViewer(){document.getElementById('text-viewer').classList.add('hidden');document.querySelector('#text-viewer .tv-body').innerHTML='';}
+
+// ── LONG PASTES ──────────────────────────────────────────────────
+// Pasting more than PASTE_OFFER_CHARS characters into the message box
+// offers to send it as a .txt file instead (it pastes as usual either way).
+const PASTE_OFFER_CHARS=500;
+let pasteOffer=null; // {text, start}
+function showPasteOffer(text,start){
+  pasteOffer={text,start};
+  const el=document.getElementById('paste-offer');
+  el.querySelector('.po-len').textContent=text.length.toLocaleString();
+  el.classList.remove('hidden');
+}
+function hidePasteOffer(){pasteOffer=null;document.getElementById('paste-offer')?.classList.add('hidden');}
+function acceptPasteOffer(){
+  const o=pasteOffer;hidePasteOffer();
+  if(!o)return;
+  const input=document.getElementById('msg-input');
+  // Take the pasted text back out of the box (if it's still there as pasted).
+  const at=input.value.substr(o.start,o.text.length)===o.text?o.start:input.value.indexOf(o.text);
+  if(at>=0){input.value=input.value.slice(0,at)+input.value.slice(at+o.text.length);autoResize(input);renderComposerHighlight();input.setSelectionRange(at,at);}
+  input.focus();
+  queueBlobs([new File([o.text],'message.txt',{type:'text/plain'})]);
+}
+function initPasteOffer(){
+  const el=document.getElementById('paste-offer');
+  el.querySelector('.po-go').addEventListener('click',acceptPasteOffer);
+  el.querySelector('.rb-x').addEventListener('click',()=>{hidePasteOffer();document.getElementById('msg-input').focus();});
+  const input=document.getElementById('msg-input');
+  // Gone once what was pasted isn't in the box any more (deleted or sent).
+  input.addEventListener('input',()=>{if(pasteOffer&&!input.value.includes(pasteOffer.text))hidePasteOffer();});
+  const ov=document.getElementById('text-viewer');
+  ov.querySelector('.tv-close').addEventListener('click',closeTextViewer);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)closeTextViewer();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!ov.classList.contains('hidden')){e.stopImmediatePropagation();closeTextViewer();}},true);
+}
+
 // Ctrl+V / Paste in the message box: files on the clipboard become
 // attachments; plain text pastes as normal.
 function initPasteAttachments(){
   document.getElementById('msg-input').addEventListener('paste',e=>{
     const files=[...(e.clipboardData?.items||[])].filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean);
-    if(!files.length)return; // just text — let it paste normally
+    if(!files.length){ // just text — it pastes normally; a long one is offered as a file
+      const text=(e.clipboardData?.getData('text/plain')||'').replace(/\r\n?/g,'\n');
+      if(text.length>PASTE_OFFER_CHARS&&!document.getElementById('attach-btn').disabled){
+        const start=e.target.selectionStart??0;
+        setTimeout(()=>showPasteOffer(text,start),0);
+      }
+      return;
+    }
     e.preventDefault();
     if(document.getElementById('attach-btn').disabled){toast('Open a channel to attach files',true);return;}
     queueBlobs(files);
@@ -6573,6 +6841,8 @@ function buildMsgEl(msg,grouped){
       body.appendChild(buildMediaPlayer(a,'video'));
     }else if(a.mime?.startsWith('audio/')){
       body.appendChild(buildMediaPlayer(a,'audio'));
+    }else if(isTextPreviewable(a)){
+      body.appendChild(buildTextFile(a));
     }else{
       const chip=document.createElement('div');chip.className='msg-file-chip';
       chip.innerHTML=`${icon(fileTypeIcon(a.name,a.mime),'file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
@@ -6840,7 +7110,7 @@ async function sendMessage(){
   if(!state.selectedBoardId)return;
   if(state.attachQueue.some(a=>a.status==='converting')){toast('Still converting a video, please wait…');return;}
   if(state.attachQueue.some(a=>a.status==='pending')){toast('Still uploading, please wait…');return;}
-  rememberSent(typed);
+  rememberSent(typed);hidePasteOffer();
   input.value='';autoResize(input);closeEmojiSuggest();renderComposerHighlight();
   stopTyping(); // sent — back to the plain green circle
   const attachObjs=readyAttachments.map(a=>({url:a.url,name:a.filename,mime:a.mime,...(a.spoiler?{spoiler:true}:{})}));
@@ -12453,6 +12723,7 @@ function init(){
   initTooltips();
   initShortcodes();
   initPasteAttachments();
+  initPasteOffer();
   initContextMenus();
   initEditServer();
   initElasticScroll();
