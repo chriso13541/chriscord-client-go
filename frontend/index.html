@@ -7705,7 +7705,7 @@ function setNoiseSuppression(on){audioSettings.noiseSuppression=!!on;pushAudioSe
 function renderNoiseSuppression(){
   const on=audioSettings.noiseSuppression!==false;
   const btn=document.getElementById('voice-noise-btn');
-  if(btn){btn.classList.toggle('on',on);btn.title=`Noise suppression: ${on?'on':'off'} (RNNoise)`;}
+  if(btn){btn.classList.toggle('on',on);btn.title=`Noise suppression: ${on?'on':'off'} \u2014 click to turn ${on?'off':'on'}, right-click for more`;}
   const t=document.getElementById('noise-pop-toggle');if(t)t.checked=on;
   const s=document.getElementById('noise-suppression');if(s)s.checked=on;
 }
@@ -7721,7 +7721,15 @@ function toggleNoisePop(){
   pop.style.top=Math.max(8,r.top-h-8)+'px';
 }
 function initNoiseSuppressionUI(){
-  document.getElementById('voice-noise-btn').addEventListener('click',e=>{e.stopPropagation();toggleNoisePop();});
+  // Left click switches it on or off; right click opens the panel about it.
+  const nb=document.getElementById('voice-noise-btn');
+  nb.addEventListener('click',e=>{
+    e.stopPropagation();closeNoisePop();
+    const on=audioSettings.noiseSuppression===false;
+    setNoiseSuppression(on);
+    toast(`Noise suppression ${on?'on':'off'}`);
+  });
+  nb.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();toggleNoisePop();});
   document.getElementById('noise-pop-toggle').addEventListener('change',e=>setNoiseSuppression(e.target.checked));
   document.getElementById('noise-suppression').addEventListener('change',e=>setNoiseSuppression(e.target.checked));
   document.addEventListener('mousedown',e=>{if(!e.target.closest('#noise-pop,#voice-noise-btn'))closeNoisePop();},true);
