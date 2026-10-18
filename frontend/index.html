@@ -1389,6 +1389,14 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .results-more button { font:inherit; font-size:.8rem; font-weight:600; color:var(--text); background:var(--bg-light); border:1px solid var(--border); border-radius:6px; padding:6px 14px; cursor:pointer; }
 .results-more button:hover:not(:disabled) { background:var(--accent); border-color:var(--accent); color:#fff; }
 .results-more button:disabled { opacity:.6; cursor:default; }
+.results-more .rm-line { display:flex; align-items:center; justify-content:center; gap:6px; }
+.results-more .rm-line .ic { width:16px; height:16px; }
+.search-bar { width:80%; height:4px; border-radius:2px; background:var(--bg-light); overflow:hidden; }
+.search-bar > div { height:100%; background:var(--accent); border-radius:2px; transition:width .25s; }
+.results-more .rm-stop { padding:3px 12px; font-size:.75rem; }
+/* Settings → Search: this computer's copy of the server's history. */
+.copy-card .copy-bar { width:100%; margin-top:8px; }
+.copy-card .au-btns { flex-wrap:wrap; }
 .msg-pin { display:inline-flex; align-self:center; margin-right:-4px; }
 .msg-pin-ic { width:15px; height:15px; color:var(--text-muted); }
 #results-summary .clear-results { background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:auto; font-size:.78rem; padding:2px 5px; border-radius:4px; flex-shrink:0; }
@@ -2013,6 +2021,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div class="settings-tab" data-tab="screenshare">Screen Sharing</div>
     <div class="settings-tab" data-tab="performance">Performance</div>
     <div class="settings-tab" data-tab="system">System</div>
+    <div class="settings-tab" data-tab="search">Search</div>
     <div class="settings-tab" data-tab="about">About</div>
   </div>
   <div id="settings-content">
@@ -2303,6 +2312,15 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="sys-games-head"><label class="settings-label">Your games</label><button class="settings-secondary-btn" type="button" id="sys-games-add"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg>Add a game</button></div>
       <p class="settings-hint" style="margin:4px 0 0">Add a program that isn’t found by itself, call a game something else, or hide one you’d rather not show (the eye).</p>
       <div id="sys-games-list"></div>
+    </div>
+
+    <div id="settings-tab-search" class="settings-tab-pane">
+      <h2>Search</h2>
+      <p class="settings-hint" style="margin-top:0">Messages are end-to-end encrypted, so the server can’t search them — this app does. To find old messages without downloading them again every time, it keeps a copy of each server’s history on this computer as you search, encrypted with your account’s key so only you can open it. It’s brought up to date before each search, edits and deletions included.</p>
+      <label class="settings-label" id="search-copy-label" style="margin-top:18px">This server</label>
+      <div class="about-update copy-card" id="search-copy-card" aria-live="polite"></div>
+      <label class="check-row" style="margin-top:14px"><input type="checkbox" id="search-copy-on"> Keep a copy of this server’s history on this computer</label>
+      <p class="settings-hint" style="margin-top:0">Off: searches fetch what they need from the server each time, and nothing is kept. Turning it off deletes this server’s copy. Each server has its own copy; switch servers to see another’s.</p>
     </div>
 
     <div id="settings-tab-about" class="settings-tab-pane">
@@ -4492,8 +4510,66 @@ function switchSettingsTab(name){
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
   if(name==='about')renderAbout();
   if(name==='system')renderSystemSettings();
+  if(name==='search')renderSearchCopySettings();
   if(name==='account')renderCloudSettings();
   if(name==='bots'){botFormOpen=false;renderBotSettings();}
+}
+
+// ── SETTINGS > SEARCH ────────────────────────────────────────────
+// This computer's copy of the current server's history (history.go):
+// how much of it there is, copying all of it, clearing it, or not keeping one.
+let searchCopyLive=null; // the latest progress while copying
+async function renderSearchCopySettings(){
+  const card=document.getElementById('search-copy-card'),on=document.getElementById('search-copy-on');
+  let info={server:'',available:false,enabled:true,messages:0,bytes:0,oldest_at:'',complete:false,downloading:false,total:-1};
+  try{info=await window.go.main.App.SearchCopyInfo();}catch{}
+  if(searchCopyLive&&searchCopyLive.server===info.server&&info.downloading)Object.assign(info,{messages:searchCopyLive.messages,oldest_at:searchCopyLive.oldest_at||info.oldest_at,total:searchCopyLive.total});
+  const label=document.getElementById('search-copy-label');
+  const name=(state.servers||[]).find(s=>s.domain===info.server);
+  label.textContent=info.server?`This server \u2014 ${(name&&(name.custom_name||name.display_name))||info.server}`:'This server';
+  on.checked=!!info.enabled;on.disabled=!info.server;
+  on.onchange=async()=>{
+    try{
+      await window.go.main.App.SetSearchCopy(on.checked);
+      if(!on.checked&&info.messages)toast('Deleted this computer\u2019s copy');
+    }catch(err){toast(String(err),true);}
+    searchCopyLive=null;renderSearchCopySettings();
+  };
+  const mb=b=>b>=1<<30?`${(b/(1<<30)).toFixed(1)} GB`:b>=1<<20?`${Math.round(b/(1<<20))} MB`:`${Math.max(1,Math.round(b/1024))} KB`;
+  let title,sub,btns='',bar='';
+  if(!info.server){title='Not connected';sub='Connect to a server to see this computer\u2019s copy of its history.';}
+  else if(!info.available){title='Not available on this server yet';sub='Its server needs updating to keep a copy up to date. Search still works \u2014 it fetches messages from the server each time.';}
+  else if(!info.enabled){title='Not keeping a copy';sub='Searches fetch what they need from the server each time.';}
+  else{
+    title=info.messages?`${nfmt(info.messages)} message${info.messages===1?'':'s'} copied${info.bytes?` (${mb(info.bytes)})`:''}`:'Nothing copied yet';
+    if(info.downloading){
+      const of=info.total>0?` of ${nfmt(info.total)}`:'';
+      sub=`Copying\u2026 ${nfmt(info.messages)}${of}${info.oldest_at?`, back to ${esc(searchDay(info.oldest_at))}`:''}. You can keep using Chriscord meanwhile.`;
+      if(info.total>0)bar=`<div class="search-bar copy-bar"><div style="width:${Math.max(2,Math.min(100,Math.round(100*info.messages/info.total)))}%"></div></div>`;
+      btns=`<button class="settings-secondary-btn" id="search-copy-stop" type="button">${icon('stop')}Stop</button>`;
+    }else{
+      sub=info.complete?`All of it${info.oldest_at?`, back to ${esc(searchDay(info.oldest_at))}`:''}. New messages are added as you search.`
+        :info.messages?`Back to ${esc(searchDay(info.oldest_at))}. Older messages are fetched from the server as you search \u2014 or copy all of it now, so searching old messages is quick.`
+        :'It\u2019s made as you search \u2014 or copy all of it now, so searching old messages is quick.';
+      btns=(info.complete?'':`<button class="settings-secondary-btn" id="search-copy-all" type="button">${icon('download')}Copy All History</button>`)+
+        (info.messages?`<button class="settings-secondary-btn" id="search-copy-clear" type="button">${icon('delete')}Clear Copy</button>`:'');
+    }
+  }
+  card.className='about-update copy-card'+(info.complete&&info.enabled&&info.available?' ok':'');
+  card.innerHTML=`<svg class="ic au-ic" aria-hidden="true"><use href="#ic-${info.downloading?'sync':info.complete&&info.enabled?'check_circle':'search'}"/></svg>`+
+    `<div class="au-text"><div class="au-title">${esc(title)}</div><div class="au-sub">${sub}</div>${bar}</div>${btns?`<div class="au-btns">${btns}</div>`:''}`;
+  card.querySelector('#search-copy-all')?.addEventListener('click',async()=>{
+    try{await window.go.main.App.DownloadSearchCopy();}catch(err){toast(String(err),true);}
+    renderSearchCopySettings();
+  });
+  card.querySelector('#search-copy-stop')?.addEventListener('click',()=>{window.go.main.App.StopSearchCopyDownload().catch(()=>{});});
+  card.querySelector('#search-copy-clear')?.addEventListener('click',async()=>{
+    try{await window.go.main.App.ClearSearchCopy();toast('Cleared this computer\u2019s copy');}catch(err){toast(String(err),true);}
+    searchCopyLive=null;renderSearchCopySettings();
+  });
+}
+function searchCopyTabOpen(){
+  return !document.getElementById('settings-modal').classList.contains('hidden')&&document.getElementById('settings-tab-search').classList.contains('active');
 }
 
 // ── SETTINGS > SYSTEM ────────────────────────────────────────────
@@ -5836,51 +5912,89 @@ async function runSearch(){
   }
   if(!f.text&&!f.from&&!f.has.length&&!boardId&&!f.after&&!f.before){exitSearch();return;}
   // Messages are encrypted, so this app does the matching (search.go): it
-  // goes back through history newest first and stops at a screenful;
-  // "Search older" carries on from there.
+  // goes back through this computer's copy of the history and then the
+  // server's, newest first, a little at a time — showing how far it's got
+  // — until it has a screenful; "Search older" carries on from there.
   const run=searchRun={f,raw,args:[f.text,f.from,f.has.join(','),boardId,
     f.after?f.after.toISOString():'',f.before?f.before.toISOString():''],results:[],page:null};
   showSearchResults([],raw,f,{searching:true});
   await searchMore(run);
 }
 let searchRun=null; // the search on screen
+const SEARCH_SCREENFUL=25;
 async function searchMore(run){
   if(run.busy)return;
-  run.busy=true;
+  run.busy=true;run.stopped=false;run.stage=null;
+  const target=run.results.length+SEARCH_SCREENFUL;
   renderSearchMore(run);
   try{
-    const page=await window.go.main.App.SearchMessages(...run.args,run.page?run.page.next:0,25);
-    if(run!==searchRun||state.resultsMode!=='search')return; // replaced or closed meanwhile
-    run.page=page;
-    const list=document.getElementById('results-list');
-    list.querySelector('.results-none')?.remove();
-    for(const m of page.results||[]){run.results.push(m);list.appendChild(buildSearchResultRow(m));}
-    updateSearchCount(run);
-  }catch(err){if(run===searchRun)toast('Search failed: '+err,true);}
+    for(;;){
+      const page=await window.go.main.App.SearchMessages(...run.args,run.page?run.page.next:'',SEARCH_SCREENFUL);
+      if(run!==searchRun||state.resultsMode!=='search')return; // replaced or closed meanwhile
+      run.page=page;run.stage=null;
+      const list=document.getElementById('results-list');
+      list.querySelector('.results-none')?.remove();
+      const more=list.querySelector('.results-more');
+      for(const m of page.results||[]){run.results.push(m);list.insertBefore(buildSearchResultRow(m),more);}
+      updateSearchCount(run);
+      if(!page.next||run.results.length>=target||run.stopped)break;
+      renderSearchMore(run); // how far it's got
+    }
+  }catch(err){if(run===searchRun&&!run.stopped)toast('Search failed: '+err,true);}
   finally{run.busy=false;if(run===searchRun)renderSearchMore(run);}
 }
-const searchedTo=p=>p?.oldest_at?new Date(p.oldest_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
+function stopSearch(run){
+  if(!run.busy)return;
+  run.stopped=true;
+  window.go.main.App.StopSearch().catch(()=>{});
+  renderSearchMore(run);
+}
+const searchDay=iso=>iso?new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
+const searchedTo=p=>searchDay(p?.oldest_at);
+const nfmt=n=>Number(n||0).toLocaleString();
 function updateSearchCount(run){
-  const n=run.results.length,done=run.page&&run.page.next<0;
+  const n=run.results.length,done=run.page&&!run.page.next;
   const el=document.querySelector('#results-summary .rs-count');
   if(el)el.textContent=`${n}${done?'':'+'} result${n===1?'':'s'}`;
 }
-// The line under the results: searching…, "Search older", or the end.
+// "12,345 of 482,113 messages · back to Mar 4, 2023"
+function searchProgressText(p){
+  if(!p)return '';
+  const of=p.total>0?` of ${nfmt(p.total)}`:'';
+  const to=p.oldest_at?` \u00b7 back to ${esc(searchedTo(p))}`:'';
+  return `${nfmt(p.searched)}${of} message${p.searched===1&&!of?'':'s'}${to}`;
+}
+function searchBar(p){
+  if(!p||!(p.total>0))return '';
+  const pct=Math.max(2,Math.min(100,Math.round(100*p.searched/p.total)));
+  return `<div class="search-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div style="width:${pct}%"></div></div>`;
+}
+// The line under the results: how the search is going (with Stop),
+// "Search older", or the end.
 function renderSearchMore(run){
   const list=document.getElementById('results-list');
   list.querySelector('.results-more')?.remove();
   const p=run.page,more=document.createElement('div');more.className='results-more';
-  if(run.busy){
-    more.innerHTML=`${icon('progress_activity','spin')}<span>Searching${p?' older messages':''}\u2026</span>`;
-  }else if(p&&p.next>=0){
-    more.innerHTML=`<span>Searched back to ${esc(searchedTo(p))}</span><button type="button">Search older</button>`;
+  if(run.busy&&run.stopped){
+    more.innerHTML=`<div class="rm-line">${icon('progress_activity','spin')}<span>Stopping\u2026</span></div>`;
+  }else if(run.busy){
+    let what;
+    if(run.stage?.stage==='opening')what='Opening this computer\u2019s copy of the history\u2026';
+    else if(run.stage?.stage==='updating')what=`Bringing the copy up to date\u2026 ${nfmt(run.stage.done)} message${run.stage.done===1?'':'s'}`;
+    else if(p)what=`Searching\u2026 ${searchProgressText(p)}`;
+    else what='Searching\u2026';
+    more.innerHTML=`<div class="rm-line">${icon('progress_activity','spin')}<span>${what}</span></div>${run.stage?'':searchBar(p)}<button type="button" class="rm-stop">Stop</button>`;
+    more.querySelector('button').addEventListener('click',()=>stopSearch(run));
+  }else if(!p||p.next){
+    more.innerHTML=p?`<span>${run.stopped?'Stopped \u2014 ':''}Searched ${searchProgressText(p)}</span>${searchBar(p)}<button type="button">Search older</button>`
+      :`<span>${run.stopped?'Stopped.':'That search didn\u2019t finish.'}</span><button type="button">${run.stopped?'Carry on':'Try again'}</button>`;
     more.querySelector('button').addEventListener('click',()=>searchMore(run));
   }else{
     if(!run.results.length){
-      list.innerHTML='<div class="results-none" style="font-size:.8rem;color:var(--text-muted);padding:4px 2px">No messages found.</div>';
+      list.innerHTML=`<div class="results-none" style="font-size:.8rem;color:var(--text-muted);padding:4px 2px">No messages found${p.searched?` in ${nfmt(p.searched)} message${p.searched===1?'':'s'}${p.oldest_at?' back to '+esc(searchedTo(p)):''}`:''}.</div>`;
       return;
     }
-    more.innerHTML=`<span>That\u2019s everything${p&&p.oldest_at?' \u2014 back to '+esc(searchedTo(p)):''}</span>`;
+    more.innerHTML=`<span>That\u2019s everything \u2014 ${nfmt(p.searched)} message${p.searched===1?'':'s'}${p.oldest_at?' back to '+esc(searchedTo(p)):''}</span>`;
   }
   list.appendChild(more);
 }
@@ -5945,11 +6059,24 @@ function updateSearchSuggest(){
     ss.index=val?0:-1; // with nothing typed at the caret, Enter still searches
   }else if(tok.key==='from'){
     title='From User';
-    const users=[...new Set([...(lastUsersPayload?.all||[]),...(state.onlineUsers||[]),...(state.messages||[]).map(m=>m.username)])]
-      .filter(Boolean).sort((a,b)=>a.localeCompare(b));
-    for(const u of users.filter(u=>u.toLowerCase().includes(val)).slice(0,10)){
-      rows.push({html:`<div class="user-avatar" data-pfp-user="${esc(u)}"></div><b>${esc(u)}</b>`,user:u,pick:()=>replaceSearchToken(tok,'from:'+u+' ')});
+    // Everyone who's ever written here (the server lists them), not just
+    // who's loaded: someone who last wrote years ago is still findable.
+    if(searchAuthors.domain!==state.domain||Date.now()-searchAuthors.at>SEARCH_AUTHORS_FRESH)
+      loadSearchAuthors().then(changed=>{if(changed&&ss.open&&searchTokenAtCaret().key==='from')updateSearchSuggest();});
+    const who=new Map();
+    if(searchAuthors.domain===state.domain)for(const a of searchAuthors.list)who.set(a.username.toLowerCase(),{name:a.username,last:a.last_at||'',imported:a.imported});
+    for(const u of [...(lastUsersPayload?.all||[]),...(state.onlineUsers||[]),...(state.messages||[]).map(m=>m.username)])
+      if(u&&!who.has(u.toLowerCase()))who.set(u.toLowerCase(),{name:u,last:''});
+    const list=[...who.values()].filter(x=>x.name.toLowerCase().includes(val));
+    // Names starting with what's typed first, then whoever wrote most recently.
+    const starts=x=>x.name.toLowerCase().startsWith(val)?1:0;
+    list.sort((a,b)=>(starts(b)-starts(a))||String(b.last).localeCompare(String(a.last))||a.name.localeCompare(b.name));
+    for(const x of list.slice(0,10)){
+      const hint=x.imported?'imported':x.last?`last wrote ${esc(searchDay(x.last))}`:'';
+      const q=/\s/.test(x.name)?`"${x.name}"`:x.name;
+      rows.push({html:`<div class="user-avatar" data-pfp-user="${esc(x.name)}"></div><b>${esc(x.name)}</b>${hint?`<span class="ss-hint">${hint}</span>`:''}`,user:x.name,pick:()=>replaceSearchToken(tok,'from:'+q+' ')});
     }
+    if(!list.length&&searchAuthors.loading)rows.push({html:`${icon('progress_activity','spin')}<span class="ss-hint" style="margin-left:0">Finding everyone who\u2019s written here\u2026</span>`,pick:()=>{}});
     ss.index=0;
   }else if(tok.key==='has'){
     title='Message Contains';
@@ -5999,10 +6126,26 @@ function updateSearchSuggest(){
   }
   box.classList.remove('hidden');ss.open=true;
 }
+// Everyone who has ever written in the channels you can read (search.go's
+// SearchAuthors), for from:. Fetched when search is used, kept a little while.
+const SEARCH_AUTHORS_FRESH=120000;
+const searchAuthors={domain:null,list:[],at:0,loading:null};
+function loadSearchAuthors(){
+  if(!state.domain)return Promise.resolve(false);
+  if(searchAuthors.domain===state.domain&&Date.now()-searchAuthors.at<SEARCH_AUTHORS_FRESH)return Promise.resolve(false);
+  if(searchAuthors.loading)return searchAuthors.loading;
+  const d=state.domain;
+  searchAuthors.loading=window.go.main.App.SearchAuthors().then(list=>{
+    if(state.domain!==d)return false;
+    Object.assign(searchAuthors,{domain:d,list:list||[],at:Date.now()});
+    return true;
+  }).catch(()=>false).finally(()=>{searchAuthors.loading=null;});
+  return searchAuthors.loading;
+}
 function initSearchFilters(){
   const input=document.getElementById('msg-search-input'),box=document.getElementById('search-suggest');
   input.addEventListener('input',()=>{renderSearchHighlight();updateSearchSuggest();});
-  input.addEventListener('focus',()=>{loadAllBoards();updateSearchSuggest();});
+  input.addEventListener('focus',()=>{loadAllBoards();loadSearchAuthors();updateSearchSuggest();});
   input.addEventListener('click',updateSearchSuggest);
   ['scroll','keyup','select'].forEach(ev=>input.addEventListener(ev,()=>{document.getElementById('search-hl').scrollLeft=input.scrollLeft;}));
   input.addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='Home'||e.key==='End')updateSearchSuggest();});
@@ -11888,6 +12031,14 @@ function init(){
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
   // Roles changed: colours/permissions, and which channels you can see.
   window.runtime.EventsOn('server:roles',()=>{loadRoles();refreshRoomsAndBoards();});
+  // Search: getting ready (opening or updating this computer's copy).
+  window.runtime.EventsOn('search:progress',p=>{if(searchRun&&searchRun.busy&&!searchRun.stopped){searchRun.stage=p;renderSearchMore(searchRun);}});
+  window.runtime.EventsOn('searchcopy:progress',p=>{
+    searchCopyLive=p;
+    if(p.error)toast('Copying the history stopped: '+p.error,true);
+    else if(p.complete&&!p.downloading)toast(`Copied all ${nfmt(p.messages)} messages`);
+    if(searchCopyTabOpen())renderSearchCopySettings();
+  });
   window.runtime.EventsOn('server:bots',()=>{serverBotsCache=null;if(botsModal&&botsModal.querySelector('.sb-list'))showBotList(true);});
   window.runtime.EventsOn('server:emojis',()=>loadCustomEmojis());
   window.runtime.EventsOn('server:stickers',()=>loadStickers());

@@ -65,7 +65,7 @@ func TestSearchNewestFirstAndPaging(t *testing.T) {
 	a.ClearSearch()
 
 	// from:cascade has:image — newest first, 25 at a time.
-	p, err := a.SearchMessages("", "cascade", "image", "", "", "", 0, 25)
+	p, err := a.SearchMessages("", "cascade", "image", "", "", "", "", 25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestSearchNewestFirstAndPaging(t *testing.T) {
 	}
 	seen := len(p.Results)
 	last := p.Results[len(p.Results)-1].ID
-	for p.Next >= 0 {
+	for p.Next != "" {
 		p, err = a.SearchMessages("", "cascade", "image", "", "", "", p.Next, 25)
 		if err != nil {
 			t.Fatal(err)
@@ -104,11 +104,11 @@ func TestSearchNewestFirstAndPaging(t *testing.T) {
 	}
 
 	// Words: whole words, and file names count.
-	p, _ = a.SearchMessages("pic120", "", "", "", "", "", 0, 25)
+	p, _ = a.SearchMessages("pic120", "", "", "", "", "", "", 25)
 	if len(p.Results) != 1 || p.Results[0].ID != "id00120" {
 		t.Fatalf("file name search: %+v", p.Results)
 	}
-	p, _ = a.SearchMessages("message 7", "", "", "", "", "", 0, 25)
+	p, _ = a.SearchMessages("message 7", "", "", "", "", "", "", 25)
 	if len(p.Results) != 1 || p.Results[0].ID != "id00007" {
 		t.Fatalf("word search: %d results", len(p.Results))
 	}
@@ -152,11 +152,11 @@ func TestSearchEncrypted(t *testing.T) {
 	defer srv.Close()
 	alice.domain = srv.URL
 	alice.ClearSearch()
-	p, err := alice.SearchMessages("meeting", "", "", "", "", "", 0, 25)
+	p, err := alice.SearchMessages("meeting", "", "", "", "", "", "", 25)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.Results) != 1 || p.Results[0].Content != "the secret meeting is tuesday" || p.Next != -1 {
+	if len(p.Results) != 1 || p.Results[0].Content != "the secret meeting is tuesday" || p.Next != "" {
 		t.Fatalf("%+v", p)
 	}
 }
