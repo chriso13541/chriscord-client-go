@@ -284,31 +284,69 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .voice-occupant-status { margin-left:auto; display:flex; gap:2px; flex-shrink:0; color:var(--text-muted); }
 .voice-occupant-status .ic { width:16px; height:16px; }
 .voice-occupant-status .ic.off { color:var(--red); }
-#voice-connected-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-mid); border-top:1px solid var(--border); font-size:.91rem; color:var(--green); }
-#voice-connected-bar .voice-bar-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.95rem; padding:2px 6px; border-radius:4px; flex-shrink:0; }
-#voice-connected-bar .voice-bar-btn:hover { background:var(--bg-light); color:var(--text); }
-#voice-connected-bar .voice-bar-btn { display:flex; align-items:center; }
-#voice-connected-bar .voice-bar-btn .ic { width:20px; height:20px; }
-#voice-connected-bar .voice-switch { display:none; font:inherit; font-size:.8rem; font-weight:700; color:#fff; background:var(--accent); padding:4px 10px; }
-#voice-connected-bar .voice-switch:hover { background:var(--accent); filter:brightness(1.1); color:#fff; }
-#voice-connected-bar.elsewhere { color:var(--text-muted); }
-#voice-connected-bar.elsewhere #voice-connected-name { flex:1; min-width:0; }
-#voice-connected-bar.elsewhere #voice-mute-btn, #voice-connected-bar.elsewhere #voice-deafen-btn, #voice-connected-bar.elsewhere #voice-leave-btn { display:none; }
-#voice-connected-bar.elsewhere .voice-switch { display:flex; }
+/* ── The panel at the bottom of the channel list ──────────────────
+   Like Discord's: one card in sections — the screen you're sharing, the
+   call you're in (with its buttons), then you (with mic, headset and
+   settings, there whether or not you're in a call). */
+#sidebar-dock { margin:0 8px 8px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; flex-shrink:0; }
+#sidebar-dock > :not(.hidden) ~ :not(.hidden) { border-top:1px solid var(--border); }
+.dock-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:5px; border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font:inherit; }
+.dock-btn:hover { background:var(--bg-light); color:var(--text); }
+.dock-btn .ic { width:20px; height:20px; }
+.dock-btn.muted { color:var(--red); }
+.dock-btn.muted:hover { color:var(--red-light); }
+.dock-btn.server, .dock-btn.server:hover { color:#c77dff; }
+/* The screen you're sharing. */
+#dock-stream { display:flex; align-items:center; gap:10px; padding:10px 10px 10px 12px; }
+#dock-stream .ds-tile { width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--green) 85%, #000); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+#dock-stream .ds-tile .ic { width:20px; height:20px; }
+#dock-stream .ds-text { display:flex; flex-direction:column; min-width:0; flex:1; }
+#dock-stream .ds-name { font-weight:700; color:var(--text-strong); font-size:.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#dock-stream .ds-sub { font-size:.74rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#dock-stream .ds-sub.warn { color:var(--yellow); } #dock-stream .ds-sub.bad { color:var(--red); }
+#dock-stream #dock-stream-stop:hover { color:var(--red); background:color-mix(in srgb, var(--red) 15%, transparent); }
+/* The call. */
+#voice-connected-bar { padding:10px 10px 10px 12px; display:flex; flex-direction:column; gap:10px; }
+#voice-connected-bar .vc-top { display:flex; align-items:center; gap:4px; min-width:0; }
+#voice-connected-name { display:flex; align-items:center; gap:10px; min-width:0; flex:1; cursor:pointer; border-radius:6px; }
+#voice-connected-name > .ic { width:22px; height:22px; flex-shrink:0; color:var(--green); }
+#voice-connected-name .vc-text { display:flex; flex-direction:column; min-width:0; }
+#voice-connected-name .vc-state { font-weight:700; font-size:.9rem; color:var(--green); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#voice-connected-name .vc-where { font-size:.74rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#voice-connected-name:hover .vc-where { color:var(--text); text-decoration:underline; }
+#voice-connected-bar.reconnecting #voice-connected-name > .ic, #voice-connected-bar.reconnecting .vc-state { color:var(--red); }
+#voice-connected-bar.elsewhere #voice-connected-name > .ic, #voice-connected-bar.elsewhere .vc-state { color:var(--text-muted); }
+#voice-connected-bar.elsewhere #voice-connected-name { cursor:default; }
+#voice-noise-btn.on { color:var(--green); }
+#voice-leave-btn:hover { color:var(--red); background:color-mix(in srgb, var(--red) 15%, transparent); }
+#voice-switch-btn { display:none; font-size:.8rem; font-weight:700; color:#fff; background:var(--accent); padding:5px 10px; }
+#voice-switch-btn:hover { background:var(--accent); filter:brightness(1.1); color:#fff; }
+#voice-connected-bar.elsewhere #voice-switch-btn { display:flex; }
+#voice-connected-bar.elsewhere #voice-noise-btn, #voice-connected-bar.elsewhere #voice-leave-btn, #voice-connected-bar.elsewhere .vc-actions { display:none; }
+#voice-connected-bar.reconnecting .vc-actions, #voice-connected-bar.reconnecting #voice-noise-btn { opacity:.4; pointer-events:none; }
+#voice-connected-bar .vc-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.vc-tile { position:relative; height:36px; border:none; border-radius:8px; background:var(--bg-light); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.vc-tile .ic { width:20px; height:20px; }
+.vc-tile:hover { filter:brightness(1.18); }
+.vc-tile.on { background:color-mix(in srgb, var(--green) 22%, var(--bg-light)); color:var(--green); }
+#voice-screen-btn.warn::after { content:''; position:absolute; top:5px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--yellow); box-shadow:0 0 0 2px var(--bg-light); }
+#voice-screen-btn.warn.bad::after { background:var(--red); }
+/* You. */
+#sidebar-user { padding:8px 8px 8px 8px; display:flex; align-items:center; gap:2px; position:relative; }
+#sidebar-user #sidebar-user-profile { flex:1; margin:0 4px 0 0; }
+#sidebar-user .user-text { display:flex; flex-direction:column; min-width:0; }
+#sidebar-user .user-sub { font-size:.74rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:4px; }
+#sidebar-user .user-sub .ic { width:14px; height:14px; flex-shrink:0; }
+#sidebar-user .user-sub.live { color:var(--green); }
+#sidebar-user .settings-btn { margin-left:0; color:var(--text-muted); }
+#sidebar-user .settings-btn:hover { color:var(--text); }
+#sidebar-user .settings-btn .ic { width:20px; height:20px; }
+#sidebar-user .status-dot-btn { padding:5px 4px; }
 .voice-occupant-row .other-device { display:inline-flex; color:var(--text-muted); } .voice-occupant-row .other-device .ic { width:14px; height:14px; }
-#voice-connected-bar .voice-bar-btn.muted { color:var(--red); }
-#voice-connected-bar .voice-bar-btn.muted:hover { color:var(--red-light); }
-#voice-connected-bar .voice-bar-btn.server, #voice-connected-bar .voice-bar-btn.server:hover { color:#c77dff; }
-#voice-leave-btn:hover { color:var(--red) !important; }
-#voice-connected-name { display:flex; align-items:center; gap:5px; min-width:0; margin-right:auto; }
 /* Dropped mid-call and expected back: faded, name in red (like Discord). */
 .voice-occupant-row.reconnecting { opacity:.5; }
 .voice-occupant-row.reconnecting .voice-occupant-name { color:var(--red); }
-#voice-connected-bar.reconnecting { color:var(--red); }
-#voice-connected-bar #voice-video-btn.on { color:var(--green); }
 /* Noise suppression (noise.go): lit while it's on. */
-#voice-connected-bar #voice-noise-btn.on { color:var(--green); }
-#voice-connected-bar.elsewhere #voice-noise-btn { display:none; }
 #noise-pop { position:fixed; z-index:450; width:272px; padding:14px 14px 12px; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.45); font-size:.84rem; }
 #noise-pop .np-head { display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text-strong); font-size:.92rem; }
 #noise-pop .np-head .ic { width:20px; height:20px; color:var(--accent); }
@@ -323,7 +361,6 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .np-switch input:checked + .np-track { background:var(--green); border-color:var(--green); }
 .np-switch input:checked + .np-track .np-knob { transform:translateX(16px); }
 .np-switch input:focus-visible + .np-track { outline:2px solid var(--accent); outline-offset:2px; }
-#voice-connected-bar.elsewhere #voice-video-btn { display:none; }
 /* Call encryption (e2ee.go), in the menu on the connected channel's name:
    green lock when everyone's encrypted, yellow when someone isn't, grey
    while keys are still being swapped. */
@@ -378,9 +415,6 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile:fullscreen { border-radius:0; cursor:default; width:100% !important; height:100% !important; }
 .vs-tile .vs-name .vs-av { width:18px; height:18px; font-size:.65rem; }
 /* Screen shares: click to watch */
-#voice-connected-bar #voice-screen-btn.on { color:var(--red); } /* sharing: click (or right-click > Stop Streaming) to stop */
-#voice-connected-bar #voice-screen-btn.on:hover { color:var(--red); background:color-mix(in srgb, var(--red) 15%, transparent); }
-#voice-connected-bar.elsewhere #voice-screen-btn { display:none; }
 .vs-live { background:#e5383b; color:#fff; font-size:.62rem; font-weight:800; letter-spacing:.04em; padding:1px 5px; border-radius:3px; }
 .vs-tile.idle::after { display:none; }
 .vs-tile .vs-watch, .vs-tile .vs-scrself { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:12px; text-align:center; color:rgba(255,255,255,.85); font-size:.85rem; font-weight:600; background:radial-gradient(circle at 50% 40%, #232a36, #0b0d11); }
@@ -392,9 +426,6 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile .vs-scrwarn.bad { background:rgba(240,71,71,.18); border-color:rgba(240,71,71,.55); color:#ffb3b3; }
 .vs-tile .vs-scrwarn .ic { width:16px; height:16px; flex-shrink:0; opacity:1; }
 .vs-tile .vs-scrself.has-preview .vs-scrwarn { position:absolute; top:8px; left:8px; right:8px; margin:0 auto; width:fit-content; max-width:none; }
-#voice-connected-bar #voice-screen-btn { position:relative; }
-#voice-connected-bar #voice-screen-btn.warn::after { content:''; position:absolute; top:1px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--yellow); box-shadow:0 0 0 2px var(--bg-mid); }
-#voice-connected-bar #voice-screen-btn.warn.bad::after { background:var(--red); }
 .vs-tile .vs-btns { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
 .vs-tile .vs-btn { border:none; border-radius:6px; padding:6px 12px; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; background:rgba(255,255,255,.14); color:#fff; }
 .vs-tile .vs-btn:hover { background:rgba(255,255,255,.24); }
@@ -471,13 +502,6 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .cam-btns { display:flex; gap:8px; flex-wrap:wrap; }
 .cam-btns .settings-secondary-btn { display:inline-flex; align-items:center; gap:6px; }
 .cam-btns .settings-secondary-btn .ic { width:18px; height:18px; }
-#voice-connected-bar.reconnecting .voice-bar-btn:not(#voice-leave-btn) { opacity:.4; pointer-events:none; }
-#voice-connected-name span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#voice-connected-name .ic { width:16px; height:16px; }
-#voice-connected-bar #voice-deafen-btn { margin-left:auto; }
-#voice-connected-bar #voice-leave-btn { font-size:.99rem; }
-#voice-connected-bar #voice-leave-btn:hover { color:var(--red); }
-#sidebar-user { padding:10px 12px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; background:var(--bg-mid); position:relative; }
 .user-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.94rem; color:#fff; flex-shrink:0; background-size:cover; background-position:center; }
 .user-avatar.speaking { box-shadow:0 0 0 3px var(--green); }
 .user-name { font-size:.94rem; font-weight:600; color:var(--text-strong); }
@@ -1934,27 +1958,38 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <button id="back-btn" title="Back"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
     </div>
     <div id="room-list"></div>
+    <div id="sidebar-dock">
+    <div id="dock-stream" class="hidden">
+      <div class="ds-tile"><svg class="ic" aria-hidden="true"><use href="#ic-screen_share"/></svg></div>
+      <div class="ds-text"><span class="ds-name" id="dock-stream-name"></span><span class="ds-sub" id="dock-stream-sub"></span></div>
+      <button id="dock-stream-stop" class="dock-btn" title="Stop streaming"><svg class="ic" aria-hidden="true"><use href="#ic-stop_screen_share"/></svg></button>
+    </div>
     <div id="voice-connected-bar" class="hidden">
-      <span id="voice-connected-name"></span>
-      <button id="voice-deafen-btn" class="voice-bar-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
-      <button id="voice-mute-btn" class="voice-bar-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
-      <button id="voice-noise-btn" class="voice-bar-btn" title="Noise suppression" aria-haspopup="dialog"><svg class="ic" aria-hidden="true"><use href="#ic-graphic_eq"/></svg></button>
-      <button id="voice-video-btn" class="voice-bar-btn" title="Turn on camera"><svg class="ic" aria-hidden="true"><use href="#ic-videocam_off"/></svg></button>
-      <button id="voice-screen-btn" class="voice-bar-btn" title="Share your screen"><svg class="ic" aria-hidden="true"><use href="#ic-screen_share"/></svg></button>
-      <button id="voice-leave-btn" class="voice-bar-btn" title="Disconnect from voice"><svg class="ic" aria-hidden="true"><use href="#ic-call_end"/></svg></button>
-      <button id="voice-switch-btn" class="voice-bar-btn voice-switch" title="Move the call to this device">Join here</button>
+      <div class="vc-top">
+        <span id="voice-connected-name"></span>
+        <button id="voice-noise-btn" class="dock-btn" title="Noise suppression" aria-haspopup="dialog"><svg class="ic" aria-hidden="true"><use href="#ic-graphic_eq"/></svg></button>
+        <button id="voice-leave-btn" class="dock-btn" title="Disconnect"><svg class="ic" aria-hidden="true"><use href="#ic-call_end"/></svg></button>
+        <button id="voice-switch-btn" class="dock-btn" title="Move the call to this device">Join here</button>
+      </div>
+      <div class="vc-actions">
+        <button id="voice-video-btn" class="vc-tile" title="Turn on camera"><svg class="ic" aria-hidden="true"><use href="#ic-videocam_off"/></svg></button>
+        <button id="voice-screen-btn" class="vc-tile" title="Share your screen"><svg class="ic" aria-hidden="true"><use href="#ic-screen_share"/></svg></button>
+      </div>
     </div>
     <div id="sidebar-user">
       <button id="sidebar-user-profile" title="View your profile">
         <span class="avatar-badge-wrap"><div class="user-avatar" id="user-avatar">?</div><span class="avatar-badge" data-presence-user-self></span></span>
-        <span class="user-name" id="user-name-label">username</span>
+        <span class="user-text"><span class="user-name" id="user-name-label">username</span><span class="user-sub" id="user-sub-label"></span></span>
       </button>
+      <button id="voice-mute-btn" class="dock-btn" title="Mute microphone"><svg class="ic" aria-hidden="true"><use href="#ic-mic"/></svg></button>
+      <button id="voice-deafen-btn" class="dock-btn" title="Deafen"><svg class="ic" aria-hidden="true"><use href="#ic-headphones"/></svg></button>
       <button class="settings-btn" id="settings-btn" title="Settings"><svg class="ic" aria-hidden="true"><use href="#ic-settings"/></svg></button>
       <button class="status-dot-btn" id="status-dot-btn" title="Connected">
         <span class="conn-shield" id="conn-shield"></span>
         <span class="status-dot" id="status-dot"></span>
       </button>
       <div id="ping-popover" class="hidden"></div>
+    </div>
     </div>
   </div>
   <div id="main-column">
@@ -4155,6 +4190,7 @@ function showChatScreen(){
   showScreen('screen-chat');
   document.getElementById('sidebar-server-name').textContent=state.serverName;
   document.getElementById('user-name-label').textContent=state.username;
+  loadMyCustomStatus();
   updateSidebarAvatar();
   document.getElementById('board-title-placeholder').className='no-board';
   document.getElementById('board-title-placeholder').textContent='Select a board to start chatting';
@@ -4394,16 +4430,16 @@ function updateVoiceConnectedBar(){
   bar.classList.toggle('reconnecting',!!pending);
   if(pending){ // dropped: keep the bar so you can still hang up
     const b=findBoardLocal(pending.boardId);
-    document.getElementById('voice-connected-name').innerHTML=`${icon('volume_up')}<span>Reconnecting\u2026 ${esc(b?.name||'')}</span>`;
-    bar.classList.remove('hidden');return;
+    setVoiceConnectedName('Reconnecting\u2026',b?.name||'');
+    bar.classList.remove('hidden');updateDock();return;
   }
   const elsewhere=voiceElsewhereBoard();
   bar.classList.toggle('elsewhere',!!elsewhere);
   if(elsewhere){ // in a call, but on your other device
     const b=findBoardLocal(elsewhere);
-    document.getElementById('voice-connected-name').innerHTML=`${icon('devices')}<span>In ${esc(b?.name||'a call')} on another device</span>`;
+    setVoiceConnectedName('On another device',b?.name||'a call','devices');
     const sw=document.getElementById('voice-switch-btn');sw.onclick=()=>toggleVoiceChannel(elsewhere);
-    bar.classList.remove('hidden');setMuteButtonState(false);setDeafenButtonState(false);return;
+    bar.classList.remove('hidden');syncMuteButtons();updateDock();return;
   }
   // This device's call. Right after joining (or rejoining) it the server's
   // list may not show us yet — we're still in the call: only hanging up
@@ -4412,7 +4448,7 @@ function updateVoiceConnectedBar(){
   // being watched each time a dropped connection rejoined.
   const boardId=state.voiceHere||null;
   if(!boardId){
-    bar.classList.add('hidden');setMuteButtonState(false);setDeafenButtonState(false);
+    bar.classList.add('hidden');syncMuteButtons();updateDock();
     if(scr.on||scr.starting)stopScreenShare(true); // likewise a screen share
     screenWatch.clear();screenRewatch.clear();
     if(cam.on||cam.starting)stopCamera(true); // left the call: the camera goes off with it
@@ -4424,14 +4460,55 @@ function updateVoiceConnectedBar(){
     const b=(list||[]).find(b=>b.id===boardId);
     if(b){boardName=b.name;break;}
   }
-  document.getElementById('voice-connected-name').innerHTML=`${icon('volume_up')}<span>${esc(boardName)}</span>`;
-  bar.classList.remove('hidden');
+  setVoiceConnectedName('Voice Connected',boardName);
+  bar.classList.remove('hidden');updateDock();
   // Cameras already on when you joined: the call's snapshot can land
   // before the join finishes, so draw them now that you're in.
   renderVideoStage();
   window.go.main.App.IsMuted().then(setMuteButtonState).catch(()=>{});
   window.go.main.App.IsDeafened().then(setDeafenButtonState).catch(()=>{});
 }
+// "Voice Connected" over "channel / server" (the channel opens the call view).
+function setVoiceConnectedName(status,channel,ic='volume_up'){
+  const where=[channel,state.serverName].filter(Boolean).join(' / ');
+  document.getElementById('voice-connected-name').innerHTML=`${icon(ic)}<span class="vc-text"><span class="vc-state">${esc(status)}</span><span class="vc-where" title="${esc(where)}">${esc(where)}</span></span>`;
+}
+// Mic and headset in your row keep working outside a call (as on Discord):
+// they say how you'll join the next one.
+function syncMuteButtons(){
+  window.go.main.App.IsMuted().then(setMuteButtonState).catch(()=>{});
+  window.go.main.App.IsDeafened().then(setDeafenButtonState).catch(()=>{});
+}
+// The sections of the panel that depend on what you're doing: the screen
+// you're sharing, and the line under your name.
+function updateDock(){
+  const ds=document.getElementById('dock-stream');
+  if(ds){
+    const live=scr.on||scr.starting;
+    ds.classList.toggle('hidden',!live);
+    if(live){
+      document.getElementById('dock-stream-name').textContent=scr.starting?'Starting your stream\u2026':(scr.source?.name||'Your screen');
+      const warn=scr.on&&!scr.starting?SHARE_WINDOW_WARN[scr.winState]:null;
+      const sub=document.getElementById('dock-stream-sub');
+      sub.textContent=warn?warn.title:scr.starting?'':`Live \u00b7 ${scr.height?scr.height+'p':'source size'} ${scr.fps||''}fps`.trim();
+      sub.classList.toggle('warn',!!warn);sub.classList.toggle('bad',!!warn?.bad);
+    }
+  }
+  const us=document.getElementById('user-sub-label');
+  if(us){
+    let html='',live=false;
+    if(scr.on){html=`${icon('screen_share')}<span>Sharing your screen</span>`;live=true;}
+    else if(cam.on){html=`${icon('videocam')}<span>Camera on</span>`;live=true;}
+    else{
+      const cs=myCustomStatus;
+      if(cs&&(cs.text||cs.emoji))html=`${cs.emoji?reactionEmojiHTML(cs.emoji):''}<span>${esc(cs.text||'')}</span>`;
+      else{const st=state.username?effectivePresence():'online';html=`<span>${esc(STATUS_LABEL[st]||'')}</span>`;}
+    }
+    if(us.innerHTML!==html)us.innerHTML=html;
+    us.classList.toggle('live',live);
+  }
+}
+
 // The bar's mic and headset: red when you've muted/deafened yourself,
 // purple while a moderator has server-muted/deafened you (whatever your own
 // setting) — back to your own state when it's lifted. "muted" stays your
@@ -8787,6 +8864,7 @@ function updateCameraButton(){
   btn.classList.toggle('on',on);
   btn.innerHTML=icon(on?'videocam':'videocam_off');
   btn.title=btn.dataset.tip=cam.starting?'Starting camera\u2026':on?'Turn off camera':'Turn on camera';
+  updateDock();
 }
 
 // ── Other people's cameras ──
@@ -9318,6 +9396,7 @@ function updateScreenButton(){
   const warn=scr.on&&!scr.starting?SHARE_WINDOW_WARN[scr.winState]:null;
   btn.classList.toggle('warn',!!warn);btn.classList.toggle('bad',!!warn?.bad);
   if(warn)btn.title=btn.dataset.tip=`${warn.title} — ${warn.text}`;
+  updateDock();
 }
 async function toggleScreenShare(){
   if(scr.on||scr.starting){stopScreenShare();playSound('webcam_stop');return;}
@@ -10113,6 +10192,7 @@ function userPresence(user){
 function refreshPresenceBadges(){
   document.querySelectorAll('[data-presence-user]').forEach(el=>{el.innerHTML=presenceBadge(userPresence(el.dataset.presenceUser));});
   if(state.username)document.querySelectorAll('[data-presence-user-self]').forEach(el=>{el.innerHTML=presenceBadge(userPresence(state.username));});
+  updateDock();
 }
 function renderStatusMenu(menu){
   const cs=myCustomStatus;
@@ -10137,10 +10217,11 @@ function renderStatusMenu(menu){
 // A line of your own (and an emoji) by your name, cleared when you like.
 // It goes inside your encrypted status (customstatus.go, presence.go).
 let myCustomStatus=null;
-async function loadMyCustomStatus(){try{myCustomStatus=await window.go.main.App.GetCustomStatus();}catch{myCustomStatus=null;}}
+async function loadMyCustomStatus(){try{myCustomStatus=await window.go.main.App.GetCustomStatus();}catch{myCustomStatus=null;}updateDock();}
 async function setMyCustomStatus(text,emoji,expires){
   try{myCustomStatus=await window.go.main.App.SetCustomStatus(text,emoji,expires);}
   catch(err){toast('Couldn\u2019t set your status: '+err,true);}
+  updateDock();
 }
 const CS_CLEAR=[['','Don\u2019t clear'],['30','30 minutes'],['60','1 hour'],['240','4 hours'],['today','Today'],['week','This week']];
 function csExpiry(v){
@@ -12388,6 +12469,8 @@ function init(){
   document.getElementById('jump-to-present-btn').addEventListener('click',jumpToPresent);
   document.getElementById('voice-deafen-btn').addEventListener('click',toggleDeafen);
   document.getElementById('voice-mute-btn').addEventListener('click',toggleMute);
+  document.getElementById('dock-stream-stop').addEventListener('click',()=>{if(scr.on||scr.starting){stopScreenShare();playSound('webcam_stop');}});
+  syncMuteButtons();updateDock();
   initNoiseSuppressionUI();
   document.getElementById('voice-leave-btn').addEventListener('click',async()=>{
     if(voiceRejoinInFlight){voiceRejoinInFlight.cancelled=true;voiceRejoinInFlight=null;updateVoiceConnectedBar();playSound('leave');toast('You won\u2019t be put back in the call.');return;}
@@ -12434,7 +12517,7 @@ function init(){
   document.getElementById('sys-games-add').addEventListener('click',openAddGame);
   window.runtime.EventsOn('game:changed',name=>renderNowPlaying(name||''));
   loadMyCustomStatus();
-  window.runtime.EventsOn('customstatus:changed',()=>{myCustomStatus=null;});
+  window.runtime.EventsOn('customstatus:changed',()=>{myCustomStatus=null;loadMyCustomStatus();});
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
     localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');

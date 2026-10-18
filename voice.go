@@ -226,8 +226,7 @@ func (a *App) ReconnectVoice(knownOthers []string) error {
 func (a *App) LeaveVoiceChannel() error {
 	a.stopVoiceSession()
 	a.e2ee.end()
-	a.voiceMuted.Store(false)
-	a.voiceDeafened.Store(false)
+	// Muted or deafened stays as you set it, for the next call.
 
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
@@ -276,20 +275,21 @@ func (a *App) sendVoiceMuteState(boardID string, muted, deafened bool) {
 // transmitted during the current voice session, and returns the new
 // muted state. Purely client-side — muting simply stops sending anything
 // at all, so the server and other participants never need to know or be
-// told; there's nothing to forward when nothing gets sent. No-ops
-// (returns false) if not currently in a voice call. The flag lives on
+// told; there's nothing to forward when nothing gets sent. The flag lives on
 // the App, not the session, so it survives a roster-change refresh
 // tearing down and rebuilding the underlying connection.
+//
+// Outside a call it still works (the button is always in your row, as on
+// Discord): it's how you'll join the next call — join_voice says so.
 func (a *App) ToggleMute() bool {
 	a.voiceMu.Lock()
 	session := a.voice
 	a.voiceMu.Unlock()
-	if session == nil {
-		return false
-	}
 	newState := !a.voiceMuted.Load()
 	a.voiceMuted.Store(newState)
-	a.sendVoiceMuteState(session.boardID, newState, a.voiceDeafened.Load())
+	if session != nil {
+		a.sendVoiceMuteState(session.boardID, newState, a.voiceDeafened.Load())
+	}
 	return newState
 }
 
@@ -306,19 +306,18 @@ func (a *App) IsMuted() bool {
 // leaving mute as a separate thing to manage after undeafening. Purely
 // client-side, same as mute: deafened audio is still received and
 // decoded as normal, just not written to the output device, so nothing
-// needs telling the server or other participants. No-ops (returns false)
-// if not currently in a voice call.
+// needs telling the server or other participants. Outside a call it sets
+// how you'll join the next one, as ToggleMute does.
 func (a *App) ToggleDeafen() bool {
 	a.voiceMu.Lock()
 	session := a.voice
 	a.voiceMu.Unlock()
-	if session == nil {
-		return false
-	}
 	newState := !a.voiceDeafened.Load()
 	a.voiceDeafened.Store(newState)
 	a.voiceMuted.Store(newState)
-	a.sendVoiceMuteState(session.boardID, newState, newState)
+	if session != nil {
+		a.sendVoiceMuteState(session.boardID, newState, newState)
+	}
 	return newState
 }
 
