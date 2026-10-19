@@ -13829,7 +13829,7 @@ function init(){
   const renderE2EE=()=>{
     document.getElementById('e2ee-code').textContent=e2ee.active?e2ee.code:'\u2014';
     document.getElementById('e2ee-peers').innerHTML=e2ee.peers.map(p=>{
-      const cls=p.status==='ok'?'ok':(p.status==='waiting'?'':'bad');
+      const cls=p.status==='ok'||p.status==='playonly'?'ok':(p.status==='waiting'?'':'bad');
       return `<li><span>${esc(displayName(p.user))}</span><span class="st ${cls}">${esc(e2eeLabels[p.status]||p.status)}</span></li>`;
     }).join('')||'<li><span style="color:var(--text-muted)">Nobody else is here yet.</span></li>';
   };

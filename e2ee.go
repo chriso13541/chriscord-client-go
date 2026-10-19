@@ -615,8 +615,10 @@ func (c *callCrypto) snapshot() e2eeState {
 			s = "unsupported"
 		case p != nil && p.changed:
 			s = "changed"
+		case p != nil && c.app.rosterIsAutomated(p.identityHex) && len(p.keys) > 0:
+			s = "playonly" // a bot or plugin: its sound reaches you (encrypted), yours never reaches it
 		case p != nil && c.app.rosterIsAutomated(p.identityHex):
-			s = "playonly" // a bot or plugin: its sound reaches you, yours never reaches it
+			s = "waiting" // its key hasn't arrived yet
 		case p != nil && !c.app.rosterAllowsCall(p.identityHex, c.board):
 			s = "unapproved"
 		case p != nil && len(p.keys) > 0:
