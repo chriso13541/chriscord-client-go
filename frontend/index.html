@@ -1105,7 +1105,12 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 #profile-popup { position:fixed; z-index:400; }
 /* Kept a modest size (positionProfilePopup sets the height to fit the
    window); what doesn't fit scrolls inside the card. */
-#profile-popup .profile-card { max-height:min(520px, calc(100vh - 16px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+#profile-popup .profile-card { max-height:min(520px, calc(100vh - 16px)); overflow-y:auto; overscroll-behavior:contain; }
+/* The app's own scrollbar (no scrollbar-width here: setting it makes the
+   webview drop the ::-webkit-scrollbar styling for the plain one), kept
+   clear of the card's rounded corners. */
+#profile-popup .profile-card::-webkit-scrollbar-track { margin:10px 0; }
+#profile-popup .profile-card::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
 /* Things that open a profile card */
 .member-row, .voice-occupant-row, .msg-avatar:not(.msg-avatar-time), .msg-username { cursor:pointer; }
 .msg-username:hover { text-decoration:underline; }
