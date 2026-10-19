@@ -315,6 +315,11 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 #chan-readers { display:inline-flex; align-items:center; gap:4px; margin-left:10px; padding:1px 8px; border-radius:10px; background:var(--bg-mid); color:var(--text-muted); font-size:.72rem; white-space:nowrap; cursor:default; }
 #chan-readers .ic { width:13px; height:13px; }
 #chan-readers.hidden { display:none; }
+/* Member list changes waiting for you (managers and approvers). */
+#roster-pending { display:inline-flex; align-items:center; gap:5px; margin-left:8px; padding:3px 10px; border-radius:12px; border:1px solid color-mix(in srgb, var(--yellow,#e0b04c) 60%, transparent); background:color-mix(in srgb, var(--yellow,#e0b04c) 16%, transparent); color:var(--yellow,#e0b04c); font:inherit; font-size:.75rem; font-weight:700; white-space:nowrap; cursor:pointer; }
+#roster-pending:hover { background:color-mix(in srgb, var(--yellow,#e0b04c) 26%, transparent); }
+#roster-pending .ic { width:14px; height:14px; }
+#roster-pending.hidden { display:none; }
 #plug-reply, .pp-reply { margin:0 16px 8px; background:var(--bg-mid); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:6px; padding:8px 10px; font-size:.85rem; }
 .pp-reply { margin:0 14px 12px; background:var(--bg-dark); }
 #plug-reply.error, .pp-reply.error { border-left-color:var(--red); }
@@ -350,6 +355,7 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 #composer-field.cmd-mode #msg-hl { color:var(--text-strong); }
 .pc-ns { color:var(--accent); background:rgba(114,137,218,.18); border-radius:3px; }
 .pc-sep { color:var(--text-muted); }
+.pc-ns.partial { opacity:.7; }
 .pc-cmd { color:#6fd3a0; } .pc-cmd.partial { color:#9fbfae; }
 .pc-arg { color:var(--text-strong); }
 .pc-num { color:#f2b56b; }
@@ -1097,7 +1103,9 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .pc-edit:hover { background:var(--bg-dark); color:var(--text-strong); }
 .pc-edit .ic { width:16px; height:16px; }
 #profile-popup { position:fixed; z-index:400; }
-#profile-popup .profile-card { max-height:calc(100vh - 16px); overflow-y:auto; }
+/* Kept a modest size (positionProfilePopup sets the height to fit the
+   window); what doesn't fit scrolls inside the card. */
+#profile-popup .profile-card { max-height:min(520px, calc(100vh - 16px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
 /* Things that open a profile card */
 .member-row, .voice-occupant-row, .msg-avatar:not(.msg-avatar-time), .msg-username { cursor:pointer; }
 .msg-username:hover { text-decoration:underline; }
@@ -2221,6 +2229,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
       <span id="chan-readers" class="hidden"></span>
+      <button id="roster-pending" class="hidden" type="button"></button>
       <span class="board-title call-title" id="call-mode-title"></span>
       <button id="call-mode-btn" class="hidden" type="button" title="Switch to the call view"><svg class="ic" aria-hidden="true"><use href="#ic-grid_view"/></svg><span>Call</span></button>
       <button id="mute-mentions-btn" class="header-icon-btn" title="Mute @mention sounds on this server" disabled><svg class="ic" aria-hidden="true"><use href="#ic-notifications"/></svg></button>
@@ -3277,13 +3286,13 @@ async function onCloudSynced(e){
 // ── URL detection ────────────────────────────────────────────────
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 
-// A message's text; one that's a plugin command ("music::play …", as sent
+// A message's text; one that's a plugin command ("/music play …", as sent
 // from the message box) has the command coloured as it was typed.
 function renderMessageText(text){
-  const m=/^([a-z0-9-]+)::([a-z0-9_-]*)(?=\s|$)/i.exec(text||'');
-  if(!m||!pluginById(m[1].toLowerCase()))return renderTextWithLinks(text);
+  const m=/^\/([a-z0-9-]+)\s+([a-z0-9_-]+)(?=\s|$)/i.exec(text||'');
+  if(!m||!pluginById(m[1].toLowerCase())?.commands?.some(c=>c.name===m[2].toLowerCase()))return renderTextWithLinks(text);
   const rest=text.slice(m[0].length);
-  return `<span class="msg-plugcmd"><span class="pc-ns">${esc(m[1])}</span><span class="pc-sep">::</span><span class="pc-cmd">${esc(m[2])}</span></span>`+(rest?renderTextWithLinks(rest):'');
+  return `<span class="msg-plugcmd"><span class="pc-sep">/</span><span class="pc-ns">${esc(m[1])}</span> <span class="pc-cmd">${esc(m[2])}</span></span>`+(rest?renderTextWithLinks(rest):'');
 }
 function renderTextWithLinks(text) {
   // Stickers (<s:name:id>) come out of the text and show big below it.
@@ -7402,7 +7411,7 @@ function initSentHistory(){
 }
 
 async function sendMessage(){
-  if(await sendPluginCommand())return; // music::play … goes to the plugin
+  if(await sendPluginCommand())return; // /music play … goes to the plugin
   const input=document.getElementById('msg-input');
   const typed=input.value.trim(),content=typedToTokens(typed);
   const readyAttachments=state.attachQueue.filter(a=>a.status==='done');
@@ -7427,6 +7436,7 @@ async function sendMessage(){
 
 async function goBack(){
   rosterLastState='';rosterWaitingCount=0;rosterForksSeen.clear();closeRosterModal();
+  rosterPendingSeen=-1;document.getElementById('roster-pending')?.classList.add('hidden');
   closePluginPop();plug.list=[];plug.panels=new Map();renderPluginBar();document.getElementById('plug-reply')?.classList.add('hidden');
   voiceRejoin=null;state.voiceHere=null;voiceHungUpWhileAway=null;state.voiceReconnecting={};
   state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
@@ -8044,6 +8054,10 @@ function identityHTML(v){
 function positionProfilePopup(pop,r,place){
   const z=uiScale(),m=8,gap=12;
   pop.style.left='0px';pop.style.top='0px';
+  // Never taller than the window (in CSS pixels at this zoom), nor than
+  // 520 px: the rest scrolls inside the card.
+  const cardEl=pop.querySelector('.profile-card');
+  if(cardEl)cardEl.style.maxHeight=Math.max(200,Math.min(520,(innerHeight-2*m)/z))+'px';
   const card=pop.getBoundingClientRect(),w=card.width,h=card.height;
   const W=innerWidth,H=innerHeight;
   if(!r){ // nothing to anchor to — centre it
@@ -12528,8 +12542,8 @@ function renderComposerHighlight(){
 //  - its panel, from the plugin bar in the header (pinned ones always
 //    there, the rest in the tray behind the puzzle piece). The plugin
 //    describes the panel and the app draws it; plugins never run code here.
-//  - its commands, typed in the message box: music::play <song>. Suggestions
-//    as you type (plugins after "::", then commands, then each argument),
+//  - its commands, typed in the message box: /music play <song>. Suggestions
+//    as you type (plugins after "/", then commands, then each argument),
 //    and the command coloured like the search filters.
 // Both go to the plugin through the server: sealed for the plugin when it
 // takes lanes (the app's lanes_app.go: the server only passes them on),
@@ -12705,11 +12719,11 @@ function renderPluginTray(pop){
       <div class="pt-row" data-plugin="${esc(p.id)}">
         <span class="pt-ic">${pluginIcon(p)}</span>
         <span class="pt-text"><span class="pt-name">${esc(pluginTitle(p))}${p.connected?'':' <span class="pt-off">not running</span>'}</span>
-          <span class="pt-desc">${p.commands?.length?`<code>${esc(p.id)}::</code> `:''}${esc(p.description||'')}</span></span>
+          <span class="pt-desc">${p.commands?.length?`<code>/${esc(p.id)}</code> `:''}${esc(p.description||'')}</span></span>
         ${p.panel&&!pluginBlocked(p.id)?`<button class="pt-pin${isPinned(p)?' on':''}" title="${isPinned(p)?'Unpin from the bar':'Pin to the bar'}">${icon('keep')}</button>`:''}
         <button class="pt-block${pluginBlocked(p.id)?' on':''}" title="${pluginBlocked(p.id)?'Unblock':'Block for me: hide its panel, announcements and messages, mute it in calls, and send it nothing'}">${icon('block')}</button>
       </div>`).join('')}</div>
-    <div class="pp-foot">Plugins run on the server: whoever runs it can see what you send them, and any channel the signed member list lets them read. They can play into calls but never hear them. Type <code>::</code> in a channel for their commands.</div>`;
+    <div class="pp-foot">Plugins run on the server: whoever runs it can see what you send them, and any channel the signed member list lets them read. They can play into calls but never hear them. Type <code>/</code> in a channel for their commands.</div>`;
   pop.querySelectorAll('.pt-row').forEach(row=>{
     const p=pluginById(row.dataset.plugin);
     row.classList.toggle('blocked',pluginBlocked(p.id));
@@ -12728,7 +12742,7 @@ function renderPluginTray(pop){
 function startPluginCommand(id){
   const ta=document.getElementById('msg-input');
   if(!ta||ta.disabled){toast('Open a channel to use its commands');return;}
-  ta.value=id+'::';ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
+  ta.value='/'+id+' ';ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
   autoResize(ta);onPluginInput(ta);
 }
 
@@ -12791,7 +12805,7 @@ function renderPluginPanel(pop,p){
     <div class="pp-body">${!p.connected?`<div class="pp-text muted">${esc(pluginTitle(p))} isn’t running right now.</div>`
       :x?renderPanelBlocks(x.panel,x.at):`<div class="pp-text muted">Nothing to show yet.</div>`}</div>
     <div class="pp-reply hidden"></div>
-    ${p.commands?.length?`<div class="pp-foot">Or type <a href="#" class="pp-cmds"><code>${esc(p.id)}::</code></a> in a channel for its commands.</div>`:''}`;
+    ${p.commands?.length?`<div class="pp-foot">Or type <a href="#" class="pp-cmds"><code>/${esc(p.id)}</code></a> in a channel for its commands.</div>`:''}`;
   pop.querySelector('.pp-x').onclick=closePluginPop;
   pop.querySelector('.pp-pin').onclick=e=>{e.stopPropagation();setPinned(p.id,!isPinned(p));renderPluginPop();};
   pop.querySelector('.pp-cmds')?.addEventListener('click',e=>{e.preventDefault();closePluginPop();startPluginCommand(p.id);});
@@ -12834,7 +12848,7 @@ function tickPluginProgress(){
 // ── From the server ──
 function onPluginEvent(raw){
   let v;try{v=JSON.parse(raw);}catch{return;}
-  if(v.type==='plugins_updated'){loadPlugins();return;}
+  if(v.type==='plugins_updated'){loadPlugins();scheduleRosterPending();return;}
   if(v.plugin&&pluginBlocked(v.plugin))return;
   if(v.type==='plugin_notice'){addPluginNotice(v);return;}
   if(v.type==='plugin_panel'){
@@ -12873,29 +12887,36 @@ function showReplyIn(box,r){
 }
 
 // ── Commands in the message box ──
-// "<plugin>::<command> <arguments>". A known plugin's name (or "::" alone)
-// makes it a command; anything else is an ordinary message.
+// "/<plugin> <command> <arguments>". "/" alone, or with a plugin's name (or
+// the start of one), makes it a command; anything else is an ordinary
+// message. While suggestions are shown, Tab and Enter pick (Enter only
+// sends once there's nothing to pick); Esc closes them.
 const plugSug={open:false,soft:false,items:[],index:0,kind:'',error:''};
 function cmdPlugins(){return plug.list.filter(p=>p.commands?.length&&!pluginBlocked(p.id));}
 function parsePluginCommand(v,caret=v.length){
-  if(!v||v.includes('\n'))return null;
-  const m=v.match(/^([a-z][a-z0-9-]*)?::(\S*)/i);
+  if(!v||v.includes('\n')||v[0]!=='/')return null;
+  const m=v.match(/^\/([a-z0-9-]*)(\s+)?(\S*)/i);
   if(!m)return null;
-  const ns=(m[1]||'').toLowerCase();
-  const plugin=ns?pluginById(ns):null;
-  if(ns&&!plugin)return null; // not a plugin here: just a message
-  const r={ns,plugin,cmdText:m[2],cmd:null,args:{},marks:[],missing:[],bad:[],argIndex:-1,argStart:0};
-  const nsEnd=ns.length;
-  if(ns)r.marks.push([0,nsEnd,'pc-ns']);
-  r.marks.push([nsEnd,nsEnd+2,'pc-sep']);
-  if(!plugin)return r;
-  const cStart=nsEnd+2,cEnd=cStart+m[2].length;
-  const word=m[2].toLowerCase();
+  const ns=m[1].toLowerCase();
+  const plugins=cmdPlugins();
+  const plugin=ns?plugins.find(p=>p.id===ns)||null:null;
+  const nsDone=!!m[2]; // a space after its name
+  // Not a plugin's name (nor the start of one): an ordinary message.
+  if(!ns&&nsDone)return null;
+  if(ns&&!plugin&&(nsDone||!plugins.some(p=>p.id.startsWith(ns))))return null;
+  const r={ns,plugin,nsDone,cmdText:nsDone?m[3]:'',cmd:null,args:{},marks:[],missing:[],bad:[],argIndex:-1,argStart:0};
+  const nsEnd=1+m[1].length;
+  r.marks.push([0,1,'pc-sep']);
+  if(ns)r.marks.push([1,nsEnd,plugin?'pc-ns':'pc-ns partial']);
+  if(!plugin||!nsDone)return r;
+  const cStart=nsEnd+m[2].length,cEnd=cStart+m[3].length;
+  r.cEnd=cEnd;
+  const word=m[3].toLowerCase();
   r.cmd=plugin.commands?.find(c=>c.name===word)||null;
-  if(m[2]){
+  if(m[3]){
     const partial=!r.cmd&&caret===cEnd&&plugin.commands?.some(c=>c.name.startsWith(word));
     r.marks.push([cStart,cEnd,r.cmd?'pc-cmd':partial?'pc-cmd partial':'pc-bad']);
-    if(!r.cmd&&!partial)r.bad.push(`${plugin.name||plugin.id} has no command called ${m[2]}`);
+    if(!r.cmd&&!partial)r.bad.push(`${plugin.name||plugin.id} has no command called ${m[3]}`);
   }
   if(!r.cmd)return r;
   // The arguments, in order: one word each, the last text one takes the rest.
@@ -12923,7 +12944,7 @@ function parsePluginCommand(v,caret=v.length){
     i=end;
   }
   while(i<v.length&&/\s/.test(v[i]))i++;
-  if(i<v.length){r.marks.push([i,v.length,'pc-bad']);r.bad.push(`${r.ns}::${r.cmd.name} doesn’t take that much`);}
+  if(i<v.length){r.marks.push([i,v.length,'pc-bad']);r.bad.push(`/${r.ns} ${r.cmd.name} doesn’t take that much`);}
   if(r.argIndex<0&&args.length)r.argIndex=0;
   return r;
 }
@@ -12942,33 +12963,24 @@ function pluginCommandHighlight(ta,hl){
 function closePluginSuggest(){plugSug.open=false;plugSug.error='';document.getElementById('plug-suggest')?.classList.add('hidden');}
 function onPluginInput(ta){
   plugSug.error='';
-  const v=ta.value,caret=ta.selectionStart,before=v.slice(0,caret);
+  const v=ta.value,caret=ta.selectionStart;
   const plugins=cmdPlugins();
   if(!plugins.length||v.includes('\n')){closePluginSuggest();return;}
-  // Plugins: "mu:" (then Enter or Tab), or — softly, Tab only — a first
-  // word that starts a plugin's name. ("::" on its own: below.)
-  if(caret===v.length){
-    const w=before.match(/^([a-z][a-z0-9-]*)(:?)$/i);
-    if(w&&(w[2]||w[1].length>=2)){
-      const part=w[1].toLowerCase();
-      const items=plugins.filter(p=>p.id.startsWith(part)).map(p=>({kind:'plugin',p,text:p.id+'::'}));
-      if(items.length){plugSug.kind='plugin';plugSug.items=items;plugSug.soft=!w[2];plugSug.index=w[2]?0:-1;renderPluginSuggest(ta);return;}
-    }
-  }
   const r=parsePluginCommand(v,caret);
   if(!r){closePluginSuggest();return;}
-  if(!r.plugin){ // "::" then a partial name
-    const part=r.cmdText.toLowerCase();
-    const items=plugins.filter(p=>p.id.startsWith(part)).map(p=>({kind:'plugin',p,text:p.id+'::'}));
+  if(!r.plugin||!r.nsDone){
+    // "/" and the start of a plugin's name: the plugins.
+    const items=plugins.filter(p=>p.id.startsWith(r.ns)).map(p=>({kind:'plugin',p,text:'/'+p.id+' '}));
     if(!items.length){closePluginSuggest();return;}
     plugSug.kind='plugin';plugSug.items=items;plugSug.soft=false;plugSug.index=0;renderPluginSuggest(ta,r);return;
   }
-  const cEnd=r.ns.length+2+r.cmdText.length;
-  if(!r.cmd||(caret<=cEnd&&!r.hasSpace)){
+  // Its commands — until one's typed in full (and, if it takes arguments,
+  // a space after it): then its arguments, so Enter can send it.
+  if(!r.cmd||(caret<=r.cEnd&&!r.hasSpace&&r.cmd.args?.length)){
     // Its commands.
     const part=r.cmdText.toLowerCase();
-    const items=(r.plugin.commands||[]).filter(c=>c.name.startsWith(part)).map(c=>({kind:'cmd',p:r.plugin,c,text:`${r.ns}::${c.name}${c.args?.length?' ':''}`}));
-    if(!items.length){plugSug.kind='none';plugSug.items=[];renderPluginSuggest(ta,r);return;}
+    const items=(r.plugin.commands||[]).filter(c=>c.name.startsWith(part)).map(c=>({kind:'cmd',p:r.plugin,c,text:`/${r.ns} ${c.name}${c.args?.length?' ':''}`}));
+    if(!items.length){plugSug.kind='none';plugSug.items=[];plugSug.index=-1;renderPluginSuggest(ta,r);return;}
     plugSug.kind='cmd';plugSug.items=items;plugSug.soft=false;plugSug.index=0;renderPluginSuggest(ta,r);return;
   }
   // Its arguments: the one you're on, and its choices.
@@ -12982,7 +12994,7 @@ function onPluginInput(ta){
   renderPluginSuggest(ta,r);
 }
 function sigHTML(ns,c,on=-1){
-  return `<span class="pc-ns">${esc(ns)}</span><span class="pc-sep">::</span><span class="pc-cmd">${esc(c.name)}</span>`+
+  return `<span class="pc-sep">/</span><span class="pc-ns">${esc(ns)}</span> <span class="pc-cmd">${esc(c.name)}</span>`+
     (c.args||[]).map((a,i)=>` <span class="ps-arg${i===on?' on':''}">${a.required?'&lt;':'['}${esc(a.name)}${a.required?'&gt;':']'}</span>`).join('');
 }
 function renderPluginSuggest(ta,r){
@@ -12993,9 +13005,9 @@ function renderPluginSuggest(ta,r){
   if(plugSug.kind==='error'){
     // (just what's wrong, below)
   }else if(plugSug.kind==='plugin'){
-    html=`<div class="ps-title">Plugins${plugSug.soft?' <span class="ps-key">Tab</span>':''}</div>`+plugSug.items.map((x,i)=>`
+    html=`<div class="ps-title">Plugins</div>`+plugSug.items.map((x,i)=>`
       <div class="ps-row${i===plugSug.index?' on':''}" data-i="${i}"><span class="ps-ic">${pluginIcon(x.p)}</span>
-        <span class="ps-name"><span class="pc-ns">${esc(x.p.id)}</span><span class="pc-sep">::</span></span><span class="ps-desc">${esc(pluginTitle(x.p))}${x.p.description?' — '+esc(x.p.description):''}</span></div>`).join('');
+        <span class="ps-name"><span class="pc-sep">/</span><span class="pc-ns">${esc(x.p.id)}</span></span><span class="ps-desc">${esc(pluginTitle(x.p))}${x.p.description?' — '+esc(x.p.description):''}</span></div>`).join('');
   }else if(plugSug.kind==='cmd'||plugSug.kind==='none'){
     html=`<div class="ps-title">${esc(pluginTitle(r.plugin))} commands</div>`+(plugSug.items.length?plugSug.items.map((x,i)=>`
       <div class="ps-row${i===plugSug.index?' on':''}" data-i="${i}"><span class="ps-name">${sigHTML(r.ns,x.c)}</span><span class="ps-desc">${esc(x.c.description||'')}</span></div>`).join('')
@@ -13009,7 +13021,7 @@ function renderPluginSuggest(ta,r){
   }
   if(plugSug.error)html+=`<div class="ps-err">${esc(plugSug.error)}</div>`;
   const p=r?.plugin||(plugSug.items[0]?.p);
-  html+=`<div class="ps-foot">${plugSug.kind==='args'?`<span class="ps-key">Enter</span> sends it to ${esc(p?pluginTitle(p):'the plugin')} · `:plugSug.soft?'':'<span class="ps-key">Tab</span> picks · '}${p?.lanes&&p?.lanes_ok?`${icon('lock')}End-to-end encrypted to ${esc(pluginTitle(p))}`:`${icon('lock_open')}Goes to the plugin on this server, not end-to-end encrypted`}${plugSug.kind==='args'?' · posted in the channel too':''}</div>`;
+  html+=`<div class="ps-foot">${plugSug.kind==='args'&&!plugSug.items.length?`<span class="ps-key">Enter</span> sends it to ${esc(p?pluginTitle(p):'the plugin')} · `:plugSug.items.length?'<span class="ps-key">Tab</span> or <span class="ps-key">Enter</span> picks · <span class="ps-key">Esc</span> closes · ':''}${p?.lanes&&p?.lanes_ok?`${icon('lock')}End-to-end encrypted to ${esc(pluginTitle(p))}`:`${icon('lock_open')}Goes to the plugin on this server, not end-to-end encrypted`}${plugSug.kind==='args'?' · posted in the channel too':''}</div>`;
   box.innerHTML=html;
   box.classList.remove('hidden');
   plugSug.open=true;
@@ -13024,10 +13036,10 @@ function acceptPluginSuggest(ta){
     ta.value=v.slice(0,x.start)+x.c+(after.startsWith(' ')?after:' '+after.trimStart());
     const c=x.start+x.c.length+1;ta.setSelectionRange(c,c);
   }else{
-    // The plugin or command replaces what's typed so far (keeping any arguments).
-    const v=ta.value,m=v.match(/^[a-z0-9-]*(?:::?\S*)?/i);
+    // The plugin or command replaces what's typed so far (keeping the rest).
+    const v=ta.value,m=v.match(x.kind==='cmd'?/^\/[a-z0-9-]*\s+\S*/i:/^\/[a-z0-9-]*\s*/i);
     let rest=v.slice(m?m[0].length:0);
-    if(x.kind==='cmd'&&x.text.endsWith(' '))rest=rest.trimStart();
+    if(x.text.endsWith(' '))rest=rest.trimStart();
     ta.value=x.text+rest;
     ta.setSelectionRange(x.text.length,x.text.length);
   }
@@ -13042,10 +13054,10 @@ async function sendPluginCommand(){
   const r=parsePluginCommand(v,v.length);
   if(!r)return false;
   const fail=msg=>{plugSug.error=msg;plugSug.items=[];plugSug.index=-1;plugSug.soft=false;plugSug.kind=r.cmd?'args':'error';renderPluginSuggest(ta,r);plugSug.error='';return true;};
-  if(!r.plugin)return fail('Which plugin? Type its name before the ::');
+  if(!r.plugin||!r.nsDone)return fail('Which plugin? Pick one above');
   if(!r.cmd)return fail(r.cmdText?`${pluginTitle(r.plugin)} has no command called ${r.cmdText}`:`Which ${pluginTitle(r.plugin)} command? Pick one above`);
   if(r.bad.length)return fail(r.bad[0]);
-  if(r.missing.length)return fail(`${r.ns}::${r.cmd.name} needs ${r.missing.join(' and ')}`);
+  if(r.missing.length)return fail(`/${r.ns} ${r.cmd.name} needs ${r.missing.join(' and ')}`);
   if(!state.selectedBoardId)return fail('Open a channel first');
   try{
     await window.go.main.App.PluginCommand(r.plugin.id,r.cmd.name,r.args,state.selectedBoardId);
@@ -13058,7 +13070,7 @@ async function sendPluginCommand(){
   ta.value='';autoResize(ta);closePluginSuggest();renderComposerHighlight();
   plug.lastAsk={plugin:r.plugin.id,where:'box',at:Date.now()};
   const box=document.getElementById('plug-reply');
-  plug.reply={plugin:r.plugin.id,name:pluginTitle(r.plugin),text:`${r.ns}::${r.cmd.name}${Object.values(r.args).length?' '+Object.values(r.args).join(' '):''}`,pending:true,where:'box',at:Date.now()};
+  plug.reply={plugin:r.plugin.id,name:pluginTitle(r.plugin),text:`/${r.ns} ${r.cmd.name}${Object.values(r.args).length?' '+Object.values(r.args).join(' '):''}`,pending:true,where:'box',at:Date.now()};
   showReplyIn(box,plug.reply);
   return true;
 }
@@ -13075,16 +13087,17 @@ function initPlugins(){
       e.preventDefault();e.stopImmediatePropagation();
       plugSug.index=(plugSug.index+(e.key==='ArrowDown'?1:-1)+n)%n;
       document.querySelectorAll('#plug-suggest .ps-row').forEach((x,i)=>x.classList.toggle('on',i===plugSug.index));
+      document.querySelector('#plug-suggest .ps-row.on')?.scrollIntoView({block:'nearest'});
     }else if(e.key==='Tab'&&n){
       e.preventDefault();e.stopImmediatePropagation();
       if(plugSug.index<0)plugSug.index=0;
       acceptPluginSuggest(ta);
-    }else if(e.key==='Enter'&&!e.shiftKey&&!plugSug.soft&&plugSug.index>=0&&n){
-      // A command already typed in full goes; otherwise Enter picks.
-      const x=plugSug.items[plugSug.index];
-      const r=parsePluginCommand(ta.value);
-      const done=x.kind==='cmd'&&r?.cmd&&r.cmd.name===x.c.name&&!(x.c.args||[]).some(a=>a.required);
-      if(!done){e.preventDefault();e.stopImmediatePropagation();acceptPluginSuggest(ta);}
+    }else if(e.key==='Enter'&&!e.shiftKey&&n){
+      // While there's a list, Enter picks from it (like Tab): it only sends
+      // once there's nothing left to pick — or after Esc closes the list.
+      e.preventDefault();e.stopImmediatePropagation();
+      if(plugSug.index<0)plugSug.index=0;
+      acceptPluginSuggest(ta);
     }else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closePluginSuggest();}
   },true);
   ta.addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='Home'||e.key==='End'){if(parsePluginCommand(ta.value))onPluginInput(ta);renderComposerHighlight();}});
@@ -13357,6 +13370,7 @@ async function onRosterChanged(){
   rosterLastState=info.state;rosterPolicyCache=info.policy;
   rosterBadge(info);
   updateChannelReaders();
+  scheduleRosterPending();
   // The list is required: the owner's app sets it up; everyone else is told why nothing opens.
   if(info.state==='none'&&was!=='none'&&state.domain&&!rosterSetupAsked.has(state.domain)){
     rosterSetupAsked.add(state.domain);
@@ -13375,6 +13389,47 @@ function rosterBadge(info){
   rosterWaitingCount=appr?(info.proposals||[]).filter(p=>!p.signed&&!p.ready).length:0;
   document.getElementById('server-info-btn')?.classList.toggle('has-badge',rosterWaitingCount>0||info.state==='replaced'||info.state==='none'||info.forks.length>0);
 }
+// What's waiting for you on the member list, shown at the top of the chat
+// (and said once when there's something new): changes others proposed that
+// you can approve, and — for managers — where the server and the list
+// disagree (someone new, a new channel, a plugin just installed).
+let rosterPendingTimer=0,rosterPendingSeen=-1,rosterPendingBusy=false;
+function scheduleRosterPending(){clearTimeout(rosterPendingTimer);rosterPendingTimer=setTimeout(updateRosterPending,800);}
+async function updateRosterPending(){
+  const btn=document.getElementById('roster-pending');
+  if(!btn)return;
+  if(!state.domain){btn.classList.add('hidden');return;}
+  if(rosterPendingBusy){scheduleRosterPending();return;}
+  rosterPendingBusy=true;
+  try{
+    const domain=state.domain;
+    let info;try{info=await window.go.main.App.RosterInfo();}catch{return;}
+    const me=info.me,approver=(info.approvers||[]).includes(me);
+    const manager=info.owner===me||(info.members||[]).some(m=>m.key===me&&m.manager);
+    const owner=state.serverOwner&&state.serverOwner===state.username;
+    let n=0,label='',tip='';
+    if(info.state==='none'&&owner){n=1;label='Set up the signed member list';tip='Nobody’s app shares keys here until you do.';}
+    else if(info.state==='replaced'){n=1;label='Member list needs checking';tip=info.problem||'';}
+    else if(info.state==='active'&&(manager||approver)){
+      const waiting=approver?(info.proposals||[]).filter(p=>!p.signed&&!p.ready).length:0;
+      let diffs=0;
+      if(manager){
+        try{rosterView=await window.go.main.App.RosterServerView(allBoards().map(b=>b.id).concat(['@presence']));diffs=rosterDifferences(info,rosterView).length;}catch{}
+      }
+      n=waiting+diffs;
+      if(n){
+        label=`${n} member list change${n===1?'':'s'} to approve`;
+        tip=[waiting?`${waiting} proposed by others, waiting for your approval`:'',diffs?`${diffs} where the server and the list disagree (someone new, a new channel, a new plugin…)`:''].filter(Boolean).join('; ')+'.';
+      }
+    }
+    if(state.domain!==domain)return;
+    btn.classList.toggle('hidden',!n);
+    btn.innerHTML=`${icon('verified_user')}${esc(label)}`;
+    btn.title=tip?tip+' Click to open the member list.':'';
+    if(n>0&&rosterPendingSeen>=0&&n>rosterPendingSeen)toast(`${label} — click the yellow button at the top, or Server info → Member list.`);
+    rosterPendingSeen=n;
+  }finally{rosterPendingBusy=false;}
+}
 const rosterSetupAsked=new Set(); // servers this app has asked the owner to set the list up on
 // The owner, on a server without its list: straight to setting it up.
 async function openRosterSetup(){
@@ -13384,6 +13439,8 @@ async function openRosterSetup(){
 }
 function initRoster(){
   window.runtime.EventsOn('roster:changed',onRosterChanged);
+  document.getElementById('roster-pending')?.addEventListener('click',()=>openRosterModal());
+  setInterval(()=>{if(state.domain&&state.wsConnected!==false)updateRosterPending();},2*60*1000); // new members and channels
 }
 
 // ── SPELL CHECK ──────────────────────────────────────────────────
