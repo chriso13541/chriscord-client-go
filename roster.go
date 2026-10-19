@@ -249,6 +249,11 @@ type Roster struct {
 	// applied), so two apps can tell whether they see the same list.
 	Head    string
 	Applied int
+	// Heads: every head the list has had (their first 16 characters), so a
+	// message sent with an earlier one isn't taken for a different list.
+	Heads map[string]bool
+	// StartedAt: when the list was started (its first entry's time).
+	StartedAt int64
 	// Rejected: entries the server stored that don't hold up, and why.
 	Rejected []RosterRejected
 	// Changes: what each applied entry did, for showing (newest last).
@@ -497,6 +502,7 @@ func (r *Roster) start(e RosterEntry) error {
 	if r.Needed() > len(r.Approvers()) {
 		return errors.New("it needs more approvals than there are approvers")
 	}
+	r.StartedAt = op.At
 	r.applied(e, op, map[string]bool{op.By: true})
 	return nil
 }
@@ -513,6 +519,10 @@ func (r *Roster) applied(e RosterEntry, op RosterOp, signers map[string]bool) {
 	h := entryHash(e.Body)
 	sum := sha256.Sum256(append(prev, h[:]...))
 	r.Head = hex.EncodeToString(sum[:])
+	if r.Heads == nil {
+		r.Heads = map[string]bool{}
+	}
+	r.Heads[r.Head[:16]] = true
 	r.Applied++
 	var who []string
 	for k := range signers {

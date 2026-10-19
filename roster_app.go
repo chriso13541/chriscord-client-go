@@ -270,7 +270,12 @@ func (rc *rosterClient) integrateLocked(fresh []RosterEntry, lastSeq int64) {
 			return
 		}
 		rc.r = r
+		// Every head it has had, not just the newest: messages sent before
+		// the last change carry an earlier one.
 		rc.heads = map[string]bool{headPrefix(r.Head): true}
+		for h := range r.Heads {
+			rc.heads[h] = true
+		}
 		rc.applyLocked(rc.entries[k:], rc.pin != nil && rc.pin.ID == r.ID)
 	} else {
 		rc.applyLocked(fresh, true)
@@ -439,8 +444,8 @@ func (a *App) rosterSignedSince(createdAt string) bool {
 	rc := a.roster
 	rc.mu.Lock()
 	var start int64
-	if rc.state == rosterActive && rc.r != nil && len(rc.r.Changes) > 0 {
-		start = rc.r.Changes[0].Op.At
+	if rc.state == rosterActive && rc.r != nil {
+		start = rc.r.StartedAt
 	}
 	rc.mu.Unlock()
 	if start == 0 {
