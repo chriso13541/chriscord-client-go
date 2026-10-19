@@ -305,6 +305,14 @@ type textPlain struct {
 	T string      `json:"t"`
 	A []fileMeta  `json:"a,omitempty"`
 	I *textImport `json:"i,omitempty"`
+	// RH: the signed member list's head as the sender saw it (roster.go),
+	// so apps shown different lists notice.
+	RH string `json:"rh,omitempty"`
+	// L: its link's preview, made by the sender's app (linkpreview.go).
+	L *textLinkPreview `json:"l,omitempty"`
+	// K, S: the writer's identity key and signature (msgsig.go).
+	K string `json:"k,omitempty"`
+	S string `json:"s,omitempty"`
 }
 
 // textImport marks a message brought over from elsewhere by chriscord-import:
@@ -536,6 +544,9 @@ func (t *textCrypto) newGeneration(board string, bk *boardKeys) error {
 	boxes := []map[string]string{}
 	haveSelf := false
 	for _, m := range bk.members {
+		if !t.app.rosterAllows(m.PublicKey, board) {
+			continue // the signed member list doesn't let them read it (roster_app.go)
+		}
 		enc, ok := t.memberEncKey(m, id.domain)
 		if !ok {
 			continue // not on an encryption-capable app yet: they get it once they are (runPending)
@@ -565,6 +576,7 @@ func (t *textCrypto) newGeneration(board string, bk *boardKeys) error {
 		cur.latest, cur.rotate = gen, false
 	}
 	t.mu.Unlock()
+	t.app.rosterMadeNewKey(board)
 	log.Printf("e2ee: new key (generation %d) for %s, for %d member(s)", gen, board, len(boxes))
 	return nil
 }
@@ -572,12 +584,12 @@ func (t *textCrypto) newGeneration(board string, bk *boardKeys) error {
 // seal encrypts a message's text for sending in board. Empty text stays
 // empty (a files-only message).
 func (t *textCrypto) seal(board, text string) (string, error) {
-	return t.sealWith(board, text, nil)
+	return t.sealWith(board, text, nil, nil)
 }
 
 // sealWith encrypts a message's text and its encrypted attachments'
 // details. Nothing at all stays empty.
-func (t *textCrypto) sealWith(board, text string, files []fileMeta) (string, error) {
+func (t *textCrypto) sealWith(board, text string, files []fileMeta, preview *textLinkPreview) (string, error) {
 	if text == "" && len(files) == 0 {
 		return "", nil
 	}
@@ -586,6 +598,13 @@ func (t *textCrypto) sealWith(board, text string, files []fileMeta) (string, err
 		return "", errors.New("not signed in")
 	}
 	t.ensurePublished()
+	if why := t.app.rosterWhyNoKeys(); why != "" {
+		return "", errors.New(textNoKeyNotice + why)
+	}
+	if !t.app.rosterAllows(id.idHex, board) {
+		return "", errors.New(textNoKeyNotice + "the server's signed member list doesn't (yet) say who may read this channel — " +
+			"an approver has to approve it (Server info → Member list)")
+	}
 	l := t.lockFor(board)
 	l.Lock()
 	defer l.Unlock()
@@ -595,7 +614,7 @@ func (t *textCrypto) sealWith(board, text string, files []fileMeta) (string, err
 		if err != nil {
 			return "", fmt.Errorf("%s%w", textNoKeyNotice, err)
 		}
-		if bk.latest == 0 || bk.rotate || t.key(board, bk.latest) == nil {
+		if bk.latest == 0 || bk.rotate || t.key(board, bk.latest) == nil || t.app.rosterNeedsNewKey(board) {
 			// No key yet, someone lost access, or the newest key hasn't been
 			// shared with this account: start a new generation.
 			err := t.newGeneration(board, bk)
@@ -610,7 +629,9 @@ func (t *textCrypto) sealWith(board, text string, files []fileMeta) (string, err
 		gen := t.boards[board].latest
 		key := t.boards[board].keys[gen]
 		t.mu.Unlock()
-		return sealPlain(key, board, gen, textPlain{U: id.me, T: text, A: files})
+		p := textPlain{U: id.me, T: text, A: files, RH: t.app.rosterHead(), L: preview}
+		signPlain(&p, board, gen, id)
+		return sealPlain(key, board, gen, p)
 	}
 }
 
@@ -625,9 +646,16 @@ func (t *textCrypto) openContent(board, author, importedFrom, content string) (s
 // openFull is openContent plus the message's encrypted attachments, and
 // for imported history who wrote it originally.
 func (t *textCrypto) openFull(board, author, importedFrom, content string) (string, string, []fileMeta, *textImport) {
+	text, state, files, imp, _, _ := t.openFullP(board, author, importedFrom, content)
+	return text, state, files, imp
+}
+
+// openFullP is openFull plus the link preview the sender made (none for a
+// message that isn't really theirs).
+func (t *textCrypto) openFullP(board, author, importedFrom, content string) (string, string, []fileMeta, *textImport, *textLinkPreview, msgWriter) {
 	gen, blob, ok := parseText(content)
 	if !ok {
-		return content, "", nil, nil
+		return content, "", nil, nil, nil, msgWriter{}
 	}
 	key := t.key(board, gen)
 	if key == nil {
@@ -651,24 +679,29 @@ func (t *textCrypto) openFull(board, author, importedFrom, content string) (stri
 		t.mu.Lock()
 		t.locked[board] = true
 		t.mu.Unlock()
-		return textLockedMsg, "locked", nil, nil
+		return textLockedMsg, "locked", nil, nil, nil, msgWriter{}
 	}
 	p, err := openText(key, board, gen, blob)
 	if err != nil {
-		return textBrokenMsg, "error", nil, nil
+		return textBrokenMsg, "error", nil, nil, nil, msgWriter{}
 	}
+	t.app.rosterNoteHead(p.U, p.RH)
 	if p.I != nil {
 		// Imported: it has to be shown as that same person's (whoever
 		// has claimed them since).
 		if !strings.EqualFold(importedFrom, p.I.S+":"+p.I.ID) {
-			return fmt.Sprintf("⚠ Imported as %s's, but not shown as theirs: %s", p.I.N, p.T), "forged", p.A, p.I
+			return fmt.Sprintf("⚠ Imported as %s's, but not shown as theirs: %s", p.I.N, p.T), "forged", p.A, p.I, nil, msgWriter{}
 		}
-		return p.T, "ok", p.A, p.I
+		return p.T, "ok", p.A, p.I, p.L, msgWriter{}
 	}
 	if author != "" && p.U != author {
-		return fmt.Sprintf("⚠ Written by %s, not %s: %s", p.U, author, p.T), "forged", p.A, nil
+		return fmt.Sprintf("⚠ Written by %s, not %s: %s", p.U, author, p.T), "forged", p.A, nil, nil, msgWriter{}
 	}
-	return p.T, "ok", p.A, nil
+	w, why := t.checkWriter(board, gen, p)
+	if why != "" {
+		return fmt.Sprintf("⚠ Claims to be from %s, but %s: %s", p.U, why, p.T), "forged", p.A, nil, nil, w
+	}
+	return p.T, "ok", p.A, nil, p.L, w
 }
 
 // open decrypts a message (and the preview of the one it replies to) in place.
@@ -684,7 +717,16 @@ func (t *textCrypto) open(m *ChatMessage) {
 	t.mu.Unlock()
 	var files []fileMeta
 	var imp *textImport
-	m.Content, m.E2EE, files, imp = t.openFull(m.BoardID, m.Username, m.ImportedFrom, m.Content)
+	var lp *textLinkPreview
+	var w msgWriter
+	m.Content, m.E2EE, files, imp, lp, w = t.openFullP(m.BoardID, m.Username, m.ImportedFrom, m.Content)
+	m.Preview = lp.asLinkPreview()
+	m.AuthorKind = w.Kind
+	// Unsigned, but sent since this server's signed member list started (so
+	// by an app that signs): someone with the channel's key wrote it as them.
+	if w.Unsigned && m.E2EE == "ok" && t.app.rosterSignedSince(m.CreatedAt) {
+		m.Unverified = true
+	}
 	if imp != nil {
 		m.ImportedName = imp.N
 	}
@@ -837,6 +879,9 @@ func (t *textCrypto) runPending() {
 	fetched := map[string]bool{}
 	var boxes []map[string]interface{}
 	for _, p := range r.Pending {
+		if !t.app.rosterAllows(p.Recipient.PublicKey, p.BoardID) {
+			continue // the signed member list doesn't let them read it (roster_app.go)
+		}
 		enc, ok := t.memberEncKey(p.Recipient, id.domain)
 		if !ok {
 			continue

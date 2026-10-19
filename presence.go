@@ -186,7 +186,7 @@ func (a *App) publishPresence() {
 	blob, ok := a.text.sealCached(presenceKeyID, string(data), presenceKeyRecheck)
 	var err error
 	if !ok {
-		blob, err = a.text.sealWith(presenceKeyID, string(data), nil)
+		blob, err = a.text.sealWith(presenceKeyID, string(data), nil, nil)
 	}
 	if err != nil || blob == "" {
 		return // no key yet / not connected: the next one tries again

@@ -59,12 +59,17 @@ type App struct {
 	text             *textCrypto
 	// cloud is the optional chriscord.app online account (cloud.go).
 	cloud            *cloudClient
+	// roster is the server's signed member list (roster_app.go).
+	roster           *rosterClient
+	lanes            *laneClient
 }
 
 func NewApp() *App {
 	a := &App{}
 	a.e2ee = newCallCrypto(a)
 	a.text = newTextCrypto(a)
+	a.roster = newRosterClient(a)
+	a.lanes = newLaneClient(a)
 	a.cloud = newCloudClient(a)
 	theCloud = a.cloud
 	return a
@@ -1067,6 +1072,8 @@ func (a *App) connect(domain, serverKey, invite string) error {
 	// Message encryption: publish this account's key, share keys others need.
 	// In its own goroutine: it needs a.mu, which connect holds until it returns.
 	go a.text.begin()
+	go a.roster.begin() // the signed member list: who may be given keys
+	go a.laneClient().begin() // plugin lanes (lanes_app.go)
 	a.sendPfpInfo(a.account.PfpUpdatedAt)
 	a.sendProfileInfo(a.account.ProfileUpdatedAt)
 	return nil
@@ -1294,6 +1301,9 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		_, raw, err := conn.ReadMessage()
 		if err != nil { return }
 		_ = conn.SetReadDeadline(time.Now().Add(wsDeadAfter)) // heard from the server: still alive
+		if a.pluginEvent(raw) { // plugins.go
+			continue
+		}
 		var msg serverMsg
 		if err := json.Unmarshal(raw, &msg); err != nil {
 			// A voice_e2ee message's "data" is call-encryption key exchange,
@@ -1358,6 +1368,8 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			a.voiceMuted.Store(false)
 			a.voiceDeafened.Store(false)
 			runtime.EventsEmit(a.ctx, "voice:moved", msg.BoardID)
+		case "roster_changed":
+			a.roster.changed() // roster_app.go
 		case "bots_updated":
 			// A bot was added, changed or removed (bots.go): Server → Bots reloads.
 			runtime.EventsEmit(a.ctx, "server:bots")
@@ -1674,10 +1686,19 @@ type InviteInfo struct {
 }
 
 // CreateInvite makes a short-lived invite link code for this server.
-func (a *App) CreateInvite() (*InviteInfo, error) {
+func (a *App) CreateInvite() (*InviteInfo, error) { return a.CreateInviteFor(0) }
+
+// CreateInviteFor makes an invite link code that works for minutes (0: the
+// server's usual few; up to a week — for signed invites, roster_app.go).
+func (a *App) CreateInviteFor(minutes int) (*InviteInfo, error) {
 	a.mu.Lock(); domain := a.domain; token := a.token; a.mu.Unlock()
-	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/invites", nil)
+	var body io.Reader
+	if minutes > 0 {
+		body = strings.NewReader(fmt.Sprintf(`{"minutes":%d}`, minutes))
+	}
+	req, err := http.NewRequest("POST", normaliseHTTP(domain)+"/api/invites", body)
 	if err != nil { return nil, err }
+	if body != nil { req.Header.Set("Content-Type", "application/json") }
 	req.Header.Set("X-Session-Token", token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil { return nil, fmt.Errorf("network error: %w", err) }

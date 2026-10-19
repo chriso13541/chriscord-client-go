@@ -118,6 +118,13 @@ type ChatMessage struct {
 	// Also set by this app: an imported message's author's name where it
 	// came from (from inside the encrypted message).
 	ImportedName string `json:"imported_name,omitempty"`
+	// And its link's preview, as the sender's app made it (linkpreview.go).
+	Preview *LinkPreview `json:"preview,omitempty"`
+	// Who wrote it, as its signature and the signed member list say
+	// (msgsig.go): "bot" or "plugin" for one of those; Unverified for an
+	// unsigned one sent when it should have been signed.
+	AuthorKind string `json:"author_kind,omitempty"`
+	Unverified bool   `json:"unverified,omitempty"`
 }
 
 // ReplyPreview is what a reply shows of the message it answers.

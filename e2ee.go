@@ -237,6 +237,11 @@ func (c *callCrypto) helloLocked(priv ed25519.PrivateKey, reply bool) map[string
 
 // keyMsgLocked wraps one of this app's sending keys for one peer.
 func (c *callCrypto) keyMsgLocked(user string, p *e2eePeer, k *sendKey) (outMsg, bool) {
+	// Only to someone the signed member list lets into this call
+	// (roster_app.go): anyone else may speak, but can't listen.
+	if !c.app.rosterAllowsCall(p.identityHex, c.board) {
+		return outMsg{}, false
+	}
 	box, err := wrapKey(c.ephPriv, c.ephPub, p.eph, c.board, c.me, user, k.kid, k.raw)
 	if err != nil {
 		log.Printf("e2ee: wrapping a key for %s: %v", user, err)
@@ -610,6 +615,10 @@ func (c *callCrypto) snapshot() e2eeState {
 			s = "unsupported"
 		case p != nil && p.changed:
 			s = "changed"
+		case p != nil && c.app.rosterIsAutomated(p.identityHex):
+			s = "playonly" // a bot or plugin: its sound reaches you, yours never reaches it
+		case p != nil && !c.app.rosterAllowsCall(p.identityHex, c.board):
+			s = "unapproved"
 		case p != nil && len(p.keys) > 0:
 			s = "ok"
 		}

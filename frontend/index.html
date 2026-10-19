@@ -190,6 +190,175 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 .owner-crown { display:inline-flex; color:var(--yellow); flex-shrink:0; }
 /* BOTS: the tag by a bot's name, Settings > Bots, the server's bots window */
 .bot-tag.plugin { background:#3ba55d; }
+/* The signed member list (see SIGNED MEMBER LIST in the script). */
+.roster-modal { width:640px; }
+.rl-p { font-size:.88rem; color:var(--text); line-height:1.5; margin:0 0 12px; }
+.rl-muted { color:var(--text-muted); }
+.rl-sub { font-size:.78rem; color:var(--text-muted); line-height:1.4; }
+.rl-bad { color:var(--red-light); }
+.rl-status, .rl-warn { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:8px; font-size:.86rem; line-height:1.45; margin-bottom:6px; }
+.rl-status { background:rgba(67,181,129,.1); border:1px solid rgba(67,181,129,.35); }
+.rl-status > .ic { color:var(--green); width:22px; height:22px; flex-shrink:0; }
+.rl-warn { background:rgba(240,71,71,.1); border:1px solid rgba(240,71,71,.4); margin-bottom:12px; }
+.rl-warn > .ic { color:var(--red-light); width:22px; height:22px; flex-shrink:0; }
+.rl-item { background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+.rl-what { font-size:.88rem; color:var(--text-strong); margin-bottom:3px; overflow-wrap:anywhere; }
+.rl-members, .rl-history { border:1px solid var(--border); border-radius:8px; max-height:240px; overflow-y:auto; }
+.rl-member, .rl-hist { display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid var(--border); font-size:.86rem; flex-wrap:wrap; }
+.rl-member:last-child, .rl-hist:last-child { border-bottom:none; }
+.rl-hist { justify-content:space-between; }
+.rl-name { color:var(--text-strong); }
+.rl-badge { display:inline-flex; align-items:center; gap:3px; font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); background:var(--bg-light); border-radius:3px; padding:1px 5px; }
+.rl-badge .ic { width:12px; height:12px; color:var(--yellow); }
+.rl-boards { flex-basis:100%; }
+.rl-acts { margin-left:auto; display:flex; gap:6px; }
+.rl-mini { background:var(--bg-light); border:none; color:var(--text); font-size:.75rem; padding:3px 8px; border-radius:4px; cursor:pointer; }
+.rl-mini:hover { filter:brightness(1.2); } .rl-mini.danger { color:var(--red-light); }
+.rl-mini:disabled { opacity:.5; }
+.rl-mini-check { margin-left:auto; font-size:.78rem; color:var(--text-muted); display:flex; align-items:center; gap:5px; cursor:pointer; }
+.rl-row { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:.86rem; margin-bottom:8px; }
+.rl-row label { display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text); }
+.rl-num { width:56px; padding:3px 6px; border-radius:4px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text-strong); font:inherit; }
+.roster-modal .settings-label { margin-top:18px; }
+#server-info-btn.has-badge { position:relative; }
+#server-info-btn.has-badge::after { content:''; position:absolute; right:0; top:0; width:7px; height:7px; border-radius:50%; background:var(--red); box-shadow:0 0 0 2px var(--bg-dark); }
+.sip-wait { font-size:.78rem; color:var(--yellow); margin-top:6px; line-height:1.4; }
+.si-row { display:flex; gap:10px; margin:10px 0; }
+.si-row label { flex:1; font-size:.8rem; color:var(--text-muted); display:flex; flex-direction:column; gap:4px; }
+.si-row select { padding:7px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text-strong); font:inherit; }
+/* Plugins (see PLUGINS in the script): the bar in the header, the panel and
+   tray that open from it, command suggestions over the message box, and a
+   plugin's replies just for you. */
+#plugin-bar { display:flex; align-items:center; gap:2px; margin-left:4px; }
+#plugin-bar.hidden { display:none; }
+.pb-btn { position:relative; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px 6px; border-radius:4px; display:flex; align-items:center; transition:background .15s,color .15s; }
+.pb-btn:hover { background:var(--bg-light); color:var(--text); }
+.pb-btn.on { background:var(--bg-light); color:var(--accent); }
+.pb-btn .ic { width:20px; height:20px; }
+.pb-live, .pb-off { position:absolute; right:3px; bottom:3px; width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 2px var(--bg-dark); }
+.pb-off { background:var(--text-muted); }
+#plugin-pop { position:fixed; z-index:200; width:min(340px,calc(100vw - 16px)); max-height:min(580px,calc(100vh - 80px)); overflow-y:auto; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.45); color:var(--text); font-size:.88rem; }
+#plugin-pop.hidden { display:none; }
+.pp-head { display:flex; align-items:center; gap:8px; padding:12px 10px 8px 14px; }
+.pp-ic { display:flex; } .pp-ic .ic { width:22px; height:22px; color:var(--accent); }
+.pp-name { font-weight:700; color:var(--text-strong); }
+.pp-sub { color:var(--text-muted); font-size:.78rem; }
+.pp-head .bot-tag { margin-left:0; }
+.pp-pin, .pp-x { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:4px; display:flex; }
+.pp-pin { margin-left:auto; } .pp-pin.on { color:var(--accent); }
+.pp-pin:hover, .pp-x:hover { background:var(--bg-light); color:var(--text); }
+.pp-pin .ic, .pp-x .ic { width:18px; height:18px; }
+.pp-body { padding:2px 14px 12px; display:flex; flex-direction:column; gap:10px; }
+.pp-title { font-weight:700; color:var(--text-strong); font-size:.98rem; line-height:1.3; overflow-wrap:anywhere; }
+.pp-title a { color:inherit; text-decoration:none; } .pp-title a:hover { text-decoration:underline; }
+.pp-tsub { color:var(--text-muted); font-size:.8rem; margin-top:-8px; overflow-wrap:anywhere; }
+.pp-bar { height:4px; background:var(--bg-light); border-radius:2px; overflow:hidden; }
+.pp-fill { height:100%; width:0; background:var(--accent); border-radius:2px; transition:width .5s linear; }
+.pp-progress.live .pp-fill { background:var(--red); }
+.pp-times { display:flex; justify-content:space-between; font-size:.72rem; color:var(--text-muted); margin-top:4px; font-variant-numeric:tabular-nums; }
+.pp-buttons { display:flex; gap:10px; justify-content:center; align-items:center; }
+.pp-btn { background:var(--bg-light); border:none; color:var(--text); width:36px; height:36px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s,color .15s,filter .15s; }
+.pp-btn:not(.has-ic) { width:auto; border-radius:18px; padding:0 14px; font-size:.8rem; font-weight:600; }
+.pp-btn.primary { background:var(--accent); color:#fff; width:44px; height:44px; }
+.pp-btn.primary:not(.has-ic) { width:auto; }
+.pp-btn:hover:not(:disabled) { filter:brightness(1.18); }
+.pp-btn.danger:hover:not(:disabled) { background:var(--red); color:#fff; filter:none; }
+.pp-btn:disabled { opacity:.4; cursor:default; }
+.pp-btn .ic { width:20px; height:20px; } .pp-btn.primary .ic { width:24px; height:24px; }
+.pp-input { display:flex; gap:6px; }
+.pp-input input { flex:1; min-width:0; background:var(--bg-darkest); border:1px solid var(--border); border-radius:6px; color:var(--text-strong); padding:8px 10px; font:inherit; font-size:.85rem; outline:none; }
+.pp-input input:focus { border-color:var(--accent); }
+.pp-input button { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:0 14px; font-weight:600; font-size:.82rem; cursor:pointer; }
+.pp-input button:disabled { opacity:.5; }
+.pp-ltitle { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin-bottom:4px; }
+.pp-item { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:6px; }
+.pp-item:hover { background:var(--bg-light); }
+.pp-inum { color:var(--text-muted); font-size:.75rem; width:18px; text-align:right; flex-shrink:0; font-variant-numeric:tabular-nums; }
+.pp-itext { flex:1; min-width:0; display:flex; flex-direction:column; }
+.pp-ititle { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-strong); font-size:.84rem; }
+.pp-isub { font-size:.74rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pp-iact { background:none; border:none; color:var(--text-muted); cursor:pointer; opacity:0; padding:3px; border-radius:4px; display:flex; flex-shrink:0; }
+.pp-item:hover .pp-iact, .pp-iact:focus-visible { opacity:1; }
+.pp-iact:hover { color:var(--red-light); background:var(--bg-mid); }
+.pp-iact .ic { width:16px; height:16px; }
+.pp-empty, .pp-more { color:var(--text-muted); font-size:.8rem; padding:2px 6px; }
+.pp-text { line-height:1.45; overflow-wrap:anywhere; } .pp-text.muted { color:var(--text-muted); }
+.pp-foot { border-top:1px solid var(--border); padding:8px 14px 10px; font-size:.75rem; color:var(--text-muted); line-height:1.4; }
+.pp-foot a { color:var(--accent); text-decoration:none; }
+.pp-foot code, .pt-desc code { background:var(--bg-light); border-radius:3px; padding:0 3px; font-size:.95em; color:var(--text); }
+.pt-list { padding:0 4px 4px; }
+.pt-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; }
+.pt-row:hover { background:var(--bg-light); }
+.pt-ic { display:flex; } .pt-ic .ic { width:22px; height:22px; color:var(--accent); }
+.pt-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.pt-name { font-weight:600; color:var(--text-strong); }
+.pt-off { font-weight:400; font-size:.72rem; color:var(--text-muted); }
+.pt-desc { font-size:.76rem; color:var(--text-muted); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.pt-pin { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:4px; display:flex; }
+.pt-pin.on { color:var(--accent); } .pt-pin:hover { background:var(--bg-mid); }
+.pt-pin .ic { width:18px; height:18px; }
+.pt-block { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:4px; display:flex; }
+.pt-block:hover { background:var(--bg-mid); color:var(--red); } .pt-block.on { color:var(--red); }
+.pt-block .ic { width:18px; height:18px; }
+.pt-row.blocked .pt-ic,.pt-row.blocked .pt-text { opacity:.45; }
+.pt-blocked { font-size:.68rem; color:var(--red); font-weight:600; margin-left:4px; }
+/* A plugin's announcement in a channel: not a chat message (not in its
+   history), so it looks like what it is. */
+.plug-notice { display:flex; align-items:flex-start; gap:10px; margin:2px 16px 2px 16px; padding:6px 10px; border-left:3px solid var(--accent); background:rgba(114,137,218,.08); border-radius:0 6px 6px 0; font-size:.88rem; color:var(--text); }
+.plug-notice .pn-ic { color:var(--accent); display:flex; padding-top:1px; } .plug-notice .pn-ic .ic { width:16px; height:16px; }
+.plug-notice .pn-who { font-weight:700; color:var(--text-strong); margin-right:4px; }
+.plug-notice .pn-text { white-space:pre-wrap; word-break:break-word; flex:1; }
+.plug-notice .pn-time { color:var(--text-muted); font-size:.7rem; margin-left:6px; white-space:nowrap; }
+.msg-group.from-blocked > * { display:none !important; }
+.msg-group.from-blocked::before { content:'A message from a plugin you blocked'; display:block; padding:2px 16px 2px 72px; font-size:.78rem; color:var(--text-muted); font-style:italic; }
+/* Bots and plugins the signed member list lets read this channel. */
+#chan-readers { display:inline-flex; align-items:center; gap:4px; margin-left:10px; padding:1px 8px; border-radius:10px; background:var(--bg-mid); color:var(--text-muted); font-size:.72rem; white-space:nowrap; cursor:default; }
+#chan-readers .ic { width:13px; height:13px; }
+#chan-readers.hidden { display:none; }
+#plug-reply, .pp-reply { margin:0 16px 8px; background:var(--bg-mid); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:6px; padding:8px 10px; font-size:.85rem; }
+.pp-reply { margin:0 14px 12px; background:var(--bg-dark); }
+#plug-reply.error, .pp-reply.error { border-left-color:var(--red); }
+#plug-reply.hidden, .pp-reply.hidden { display:none; }
+.pr-head { display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text-muted); }
+.pr-head .ic { width:15px; height:15px; color:var(--accent); } .error .pr-head .ic { color:var(--red); }
+.pr-head b { color:var(--text-strong); }
+.pr-only { font-size:.72rem; }
+.pr-x { margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:2px; border-radius:4px; display:flex; }
+.pr-x:hover { color:var(--text); background:var(--bg-light); } .pr-x .ic { width:15px; height:15px; }
+.pr-text { white-space:pre-wrap; margin-top:4px; color:var(--text); overflow-wrap:anywhere; max-height:240px; overflow-y:auto; line-height:1.45; }
+#plug-suggest { position:absolute; left:20px; right:20px; bottom:100%; margin-bottom:6px; z-index:62; max-height:340px; overflow-y:auto; padding:6px;
+  background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+#plug-suggest.hidden { display:none; }
+.ps-title { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); padding:2px 8px 6px; display:flex; align-items:center; gap:6px; }
+.ps-row { display:flex; align-items:baseline; gap:12px; padding:6px 8px; border-radius:4px; cursor:pointer; color:var(--text); font-size:.88rem; }
+.ps-row.on { background:var(--bg-light); }
+.ps-ic { display:flex; align-self:center; } .ps-ic .ic { width:18px; height:18px; color:var(--accent); }
+.ps-name { white-space:nowrap; flex-shrink:0; color:var(--text-strong); }
+.ps-desc { color:var(--text-muted); font-size:.8rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ps-sig { padding:6px 8px 4px; font-size:.92rem; color:var(--text-strong); }
+.ps-arg { color:var(--text-muted); } .ps-arg.on { color:var(--text-strong); background:rgba(114,137,218,.2); border-radius:3px; padding:0 3px; }
+.ps-argdesc { padding:0 8px 6px; color:var(--text-muted); font-size:.82rem; } .ps-argdesc b { color:var(--text); }
+.ps-type { font-size:.66rem; text-transform:uppercase; letter-spacing:.03em; background:var(--bg-light); border-radius:3px; padding:1px 4px; color:var(--text-muted); }
+.ps-err { color:var(--red-light); padding:4px 8px; font-size:.84rem; }
+.ps-foot { display:flex; align-items:center; gap:4px; flex-wrap:wrap; border-top:1px solid var(--border); margin-top:4px; padding:6px 8px 2px; font-size:.72rem; color:var(--text-muted); }
+.ps-foot .ic { width:13px; height:13px; }
+.ps-key { border:1px solid var(--border); border-radius:3px; padding:0 4px; font-size:.68rem; color:var(--text); font-weight:600; text-transform:none; letter-spacing:0; }
+/* The message box as a command: the text drawn by the layer behind it,
+   coloured. Colours only (no bold): the letters must stay where the
+   caret thinks they are. */
+#composer-field.cmd-mode #msg-input { color:transparent; caret-color:var(--text-strong); }
+#composer-field.cmd-mode #msg-hl { color:var(--text-strong); }
+.pc-ns { color:var(--accent); background:rgba(114,137,218,.18); border-radius:3px; }
+.pc-sep { color:var(--text-muted); }
+.pc-cmd { color:#6fd3a0; } .pc-cmd.partial { color:#9fbfae; }
+.pc-arg { color:var(--text-strong); }
+.pc-num { color:#f2b56b; }
+.pc-choice { color:#c7a2f5; } .pc-choice.partial { color:#b4a6c8; }
+.pc-bad { text-decoration:underline wavy var(--red); text-decoration-skip-ink:none; text-underline-offset:3px; }
+.msg-unverified { display:inline-flex; margin-left:6px; color:var(--yellow,#e0b04c); vertical-align:-2px; }
+.msg-unverified .ic { width:14px; height:14px; }
+/* A plugin command someone sent, in the chat. */
+.msg-plugcmd { font-family:var(--mono,ui-monospace,monospace); font-size:.92em; padding:0 2px; }
 .bot-tag { display:inline-flex; align-items:center; height:15px; padding:0 4px; margin-left:5px; border-radius:3px; background:var(--accent); color:#fff; font-size:.6rem; font-weight:800; letter-spacing:.04em; line-height:1; vertical-align:2px; flex-shrink:0; text-transform:uppercase; }
 .bot-form { margin-top:14px; padding:4px 16px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
 .bot-form .error-msg { margin-top:12px; }
@@ -1683,6 +1852,9 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-draft" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-folder_zip" viewBox="0 -960 960 960"><path d="M640-480v-80h80v80h-80Zm0 80h-80v-80h80v80Zm0 80v-80h80v80h-80ZM447-640l-80-80H160v480h400v-80h80v80h160v-400H640v80h-80v-80H447ZM160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Zm0-80v-480 480Z"/></symbol>
   <symbol id="ic-picture_as_pdf" viewBox="0 -960 960 960"><path d="M360-460h40v-80h40q17 0 28.5-11.5T480-580v-40q0-17-11.5-28.5T440-660h-80v200Zm40-120v-40h40v40h-40Zm120 120h80q17 0 28.5-11.5T640-500v-120q0-17-11.5-28.5T600-660h-80v200Zm40-40v-120h40v120h-40Zm120 40h40v-80h40v-40h-40v-40h40v-40h-80v200ZM320-240q-33 0-56.5-23.5T240-320v-480q0-33 23.5-56.5T320-880h480q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H320Zm0-80h480v-480H320v480ZM160-80q-33 0-56.5-23.5T80-160v-560h80v560h560v80H160Zm160-720v480-480Z"/></symbol>
+  <symbol id="ic-skip_next" viewBox="0 -960 960 960"><path d="M660-240v-480h80v480h-80Zm-440 0v-480l360 240-360 240Zm80-240Zm0 90 136-90-136-90v180Z"/></symbol>
+  <symbol id="ic-lock_open" viewBox="0 -960 960 960"><path d="M240-640h360v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85h-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640Zm0 480h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM240-160v-400 400Z"/></symbol>
+  <symbol id="ic-extension" viewBox="0 -960 960 960"><path d="M352-120H200q-33 0-56.5-23.5T120-200v-152q48 0 84-30.5t36-77.5q0-47-36-77.5T120-568v-152q0-33 23.5-56.5T200-800h160q0-42 29-71t71-29q42 0 71 29t29 71h160q33 0 56.5 23.5T800-720v160q42 0 71 29t29 71q0 42-29 71t-71 29v160q0 33-23.5 56.5T720-120H568q0-50-31.5-85T460-240q-45 0-76.5 35T352-120Zm-152-80h85q24-66 77-93t98-27q45 0 98 27t77 93h85v-240h80q8 0 14-6t6-14q0-8-6-14t-14-6h-80v-240H480v-80q0-8-6-14t-14-6q-8 0-14 6t-6 14v80H200v88q54 20 87 67t33 105q0 57-33 104t-87 68v88Zm260-260Z"/></symbol>
   <symbol id="ic-play_arrow" viewBox="0 -960 960 960"><path d="M320-200v-560l440 280-440 280Zm80-280Zm0 134 210-134-210-134v268Z"/></symbol>
   <symbol id="ic-video_file" viewBox="0 -960 960 960"><path d="M360-240h160q17 0 28.5-11.5T560-280v-40l80 42v-164l-80 42v-40q0-17-11.5-28.5T520-480H360q-17 0-28.5 11.5T320-440v160q0 17 11.5 28.5T360-240ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="ic-keep" viewBox="0 -960 960 960"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></symbol>
@@ -2048,10 +2220,12 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <div id="main-column">
     <div id="chat-header">
       <span class="no-board" id="board-title-placeholder">Select a board to start chatting</span>
+      <span id="chan-readers" class="hidden"></span>
       <span class="board-title call-title" id="call-mode-title"></span>
       <button id="call-mode-btn" class="hidden" type="button" title="Switch to the call view"><svg class="ic" aria-hidden="true"><use href="#ic-grid_view"/></svg><span>Call</span></button>
       <button id="mute-mentions-btn" class="header-icon-btn" title="Mute @mention sounds on this server" disabled><svg class="ic" aria-hidden="true"><use href="#ic-notifications"/></svg></button>
       <button id="toggle-pins-btn" class="header-icon-btn" title="Pinned messages" disabled><svg class="ic" aria-hidden="true"><use href="#ic-keep"/></svg></button>
+      <div id="plugin-bar" class="hidden"></div>
       <button id="toggle-members-btn" title="Toggle member list"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg> Members</button>
       <div id="search-box">
         <div id="search-field"><div id="search-hl" aria-hidden="true"></div><input id="msg-search-input" type="text" placeholder="Search" autocomplete="off" spellcheck="false"></div>
@@ -2076,6 +2250,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
           <div id="emoji-picker" class="hidden" role="dialog" aria-label="Emoji"></div>
           <div id="sticker-picker" class="hidden" role="dialog" aria-label="Stickers"></div>
           <div id="emoji-suggest" class="hidden" role="listbox"></div>
+          <div id="plug-suggest" class="hidden" role="listbox"></div>
+          <div id="plug-reply" class="hidden"></div>
           <div id="reply-bar" class="hidden"><svg class="ic" aria-hidden="true" style="width:16px;height:16px"><use href="#ic-reply"/></svg><span>Replying to <b id="reply-bar-name"></b></span><button class="rb-x" id="reply-bar-x" title="Cancel reply (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
           <div id="paste-offer" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-description"/></svg><span>That's a long paste (<b class="po-len"></b> characters).</span><button type="button" class="po-go">Send as a .txt file</button><button type="button" class="rb-x" title="Keep it as a message"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
           <div id="attach-queue" class="empty"></div>
@@ -2104,6 +2280,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     </div>
   </div>
 </div>
+
+<div id="plugin-pop" class="hidden" role="dialog" aria-label="Plugin"></div>
 
 <div id="lightbox" class="hidden">
   <div id="lb-sender"><div class="lb-avatar"></div><div style="min-width:0"><div class="lb-name"></div><div class="lb-time"></div></div></div>
@@ -2295,6 +2473,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-spell"> Check spelling while typing</label>
         <p class="settings-hint" style="margin-top:0">Misspelled words get a red underline in the message box; right-click one for suggestions or to add it to your dictionary.</p>
+        <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-previews"> Make link previews for links I send</label>
+        <p class="settings-hint" style="margin-top:0">Your app fetches the page when you send a link and puts its title and picture inside your encrypted message — the server never sees the link. The site sees your connection, as if you'd opened it. Off: links are sent without a preview.</p>
       </div>
       <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-elastic"> Elastic scrolling</label>
@@ -3097,6 +3277,14 @@ async function onCloudSynced(e){
 // ── URL detection ────────────────────────────────────────────────
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
 
+// A message's text; one that's a plugin command ("music::play …", as sent
+// from the message box) has the command coloured as it was typed.
+function renderMessageText(text){
+  const m=/^([a-z0-9-]+)::([a-z0-9_-]*)(?=\s|$)/i.exec(text||'');
+  if(!m||!pluginById(m[1].toLowerCase()))return renderTextWithLinks(text);
+  const rest=text.slice(m[0].length);
+  return `<span class="msg-plugcmd"><span class="pc-ns">${esc(m[1])}</span><span class="pc-sep">::</span><span class="pc-cmd">${esc(m[2])}</span></span>`+(rest?renderTextWithLinks(rest):'');
+}
 function renderTextWithLinks(text) {
   // Stickers (<s:name:id>) come out of the text and show big below it.
   const stickers=[];
@@ -4073,6 +4261,7 @@ function dataURLToBlob(dataUrl){
 let serverBannerAt=-1, serverBannerURL='';
 async function refreshServerMeta(){
   const domain=state.domain;if(!domain)return;
+  loadPlugins();
   let info;
   try{info=await window.go.main.App.GetServerInfo(domain);}catch{return;}
   if(state.domain!==domain)return;
@@ -4127,9 +4316,36 @@ let serverInfoOpen=false;
 // gate the button later — the server's /api/invites is the place to check.)
 const INVITE_MINUTES=10;
 let invite=null,inviteTimer=null; // the current link for this server: {domain, code, url, expires_at}
+// With a signed member list, an invite is signed too: how many people and
+// how long, approved like any other change; its link carries a secret the
+// server never sees, which is what lets someone onto the list.
+function makeSignedInvite(){
+  closeServerInfo();
+  const ov=document.createElement('div');ov.className='modal-overlay';
+  ov.innerHTML=`<div class="modal"><h2>Signed invite</h2>
+    <p style="color:var(--text-muted);margin:0 0 6px;font-size:.88rem">Whoever uses the link gets onto this server’s signed member list, with the channels everyone can read. It needs ${esc(rosterApprovalText(rosterPolicyCache))}.</p>
+    <div class="si-row"><label>Uses<select id="si-uses"><option value="1">1 person</option><option value="5">5 people</option><option value="10">10 people</option><option value="25">25 people</option><option value="0">No limit</option></select></label>
+      <label>Works for<select id="si-time"><option value="60">1 hour</option><option value="1440" selected>1 day</option><option value="10080">7 days</option></select></label></div>
+    <div class="error-msg hidden" id="si-err"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="si-no">Cancel</button><button class="btn btn-primary" id="si-go">${icon('person_add')}Create link</button></div></div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.querySelector('#si-no').onclick=close;ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+  ov.querySelector('#si-go').onclick=async e=>{
+    const b=e.currentTarget;b.disabled=true;
+    try{
+      const minutes=+ov.querySelector('#si-time').value,uses=+ov.querySelector('#si-uses').value;
+      const r=await window.go.main.App.CreateInviteFor(minutes);
+      const ri=await window.go.main.App.RosterNewInvite(uses,Math.floor(Date.parse(r.expires_at)/1000),[]);
+      invite={domain:state.domain,code:r.code,expires_at:r.expires_at,url:`${serverBase()}/invite/${r.code}#k=${ri.secret}`,waiting:ri.status==='waiting',uses};
+      close();openServerInfo();
+    }catch(err){const el=ov.querySelector('#si-err');el.textContent=String(err).replace(/^Error: /,'');el.classList.remove('hidden');b.disabled=false;}
+  };
+}
 function inviteHTML(){
   return `<div class="sip-link-row"><input class="sip-link" readonly value="${esc(invite.url)}" aria-label="Invite link"><button class="btn btn-primary sip-copy" id="sip-copy">${icon('content_copy')}Copy</button></div>
-    <div class="sip-hint"><span id="sip-countdown"></span> · <a href="#" id="sip-new">New link</a></div>`;
+    <div class="sip-hint"><span id="sip-countdown"></span>${invite.uses?` · ${invite.uses} use${invite.uses===1?'':'s'}`:''} · <a href="#" id="sip-new">New link</a></div>
+    ${invite.waiting?`<div class="sip-wait">Waiting for the other approvers (Member list). The link works once they’ve approved it.</div>`:''}`;
 }
 function inviteCountdown(){
   const el=document.getElementById('sip-countdown');if(!el||!invite)return;
@@ -4140,6 +4356,7 @@ function inviteCountdown(){
 }
 async function makeInvite(){
   if(!can(PERM.INVITE)){toast('You don\u2019t have permission to create invites on this server',true);return;}
+  if(rosterLastState==='active')return makeSignedInvite();
   try{
     const r=await window.go.main.App.CreateInvite();
     invite={domain:state.domain,code:r.code,expires_at:r.expires_at,url:`${serverBase()}/invite/${r.code}`};
@@ -4158,12 +4375,18 @@ function wireInvite(pop){
   }
 }
 // https://<server>/invite/<code> → {base, code}
+// …#k=<secret>: a signed invite's secret for the member list (roster.go) —
+// after a "#", so it never reaches the server.
 function parseInviteLink(text){
-  const m=String(text).trim().match(/^(https?:\/\/[^/\s]+)\/invite\/([A-Za-z0-9]{6,32})\/?$/i);
-  return m?{base:m[1],code:m[2]}:null;
+  const m=String(text).trim().match(/^(https?:\/\/[^/\s]+)\/invite\/([A-Za-z0-9]{6,32})\/?(?:#k=([A-Za-z0-9_-]{43}))?$/i);
+  return m?{base:m[1],code:m[2],k:m[3]||''}:null;
 }
 async function joinViaInvite(inv){
   await doConnect(inv.base,'',inv.code);
+  if(inv.k){
+    try{await window.go.main.App.RosterJoin(inv.k);}
+    catch(err){toast('Joined, but couldn’t join the signed member list yet: '+String(err).replace(/^Error: /,''),true);}
+  }
 }
 function confirmJoinInvite(inv){
   const host=inv.base.replace(/^https?:\/\//i,'');
@@ -4192,9 +4415,11 @@ function renderServerInfo(){
     ${state.serverOwner?`<div class="sip-owner">${icon('crown')}Owned by ${esc(state.serverOwner)}</div>`:''}
     ${can(PERM.INVITE)?`<div class="sip-label">Invite people</div>
     <div class="sip-invite" id="sip-invite">${invite&&Date.parse(invite.expires_at)>Date.now()?inviteHTML():`<button class="btn btn-primary sip-invite-btn" id="sip-invite-make">${icon('person_add')}Create invite link</button><div class="sip-hint">Anyone with the link can join for ${INVITE_MINUTES} minutes. It doesn\u2019t contain the server\u2019s join key.</div>`}</div>`:''}
+    <div class="sip-label" style="margin-top:12px">Member list</div><button class="btn btn-ghost sip-bots-btn" id="sip-roster" type="button">${icon(rosterLastState==='active'?'verified_user':'gpp_maybe')}${rosterLastState==='active'?'Signed member list':rosterLastState==='replaced'?'Member list — needs checking':'Member list'}${rosterWaitingCount?` (${rosterWaitingCount} waiting)`:''}</button>
     ${botsSupported()?`<div class="sip-label" style="margin-top:12px">Bots</div><button class="btn btn-ghost sip-bots-btn" id="sip-bots" type="button">${icon('smart_toy')}${can(PERM.BOTS)?'Manage Bots':'See Bots'}</button>`:''}</div>`;
   wireInvite(pop);
   pop.querySelector('#sip-bots')?.addEventListener('click',e=>{e.stopPropagation();openServerBots();});
+  pop.querySelector('#sip-roster')?.addEventListener('click',e=>{e.stopPropagation();openRosterModal();});
   const banner=pop.querySelector('.sip-banner'),ic=pop.querySelector('.sip-icon');
   const fallback=avatarColour(state.domain||state.serverName||'?');
   if(serverBannerURL)banner.style.backgroundImage=`url("${serverBannerURL}")`;
@@ -4478,6 +4703,8 @@ function setSpeakingIndicator(boardId,user,speaking){
   document.querySelector(`#video-stage .vs-tile[data-user="${CSS.escape(user)}"]`)?.classList.toggle('speaking',!!speaking);
 }
 function updateVoiceConnectedBar(){
+  // A plugin's open panel may be about your call (PLUGINS).
+  if(plug.open&&plug.open!=='@tray'&&document.getElementById('plugin-pop')?.dataset.board!==(panelFor(plug.open)?.[0]||''))renderPluginPop();
   const bar=document.getElementById('voice-connected-bar');
   if(!bar)return;
   const pending=voiceRejoin||voiceRejoinInFlight;
@@ -5409,6 +5636,7 @@ async function selectBoard(boardId,boardName,roomId){
   exitSearch();
   document.getElementById('toggle-pins-btn').disabled=false;
   const hdr=document.getElementById('board-title-placeholder');hdr.className='board-title';hdr.textContent=boardName;
+  updateChannelReaders();
   document.getElementById('msg-input').placeholder=`Message  #${boardName}`;
   document.getElementById('msg-input').disabled=false;document.getElementById('send-btn').disabled=false;document.getElementById('attach-btn').disabled=false;document.getElementById('emoji-btn').disabled=false;
   applyPermissionUI();
@@ -5945,16 +6173,17 @@ function initDragDrop(){
 
 // ── LINK PREVIEW ─────────────────────────────────────────────────
 // The first link in a message gets a preview. A link to an image or a
-// video file shows that image or video (by its extension straight away,
-// otherwise when the server finds it's one); a page gets a card — title,
+// video file shows that image or video; a page gets a card — title,
 // description and picture, or a playable video when the page offers one.
-const previewCache={};
+// The card comes inside the message: the sender's app made it
+// (linkpreview.go). Nobody else fetches it, and the server is never asked
+// (it would see the link) — a message sent without one shows none.
 const LINK_IMAGE=/\.(png|jpe?g|gif|webp|avif|bmp)$/i,LINK_VIDEO=/\.(mp4|webm|mov|m4v)$/i;
 function linkPath(url){try{return new URL(url).pathname;}catch{return '';}}
 function renderPreview(body,p,url){
   if(p.kind)appendMediaEmbed(body,p);else appendPreviewCard(body,p,url);
 }
-async function maybeRenderPreviews(msgEl,text){
+async function maybeRenderPreviews(msgEl,text,msg){
   const urls=extractURLs(text);
   if(!urls.length)return;
   // Only show one preview per message (first URL)
@@ -5967,17 +6196,15 @@ async function maybeRenderPreviews(msgEl,text){
   if(LINK_IMAGE.test(path)){appendMediaEmbed(body,{kind:'image',image:url,url});return;}
   if(LINK_VIDEO.test(path)){appendMediaEmbed(body,{kind:'video',video:url,url});return;}
 
-  // Check cache
-  if(previewCache[url]===null)return; // known failure
-  if(previewCache[url]){renderPreview(body,previewCache[url],url);return;}
-
-  try{
-    const p=await window.go.main.App.FetchLinkPreview(url);
-    if(!p||(!p.title&&!p.description&&!p.image&&!p.kind&&!p.video)){previewCache[url]=null;return;}
-    previewCache[url]=p;
-    // Only attach if the message element is still in the DOM
-    if(document.contains(msgEl))renderPreview(body,p,url);
-  }catch{previewCache[url]=null;}
+  // The sender's preview, from inside the message.
+  const p=msg?.preview;
+  if(!p||p.url!==url)return;
+  if(!p.title&&!p.description&&!p.image&&!p.kind&&!p.video)return;
+  // A link the sender's app found is an image or video file itself.
+  if(p.kind==='image'){appendMediaEmbed(body,{kind:'image',image:url,url});return;}
+  if(p.kind==='video'){appendMediaEmbed(body,{kind:'video',video:url,url});return;}
+  if(p.image&&!/^data:image\/jpeg;base64,/.test(p.image))p.image=null;
+  appendPreviewCard(body,p,url);
 }
 
 // A linked image or video shown as itself — like an attachment, loaded
@@ -6043,7 +6270,7 @@ const GROUP_WINDOW_MS = 7*60*1000;
 function isGroupedWith(prev,msg){
   // A pinned message always starts its own group, so its name line — and
   // the pin icon beside it — is always shown.
-  if(!prev||prev.username!==msg.username||msg.pinned||msg.reply_to||msg.kind||prev.kind)return false;
+  if(!prev||prev.username!==msg.username||msg.pinned||msg.reply_to||msg.kind||prev.kind||msg.unverified||prev.unverified)return false;
   const t1=Date.parse(prev.created_at),t2=Date.parse(msg.created_at);
   if(!isFinite(t1)||!isFinite(t2))return false;
   return (t2-t1)>=0 && (t2-t1)<GROUP_WINDOW_MS;
@@ -6058,7 +6285,7 @@ function renderMessages(stickToBottom=true){
   const c=document.getElementById('messages');
   const prevScrollTop=c.scrollTop,prevScrollHeight=c.scrollHeight;
   c.innerHTML='';
-  if(!state.messages.length){c.innerHTML='<div class="msg-placeholder">No messages yet. Say hi!</div>';return;}
+  if(!state.messages.length){c.innerHTML='<div class="msg-placeholder">No messages yet. Say hi!</div>';placePluginNotices(c,state.selectedBoardId);return;}
   if(state.exhaustedBoards.has(state.selectedBoardId)){
     const top=document.createElement('div');top.className='msg-placeholder';top.style.textAlign='center';
     top.textContent='— Beginning of the channel —';c.appendChild(top);
@@ -6068,6 +6295,7 @@ function renderMessages(stickToBottom=true){
     if(!prevMsg||dayKey(prevMsg.created_at)!==dayKey(m.created_at))c.appendChild(buildDateSeparator(m.created_at));
     c.appendChild(buildMsgEl(m,isGroupedWith(prevMsg,m)));
   });
+  placePluginNotices(c,state.selectedBoardId);
   chatPinned=!!stickToBottom;
   if(stickToBottom){jumpAnchor=null;c.scrollTop=c.scrollHeight;}
   else{
@@ -6863,16 +7091,17 @@ function buildMsgEl(msg,grouped){
   const div=document.createElement('div');
   div.className='msg-group'+(grouped?' grouped':'')+(msg.reply_to?' has-reply':'')+(pingsMe(msg)?' mentions-me':'');
   div.dataset.id=msg.id;div.dataset.username=msg.username;div.dataset.ts=msg.created_at||'';
+  {const bp=pluginOfUser(msg.username);if(bp&&pluginBlocked(bp.id))div.classList.add('from-blocked');}
   div.innerHTML=`${msg.reply_to?replyLineHTML(msg.reply,msg.reply_to):''}
     ${grouped
       ? `<div class="msg-avatar msg-avatar-time"><span class="hover-time" title="${hoverTime}">${time}</span></div>`
       : `<div class="msg-avatar" data-pfp-user="${esc(msg.username)}" style="background-color:${colour}">${initial}</div>`}
     <div class="msg-body">
       <div class="msg-meta">
-        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span>${botTag(msg.username)}<span class="msg-time" title="${hoverTime}">${time}</span>`}
+        ${grouped?'':`${msg.pinned?`<span class="msg-pin" title="Pinned">${icon('keep','msg-pin-ic')}</span>`:''}<span class="msg-username" data-user="${esc(msg.username)}"${nameColor(msg.username)?` style="color:${nameColor(msg.username)}"`:''}>${dnHTML(msg.username)}</span>${msgBotTag(msg)}<span class="msg-time" title="${hoverTime}">${time}</span>${msg.unverified?`<span class="msg-unverified" title="Not signed by ${esc(msg.username)} — anyone who can read this channel could have written it">${icon('gpp_maybe')}</span>`:''}`}
         ${msg.edited?'<span class="msg-edited-tag">(edited)</span>':''}${importedTagHTML(msg)}
       </div>
-      ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderTextWithLinks(msg.content)}</div>`:''}
+      ${msg.content?`<div class="msg-content${isEmojiOnly(msg.content)?' emoji-only':''}">${renderMessageText(msg.content)}</div>`:''}
     </div>
     <div class="msg-actions"><button class="msg-action-btn msg-reply-btn" title="Reply">${icon('reply')}</button><button class="msg-action-btn msg-react-btn" title="Add Reaction">${icon('add_reaction')}</button><button class="msg-action-btn msg-more-btn" title="More options">${icon('more_horiz')}</button></div>`;
 
@@ -6958,7 +7187,7 @@ function buildMsgEl(msg,grouped){
   }
 
   // Async link preview (fire and forget)
-  if(msg.content&&userCan(msg.username,PERM.EMBED))maybeRenderPreviews(div,msg.content);
+  if(msg.content&&userCan(msg.username,PERM.EMBED))maybeRenderPreviews(div,msg.content,msg);
 
   // 3-dot menu — on every message now, since anyone can Pin
   div.querySelector('.msg-more-btn').addEventListener('click',e=>{e.stopPropagation();toggleDropdown(div,msg);});
@@ -7078,7 +7307,7 @@ function setMessageContent(msgEl,content){
     c=document.createElement('div');c.className='msg-content';
     msgEl.querySelector('.msg-meta').insertAdjacentElement('afterend',c);
   }
-  c.innerHTML=renderTextWithLinks(content);
+  c.innerHTML=renderMessageText(content);
   c.classList.toggle('emoji-only',isEmojiOnly(content));
   c.querySelectorAll('.msg-link').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.url);});});
 }
@@ -7173,6 +7402,7 @@ function initSentHistory(){
 }
 
 async function sendMessage(){
+  if(await sendPluginCommand())return; // music::play … goes to the plugin
   const input=document.getElementById('msg-input');
   const typed=input.value.trim(),content=typedToTokens(typed);
   const readyAttachments=state.attachQueue.filter(a=>a.status==='done');
@@ -7196,6 +7426,8 @@ async function sendMessage(){
 }
 
 async function goBack(){
+  rosterLastState='';rosterWaitingCount=0;rosterForksSeen.clear();closeRosterModal();
+  closePluginPop();plug.list=[];plug.panels=new Map();renderPluginBar();document.getElementById('plug-reply')?.classList.add('hidden');
   voiceRejoin=null;state.voiceHere=null;voiceHungUpWhileAway=null;state.voiceReconnecting={};
   state.wsConnected=false;stopPingLoop();cancelReconnect();await window.go.main.App.Disconnect();
   setServerTheme(null); // off the server: back to your own theme
@@ -10686,7 +10918,7 @@ function initPresence(){
 // locally, so they travel in the exported account key. On sign-in the
 // account's copy wins — that's how an imported account brings its look.
 function collectClientSettings(){
-  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords,videoConvert:videoConvertOn,performance:perfSettings};
+  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords,videoConvert:videoConvertOn,performance:perfSettings,linkPreviews:previewsOn};
 }
 async function persistClientSettings(){
   try{await window.go.main.App.SaveClientSettings(JSON.stringify(collectClientSettings()));}
@@ -10703,6 +10935,7 @@ async function loadClientSettings(){
   if(typeof s.videoConvert==='boolean'){videoConvertOn=s.videoConvert;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');}
   if(s.performance&&typeof s.performance==='object'){perfSettings={...perfSettings,...s.performance};localStorage.setItem('perfSettings',JSON.stringify(perfSettings));try{applyPerfSettings(false);}catch{}}
   if(typeof s.spellcheck==='boolean'){spellOn=s.spellcheck;localStorage.setItem('spellcheck',spellOn?'1':'0');const b=document.getElementById('ap-spell');if(b)b.checked=spellOn;if(spellOn)startSpellcheck();}
+  if(typeof s.linkPreviews==='boolean'){previewsOn=s.linkPreviews;localStorage.setItem('linkPreviews',previewsOn?'1':'0');const b=document.getElementById('ap-previews');if(b)b.checked=previewsOn;window.go.main.App.SetLinkPreviews(previewsOn).catch(()=>{});}
   if(Array.isArray(s.spellWords)){spellWords=s.spellWords.filter(w=>typeof w==='string');localStorage.setItem('spellWords',JSON.stringify(spellWords));spellWorker?.postMessage({type:'setCustom',words:spellWords});}
   if(typeof s.elasticScroll==='boolean'){elasticOn=s.elasticScroll;localStorage.setItem('elasticScroll',elasticOn?'1':'0');const b=document.getElementById('ap-elastic');if(b)b.checked=elasticOn;}
   apDraft={...appearance};
@@ -11762,6 +11995,13 @@ state.bots={};
 const isBot=u=>!!state.bots?.[u];
 const PLUGIN_TIP='A plugin — a program that runs on this server. Since it runs there, whoever runs the server can see what it sees.';
 const botTag=u=>!isBot(u)?'':state.bots?.[u]?.plugin?`<span class="bot-tag plugin" title="${PLUGIN_TIP}">PLUGIN</span>`:'<span class="bot-tag" title="A bot — a program, not a person">BOT</span>';
+// A message's tag: what its signature and the signed member list say it's
+// from (msgsig.go), or else what the server says.
+function msgBotTag(msg){
+  if(msg.author_kind==='plugin')return `<span class="bot-tag plugin" title="${PLUGIN_TIP}">PLUGIN</span>`;
+  if(msg.author_kind==='bot')return '<span class="bot-tag" title="A bot — a program, not a person">BOT</span>';
+  return botTag(msg.username);
+}
 const botPermNames=p=>BOT_PERMS.filter(x=>(p&x.bit)===x.bit).map(x=>x.name);
 const botsSupported=()=>state.permsVersion>=4;
 
@@ -11893,7 +12133,9 @@ async function loadServerBots(force){
   serverBotsCache={domain:state.domain,at:Date.now(),data};
   return data;
 }
-async function allBoards(){
+// (Was also called allBoards, which quietly replaced the plain one above —
+// the search's in: filter and the spellcheck got a promise instead.)
+async function loadBoardGroups(){
   for(const r of state.rooms||[]){
     if(state.boardsByRoom[r.id])continue;
     try{state.boardsByRoom[r.id]=await window.go.main.App.GetBoards(r.id)||[];}catch{state.boardsByRoom[r.id]=[];}
@@ -11937,7 +12179,7 @@ async function showBotList(force){
   if(!botsModal)return;
   const body=botsModal.querySelector('#sb-body');
   let d;
-  try{d=await loadServerBots(force);await allBoards();}
+  try{d=await loadServerBots(force);await loadBoardGroups();}
   catch(err){body.innerHTML=`<div class="error-msg">${esc(String(err).replace(/^Error: /,''))}</div><div class="modal-actions"><button class="btn btn-ghost" id="sb-close">Close</button></div>`;body.querySelector('#sb-close').onclick=closeServerBots;return;}
   if(!botsModal)return;
   const add=d.can_manage?`<div class="sb-add"><input type="text" id="sb-link" placeholder="Paste a bot’s Add to server link" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="sb-continue">Continue</button></div>
@@ -11982,7 +12224,7 @@ async function showAddBot(link){
   const body=botsModal?.querySelector('#sb-body');if(!body)return;
   body.innerHTML='<span class="spinner"></span>';
   let info,d,groups;
-  try{[info,d,groups]=await Promise.all([window.go.main.App.ReadBotLink(link),loadServerBots(true),allBoards()]);}
+  try{[info,d,groups]=await Promise.all([window.go.main.App.ReadBotLink(link),loadServerBots(true),loadBoardGroups()]);}
   catch(err){
     body.innerHTML=`<div class="error-msg">${esc(String(err).replace(/^Error: /,''))}</div><div class="modal-actions"><button class="btn btn-ghost" id="sb-back">Back</button></div>`;
     body.querySelector('#sb-back').onclick=()=>showBotList();return;
@@ -12022,7 +12264,7 @@ async function showAddBot(link){
 }
 async function showEditBot(b,d){
   const body=botsModal?.querySelector('#sb-body');if(!body)return;
-  const groups=await allBoards();
+  const groups=await loadBoardGroups();
   body.innerHTML=`<div class="bot-card intro"><div class="bc-head">${icon('smart_toy','bc-ic')}<div class="bc-title"><div class="bc-name">${esc(b.username)}<span class="bot-tag">BOT</span></div>
       <div class="bc-sub">Added by ${esc(b.added_by)} on ${esc(fmtDay(Date.parse(b.added_at)/1000))}</div></div></div></div>
     <label class="settings-label">What it may do</label>
@@ -12053,7 +12295,7 @@ async function loadBotSection(user,pop,anchorRect,place){
   const tag=state.bots?.[user];if(!tag)return;
   let info=null,b=null;
   if(!tag.plugin)try{info=await window.go.main.App.MakerIdentity(tag.maker_key);}catch{}
-  try{const d=await loadServerBots();b=d.bots.find(x=>x.username===user);await allBoards();}catch{}
+  try{const d=await loadServerBots();b=d.bots.find(x=>x.username===user);await loadBoardGroups();}catch{}
   if(profilePopupFor!==user)return;
   const body=pop.querySelector('.pc-body');if(!body)return;
   const can=b?botPermNames(b.permissions):[],chans=b?(b.channels||[]).map(boardName).filter(Boolean):[];
@@ -12258,6 +12500,7 @@ function autoResize(el){
 function renderComposerHighlight(){
   const ta=document.getElementById('msg-input'),hl=document.getElementById('msg-hl');
   if(!ta||!hl)return;
+  if(pluginCommandHighlight(ta,hl))return; // a plugin command: its own colours
   const v=ta.value;
   // Marked ranges on the raw text: @mentions (boxed) and misspellings
   // (red wavy underline), then the text is escaped piece by piece.
@@ -12277,6 +12520,870 @@ function renderComposerHighlight(){
   // A trailing newline needs something after it to take up its line.
   hl.innerHTML=html+(v.endsWith('\n')?' ':'');
   hl.scrollTop=ta.scrollTop;
+}
+
+// ── PLUGINS ──────────────────────────────────────────────────────
+// Programs the server runs (its admin panel → Plugins), here as members of
+// their own (tagged PLUGIN). Two ways to use one, both open to everyone:
+//  - its panel, from the plugin bar in the header (pinned ones always
+//    there, the rest in the tray behind the puzzle piece). The plugin
+//    describes the panel and the app draws it; plugins never run code here.
+//  - its commands, typed in the message box: music::play <song>. Suggestions
+//    as you type (plugins after "::", then commands, then each argument),
+//    and the command coloured like the search filters.
+// Both go to the plugin through the server: sealed for the plugin when it
+// takes lanes (the app's lanes_app.go: the server only passes them on),
+// else as they are. The box says which while you type one, and a command
+// is also posted in the channel, so everyone there sees what was asked.
+const plug={list:[],panels:new Map(),open:null,anchor:null,reply:null,replyTimer:0};
+// plug.panels: plugin id → Map(channel id, or '' for everyone → {panel, at})
+
+async function loadPlugins(){
+  if(!state.domain){plug.list=[];plug.panels=new Map();renderPluginBar();return;}
+  const domain=state.domain;
+  let d={};
+  try{d=JSON.parse(await window.go.main.App.ServerPlugins()||'{}');}catch{return;}
+  if(state.domain!==domain)return;
+  plug.list=(d.plugins||[]).filter(p=>p&&p.id);
+  try{plug.blocked=new Set(await window.go.main.App.BlockedPlugins()||[]);}catch{plug.blocked=new Set();}
+  for(const p of plug.list)if(p.username&&plug.blocked.has(p.id)&&!getUserAudio(p.username).muted)setUserAudio(p.username,{muted:true});
+  plug.panels=new Map();
+  for(const p of plug.list){
+    const m=new Map();
+    for(const x of p.panels||[])if(x&&x.panel)m.set(x.board_id||'',{panel:x.panel,at:Date.now()});
+    plug.panels.set(p.id,m);
+  }
+  if(plug.open&&!plug.list.some(p=>p.id===plug.open))closePluginPop();
+  renderPluginBar();
+  if(plug.open)renderPluginPop();
+}
+function pluginById(id){return plug.list.find(p=>p.id===id)||null;}
+function pluginBlocked(id){return !!plug.blocked?.has(id);}
+// The plugin whose account a username is, if it's one.
+function pluginOfUser(u){return plug.list.find(p=>p.username&&p.username===u)||null;}
+// Blocking a plugin, for yourself: no lane to it (the app sends it
+// nothing), its panel, announcements and messages hidden, muted in calls.
+async function setPluginBlocked(p,on){
+  try{await window.go.main.App.SetPluginBlocked(p.id,on);}catch(err){toast(String(err),true);return;}
+  if(!plug.blocked)plug.blocked=new Set();
+  if(on)plug.blocked.add(p.id);else plug.blocked.delete(p.id);
+  if(p.username)setUserAudio(p.username,{muted:on});
+  if(on){plug.panels.set(p.id,new Map());if(plug.open===p.id)closePluginPop();}
+  toast(on?`Blocked ${pluginTitle(p)} for you.`:`Unblocked ${pluginTitle(p)}.`);
+  renderPluginBar();if(plug.open)renderPluginPop();
+  if(state.selectedBoardId)renderMessages(false);
+}
+// ── Announcements ──
+// What a plugin tells everyone in a channel ("Now playing …"), on each
+// member's lane: shown in the channel, marked as the plugin's, but not a
+// chat message — it isn't in the channel's history (only here, for now).
+const plugNotices=new Map(); // board → [{plugin, id, text, at}]
+function addPluginNotice(v){
+  if(!v.board_id||!v.id)return;
+  const list=plugNotices.get(v.board_id)||[];
+  if(list.some(n=>n.plugin===v.plugin&&n.id===v.id))return;
+  const n={plugin:v.plugin,id:v.id,text:String(v.text||''),at:Math.min(+v.at||Date.now(),Date.now())};
+  list.push(n);list.sort((a,b)=>a.at-b.at);
+  while(list.length>100)list.shift();
+  plugNotices.set(v.board_id,list);
+  if(v.board_id!==state.selectedBoardId)return;
+  const c=document.getElementById('messages');if(!c)return;
+  c.querySelector('.msg-placeholder:not([style])')?.remove();
+  const near=(c.scrollHeight-c.scrollTop-c.clientHeight)<150;
+  c.appendChild(pluginNoticeEl(n));
+  if(near)c.scrollTop=c.scrollHeight;
+}
+function pluginNoticeEl(n){
+  const p=pluginById(n.plugin),d=document.createElement('div');
+  d.className='plug-notice';d.dataset.at=n.at;
+  const when=new Date(n.at).toISOString();
+  d.innerHTML=`<span class="pn-ic">${p?pluginIcon(p):icon('extension')}</span><span class="pn-text"><span class="pn-who">${esc(p?pluginTitle(p):n.plugin)}</span><span class="bot-tag plugin" title="${PLUGIN_TIP}">PLUGIN</span> ${esc(n.text)}</span><span class="pn-time" title="${esc(formatHoverTime(when))} — from the plugin, not a chat message: it isn’t kept in the channel’s history">${formatTime(when)}</span>`;
+  return d;
+}
+// The channel's announcements, among its messages by time.
+function placePluginNotices(c,board){
+  const list=(plugNotices.get(board)||[]).filter(n=>!pluginBlocked(n.plugin));
+  if(!list.length)return;
+  const rows=[...c.querySelectorAll('.msg-group[data-ts]')];
+  const oldest=rows.length?Date.parse(rows[0].dataset.ts):Infinity;
+  for(const n of list){
+    if(n.at<oldest&&rows.length&&!state.exhaustedBoards.has(board))continue; // from before what's loaded
+    const after=rows.find(r=>Date.parse(r.dataset.ts)>n.at);
+    const el=pluginNoticeEl(n);
+    if(after)after.before(el);else c.appendChild(el);
+  }
+}
+// Bots and plugins the signed member list lets read the open channel.
+async function updateChannelReaders(){
+  const chip=document.getElementById('chan-readers');if(!chip)return;
+  const board=state.selectedBoardId;
+  let info;try{info=await window.go.main.App.RosterInfo();}catch{info=null;}
+  if(!info||info.state!=='active'||board!==state.selectedBoardId){chip.classList.add('hidden');return;}
+  const a=(info.access||[]).find(x=>x.board===board);
+  const auto=(info.members||[]).filter(m=>m.kind!=='member'&&a&&a.readers.includes(m.key));
+  if(!auto.length){chip.classList.add('hidden');return;}
+  const nameOf=m=>{const p=plug.list.find(x=>x.public_key&&x.public_key.toLowerCase()===m.key);return p?pluginTitle(p):(m.name||m.key.slice(0,8));};
+  const names=auto.map(nameOf);
+  chip.innerHTML=`${icon('smart_toy')}${esc(names.length===1?names[0]:names.length+' bots')} can read this`;
+  chip.title=`The signed member list lets ${names.join(', ')} read this channel (its approvers added ${auto.length===1?'it':'them'}). Whoever runs ${auto.length===1?'it':'them'} can read what's said here. Bots and plugins never hear calls.`;
+  chip.classList.remove('hidden');
+}
+function pluginTitle(p){return p.panel?.title||p.name||p.id;}
+function pluginIcon(p,cls=''){
+  const n=p.panel?.icon;
+  return n&&document.getElementById('ic-'+n)?icon(n,cls):icon('extension',cls);
+}
+// The panel to show for a plugin: the one about your call, else one about
+// a channel you can see, else the one for everyone. [channel, {panel, at}]
+function panelFor(id){
+  const m=plug.panels.get(id);
+  if(!m||!m.size)return null;
+  const v=myVoiceBoard();
+  if(v&&m.has(v))return [v,m.get(v)];
+  for(const [k,x] of m)if(k)return [k,x];
+  return m.has('')?['',m.get('')]:null;
+}
+
+// ── The bar and the tray ──
+function pinStore(){try{return JSON.parse(localStorage.getItem('pluginPins:'+state.domain)||'{}');}catch{return {};}}
+function isPinned(p){const s=pinStore();return s[p.id]!=null?!!s[p.id]:!!p.panel;}
+function setPinned(id,on){
+  const s=pinStore();s[id]=!!on;
+  try{localStorage.setItem('pluginPins:'+state.domain,JSON.stringify(s));}catch{}
+  renderPluginBar();
+  if(plug.open==='@tray')renderPluginPop();
+}
+function renderPluginBar(){
+  const bar=document.getElementById('plugin-bar');
+  if(!bar)return;
+  bar.classList.toggle('hidden',!plug.list.length);
+  if(!plug.list.length){bar.innerHTML='';return;}
+  const pinned=plug.list.filter(p=>p.panel&&isPinned(p)&&!pluginBlocked(p.id));
+  bar.innerHTML=pinned.map(p=>{
+    const live=[...(plug.panels.get(p.id)?.keys()||[])].some(k=>k);
+    return `<button class="pb-btn${plug.open===p.id?' on':''}" data-plugin="${esc(p.id)}" title="${esc(pluginTitle(p))}${p.connected?'':' — not running'}">${pluginIcon(p)}${live?'<span class="pb-live"></span>':''}${p.connected?'':'<span class="pb-off"></span>'}</button>`;
+  }).join('')+`<button class="pb-btn pb-tray${plug.open==='@tray'?' on':''}" data-plugin="@tray" title="Plugins">${icon('extension')}</button>`;
+  bar.querySelectorAll('.pb-btn').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();
+    const id=b.dataset.plugin;
+    if(plug.open===id){closePluginPop();return;}
+    openPluginPop(id,b);
+  }));
+}
+function openPluginPop(id,anchor){
+  plug.open=id;plug.anchor=anchor||document.querySelector(`#plugin-bar [data-plugin="${CSS.escape(id)}"]`)||document.querySelector('#plugin-bar .pb-tray');
+  renderPluginPop();renderPluginBar();
+}
+function closePluginPop(){
+  plug.open=null;plug.anchor=null;
+  document.getElementById('plugin-pop')?.classList.add('hidden');
+  renderPluginBar();
+}
+function placePluginPop(pop){
+  const a=plug.anchor&&document.body.contains(plug.anchor)?plug.anchor:document.querySelector('#plugin-bar .pb-tray');
+  if(!a)return;
+  const r=a.getBoundingClientRect(),w=pop.offsetWidth;
+  pop.style.top=Math.round(r.bottom+6)+'px';
+  pop.style.left=Math.round(Math.max(8,Math.min(window.innerWidth-w-8,r.right-w)))+'px';
+}
+function renderPluginPop(){
+  const pop=document.getElementById('plugin-pop');
+  if(!pop||!plug.open)return;
+  if(plug.open==='@tray')renderPluginTray(pop);
+  else{
+    const p=pluginById(plug.open);
+    if(!p){closePluginPop();return;}
+    renderPluginPanel(pop,p);
+  }
+  pop.classList.remove('hidden');
+  placePluginPop(pop);
+}
+function renderPluginTray(pop){
+  pop.className='tray';
+  pop.innerHTML=`<div class="pp-head"><span class="pp-name">Plugins</span><span class="pp-sub">run by this server</span></div>
+    <div class="pt-list">${plug.list.map(p=>`
+      <div class="pt-row" data-plugin="${esc(p.id)}">
+        <span class="pt-ic">${pluginIcon(p)}</span>
+        <span class="pt-text"><span class="pt-name">${esc(pluginTitle(p))}${p.connected?'':' <span class="pt-off">not running</span>'}</span>
+          <span class="pt-desc">${p.commands?.length?`<code>${esc(p.id)}::</code> `:''}${esc(p.description||'')}</span></span>
+        ${p.panel&&!pluginBlocked(p.id)?`<button class="pt-pin${isPinned(p)?' on':''}" title="${isPinned(p)?'Unpin from the bar':'Pin to the bar'}">${icon('keep')}</button>`:''}
+        <button class="pt-block${pluginBlocked(p.id)?' on':''}" title="${pluginBlocked(p.id)?'Unblock':'Block for me: hide its panel, announcements and messages, mute it in calls, and send it nothing'}">${icon('block')}</button>
+      </div>`).join('')}</div>
+    <div class="pp-foot">Plugins run on the server: whoever runs it can see what you send them, and any channel the signed member list lets them read. They can play into calls but never hear them. Type <code>::</code> in a channel for their commands.</div>`;
+  pop.querySelectorAll('.pt-row').forEach(row=>{
+    const p=pluginById(row.dataset.plugin);
+    row.classList.toggle('blocked',pluginBlocked(p.id));
+    if(pluginBlocked(p.id))row.querySelector('.pt-name')?.insertAdjacentHTML('beforeend','<span class="pt-blocked">BLOCKED</span>');
+    row.querySelector('.pt-pin')?.addEventListener('click',e=>{e.stopPropagation();setPinned(p.id,!isPinned(p));});
+    row.querySelector('.pt-block')?.addEventListener('click',e=>{e.stopPropagation();setPluginBlocked(p,!pluginBlocked(p.id));});
+    row.addEventListener('click',()=>{
+      if(pluginBlocked(p.id)){toast(`You’ve blocked ${pluginTitle(p)} — unblock it first`);return;}
+      if(p.panel){openPluginPop(p.id,plug.anchor);return;}
+      // No panel: start one of its commands in the message box.
+      closePluginPop();startPluginCommand(p.id);
+    });
+  });
+}
+// Puts "<id>::" in the message box, for its commands.
+function startPluginCommand(id){
+  const ta=document.getElementById('msg-input');
+  if(!ta||ta.disabled){toast('Open a channel to use its commands');return;}
+  ta.value=id+'::';ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
+  autoResize(ta);onPluginInput(ta);
+}
+
+// ── A plugin's panel ──
+function fmtClock(ms){
+  const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;
+  return h?`${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`:`${m}:${String(x).padStart(2,'0')}`;
+}
+function plugBtnHTML(b,cls){
+  const ic=b.icon&&document.getElementById('ic-'+b.icon)?icon(b.icon):'';
+  const label=String(b.label||b.action||'');
+  return `<button type="button" class="${cls}${b.style==='primary'?' primary':b.style==='danger'?' danger':''}${ic?' has-ic':''}" data-act="${esc(b.action||'')}" data-val="${esc(b.value??'')}"${b.disabled?' disabled':''} title="${esc(label)}">${ic||esc(label)}</button>`;
+}
+function renderPanelBlocks(panel,at){
+  const out=[];
+  for(const b of Array.isArray(panel?.blocks)?panel.blocks.slice(0,40):[]){
+    if(!b||typeof b!=='object')continue;
+    switch(b.type){
+      case 'title':{
+        const link=typeof b.link==='string'&&/^https?:\/\//i.test(b.link)?b.link:'';
+        out.push(`<div class="pp-title">${link?`<a href="#" data-link="${esc(link)}" title="${esc(link)}">${esc(b.text||'')}</a>`:esc(b.text||'')}</div>${b.sub?`<div class="pp-tsub">${esc(b.sub)}</div>`:''}`);
+        break;}
+      case 'progress':{
+        const dur=Math.max(0,Number(b.duration_ms)||0),el=Math.max(0,Number(b.elapsed_ms)||0);
+        out.push(`<div class="pp-progress" data-el="${el}" data-dur="${dur}" data-run="${b.running?1:0}" data-at="${at}" data-live="${b.live?1:0}">
+          <div class="pp-bar"><div class="pp-fill"></div></div><div class="pp-times"><span class="pp-now"></span><span class="pp-total"></span></div></div>`);
+        break;}
+      case 'buttons':
+        out.push(`<div class="pp-buttons">${(Array.isArray(b.buttons)?b.buttons.slice(0,8):[]).map(x=>plugBtnHTML(x||{},'pp-btn')).join('')}</div>`);
+        break;
+      case 'input':
+        out.push(`<form class="pp-input" data-act="${esc(b.action||'')}"><input type="text" maxlength="2000" placeholder="${esc(b.placeholder||'')}" spellcheck="false" autocomplete="off"><button type="submit">${esc(b.button||'Send')}</button></form>`);
+        break;
+      case 'list':{
+        const items=Array.isArray(b.items)?b.items.slice(0,100):[];
+        out.push(`<div class="pp-list">${b.title?`<div class="pp-ltitle">${esc(b.title)}</div>`:''}
+          ${items.length?items.map((it,i)=>`<div class="pp-item"><span class="pp-inum">${i+1}</span><span class="pp-itext"><span class="pp-ititle">${esc(it?.title||'')}</span>${it?.sub?`<span class="pp-isub">${esc(it.sub)}</span>`:''}</span>
+            ${(Array.isArray(it?.actions)?it.actions.slice(0,4):[]).map(x=>plugBtnHTML(x||{},'pp-iact')).join('')}</div>`).join('')
+            :`<div class="pp-empty">${esc(b.empty||'Nothing here.')}</div>`}
+          ${b.more?`<div class="pp-more">${esc(b.more)}</div>`:''}</div>`);
+        break;}
+      case 'text':
+        out.push(`<div class="pp-text${b.style==='muted'?' muted':''}">${esc(b.text||'')}</div>`);
+        break;
+    }
+  }
+  return out.join('');
+}
+function renderPluginPanel(pop,p){
+  // What's typed in its boxes survives the panel changing.
+  const typed={};let focused=null,caret=0;
+  pop.querySelectorAll('.pp-input').forEach(f=>{const i=f.querySelector('input');typed[f.dataset.act]=i.value;if(document.activeElement===i){focused=f.dataset.act;caret=i.selectionStart;}});
+  const sel=panelFor(p.id);
+  const board=sel?sel[0]:'',x=sel?sel[1]:null;
+  pop.className='panel';
+  pop.dataset.plugin=p.id;pop.dataset.board=board;
+  pop.innerHTML=`<div class="pp-head"><span class="pp-ic">${pluginIcon(p)}</span><span class="pp-name">${esc(pluginTitle(p))}</span><span class="bot-tag plugin" title="${esc(PLUGIN_TIP)}">PLUGIN</span>
+      <button class="pp-pin${isPinned(p)?' on':''}" title="${isPinned(p)?'Unpin from the bar':'Pin to the bar'}">${icon('keep')}</button>
+      <button class="pp-x" title="Close">${icon('close')}</button></div>
+    <div class="pp-body">${!p.connected?`<div class="pp-text muted">${esc(pluginTitle(p))} isn’t running right now.</div>`
+      :x?renderPanelBlocks(x.panel,x.at):`<div class="pp-text muted">Nothing to show yet.</div>`}</div>
+    <div class="pp-reply hidden"></div>
+    ${p.commands?.length?`<div class="pp-foot">Or type <a href="#" class="pp-cmds"><code>${esc(p.id)}::</code></a> in a channel for its commands.</div>`:''}`;
+  pop.querySelector('.pp-x').onclick=closePluginPop;
+  pop.querySelector('.pp-pin').onclick=e=>{e.stopPropagation();setPinned(p.id,!isPinned(p));renderPluginPop();};
+  pop.querySelector('.pp-cmds')?.addEventListener('click',e=>{e.preventDefault();closePluginPop();startPluginCommand(p.id);});
+  pop.querySelectorAll('[data-link]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.link);}));
+  pop.querySelectorAll('.pp-btn,.pp-iact').forEach(b=>b.addEventListener('click',()=>pluginAction(p,b.dataset.act,b.dataset.val,board,b)));
+  pop.querySelectorAll('.pp-input').forEach(f=>{
+    const i=f.querySelector('input');
+    if(typed[f.dataset.act])i.value=typed[f.dataset.act];
+    if(focused===f.dataset.act){i.focus();try{i.setSelectionRange(caret,caret);}catch{}}
+    f.addEventListener('submit',e=>{
+      e.preventDefault();
+      const v=i.value.trim();if(!v)return;
+      i.value='';pluginAction(p,f.dataset.act,v,board,f.querySelector('button'));
+    });
+  });
+  if(plug.reply&&plug.reply.plugin===p.id&&plug.reply.where==='panel')showReplyIn(pop.querySelector('.pp-reply'),plug.reply);
+  tickPluginProgress();
+}
+async function pluginAction(p,action,value,board,btn){
+  if(!action)return;
+  if(btn){btn.disabled=true;setTimeout(()=>{if(document.body.contains(btn))btn.disabled=false;},1500);}
+  plug.lastAsk={plugin:p.id,where:'panel',at:Date.now()};
+  try{await window.go.main.App.PluginAction(p.id,action,value||'',board||'');}
+  catch(err){toast(String(err).replace(/^Error: /,''),true);}
+}
+// Progress bars move along by themselves while something's playing.
+function tickPluginProgress(){
+  const now=Date.now();
+  document.querySelectorAll('#plugin-pop .pp-progress').forEach(el=>{
+    const dur=+el.dataset.dur,live=el.dataset.live==='1';
+    let t=+el.dataset.el;if(el.dataset.run==='1')t+=now-(+el.dataset.at);
+    if(dur>0)t=Math.min(t,dur);
+    el.querySelector('.pp-fill').style.width=live||!dur?'100%':(100*t/dur).toFixed(2)+'%';
+    el.classList.toggle('live',live);
+    el.querySelector('.pp-now').textContent=live?'LIVE · '+fmtClock(t):fmtClock(t);
+    el.querySelector('.pp-total').textContent=!live&&dur?fmtClock(dur):'';
+  });
+}
+
+// ── From the server ──
+function onPluginEvent(raw){
+  let v;try{v=JSON.parse(raw);}catch{return;}
+  if(v.type==='plugins_updated'){loadPlugins();return;}
+  if(v.plugin&&pluginBlocked(v.plugin))return;
+  if(v.type==='plugin_notice'){addPluginNotice(v);return;}
+  if(v.type==='plugin_panel'){
+    if(!v.plugin)return;
+    let m=plug.panels.get(v.plugin);
+    if(!m){m=new Map();plug.panels.set(v.plugin,m);}
+    const key=v.board_id||'';
+    if(v.panel&&typeof v.panel==='object')m.set(key,{panel:v.panel,at:Date.now()});else m.delete(key);
+    const p=pluginById(v.plugin);if(p&&!p.connected&&v.panel){p.connected=true;}
+    renderPluginBar();
+    if(plug.open===v.plugin)renderPluginPop();
+    return;
+  }
+  if(v.type==='plugin_reply')showPluginReply(v);
+}
+// A plugin's answer, just for you: in its panel if that's where you asked,
+// else above the message box (or a toast, if you've moved channel).
+function showPluginReply(v){
+  const p=pluginById(v.plugin);
+  const name=p?pluginTitle(p):(v.plugin||'Plugin');
+  const ask=plug.lastAsk&&plug.lastAsk.plugin===v.plugin&&Date.now()-plug.lastAsk.at<120000?plug.lastAsk:null;
+  const where=ask?.where==='panel'&&plug.open===v.plugin?'panel':'box';
+  plug.reply={plugin:v.plugin,name,text:String(v.content||''),error:!!v.error,where,at:Date.now()};
+  if(where==='panel'){showReplyIn(document.querySelector('#plugin-pop .pp-reply'),plug.reply);return;}
+  if(v.board_id&&v.board_id!==state.selectedBoardId){toast(`${name}: ${plug.reply.text}`,!!v.error);return;}
+  const box=document.getElementById('plug-reply');
+  showReplyIn(box,plug.reply);
+}
+function showReplyIn(box,r){
+  if(!box)return;
+  box.className=(box.id==='plug-reply'?'':'pp-reply ')+(r.error?'error':'');
+  box.innerHTML=`<div class="pr-head">${r.pending?'':icon(r.error?'error':'smart_toy')}<b>${esc(r.name)}</b><span class="pr-only">${r.pending?'Sent':'Only you can see this'}</span><button class="pr-x" title="Dismiss">${icon('close')}</button></div><div class="pr-text">${esc(r.text)}</div>`;
+  box.querySelector('.pr-x').onclick=()=>{box.classList.add('hidden');if(plug.reply===r)plug.reply=null;};
+  clearTimeout(plug.replyTimer);
+  if(r.pending)plug.replyTimer=setTimeout(()=>{if(plug.reply===r){box.classList.add('hidden');plug.reply=null;}},6000);
+}
+
+// ── Commands in the message box ──
+// "<plugin>::<command> <arguments>". A known plugin's name (or "::" alone)
+// makes it a command; anything else is an ordinary message.
+const plugSug={open:false,soft:false,items:[],index:0,kind:'',error:''};
+function cmdPlugins(){return plug.list.filter(p=>p.commands?.length&&!pluginBlocked(p.id));}
+function parsePluginCommand(v,caret=v.length){
+  if(!v||v.includes('\n'))return null;
+  const m=v.match(/^([a-z][a-z0-9-]*)?::(\S*)/i);
+  if(!m)return null;
+  const ns=(m[1]||'').toLowerCase();
+  const plugin=ns?pluginById(ns):null;
+  if(ns&&!plugin)return null; // not a plugin here: just a message
+  const r={ns,plugin,cmdText:m[2],cmd:null,args:{},marks:[],missing:[],bad:[],argIndex:-1,argStart:0};
+  const nsEnd=ns.length;
+  if(ns)r.marks.push([0,nsEnd,'pc-ns']);
+  r.marks.push([nsEnd,nsEnd+2,'pc-sep']);
+  if(!plugin)return r;
+  const cStart=nsEnd+2,cEnd=cStart+m[2].length;
+  const word=m[2].toLowerCase();
+  r.cmd=plugin.commands?.find(c=>c.name===word)||null;
+  if(m[2]){
+    const partial=!r.cmd&&caret===cEnd&&plugin.commands?.some(c=>c.name.startsWith(word));
+    r.marks.push([cStart,cEnd,r.cmd?'pc-cmd':partial?'pc-cmd partial':'pc-bad']);
+    if(!r.cmd&&!partial)r.bad.push(`${plugin.name||plugin.id} has no command called ${m[2]}`);
+  }
+  if(!r.cmd)return r;
+  // The arguments, in order: one word each, the last text one takes the rest.
+  const args=r.cmd.args||[];
+  let i=cEnd;
+  const rest=v.slice(cEnd);
+  r.hasSpace=/^\s/.test(rest);
+  for(let k=0;k<args.length;k++){
+    const a=args[k];
+    while(i<v.length&&/\s/.test(v[i]))i++;
+    if(caret>=i||k===0)r.argIndex=k,r.argStart=i;
+    if(i>=v.length){if(a.required)r.missing.push(a.name);continue;}
+    let end;
+    if(k===args.length-1&&(a.type||'text')==='text')end=v.trimEnd().length;
+    else{end=i;while(end<v.length&&!/\s/.test(v[end]))end++;}
+    const val=v.slice(i,end);
+    let cls='pc-arg';
+    if(a.type==='number'){cls=isNaN(Number(val))?'pc-bad':'pc-num';if(cls==='pc-bad')r.bad.push(`“${val}” isn’t a number (${a.name})`);}
+    else if(a.type==='choice'&&a.choices?.length){
+      const ok=a.choices.includes(val),partial=caret===end&&a.choices.some(c=>c.startsWith(val));
+      cls=ok?'pc-choice':partial?'pc-choice partial':'pc-bad';
+      if(!ok&&!partial)r.bad.push(`${a.name} is one of: ${a.choices.join(', ')}`);
+    }
+    r.marks.push([i,end,cls]);r.args[a.name]=val;
+    i=end;
+  }
+  while(i<v.length&&/\s/.test(v[i]))i++;
+  if(i<v.length){r.marks.push([i,v.length,'pc-bad']);r.bad.push(`${r.ns}::${r.cmd.name} doesn’t take that much`);}
+  if(r.argIndex<0&&args.length)r.argIndex=0;
+  return r;
+}
+// The message box's colours while it's a command (renderComposerHighlight).
+function pluginCommandHighlight(ta,hl){
+  const field=document.getElementById('composer-field');
+  const r=parsePluginCommand(ta.value,ta.selectionStart);
+  field.classList.toggle('cmd-mode',!!r);
+  if(!r)return false;
+  const v=ta.value;let html='',pos=0;
+  for(const [a,b,cls] of r.marks.sort((x,y)=>x[0]-y[0])){if(a<pos)continue;html+=esc(v.slice(pos,a))+`<span class="${cls}">${esc(v.slice(a,b))}</span>`;pos=b;}
+  hl.innerHTML=html+esc(v.slice(pos));
+  hl.scrollTop=ta.scrollTop;
+  return true;
+}
+function closePluginSuggest(){plugSug.open=false;plugSug.error='';document.getElementById('plug-suggest')?.classList.add('hidden');}
+function onPluginInput(ta){
+  plugSug.error='';
+  const v=ta.value,caret=ta.selectionStart,before=v.slice(0,caret);
+  const plugins=cmdPlugins();
+  if(!plugins.length||v.includes('\n')){closePluginSuggest();return;}
+  // Plugins: "mu:" (then Enter or Tab), or — softly, Tab only — a first
+  // word that starts a plugin's name. ("::" on its own: below.)
+  if(caret===v.length){
+    const w=before.match(/^([a-z][a-z0-9-]*)(:?)$/i);
+    if(w&&(w[2]||w[1].length>=2)){
+      const part=w[1].toLowerCase();
+      const items=plugins.filter(p=>p.id.startsWith(part)).map(p=>({kind:'plugin',p,text:p.id+'::'}));
+      if(items.length){plugSug.kind='plugin';plugSug.items=items;plugSug.soft=!w[2];plugSug.index=w[2]?0:-1;renderPluginSuggest(ta);return;}
+    }
+  }
+  const r=parsePluginCommand(v,caret);
+  if(!r){closePluginSuggest();return;}
+  if(!r.plugin){ // "::" then a partial name
+    const part=r.cmdText.toLowerCase();
+    const items=plugins.filter(p=>p.id.startsWith(part)).map(p=>({kind:'plugin',p,text:p.id+'::'}));
+    if(!items.length){closePluginSuggest();return;}
+    plugSug.kind='plugin';plugSug.items=items;plugSug.soft=false;plugSug.index=0;renderPluginSuggest(ta,r);return;
+  }
+  const cEnd=r.ns.length+2+r.cmdText.length;
+  if(!r.cmd||(caret<=cEnd&&!r.hasSpace)){
+    // Its commands.
+    const part=r.cmdText.toLowerCase();
+    const items=(r.plugin.commands||[]).filter(c=>c.name.startsWith(part)).map(c=>({kind:'cmd',p:r.plugin,c,text:`${r.ns}::${c.name}${c.args?.length?' ':''}`}));
+    if(!items.length){plugSug.kind='none';plugSug.items=[];renderPluginSuggest(ta,r);return;}
+    plugSug.kind='cmd';plugSug.items=items;plugSug.soft=false;plugSug.index=0;renderPluginSuggest(ta,r);return;
+  }
+  // Its arguments: the one you're on, and its choices.
+  const a=r.cmd.args?.[r.argIndex];
+  let items=[];
+  if(a?.type==='choice'&&a.choices?.length){
+    const cur=(r.args[a.name]||'').toLowerCase();
+    items=a.choices.filter(c=>c.toLowerCase().startsWith(cur)&&c!==r.args[a.name]).map(c=>({kind:'choice',c,start:r.argStart,len:(r.args[a.name]||'').length}));
+  }
+  plugSug.kind='args';plugSug.items=items;plugSug.soft=false;plugSug.index=items.length?0:-1;
+  renderPluginSuggest(ta,r);
+}
+function sigHTML(ns,c,on=-1){
+  return `<span class="pc-ns">${esc(ns)}</span><span class="pc-sep">::</span><span class="pc-cmd">${esc(c.name)}</span>`+
+    (c.args||[]).map((a,i)=>` <span class="ps-arg${i===on?' on':''}">${a.required?'&lt;':'['}${esc(a.name)}${a.required?'&gt;':']'}</span>`).join('');
+}
+function renderPluginSuggest(ta,r){
+  const box=document.getElementById('plug-suggest');
+  if(!box)return;
+  closeEmojiSuggest();
+  let html='';
+  if(plugSug.kind==='error'){
+    // (just what's wrong, below)
+  }else if(plugSug.kind==='plugin'){
+    html=`<div class="ps-title">Plugins${plugSug.soft?' <span class="ps-key">Tab</span>':''}</div>`+plugSug.items.map((x,i)=>`
+      <div class="ps-row${i===plugSug.index?' on':''}" data-i="${i}"><span class="ps-ic">${pluginIcon(x.p)}</span>
+        <span class="ps-name"><span class="pc-ns">${esc(x.p.id)}</span><span class="pc-sep">::</span></span><span class="ps-desc">${esc(pluginTitle(x.p))}${x.p.description?' — '+esc(x.p.description):''}</span></div>`).join('');
+  }else if(plugSug.kind==='cmd'||plugSug.kind==='none'){
+    html=`<div class="ps-title">${esc(pluginTitle(r.plugin))} commands</div>`+(plugSug.items.length?plugSug.items.map((x,i)=>`
+      <div class="ps-row${i===plugSug.index?' on':''}" data-i="${i}"><span class="ps-name">${sigHTML(r.ns,x.c)}</span><span class="ps-desc">${esc(x.c.description||'')}</span></div>`).join('')
+      :`<div class="ps-err">${esc(pluginTitle(r.plugin))} has no command starting “${esc(r.cmdText)}”</div>`);
+  }else{
+    const a=r.cmd.args?.[r.argIndex];
+    html=`<div class="ps-sig">${sigHTML(r.ns,r.cmd,r.argIndex)}</div>
+      ${a?`<div class="ps-argdesc"><b>${esc(a.name)}</b>${a.type&&a.type!=='text'?` <span class="ps-type">${esc(a.type)}</span>`:''}${a.required?'':' <span class="ps-type">optional</span>'}${a.description?' — '+esc(a.description):''}</div>`
+        :`<div class="ps-argdesc">${esc(r.cmd.description||'')}</div>`}
+      ${plugSug.items.map((x,i)=>`<div class="ps-row${i===plugSug.index?' on':''}" data-i="${i}"><span class="ps-name"><span class="pc-choice">${esc(x.c)}</span></span></div>`).join('')}`;
+  }
+  if(plugSug.error)html+=`<div class="ps-err">${esc(plugSug.error)}</div>`;
+  const p=r?.plugin||(plugSug.items[0]?.p);
+  html+=`<div class="ps-foot">${plugSug.kind==='args'?`<span class="ps-key">Enter</span> sends it to ${esc(p?pluginTitle(p):'the plugin')} · `:plugSug.soft?'':'<span class="ps-key">Tab</span> picks · '}${p?.lanes&&p?.lanes_ok?`${icon('lock')}End-to-end encrypted to ${esc(pluginTitle(p))}`:`${icon('lock_open')}Goes to the plugin on this server, not end-to-end encrypted`}${plugSug.kind==='args'?' · posted in the channel too':''}</div>`;
+  box.innerHTML=html;
+  box.classList.remove('hidden');
+  plugSug.open=true;
+  box.querySelectorAll('.ps-row').forEach(row=>row.addEventListener('mousedown',e=>{e.preventDefault();plugSug.index=+row.dataset.i;acceptPluginSuggest(ta);}));
+}
+// Takes the highlighted suggestion; false if there was nothing to take.
+function acceptPluginSuggest(ta){
+  const x=plugSug.items[plugSug.index];
+  if(!x)return false;
+  if(x.kind==='choice'){
+    const v=ta.value,after=v.slice(x.start+x.len);
+    ta.value=v.slice(0,x.start)+x.c+(after.startsWith(' ')?after:' '+after.trimStart());
+    const c=x.start+x.c.length+1;ta.setSelectionRange(c,c);
+  }else{
+    // The plugin or command replaces what's typed so far (keeping any arguments).
+    const v=ta.value,m=v.match(/^[a-z0-9-]*(?:::?\S*)?/i);
+    let rest=v.slice(m?m[0].length:0);
+    if(x.kind==='cmd'&&x.text.endsWith(' '))rest=rest.trimStart();
+    ta.value=x.text+rest;
+    ta.setSelectionRange(x.text.length,x.text.length);
+  }
+  ta.focus();autoResize(ta);onPluginInput(ta);renderComposerHighlight();
+  return true;
+}
+// Sends the message box's command, if it is one (sendMessage asks first).
+// True when it was one (sent, or kept with what's wrong shown).
+async function sendPluginCommand(){
+  const ta=document.getElementById('msg-input');
+  const v=ta.value.trim();
+  const r=parsePluginCommand(v,v.length);
+  if(!r)return false;
+  const fail=msg=>{plugSug.error=msg;plugSug.items=[];plugSug.index=-1;plugSug.soft=false;plugSug.kind=r.cmd?'args':'error';renderPluginSuggest(ta,r);plugSug.error='';return true;};
+  if(!r.plugin)return fail('Which plugin? Type its name before the ::');
+  if(!r.cmd)return fail(r.cmdText?`${pluginTitle(r.plugin)} has no command called ${r.cmdText}`:`Which ${pluginTitle(r.plugin)} command? Pick one above`);
+  if(r.bad.length)return fail(r.bad[0]);
+  if(r.missing.length)return fail(`${r.ns}::${r.cmd.name} needs ${r.missing.join(' and ')}`);
+  if(!state.selectedBoardId)return fail('Open a channel first');
+  try{
+    await window.go.main.App.PluginCommand(r.plugin.id,r.cmd.name,r.args,state.selectedBoardId);
+  }catch(err){return fail(String(err).replace(/^Error: /,''));}
+  // Everyone in the channel sees what was asked (as an ordinary, encrypted
+  // message): only the plugin's answers to you are just for you.
+  const board=state.selectedBoardId;
+  window.go.main.App.SendMessage(board,typedToTokens(v),[],'').catch(err=>toast('Couldn\u2019t post the command in the channel: '+String(err).replace(/^Error: /,''),true));
+  rememberSent(v);
+  ta.value='';autoResize(ta);closePluginSuggest();renderComposerHighlight();
+  plug.lastAsk={plugin:r.plugin.id,where:'box',at:Date.now()};
+  const box=document.getElementById('plug-reply');
+  plug.reply={plugin:r.plugin.id,name:pluginTitle(r.plugin),text:`${r.ns}::${r.cmd.name}${Object.values(r.args).length?' '+Object.values(r.args).join(' '):''}`,pending:true,where:'box',at:Date.now()};
+  showReplyIn(box,plug.reply);
+  return true;
+}
+function initPlugins(){
+  window.runtime.EventsOn('plugin:event',onPluginEvent);
+  const ta=document.getElementById('msg-input');
+  ta.addEventListener('input',e=>{if(!e.isComposing)onPluginInput(ta);});
+  ta.addEventListener('click',()=>{if(parsePluginCommand(ta.value))onPluginInput(ta);});
+  // Capture, so Enter / Tab pick a suggestion instead of sending.
+  ta.addEventListener('keydown',e=>{
+    if(!plugSug.open)return;
+    const n=plugSug.items.length;
+    if((e.key==='ArrowDown'||e.key==='ArrowUp')&&n&&!plugSug.soft){
+      e.preventDefault();e.stopImmediatePropagation();
+      plugSug.index=(plugSug.index+(e.key==='ArrowDown'?1:-1)+n)%n;
+      document.querySelectorAll('#plug-suggest .ps-row').forEach((x,i)=>x.classList.toggle('on',i===plugSug.index));
+    }else if(e.key==='Tab'&&n){
+      e.preventDefault();e.stopImmediatePropagation();
+      if(plugSug.index<0)plugSug.index=0;
+      acceptPluginSuggest(ta);
+    }else if(e.key==='Enter'&&!e.shiftKey&&!plugSug.soft&&plugSug.index>=0&&n){
+      // A command already typed in full goes; otherwise Enter picks.
+      const x=plugSug.items[plugSug.index];
+      const r=parsePluginCommand(ta.value);
+      const done=x.kind==='cmd'&&r?.cmd&&r.cmd.name===x.c.name&&!(x.c.args||[]).some(a=>a.required);
+      if(!done){e.preventDefault();e.stopImmediatePropagation();acceptPluginSuggest(ta);}
+    }else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closePluginSuggest();}
+  },true);
+  ta.addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='Home'||e.key==='End'){if(parsePluginCommand(ta.value))onPluginInput(ta);renderComposerHighlight();}});
+  ta.addEventListener('blur',()=>setTimeout(()=>{if(document.activeElement!==ta)closePluginSuggest();},150));
+  document.addEventListener('mousedown',e=>{
+    if(!plug.open)return;
+    if(e.target.closest('#plugin-pop,#plugin-bar'))return;
+    closePluginPop();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&plug.open&&!e.defaultPrevented)closePluginPop();});
+  window.addEventListener('resize',()=>{const pop=document.getElementById('plugin-pop');if(plug.open&&pop)placePluginPop(pop);});
+  setInterval(()=>{if(plug.open&&plug.open!=='@tray')tickPluginProgress();},500);
+}
+
+// ── SIGNED MEMBER LIST ───────────────────────────────────────────
+// Who may read each channel, signed by the owner and the approvers they
+// chose (roster.go, roster_app.go). This app only gives its channel and
+// call keys to people the list allows, whatever the server says. Server
+// info → Member list shows it: what's waiting for approval, where the
+// server and the list disagree, the members, the setting and the history.
+let rosterModal=null,rosterView=null,rosterLastState='',rosterForksSeen=new Set(),rosterPolicyCache=null;
+function rosterApprovalText(p){
+  if(!p)return '';
+  const who=p.approvers==='owner'?'the owner':'the owner and member managers';
+  const n=p.need==='majority'?'a majority':p.need==='n'?`${p.n}`:'1';
+  return `${n} approval${n==='1'?'':'s'} from ${who}`;
+}
+function rosterCode(h){return h?`${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}`.toUpperCase():'';}
+// A name for an identity key: the server's name for them, else the list's.
+function rosterNamer(info,view){
+  const names=new Map();
+  for(const m of info?.members||[])if(m.name)names.set(m.key,m.name);
+  for(const m of view?.members||[])if(m.username)names.set(m.key,m.username);
+  return k=>names.get(k)||(k?k.slice(0,8)+'…':'?');
+}
+function rosterBoard(id){
+  const b=allBoards().find(x=>x.id===id);
+  return b?`${b.voice?'🔊 ':'#'}${b.name}`:(id==='@presence'?'everyone’s status':'a channel you can’t see');
+}
+// One change, in words.
+function describeRosterOp(op,name){
+  const chans=bs=>(bs||[]).map(rosterBoard).join(', ');
+  switch(op.op){
+    case 'start':return `${name(op.by)} turned the signed member list on`;
+    case 'add':return `Add ${op.name||name(op.key)}${op.kind&&op.kind!=='member'?` (a ${op.kind})`:''}${op.boards?.length?`, reading ${chans(op.boards)}`:''}`;
+    case 'join':return `${op.name||name(op.by)} joined with an invite`;
+    case 'remove':return op.key===op.by?`${name(op.key)} left`:`Remove ${name(op.key)}`;
+    case 'access':{
+      const parts=[];
+      if(op.all===true)parts.push('everyone can read it');
+      if(op.all===false)parts.push('no longer everyone’s');
+      if(op.add?.length)parts.push('let '+op.add.map(name).join(', ')+' read it');
+      if(op.remove?.length)parts.push('take '+op.remove.map(name).join(', ')+' off it');
+      return `${rosterBoard(op.board)}: ${parts.join('; ')||'no change'}`;
+    }
+    case 'manager':return op.on?`Make ${name(op.key)} a member manager`:`${name(op.key)} stops managing members`;
+    case 'policy':return `Approvals: ${rosterApprovalText(op.policy)}`;
+    case 'invite':{
+      const i=op.invite||{};
+      return `New invite: ${i.uses?`${i.uses} use${i.uses===1?'':'s'}`:'no limit'}${i.expires?`, until ${new Date(i.expires*1000).toLocaleString()}`:''}${i.boards?.length?`, with ${chans(i.boards)}`:''}`;
+    }
+    case 'uninvite':return 'Revoke an invite';
+    case 'owner':return `Hand the server to ${name(op.key)}`;
+  }
+  return op.op;
+}
+// Where the server and the list disagree, as changes to propose.
+function rosterDifferences(info,view){
+  const out=[];
+  const members=new Map(info.members.map(m=>[m.key,m]));
+  const access=new Map(info.access.map(a=>[a.board,a]));
+  const reads=(k,b)=>{const a=access.get(b),m=members.get(k);return !!a&&!!m&&(a.readers.includes(k)||(a.all&&m.kind==='member'));};
+  // People the server has, the list doesn't: they can't read anything yet.
+  // Plugins aren't given channels from what the server shows: they don't
+  // need any (their commands and announcements go on lanes) — an approver
+  // gives one a channel by hand if it must read it (chat commands).
+  const isPlugin=k=>(members.get(k)?.kind||view.members.find(m=>m.key===k)?.kind)==='plugin';
+  for(const m of view.members){
+    if(members.has(m.key))continue;
+    const boards=m.kind==='plugin'?[]:Object.entries(view.boards).filter(([b,ks])=>b!=='@presence'&&ks.includes(m.key)&&!(access.get(b)?.all&&m.kind==='member')).map(([b])=>b);
+    out.push({text:`${m.username} is on the server but not on the list, so nobody’s app gives them keys`,
+      op:{op:'add',key:m.key,kind:m.kind,name:m.username,boards}});
+  }
+  for(const [b,keys] of Object.entries(view.boards)){
+    if(b==='@presence')continue;
+    const a=access.get(b);
+    if(!a){
+      const everyone=view.members.filter(m=>m.kind==='member').every(m=>keys.includes(m.key));
+      const readers=(everyone?keys.filter(k=>view.members.find(m=>m.key===k)?.kind!=='member'):keys).filter(k=>!isPlugin(k));
+      out.push({text:`${rosterBoard(b)} isn’t on the list yet, so nobody can send in it`,op:{op:'access',board:b,all:everyone,add:readers.filter(k=>members.has(k))}});
+      continue;
+    }
+    const add=keys.filter(k=>members.has(k)&&!reads(k,b)&&!isPlugin(k));
+    if(add.length)out.push({text:`The server lets ${add.map(rosterNamer(info,view)).join(', ')} see ${rosterBoard(b)}; the list doesn’t`,op:{op:'access',board:b,add}});
+    const gone=a.readers.filter(k=>!keys.includes(k));
+    if(gone.length)out.push({text:`The list lets ${gone.map(rosterNamer(info,view)).join(', ')} read ${rosterBoard(b)}; the server doesn’t show them there any more`,op:{op:'access',board:b,remove:gone}});
+  }
+  return out;
+}
+async function openRosterModal(){
+  closeServerInfo();
+  if(!rosterModal){
+    const ov=document.createElement('div');ov.className='modal-overlay';
+    ov.innerHTML=`<div class="modal bots-modal roster-modal"><h2>Member list</h2><div id="rl-body"><span class="spinner"></span></div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('mousedown',e=>{if(e.target===ov)closeRosterModal();});
+    rosterModal=ov;
+  }
+  await renderRosterModal(true);
+}
+function closeRosterModal(){rosterModal?.remove();rosterModal=null;}
+async function renderRosterModal(fetchView){
+  if(!rosterModal)return;
+  const body=rosterModal.querySelector('#rl-body');
+  let info;
+  try{info=await window.go.main.App.RosterInfo();}catch(err){body.innerHTML=`<div class="error-msg">${esc(String(err))}</div>`;return;}
+  if(fetchView||!rosterView){
+    try{rosterView=await window.go.main.App.RosterServerView(allBoards().map(b=>b.id).concat(['@presence']));}catch{rosterView={members:[],boards:{}};}
+  }
+  if(!rosterModal)return;
+  const view=rosterView,name=rosterNamer(info,view);
+  const me=info.me,owner=state.serverOwner&&state.serverOwner===state.username;
+  const approver=(info.approvers||[]).includes(me);
+  const manager=info.owner===me||(info.members||[]).some(m=>m.key===me&&m.manager);
+  let html='';
+  if(info.state==='loading'){html=`<p class="rl-p">Checking this server’s member list…</p>`;}
+  else if(info.state==='replaced'){
+    html=`<div class="rl-warn">${icon('gpp_maybe')}<div><b>Nobody gets your keys here until this is sorted out.</b><br>${esc(info.problem||'')}.</div></div>
+      <p class="rl-p">If the owner started the list over on purpose (for example after losing their keys), ask them — not in this server, somewhere you know is really them — and compare its code: <b>${esc(rosterCode(info.head))||'—'}</b>.</p>
+      ${info.id?`<div class="modal-actions"><button class="btn btn-ghost" id="rl-close">Close</button><button class="btn btn-danger" id="rl-accept">Trust the new list</button></div>`:`<div class="modal-actions"><button class="btn btn-ghost" id="rl-close">Close</button></div>`}`;
+  }else if(info.state==='none'){
+    html=`<div class="rl-warn">${icon('gpp_maybe')}<div><b>Nobody’s app shares keys here yet.</b><br>${esc(info.problem||'This server doesn’t have its signed member list yet.')}</div></div>
+      <p class="rl-p">Every server needs a signed member list: the owner and the members who manage members sign every change to who can read what. The server can’t add anyone, and every app checks — so until the list exists, nobody can send or read messages, or hear anyone in a call.</p>
+      ${owner?`<button class="btn btn-primary" id="rl-start">${icon('verified_user')}Set up the signed member list…</button>`:`<p class="rl-p" style="color:var(--text-muted)">The server’s owner sets it up the next time they open the server in Chriscord.</p>`}
+      <div class="modal-actions"><button class="btn btn-ghost" id="rl-close">Close</button></div>`;
+  }else{
+    const waiting=info.proposals||[];
+    const diffs=manager?rosterDifferences(info,view):[];
+    html=`<div class="rl-status">${icon('verified_user')}<div><b>On.</b> Changes need ${esc(rosterApprovalText(info.policy))}.
+      <div class="rl-sub">List code <b>${esc(rosterCode(info.head))}</b> — everyone’s app should show the same.${info.rejected?` ${info.rejected} entr${info.rejected===1?'y':'ies'} the server stored didn’t check out and ${info.rejected===1?'was':'were'} ignored.`:''}</div></div></div>
+      ${info.forks.length?`<div class="rl-warn">${icon('gpp_maybe')}<div><b>${info.forks.map(esc).join(', ')} ${info.forks.length===1?'is':'are'} being shown a different member list.</b> Their messages were sent with a list your app has never had. The server may be showing people different lists — compare list codes with them.</div></div>`:''}
+      <div class="settings-label">Waiting for approval</div>
+      ${waiting.length?waiting.map(p=>{
+        let op={};try{op=typeof p.op==='string'?JSON.parse(p.op):p.op;}catch{}
+        return `<div class="rl-item" data-id="${esc(p.id)}"><div class="rl-what">${esc(describeRosterOp(op,name))}${op.note?`<div class="rl-sub">“${esc(op.note)}”</div>`:''}</div>
+          <div class="rl-sub">Proposed by ${esc(name(p.by))} · ${p.approvals} of ${p.needed} approval${p.needed===1?'':'s'}${p.signers.length?` (${p.signers.map(name).map(esc).join(', ')})`:''}${p.problem&&!p.problem.startsWith('needs ')?` · <span class="rl-bad">${esc(p.problem)}</span>`:''}</div>
+          <div class="bc-actions">${approver&&!p.signed?`<button class="settings-secondary-btn" data-act="approve">${icon('check')}Approve</button>`:''}${p.mine||owner?`<button class="settings-secondary-btn danger" data-act="withdraw">${icon('close')}${p.mine?'Withdraw':'Turn down'}</button>`:''}</div></div>`;
+      }).join(''):'<p class="rl-p rl-muted">Nothing.</p>'}
+      ${manager?`<div class="settings-label">Where the server and the list disagree</div>
+        ${diffs.length?diffs.map((d,i)=>`<div class="rl-item"><div class="rl-what">${esc(d.text)}</div><div class="rl-sub">Proposes: ${esc(describeRosterOp(d.op,name))}</div>
+          <div class="bc-actions"><button class="settings-secondary-btn" data-diff="${i}">${icon('verified_user')}${approver?'Approve':'Propose'}</button></div></div>`).join('')
+          :'<p class="rl-p rl-muted">They agree.</p>'}`:''}
+      <div class="settings-label">Members</div>
+      <div class="rl-members">${info.members.slice().sort((a,b)=>name(a.key).localeCompare(name(b.key))).map(m=>`<div class="rl-member" data-key="${esc(m.key)}">
+        <span class="rl-name">${esc(name(m.key))}</span>${m.kind!=='member'?`<span class="bot-tag${m.kind==='plugin'?' plugin':''}">${esc(m.kind.toUpperCase())}</span>`:''}
+        ${m.owner?`<span class="rl-badge">${icon('crown')}Owner</span>`:m.manager?'<span class="rl-badge">Manager</span>':''}
+        ${m.boards.length?`<span class="rl-sub rl-boards">+ ${m.boards.map(rosterBoard).map(esc).join(', ')}</span>`:''}
+        <span class="rl-acts">${approver&&m.kind==='member'&&!m.owner?`<button class="rl-mini" data-mgr="${m.manager?0:1}">${m.manager?'Not a manager':'Make manager'}</button>`:''}
+          ${manager&&!m.owner&&m.key!==me?`<button class="rl-mini danger" data-remove>Remove</button>`:''}</span></div>`).join('')}</div>
+      <div class="settings-label">Approvals</div>
+      <div class="rl-policy">${rosterPolicyForm(info.policy,info)}</div>
+      ${approver?`<div class="bc-actions"><button class="settings-secondary-btn" id="rl-policy-go">${icon('verified_user')}Propose this setting</button></div>`:''}
+      <div class="settings-label">History</div>
+      <div class="rl-history">${info.changes.slice(-30).reverse().map(c=>{let op={};try{op=typeof c.op==='string'?JSON.parse(c.op):c.op;}catch{}
+        return `<div class="rl-hist"><span>${esc(describeRosterOp(op,name))}</span><span class="rl-sub">${op.at?new Date(op.at*1000).toLocaleDateString():''} · signed by ${c.signers.filter(k=>info.members.some(m=>m.key===k)||k===op.by).map(name).map(esc).join(', ')}${op.op==='join'?' with the invite':''}</span></div>`;}).join('')}</div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="rl-close">Close</button></div>`;
+  }
+  body.innerHTML=html;
+  body.querySelector('#rl-close')?.addEventListener('click',closeRosterModal);
+  body.querySelector('#rl-start')?.addEventListener('click',()=>showRosterStart(view));
+  body.querySelector('#rl-accept')?.addEventListener('click',async()=>{
+    if(!confirm('Trust the new member list? Only do this if the owner told you (somewhere you know is really them) that they started it over.'))return;
+    try{await window.go.main.App.RosterAccept();}catch(err){toast(String(err),true);}
+    renderRosterModal();
+  });
+  const act=async(fn,btn)=>{if(btn)btn.disabled=true;try{const r=await fn();if(r==='waiting')toast('Proposed — it needs more approvals. The other approvers see it under Member list.');else if(r==='done')toast('Done — it’s on the list.');}catch(err){toast(String(err).replace(/^Error: /,''),true);}renderRosterModal();};
+  body.querySelectorAll('.rl-item[data-id]').forEach(el=>{
+    el.querySelector('[data-act="approve"]')?.addEventListener('click',e=>act(()=>window.go.main.App.RosterApprove(el.dataset.id),e.currentTarget));
+    el.querySelector('[data-act="withdraw"]')?.addEventListener('click',e=>act(()=>window.go.main.App.RosterWithdraw(el.dataset.id),e.currentTarget));
+  });
+  const diffs=info.state==='active'&&manager?rosterDifferences(info,view):[];
+  body.querySelectorAll('[data-diff]').forEach(b=>b.addEventListener('click',()=>act(()=>window.go.main.App.RosterPropose(JSON.stringify(diffs[+b.dataset.diff].op)),b)));
+  body.querySelectorAll('.rl-member').forEach(row=>{
+    const k=row.dataset.key;
+    row.querySelector('[data-mgr]')?.addEventListener('click',e=>act(()=>window.go.main.App.RosterPropose(JSON.stringify({op:'manager',key:k,on:e.currentTarget.dataset.mgr==='1'})),e.currentTarget));
+    row.querySelector('[data-remove]')?.addEventListener('click',e=>{
+      if(!confirm(`Take ${name(k)} off the member list? Nobody’s app gives them keys after this, and every channel they could read gets a new key.`))return;
+      act(()=>window.go.main.App.RosterPropose(JSON.stringify({op:'remove',key:k})),e.currentTarget);
+    });
+  });
+  wireRosterPolicyForm(body,info);
+  body.querySelector('#rl-policy-go')?.addEventListener('click',e=>act(()=>window.go.main.App.RosterPropose(JSON.stringify({op:'policy',policy:readRosterPolicy(body)})),e.currentTarget));
+}
+// The setting: who approves, and how many.
+function rosterPolicyForm(p,info,managersCount){
+  p=p||{approvers:'owner',need:'1'};
+  return `<div class="rl-row"><label><input type="radio" name="rl-appr" value="owner"${p.approvers!=='managers'?' checked':''}> The owner</label>
+      <label><input type="radio" name="rl-appr" value="managers"${p.approvers==='managers'?' checked':''}> The owner and member managers</label></div>
+    <div class="rl-row rl-need"><label><input type="radio" name="rl-need" value="1"${p.need==='1'?' checked':''}> 1 approval</label>
+      <label><input type="radio" name="rl-need" value="n"${p.need==='n'?' checked':''}> <input type="number" id="rl-n" min="1" value="${p.n||2}" class="rl-num"> approvals</label>
+      <label><input type="radio" name="rl-need" value="majority"${p.need==='majority'?' checked':''}> A majority of them</label></div>
+    <div class="rl-sub" id="rl-policy-hint"></div>`;
+}
+function readRosterPolicy(root){
+  const appr=root.querySelector('input[name="rl-appr"]:checked')?.value||'owner';
+  const need=root.querySelector('input[name="rl-need"]:checked')?.value||'1';
+  const n=Math.max(1,parseInt(root.querySelector('#rl-n')?.value||'1',10)||1);
+  return need==='n'?{approvers:appr,need,n}:{approvers:appr,need};
+}
+function wireRosterPolicyForm(root,info,managers){
+  const hint=root.querySelector('#rl-policy-hint');if(!hint)return;
+  const update=()=>{
+    const p=readRosterPolicy(root);
+    const count=p.approvers==='owner'?1:1+(managers??(info?.members||[]).filter(m=>m.manager&&!m.owner).length);
+    const nIn=root.querySelector('#rl-n');if(nIn)nIn.max=count;
+    const need=p.need==='majority'?Math.floor(count/2)+1:p.need==='n'?p.n:1;
+    root.querySelectorAll('#rl-go,#rl-policy-go').forEach(b=>b.disabled=need>count);
+    hint.innerHTML=need>count?`<span class="rl-bad">There ${count===1?'is':'are'} only ${count} approver${count===1?'':'s'} — it can’t need ${need}.</span>`
+      :`${count} approver${count===1?'':'s'}; a change needs ${need}. Removing people or access only ever needs one manager, and anyone can leave.`;
+  };
+  root.querySelectorAll('input[name="rl-appr"],input[name="rl-need"],#rl-n').forEach(i=>i.addEventListener('input',update));
+  root.querySelector('#rl-n')?.addEventListener('focus',()=>{const r=root.querySelector('input[name="rl-need"][value="n"]');if(r)r.checked=true;update();});
+  update();
+}
+// Turning it on: who's on it to start with (as the server has it — the owner
+// checks), who manages members, and the setting.
+function showRosterStart(view){
+  const body=rosterModal?.querySelector('#rl-body');if(!body)return;
+  const people=view.members;
+  const boards=Object.keys(view.boards).filter(b=>b!=='@presence');
+  const humans=people.filter(m=>m.kind==='member');
+  // Plugins start with no channels (see rosterDifferences).
+  const plugin=k=>people.find(m=>m.key===k)?.kind==='plugin';
+  const access=boards.map(b=>{const ks=view.boards[b];const everyone=humans.every(m=>ks.includes(m.key));
+    return {board:b,all:everyone,readers:(everyone?ks.filter(k=>people.find(m=>m.key===k)?.kind!=='member'):ks).filter(k=>!plugin(k))};});
+  // Who manages members, to start with: whoever the server's roles let kick
+  // or ban (the owner checks).
+  const manages=m=>m.kind==='member'&&(userCan(m.username,PERM.KICK)||userCan(m.username,PERM.BAN));
+  body.innerHTML=`<p class="rl-p">The list starts as the server has things now — check it carefully: anyone on it can read the channels shown. After this, changes need approvals.</p>
+    <div class="settings-label">Members (${people.length})</div>
+    <div class="rl-members">${people.map(m=>`<div class="rl-member"><span class="rl-name">${esc(m.username)}</span>${m.kind!=='member'?`<span class="bot-tag${m.kind==='plugin'?' plugin':''}">${esc(m.kind.toUpperCase())}</span>`:''}
+      ${m.kind==='member'&&m.username!==state.username?`<label class="rl-mini-check"><input type="checkbox" data-mgr="${esc(m.key)}"${manages(m)?' checked':''}> Manages members</label>`:''}</div>`).join('')}</div>
+    <div class="settings-label">Channels</div>
+    <div class="rl-history">${access.map(a=>`<div class="rl-hist"><span>${esc(rosterBoard(a.board))}</span><span class="rl-sub">${a.all?'Everyone':''}${a.all&&a.readers.length?' and ':''}${a.readers.length?a.readers.map(k=>esc(people.find(m=>m.key===k)?.username||k.slice(0,8))).join(', '):a.all?'':'Nobody'}</span></div>`).join('')}</div>
+    <p class="rl-sub" style="margin-top:6px">Channels you can’t see aren’t included: a manager who can see them approves them later.</p>
+    <div class="settings-label">Who approves changes</div>${rosterPolicyForm({approvers:'managers',need:'1'})}
+    <div class="error-msg hidden" id="rl-err"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="rl-back">Back</button><button class="btn btn-primary" id="rl-go">${icon('verified_user')}Sign and turn on</button></div>`;
+  const managers=()=>body.querySelectorAll('[data-mgr]:checked').length;
+  wireRosterPolicyForm(body,null,managers());
+  body.querySelectorAll('[data-mgr]').forEach(c=>c.addEventListener('change',()=>wireRosterPolicyForm(body,null,managers())));
+  body.querySelector('#rl-back').onclick=()=>renderRosterModal();
+  body.querySelector('#rl-go').onclick=async e=>{
+    const b=e.currentTarget;b.disabled=true;
+    const req={policy:readRosterPolicy(body),
+      members:people.map(m=>({key:m.key,kind:m.kind,name:m.username})),
+      managers:[...body.querySelectorAll('[data-mgr]:checked')].map(c=>c.dataset.mgr),
+      access:access.map(a=>({board:a.board,all:a.all,readers:a.readers}))};
+    try{await window.go.main.App.RosterStart(req);toast('The signed member list is on.');renderRosterModal();}
+    catch(err){const el=body.querySelector('#rl-err');el.textContent=String(err).replace(/^Error: /,'');el.classList.remove('hidden');b.disabled=false;}
+  };
+}
+// The member list changed (or this app's view of it).
+async function onRosterChanged(){
+  let info;try{info=await window.go.main.App.RosterInfo();}catch{return;}
+  if(info.state==='replaced'&&rosterLastState!=='replaced'&&rosterLastState!=='')
+    toast('This server’s member list was dropped or started over — your app isn’t giving anyone keys here until you check (Server info → Member list).',true);
+  for(const f of info.forks)if(!rosterForksSeen.has(f)){rosterForksSeen.add(f);toast(`${f} is being shown a different member list than you. Compare list codes with them (Server info → Member list).`,true);}
+  const was=rosterLastState;
+  rosterLastState=info.state;rosterPolicyCache=info.policy;
+  rosterBadge(info);
+  updateChannelReaders();
+  // The list is required: the owner's app sets it up; everyone else is told why nothing opens.
+  if(info.state==='none'&&was!=='none'&&state.domain&&!rosterSetupAsked.has(state.domain)){
+    rosterSetupAsked.add(state.domain);
+    const domain=state.domain;
+    for(let i=0;i<20&&!state.serverOwner&&state.domain===domain;i++)await new Promise(r=>setTimeout(r,150)); // the owner's name comes with the server's info
+    if(state.domain!==domain)return;
+    if(state.serverOwner===state.username&&!/too old/.test(info.problem||''))openRosterSetup();
+    else toast(info.problem||'This server doesn’t have its signed member list yet, so nobody’s app shares keys here. The owner sets it up next time they open the server.',true);
+  }
+  if(rosterModal&&!rosterModal.querySelector('#rl-go'))renderRosterModal();
+}
+// How many changes are waiting for this account's approval.
+let rosterWaitingCount=0;
+function rosterBadge(info){
+  const me=info.me,appr=(info.approvers||[]).includes(me);
+  rosterWaitingCount=appr?(info.proposals||[]).filter(p=>!p.signed&&!p.ready).length:0;
+  document.getElementById('server-info-btn')?.classList.toggle('has-badge',rosterWaitingCount>0||info.state==='replaced'||info.state==='none'||info.forks.length>0);
+}
+const rosterSetupAsked=new Set(); // servers this app has asked the owner to set the list up on
+// The owner, on a server without its list: straight to setting it up.
+async function openRosterSetup(){
+  await openRosterModal();
+  let info;try{info=await window.go.main.App.RosterInfo();}catch{return;}
+  if(info.state==='none'&&rosterModal&&rosterView&&!/too old/.test(info.problem||''))showRosterStart(rosterView);
+}
+function initRoster(){
+  window.runtime.EventsOn('roster:changed',onRosterChanged);
 }
 
 // ── SPELL CHECK ──────────────────────────────────────────────────
@@ -12433,7 +13540,15 @@ function initVideoConvert(){
     item.convertPct=p.percent;item.convertStage=p.stage||'Converting';renderAttachQueue();
   });
 }
+// Link previews for links you send (linkpreview.go): on unless turned off.
+let previewsOn=localStorage.getItem('linkPreviews')!=='0';
+function initLinkPreviewSetting(){
+  const box=document.getElementById('ap-previews');if(!box)return;
+  box.checked=previewsOn;window.go.main.App.SetLinkPreviews(previewsOn).catch(()=>{});
+  box.addEventListener('change',()=>{previewsOn=box.checked;localStorage.setItem('linkPreviews',previewsOn?'1':'0');window.go.main.App.SetLinkPreviews(previewsOn).catch(()=>{});persistClientSettings();});
+}
 function initSpellcheck(){
+  initLinkPreviewSetting();
   const box=document.getElementById('ap-spell');
   box.checked=spellOn;
   box.addEventListener('change',()=>{
@@ -12635,7 +13750,9 @@ function init(){
   const e2eeWarned=new Set();
   const e2eeLabels={ok:'Encrypted',waiting:'Exchanging keys\u2026',
     unsupported:'Can\u2019t encrypt \u2014 needs to update Chriscord',
-    changed:'Identity key changed \u2014 compare the call code'};
+    changed:'Identity key changed \u2014 compare the call code',
+    unapproved:'Not on the signed member list \u2014 can\u2019t hear you',
+    playonly:'Bot or plugin \u2014 plays into the call, can\u2019t hear it'};
   // 'ok' (green), 'warn' (yellow: someone can't encrypt, or their key
   // changed) or '' (grey: keys still being swapped, or not in a call).
   const e2eeLevel=()=>{
@@ -12796,6 +13913,8 @@ function init(){
   initSearchFilters();
   initTooltips();
   initShortcodes();
+  initPlugins();
+  initRoster();
   initPasteAttachments();
   initPasteOffer();
   initContextMenus();

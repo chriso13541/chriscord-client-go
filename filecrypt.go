@@ -312,7 +312,7 @@ func (t *textCrypto) sealMessage(board, text string, atts []Attachment) (string,
 		files = append(files, m)
 		out = append(out, Attachment{URL: m.URL, Name: fileOpaqueName, Mime: fileOpaqueMime})
 	}
-	content, err := t.sealWith(board, text, files)
+	content, err := t.sealWith(board, text, files, previewFor(text))
 	return content, out, err
 }
 
@@ -321,7 +321,7 @@ func (t *textCrypto) sealEdit(msgID, text string) (string, error) {
 	t.mu.Lock()
 	files := t.msgFiles[msgID]
 	t.mu.Unlock()
-	return t.sealWith(t.boardOf(msgID), text, files)
+	return t.sealWith(t.boardOf(msgID), text, files, previewFor(text))
 }
 
 // ── Uploading ─────────────────────────────────────────────────────────────────
