@@ -308,6 +308,13 @@ func (lc *laneClient) lane(id string) (*appLane, error) {
 	if blocked {
 		return nil, errors.New("you've blocked " + p.Name + " — unblock it in its menu to use it")
 	}
+	if p.EncKey == nil || p.EncSig == nil {
+		// The list was loaded before it published its key (it does just
+		// after it starts): look again.
+		if fresh, ok := lc.refreshPlugin(id); ok {
+			p = fresh
+		}
+	}
 	enc, err := lc.a.laneKeyFor(p)
 	if err != nil {
 		return nil, err
@@ -338,6 +345,70 @@ func (lc *laneClient) lane(id string) (*appLane, error) {
 		return nil, err
 	}
 	return l, nil
+}
+
+// refreshPlugin loads the server's plugin list again and notes what it
+// says about every plugin (keys, running), without opening anything.
+// Returns plugin id's entry.
+func (lc *laneClient) refreshPlugin(id string) (lanePlugin, bool) {
+	data, err := lc.a.serverBotCall("GET", "/api/plugins", nil)
+	if err != nil {
+		return lanePlugin{}, false
+	}
+	var d struct {
+		Plugins []lanePlugin `json:"plugins"`
+	}
+	if json.Unmarshal(data, &d) != nil {
+		return lanePlugin{}, false
+	}
+	var out lanePlugin
+	found := false
+	lc.mu.Lock()
+	for _, p := range d.Plugins {
+		if p.ID == "" {
+			continue
+		}
+		if old, had := lc.plugins[p.ID]; had && (!strings.EqualFold(old.PublicKey, p.PublicKey) || (encOf(old) != "" && encOf(old) != encOf(p))) {
+			lc.dropLocked(p.ID) // its keys changed: its lane is gone
+		}
+		lc.plugins[p.ID] = p
+		if p.ID == id {
+			out, found = p, true
+		}
+	}
+	lc.mu.Unlock()
+	return out, found
+}
+
+// keysChanged: someone published an encryption key — perhaps a plugin that
+// had just started. Lanes to running plugins that still lack one are
+// opened now.
+func (lc *laneClient) keysChanged() {
+	lc.mu.Lock()
+	waiting := false
+	for id, p := range lc.plugins {
+		if p.Lanes && p.Connected && lc.lanes[id] == nil && !lc.blocked[id] {
+			waiting = true
+		}
+	}
+	lc.mu.Unlock()
+	if !waiting {
+		return
+	}
+	lc.refreshPlugin("")
+	lc.mu.Lock()
+	var open []string
+	for id, p := range lc.plugins {
+		if p.Lanes && p.Connected && p.EncKey != nil && lc.lanes[id] == nil && !lc.blocked[id] {
+			open = append(open, id)
+		}
+	}
+	lc.mu.Unlock()
+	for _, id := range open {
+		if _, err := lc.lane(id); err != nil {
+			log.Printf("lanes: %s: %v", id, err)
+		}
+	}
 }
 
 // laneKeyFor checks a plugin's keys: its encryption key signed by its

@@ -1326,6 +1326,7 @@ func (a *App) wsReader(conn *websocket.Conn) {
 			runtime.EventsEmit(a.ctx, "chat:history", historyEvent{BoardID: msg.BoardID, Messages: msg.Messages})
 		case "e2ee_changed":
 			a.text.changed() // keys moved: share any this app can, retry locked messages
+			go a.lanes.keysChanged() // a plugin may just have published its key (lanes_app.go)
 		case "history_changed":
 			// Messages changed under the page (history imported, or an
 			// imported person claimed): the open channel loads again.
