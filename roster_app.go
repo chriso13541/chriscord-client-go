@@ -453,6 +453,32 @@ func (a *App) rosterSignedSince(createdAt string) bool {
 	return err == nil && t.Unix() > start+10*60
 }
 
+// rosterVouchesAutomated: whether domain's signed member list (this app's
+// current server, once checked) has key as a bot or plugin. Waits a little
+// while the list is still being checked.
+func (a *App) rosterVouchesAutomated(domain, key string) bool {
+	if a == nil || a.roster == nil {
+		return false
+	}
+	rc := a.roster
+	for i := 0; ; i++ {
+		rc.mu.Lock()
+		state, same := rc.state, rc.domain == domain
+		rc.mu.Unlock()
+		if !same || state != rosterLoading || i >= 40 {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	if rc.domain != domain || rc.state != rosterActive || rc.r == nil {
+		return false
+	}
+	m, ok := rc.r.Members[strings.ToLower(key)]
+	return ok && (m.Kind == kindBot || m.Kind == kindPlugin)
+}
+
 // rosterIsAutomated: whether the list has key as a bot or plugin.
 func (a *App) rosterIsAutomated(key string) bool {
 	k, _ := a.rosterKindOf(key)

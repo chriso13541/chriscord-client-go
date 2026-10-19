@@ -126,6 +126,13 @@ func noteIdentity(domain, user, idHex, old string) {
 
 func (k *keyCheck) note(domain, user, idHex, old string) {
 	changed := old != "" && old != idHex
+	if changed && k.c.app.rosterVouchesAutomated(domain, idHex) {
+		// A bot's or plugin's new key that the server's signed member list
+		// has (its approvers signed it in): a reinstalled plugin, say — not
+		// someone pretending. Nothing to warn about.
+		log.Printf("identity: %s's key on %s changed; the signed member list has the new one as a bot or plugin", user, domain)
+		return
+	}
 	if changed {
 		k.mu.Lock()
 		k.changes[domain+"\x00"+user] = idHex
