@@ -1517,6 +1517,13 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .about-meta a { color:var(--text-link, var(--accent)); cursor:pointer; text-decoration:none; }
 .about-meta a:hover { text-decoration:underline; }
 #settings-tab-about .settings-label { margin-top:26px; }
+.about-usage { padding:14px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
+.au-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.au-stat .au-k { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); }
+.au-stat .au-v { font-size:1.25rem; font-weight:700; color:var(--text-strong); font-variant-numeric:tabular-nums; margin-top:2px; }
+.au-parts { margin-top:12px; padding-top:10px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:4px; font-size:.82rem; color:var(--text-muted); }
+.au-parts div { display:flex; justify-content:space-between; gap:12px; font-variant-numeric:tabular-nums; }
+.au-parts b { color:var(--text); font-weight:600; }
 .about-update { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 16px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; }
 .about-update .au-ic { width:24px; height:24px; flex-shrink:0; color:var(--text-muted); }
 .about-update.ok .au-ic, .about-update.available .au-ic { color:var(--green); }
@@ -2658,6 +2665,11 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       </div>
       <label class="settings-label">Updates</label>
       <div class="about-update" id="about-update" aria-live="polite"></div>
+      <div id="about-usage-wrap" class="hidden">
+        <label class="settings-label">Using right now</label>
+        <div class="about-usage" id="about-usage"></div>
+        <p class="settings-hint">All of Chriscord’s processes added up — the app, the WebView2 processes that draw its window, and anything else it runs — measured the way Task Manager measures them. GPU is its busiest graphics engine (drawing, video decoding…).</p>
+      </div>
     </div>
 
     <div id="settings-tab-screenshare" class="settings-tab-pane">
@@ -4896,6 +4908,7 @@ function openSettings(tab='profile'){
 }
 function closeSettings(){
   document.getElementById('settings-modal').classList.add('hidden');
+  aboutUsage(false);
   setLevelMeter(false);
   if(bannerCrop.img)closeBannerCropper();
   if(micTestRunning)stopMicTest();
@@ -4932,6 +4945,7 @@ function switchSettingsTab(name){
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.settings-tab-pane').forEach(p=>p.classList.toggle('active',p.id==='settings-tab-'+name));
   if(name==='about')renderAbout();
+  aboutUsage(name==='about'); // its readout only refreshes while About is showing
   if(name==='system')renderSystemSettings();
   if(name==='search')renderSearchCopySettings();
   if(name==='account')renderCloudSettings();
@@ -5135,6 +5149,32 @@ async function onStartupToggle(e){
 // the same as the title bar arrow: Chriscord closes, the launcher installs
 // the new build, and Chriscord opens again.
 const about={state:'idle',version:'',error:'',checkedAt:0};
+// Settings → About: how much memory, CPU and GPU Chriscord is using
+// (usage_windows.go), every 2 seconds while About is open.
+let aboutUsageTimer=0;
+function aboutUsage(on){
+  clearInterval(aboutUsageTimer);aboutUsageTimer=0;
+  if(!on)return;
+  const tick=async()=>{
+    // Only while About is what's showing: closed some other way, or another tab → stop.
+    if(document.getElementById('settings-modal')?.classList.contains('hidden')||!document.getElementById('settings-tab-about')?.classList.contains('active')){aboutUsage(false);return;}
+    if(document.hidden)return; // minimised or in the tray: nothing to show, so no reading
+    let u;try{u=await window.go.main.App.GetUsage();}catch{return;}
+    const wrap=document.getElementById('about-usage-wrap'),box=document.getElementById('about-usage');
+    if(!wrap||!box)return;
+    wrap.classList.toggle('hidden',!u?.supported);
+    if(!u?.supported){clearInterval(aboutUsageTimer);aboutUsageTimer=0;return;}
+    const mb=b=>b>=1073741824?`${(b/1073741824).toFixed(2)} GB`:`${Math.round(b/1048576)} MB`;
+    const pct=v=>v==null?'…':`${v<10?v.toFixed(1):Math.round(v)}%`;
+    box.innerHTML=`<div class="au-stats">
+        <div class="au-stat"><div class="au-k">Memory</div><div class="au-v">${mb(u.memory)}</div></div>
+        <div class="au-stat"><div class="au-k">CPU</div><div class="au-v">${pct(u.cpu)}</div></div>
+        <div class="au-stat"><div class="au-k">GPU</div><div class="au-v">${pct(u.gpu)}</div></div>
+      </div>
+      <div class="au-parts">${(u.parts||[]).map(p=>`<div><span><b>${esc(p.name)}</b> · ${p.processes} process${p.processes===1?'':'es'}</span><span>${mb(p.memory)}</span></div>`).join('')}</div>`;
+  };
+  tick();aboutUsageTimer=setInterval(tick,2000);
+}
 async function renderAbout(){
   let info={};
   try{info=await window.go.main.App.GetAboutInfo();}catch{}
