@@ -78,6 +78,10 @@ body.dragging-server, body.dragging-server * { cursor:grabbing !important; user-
 
 /* MODAL */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:100; }
+/* A modal taller than the space it has: "safe" keeps its top in view (and
+   the overlay scrolls) — plain centring pushed the top up under the title
+   bar, out of reach. */
+.modal-overlay { align-items:safe center; overflow-y:auto; padding:20px 0; box-sizing:border-box; }
 .modal { background:var(--bg-dark); border:1px solid var(--border); border-radius:12px; padding:28px 30px; width:420px; max-width:95%; }
 .modal h2 { font-size:1.2rem; color:var(--text-strong); margin-bottom:16px; }
 .modal p { color:var(--text-muted); font-size:.9rem; margin-bottom:20px; line-height:1.5; }
@@ -401,7 +405,7 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 .bc-actions .settings-secondary-btn { margin-top:0; display:inline-flex; align-items:center; gap:6px; }
 .bc-actions .settings-secondary-btn .ic { width:16px; height:16px; }
 .settings-secondary-btn.danger { color:var(--red-light); }
-.bots-modal { width:600px; max-height:calc(100vh - 60px); overflow-y:auto; }
+.bots-modal { width:600px; max-height:100%; box-sizing:border-box; overflow-y:auto; } /* the overlay's height, not 100vh: the page's zoom (Ctrl +) scales vh too, so 100vh was taller than the window */
 .bot-modal { width:520px; }
 .bots-modal .settings-label, .bots-modal .settings-label:first-of-type, .bot-modal .settings-label { margin-top:18px; }
 .sb-add { display:flex; gap:8px; margin-bottom:12px; }
@@ -13270,7 +13274,10 @@ async function renderRosterModal(fetchView){
         return `<div class="rl-hist"><span>${esc(describeRosterOp(op,name))}</span><span class="rl-sub">${op.at?new Date(op.at*1000).toLocaleDateString():''} · signed by ${c.signers.filter(k=>info.members.some(m=>m.key===k)||k===op.by).map(name).map(esc).join(', ')}${op.op==='join'?' with the invite':''}</span></div>`;}).join('')}</div>
       <div class="modal-actions"><button class="btn btn-ghost" id="rl-close">Close</button></div>`;
   }
+  // Re-rendered whenever the list changes: keep where each list was scrolled to.
+  const scrolls=[...body.querySelectorAll('.rl-members,.rl-history')].map(el=>el.scrollTop);
   body.innerHTML=html;
+  body.querySelectorAll('.rl-members,.rl-history').forEach((el,i)=>{if(scrolls[i])el.scrollTop=scrolls[i];});
   body.querySelector('#rl-close')?.addEventListener('click',closeRosterModal);
   body.querySelector('#rl-start')?.addEventListener('click',()=>showRosterStart(view));
   body.querySelector('#rl-accept')?.addEventListener('click',async()=>{
