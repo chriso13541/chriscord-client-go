@@ -335,6 +335,13 @@ img.plug-ico { border-radius:4px; }
 .pp-reply { margin:0 14px 12px; background:var(--bg-dark); }
 #plug-reply.error, .pp-reply.error { border-left-color:var(--red); }
 #plug-reply.hidden, .pp-reply.hidden { display:none; }
+/* Going away: a quick fade rather than vanishing (hideReplyBox). */
+#plug-reply, .pp-reply { transition:opacity .25s ease; }
+#plug-reply.fading, .pp-reply.fading { opacity:0; }
+/* A modal's close button, top right, staying put while it scrolls. */
+.modal-x { position:sticky; top:0; float:right; margin:-12px -14px 0 8px; z-index:1; background:var(--bg-dark); border:none; color:var(--text-muted); cursor:pointer; padding:6px; border-radius:6px; display:flex; }
+.modal-x:hover { background:var(--bg-light); color:var(--text); }
+.modal-x .ic { width:20px; height:20px; }
 .pr-head { display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text-muted); }
 .pr-head .ic { width:15px; height:15px; color:var(--accent); } .error .pr-head .ic { color:var(--red); }
 .pr-head b { color:var(--text-strong); }
@@ -12908,9 +12915,17 @@ function showReplyIn(box,r){
   if(!box)return;
   box.className=(box.id==='plug-reply'?'':'pp-reply ')+(r.error?'error':'');
   box.innerHTML=`<div class="pr-head">${r.pending?'':icon(r.error?'error':'smart_toy')}<b>${esc(r.name)}</b><span class="pr-only">${r.pending?'Sent':'Only you can see this'}</span><button class="pr-x" title="Dismiss">${icon('close')}</button></div><div class="pr-text">${esc(r.text)}</div>`;
-  box.querySelector('.pr-x').onclick=()=>{box.classList.add('hidden');if(plug.reply===r)plug.reply=null;};
+  box.querySelector('.pr-x').onclick=()=>{hideReplyBox(box);if(plug.reply===r)plug.reply=null;};
   clearTimeout(plug.replyTimer);
-  if(r.pending)plug.replyTimer=setTimeout(()=>{if(plug.reply===r){box.classList.add('hidden');plug.reply=null;}},6000);
+  if(r.pending)plug.replyTimer=setTimeout(()=>{if(plug.reply===r){hideReplyBox(box);plug.reply=null;}},4500);
+}
+// A plugin's answer box going away: fades out, then hides. A new answer
+// shown meanwhile (showReplyIn resets the class) keeps it.
+function hideReplyBox(box){
+  if(!box||box.classList.contains('hidden'))return;
+  const gen=String((+box.dataset.gen||0)+1);box.dataset.gen=gen;
+  box.classList.add('fading');
+  setTimeout(()=>{if(box.dataset.gen===gen&&box.classList.contains('fading')){box.classList.add('hidden');box.classList.remove('fading');}},260);
 }
 
 // ── Commands in the message box ──
@@ -13238,8 +13253,9 @@ async function openRosterModal(){
   closeServerInfo();
   if(!rosterModal){
     const ov=document.createElement('div');ov.className='modal-overlay';
-    ov.innerHTML=`<div class="modal bots-modal roster-modal"><h2>Member list</h2><div id="rl-body"><span class="spinner"></span></div></div>`;
+    ov.innerHTML=`<div class="modal bots-modal roster-modal"><button class="modal-x" type="button" title="Close">${icon('close')}</button><h2>Member list</h2><div id="rl-body"><span class="spinner"></span></div></div>`;
     document.body.appendChild(ov);
+    ov.querySelector('.modal-x').addEventListener('click',closeRosterModal);
     ov.addEventListener('mousedown',e=>{if(e.target===ov)closeRosterModal();});
     rosterModal=ov;
   }
