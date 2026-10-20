@@ -157,6 +157,43 @@ type RosterEntry struct {
 
 func rosterMessage(body string) []byte { return append([]byte(rosterContext), body...) }
 
+// rosterRejectContext: what an approver signs to turn a proposed change
+// down — never the same message as approving it.
+const rosterRejectContext = "chriscord-roster-reject-v1\x00"
+
+func rosterRejectMessage(body string) []byte { return append([]byte(rosterRejectContext), body...) }
+
+// rejecters: the keys whose rejections of body hold up (each once).
+func rejecters(body string, sigs []RosterSig) map[string]bool {
+	out := map[string]bool{}
+	if len(sigs) > rosterMaxSigs {
+		return out
+	}
+	msg := rosterRejectMessage(body)
+	for _, s := range sigs {
+		k := strings.ToLower(s.Key)
+		pub, err1 := hex.DecodeString(k)
+		sig, err2 := hex.DecodeString(s.Sig)
+		if err1 == nil && err2 == nil && len(pub) == ed25519.PublicKeySize && ed25519.Verify(pub, msg, sig) {
+			out[k] = true
+		}
+	}
+	return out
+}
+
+// TurnedDown: whether approvers have rejected a change so that it can't get
+// the approvals it needs any more (with "1 approval" and one approver, one
+// rejection; with two approvals needed of three, two).
+func (r *Roster) TurnedDown(rejected map[string]bool) bool {
+	n := 0
+	for _, a := range r.Approvers() {
+		if rejected[a] {
+			n++
+		}
+	}
+	return n > 0 && len(r.Approvers())-n < r.Needed()
+}
+
 // newRosterOp fills in the common fields of an op proposed by "by".
 func newRosterOp(roster, by, op string) RosterOp {
 	id := make([]byte, 16)

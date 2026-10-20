@@ -239,6 +239,13 @@ body.no-react .msg-react-btn, body.no-react .reaction.add { display:none !import
 .pb-btn:hover { background:var(--bg-light); color:var(--text); }
 .pb-btn.on { background:var(--bg-light); color:var(--accent); }
 .pb-btn .ic { width:20px; height:20px; }
+/* A plugin's icon: its own .ico/.png, or its profile picture (pluginIcon). */
+.plug-ico { width:20px; height:20px; flex-shrink:0; display:inline-block; border-radius:50%; object-fit:cover; }
+img.plug-ico { border-radius:4px; }
+.plug-av { display:inline-flex; align-items:center; justify-content:center; color:#fff; font-size:.6rem; font-weight:700; background-size:cover; background-position:center; line-height:1; }
+.pp-ic .plug-ico, .pt-ic .plug-ico { width:22px; height:22px; font-size:.68rem; }
+.plug-notice .pn-ic .plug-ico { width:16px; height:16px; font-size:.52rem; }
+.ps-ic .plug-ico { width:18px; height:18px; font-size:.56rem; }
 .pb-live, .pb-off { position:absolute; right:3px; bottom:3px; width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 2px var(--bg-dark); }
 .pb-off { background:var(--text-muted); }
 #plugin-pop { position:fixed; z-index:200; width:min(340px,calc(100vw - 16px)); max-height:min(580px,calc(100vh - 80px)); overflow-y:auto; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.45); color:var(--text); font-size:.88rem; }
@@ -12652,9 +12659,20 @@ async function updateChannelReaders(){
   chip.classList.remove('hidden');
 }
 function pluginTitle(p){return p.panel?.title||p.name||p.id;}
+// A plugin's icon: the .ico/.png it ships (plugin.json "icon"), else its
+// profile picture — by default the coloured circle with its initial, as
+// it shows in the member list.
 function pluginIcon(p,cls=''){
-  const n=p.panel?.icon;
-  return n&&document.getElementById('ic-'+n)?icon(n,cls):icon('extension',cls);
+  const ico=typeof p.icon==='string'&&/^data:image\/(x-icon|png);base64,[A-Za-z0-9+/=]+$/.test(p.icon)?p.icon:'';
+  if(ico)return `<img class="plug-ico ${esc(cls)}" src="${ico}" alt="">`;
+  const name=p.username||pluginTitle(p)||'?';
+  if(p.username)queueMicrotask(paintPluginAvatars); // once it's on the page
+  return `<span class="plug-ico plug-av ${esc(cls)}"${p.username?` data-pfp-user="${esc(p.username)}"`:''} style="background-color:${avatarColour(name)}">${esc(name[0].toUpperCase())}</span>`;
+}
+// Plugins' pictures, onto icons just put on the page (applyUserAvatar fetches
+// and caches them like anyone's).
+function paintPluginAvatars(){
+  document.querySelectorAll('.plug-av[data-pfp-user]:not([data-pfp-src])').forEach(el=>applyUserAvatar(el,el.dataset.pfpUser));
 }
 // The panel to show for a plugin: the one about your call, else one about
 // a channel you can see, else the one for everyone. [channel, {panel, at}]
@@ -13190,6 +13208,16 @@ function rosterDifferences(info,view){
     out.push({text:`${m.username} is on the server but not on the list, so nobody’s app gives them keys`,
       op:{op:'add',key:m.key,kind:m.kind,name:m.username,boards}});
   }
+  // Bots and plugins on the list that the server no longer has (removed):
+  // they come off. (A plugin's does by itself — updateRosterPending.)
+  if(view.bots_ok){
+    const there=new Set(view.bots||[]);
+    for(const m of info.members){
+      if(m.kind==='member'||there.has(m.key))continue;
+      out.push({text:`${m.name||rosterNamer(info,view)(m.key)} (${m.kind}) was removed from the server but is still on the list`,
+        op:{op:'remove',key:m.key},gonePlugin:m.kind==='plugin'});
+    }
+  }
   for(const [b,keys] of Object.entries(view.boards)){
     if(b==='@presence')continue;
     const a=access.get(b);
@@ -13252,8 +13280,8 @@ async function renderRosterModal(fetchView){
       ${waiting.length?waiting.map(p=>{
         let op={};try{op=typeof p.op==='string'?JSON.parse(p.op):p.op;}catch{}
         return `<div class="rl-item" data-id="${esc(p.id)}"><div class="rl-what">${esc(describeRosterOp(op,name))}${op.note?`<div class="rl-sub">“${esc(op.note)}”</div>`:''}</div>
-          <div class="rl-sub">Proposed by ${esc(name(p.by))} · ${p.approvals} of ${p.needed} approval${p.needed===1?'':'s'}${p.signers.length?` (${p.signers.map(name).map(esc).join(', ')})`:''}${p.problem&&!p.problem.startsWith('needs ')?` · <span class="rl-bad">${esc(p.problem)}</span>`:''}</div>
-          <div class="bc-actions">${approver&&!p.signed?`<button class="settings-secondary-btn" data-act="approve">${icon('check')}Approve</button>`:''}${p.mine||owner?`<button class="settings-secondary-btn danger" data-act="withdraw">${icon('close')}${p.mine?'Withdraw':'Turn down'}</button>`:''}</div></div>`;
+          <div class="rl-sub">Proposed by ${esc(name(p.by))} · ${p.approvals} of ${p.needed} approval${p.needed===1?'':'s'}${p.signers.length?` (${p.signers.map(name).map(esc).join(', ')})`:''}${(p.rejecters||[]).length?` · turned down by ${p.rejecters.map(name).map(esc).join(', ')}`:''}${p.turned_down?` · <span class="rl-bad">Turned down</span>`:rosterStuck(p)?` · <span class="rl-bad">Can’t go through: ${esc(p.problem)}</span>`:''}</div>
+          <div class="bc-actions">${approver&&!p.signed&&!p.rejected&&!p.turned_down&&!rosterStuck(p)?`<button class="settings-secondary-btn" data-act="approve">${icon('check')}Approve</button><button class="settings-secondary-btn danger" data-act="reject">${icon('block')}Reject</button>`:''}${p.mine?`<button class="settings-secondary-btn danger" data-act="withdraw">${icon('close')}Withdraw</button>`:owner&&(p.turned_down||rosterStuck(p))?`<button class="settings-secondary-btn danger" data-act="withdraw">${icon('close')}Clear away</button>`:''}</div></div>`;
       }).join(''):'<p class="rl-p rl-muted">Nothing.</p>'}
       ${manager?`<div class="settings-label">Where the server and the list disagree</div>
         ${diffs.length?diffs.map((d,i)=>`<div class="rl-item"><div class="rl-what">${esc(d.text)}</div><div class="rl-sub">Proposes: ${esc(describeRosterOp(d.op,name))}</div>
@@ -13285,10 +13313,14 @@ async function renderRosterModal(fetchView){
     try{await window.go.main.App.RosterAccept();}catch(err){toast(String(err),true);}
     renderRosterModal();
   });
-  const act=async(fn,btn)=>{if(btn)btn.disabled=true;try{const r=await fn();if(r==='waiting')toast('Proposed — it needs more approvals. The other approvers see it under Member list.');else if(r==='done')toast('Done — it’s on the list.');}catch(err){toast(String(err).replace(/^Error: /,''),true);}renderRosterModal();};
+  const act=async(fn,btn)=>{if(btn)btn.disabled=true;try{const r=await fn();if(r==='waiting')toast('Proposed — it needs more approvals. The other approvers see it under Member list.');else if(r==='done')toast('Done — it’s on the list.');else if(r==='rejected')toast('Turned down.');}catch(err){toast(String(err).replace(/^Error: /,''),true);}renderRosterModal();scheduleRosterPending();};
   body.querySelectorAll('.rl-item[data-id]').forEach(el=>{
     el.querySelector('[data-act="approve"]')?.addEventListener('click',e=>act(()=>window.go.main.App.RosterApprove(el.dataset.id),e.currentTarget));
     el.querySelector('[data-act="withdraw"]')?.addEventListener('click',e=>act(()=>window.go.main.App.RosterWithdraw(el.dataset.id),e.currentTarget));
+    el.querySelector('[data-act="reject"]')?.addEventListener('click',e=>{
+      if(!confirm('Turn this change down? Once it can’t get the approvals it needs, it’s cleared away.'))return;
+      act(()=>window.go.main.App.RosterReject(el.dataset.id),e.currentTarget);
+    });
   });
   const diffs=info.state==='active'&&manager?rosterDifferences(info,view):[];
   body.querySelectorAll('[data-diff]').forEach(b=>b.addEventListener('click',()=>act(()=>window.go.main.App.RosterPropose(JSON.stringify(diffs[+b.dataset.diff].op)),b)));
@@ -13301,6 +13333,7 @@ async function renderRosterModal(fetchView){
     });
   });
   wireRosterPolicyForm(body,info);
+  scheduleRosterPending(); // the button at the top counts what's shown here
   body.querySelector('#rl-policy-go')?.addEventListener('click',e=>act(()=>window.go.main.App.RosterPropose(JSON.stringify({op:'policy',policy:readRosterPolicy(body)})),e.currentTarget));
 }
 // The setting: who approves, and how many.
@@ -13394,11 +13427,20 @@ async function onRosterChanged(){
   }
   if(rosterModal&&!rosterModal.querySelector('#rl-go'))renderRosterModal();
 }
+// A proposed change that can't go through whoever approves it (the list
+// has moved on: already done, already a member, another list…).
+function rosterStuck(p){return !!p.problem&&!p.problem.startsWith('needs ')&&!p.ready;}
+// The changes waiting for this account's approval — exactly the ones the
+// member list shows Approve on.
+function rosterWaitingFor(info){
+  const me=info.me;
+  if(!(info.approvers||[]).includes(me))return [];
+  return (info.proposals||[]).filter(p=>!p.signed&&!p.ready&&!p.rejected&&!p.turned_down&&!rosterStuck(p));
+}
 // How many changes are waiting for this account's approval.
 let rosterWaitingCount=0;
 function rosterBadge(info){
-  const me=info.me,appr=(info.approvers||[]).includes(me);
-  rosterWaitingCount=appr?(info.proposals||[]).filter(p=>!p.signed&&!p.ready).length:0;
+  rosterWaitingCount=rosterWaitingFor(info).length;
   document.getElementById('server-info-btn')?.classList.toggle('has-badge',rosterWaitingCount>0||info.state==='replaced'||info.state==='none'||info.forks.length>0);
 }
 // What's waiting for you on the member list, shown at the top of the chat
@@ -13406,6 +13448,7 @@ function rosterBadge(info){
 // you can approve, and — for managers — where the server and the list
 // disagree (someone new, a new channel, a plugin just installed).
 let rosterPendingTimer=0,rosterPendingSeen=-1,rosterPendingBusy=false;
+const rosterAutoRemoved=new Set(),rosterAutoCleared=new Set(); // done once each, this session
 function scheduleRosterPending(){clearTimeout(rosterPendingTimer);rosterPendingTimer=setTimeout(updateRosterPending,800);}
 async function updateRosterPending(){
   const btn=document.getElementById('roster-pending');
@@ -13423,10 +13466,29 @@ async function updateRosterPending(){
     if(info.state==='none'&&owner){n=1;label='Set up the signed member list';tip='Nobody’s app shares keys here until you do.';}
     else if(info.state==='replaced'){n=1;label='Member list needs checking';tip=info.problem||'';}
     else if(info.state==='active'&&(manager||approver)){
-      const waiting=approver?(info.proposals||[]).filter(p=>!p.signed&&!p.ready).length:0;
+      const waiting=rosterWaitingFor(info).length;
       let diffs=0;
       if(manager){
-        try{rosterView=await window.go.main.App.RosterServerView(allBoards().map(b=>b.id).concat(['@presence']));diffs=rosterDifferences(info,rosterView).length;}catch{}
+        try{
+          rosterView=await window.go.main.App.RosterServerView(allBoards().map(b=>b.id).concat(['@presence']));
+          const all=rosterDifferences(info,rosterView);
+          // A plugin removed from the server comes off the list by itself:
+          // taking someone off needs only one manager, so this goes straight in.
+          const gone=all.filter(d=>d.gonePlugin&&!rosterAutoRemoved.has(d.op.key));
+          for(const d of gone){
+            rosterAutoRemoved.add(d.op.key);
+            try{await window.go.main.App.RosterPropose(JSON.stringify(d.op));}catch(err){console.warn('member list: taking off a removed plugin:',err);}
+          }
+          diffs=all.filter(d=>!d.gonePlugin).length;
+        }catch{}
+      }
+      // Changes turned down, or that can't go through any more: the
+      // proposer's (or the owner's) app clears them away.
+      for(const p of info.proposals||[]){
+        if((p.turned_down||(rosterStuck(p)&&/^(a repeat|for a different member list|already a member|not a member)$/.test(p.problem)))&&(p.mine||owner)&&!rosterAutoCleared.has(p.id)){
+          rosterAutoCleared.add(p.id);
+          window.go.main.App.RosterWithdraw(p.id).catch(()=>{});
+        }
       }
       n=waiting+diffs;
       if(n){

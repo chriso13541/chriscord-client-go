@@ -338,3 +338,37 @@ func TestRosterConsider(t *testing.T) {
 	}
 	l.add(e, true)
 }
+
+// Turning a change down: signed with its own message (an approval's
+// signature doesn't count as one, or the other way round), only approvers
+// count, and it's turned down once it can't get the approvals it needs.
+func TestRosterTurnedDown(t *testing.T) {
+	owner, mgr, other := newRK(), newRK(), newRK()
+	l := startLog(t, owner, RosterPolicy{Approvers: "managers", Need: "1"}, []RosterMember{member(mgr), member(other)}, []string{mgr.hex}, nil)
+	add := opOf(other, opAdd)
+	add.Roster, add.Key, add.Kind = l.r.ID, newRK().hex, kindMember
+	e, err := makeRosterEntry(add, other.priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject := func(k rk) RosterSig {
+		return RosterSig{Key: k.hex, Sig: hex.EncodeToString(ed25519.Sign(k.priv, rosterRejectMessage(e.Body)))}
+	}
+	approve := RosterSig{Key: owner.hex, Sig: hex.EncodeToString(ed25519.Sign(owner.priv, rosterMessage(e.Body)))}
+	if got := rejecters(e.Body, []RosterSig{approve}); len(got) != 0 {
+		t.Fatal("an approval counted as a rejection")
+	}
+	if e2 := (RosterEntry{Body: e.Body, Sigs: []RosterSig{reject(owner)}}); e2.signers()[owner.hex] {
+		t.Fatal("a rejection counted as an approval")
+	}
+	// Two approvers, one approval needed: one rejection leaves the other.
+	if l.r.TurnedDown(rejecters(e.Body, []RosterSig{reject(owner)})) {
+		t.Fatal("turned down while another approver could still approve")
+	}
+	if l.r.TurnedDown(rejecters(e.Body, []RosterSig{reject(other)})) {
+		t.Fatal("a non-approver turned it down")
+	}
+	if !l.r.TurnedDown(rejecters(e.Body, []RosterSig{reject(owner), reject(mgr)})) {
+		t.Fatal("both approvers turned it down, but it isn't")
+	}
+}

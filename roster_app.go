@@ -57,6 +57,7 @@ type rosterPin struct {
 
 type rosterProposal struct {
 	Entry     RosterEntry
+	Rejects   []RosterSig // approvers turning it down (rosterRejectMessage)
 	CreatedAt string
 }
 
@@ -189,6 +190,7 @@ type rosterResp struct {
 	Proposals []struct {
 		Body      string      `json:"body"`
 		Sigs      []RosterSig `json:"sigs"`
+		Rejects   []RosterSig `json:"rejects"`
 		CreatedAt string      `json:"created_at"`
 	} `json:"proposals"`
 }
@@ -276,7 +278,7 @@ func (rc *rosterClient) refreshOnce() {
 		}
 		all = append(all, resp.Entries...)
 		for _, p := range resp.Proposals {
-			proposals = append(proposals, rosterProposal{Entry: RosterEntry{Body: p.Body, Sigs: p.Sigs}, CreatedAt: p.CreatedAt})
+			proposals = append(proposals, rosterProposal{Entry: RosterEntry{Body: p.Body, Sigs: p.Sigs}, Rejects: p.Rejects, CreatedAt: p.CreatedAt})
 		}
 		if len(resp.Entries) > 0 {
 			after = resp.Entries[len(resp.Entries)-1].Seq
@@ -726,8 +728,11 @@ type rosterProposalInfo struct {
 	Needed    int             `json:"needed"`
 	Ready     bool            `json:"ready"`
 	Problem   string          `json:"problem"`
-	Mine      bool            `json:"mine"`   // proposed by this account
-	Signed    bool            `json:"signed"` // this account has approved it
+	Mine      bool            `json:"mine"`        // proposed by this account
+	Signed    bool            `json:"signed"`      // this account has approved it
+	Rejecters []string        `json:"rejecters"`   // approvers who turned it down
+	Rejected  bool            `json:"rejected"`    // this account has turned it down
+	TurnedDn  bool            `json:"turned_down"` // it can't get the approvals it needs any more
 	CreatedAt string          `json:"created_at"`
 }
 
@@ -809,8 +814,17 @@ func (a *App) RosterInfo() rosterInfo {
 			who = append(who, k)
 		}
 		sort.Strings(who)
+		rejected := rejecters(p.Entry.Body, p.Rejects)
+		rej := []string{}
+		for k := range rejected {
+			if r.isApprover(k) {
+				rej = append(rej, k)
+			}
+		}
+		sort.Strings(rej)
 		info.Proposals = append(info.Proposals, rosterProposalInfo{ID: c.Op.ID, Op: json.RawMessage(p.Entry.Body), By: c.Op.By, Signers: who,
-			Approvals: c.Approvals, Needed: c.Needed, Ready: c.Ready, Problem: c.Problem, Mine: c.Op.By == rc.me, Signed: signers[rc.me], CreatedAt: p.CreatedAt})
+			Approvals: c.Approvals, Needed: c.Needed, Ready: c.Ready, Problem: c.Problem, Mine: c.Op.By == rc.me, Signed: signers[rc.me], CreatedAt: p.CreatedAt,
+			Rejecters: rej, Rejected: rejected[rc.me], TurnedDn: r.TurnedDown(rejected)})
 	}
 	for _, ch := range r.Changes {
 		body, _ := json.Marshal(ch.Op)
@@ -972,6 +986,44 @@ func (a *App) RosterApprove(id string) (string, error) {
 	return "waiting", nil
 }
 
+// RosterReject turns a proposed change down, as one of the approvers:
+// signed, so every app can check it was really them. Once approvers have
+// turned it down so it can't get the approvals it needs, every app shows it
+// as turned down, and the proposer's or the owner's app clears it away.
+func (a *App) RosterReject(id string) (string, error) {
+	priv, me, err := a.rosterSigner()
+	if err != nil {
+		return "", err
+	}
+	rc := a.roster
+	rc.mu.Lock()
+	r := rc.r
+	approver := r != nil && r.isApprover(me)
+	body := ""
+	for i := range rc.proposals {
+		if op, err := rc.proposals[i].Entry.op(); err == nil && op.ID == id {
+			body = rc.proposals[i].Entry.Body
+		}
+	}
+	rc.mu.Unlock()
+	if body == "" || r == nil {
+		return "", errors.New("that change isn't waiting any more")
+	}
+	if !approver {
+		return "", errors.New("you're not one of this server's approvers")
+	}
+	sig := RosterSig{Key: me, Sig: hex.EncodeToString(ed25519.Sign(priv, rosterRejectMessage(body)))}
+	if err := a.doJSON("POST", "/api/roster/proposals/"+id+"/reject", sig, nil); err != nil {
+		var h *httpError
+		if errors.As(err, &h) && h.code == 404 {
+			return "", errors.New("this server is too old to turn changes down — update it (the owner can still turn it down)")
+		}
+		return "", err
+	}
+	rc.refresh()
+	return "rejected", nil
+}
+
 // consider checks an entry against the list as it is now.
 func (rc *rosterClient) consider(e RosterEntry) Approval {
 	rc.mu.Lock()
@@ -1112,6 +1164,11 @@ type rosterServerMember struct {
 
 type rosterServerView struct {
 	Members []rosterServerMember `json:"members"`
+	// Bots: every bot and plugin the server has (identity keys), and
+	// whether that list loaded — so the page can tell one that was removed
+	// from the server but is still on the member list.
+	Bots   []string `json:"bots"`
+	BotsOK bool     `json:"bots_ok"`
 	// Boards: channel → the identity keys the server says can see it.
 	// Channels this account can't see are missing (the server won't say).
 	Boards map[string][]string `json:"boards"`
@@ -1122,7 +1179,7 @@ type rosterServerView struct {
 // for showing approvers where it and the list disagree. It's only what the
 // server claims: the list is what counts.
 func (a *App) RosterServerView(boards []string) (rosterServerView, error) {
-	v := rosterServerView{Members: []rosterServerMember{}, Boards: map[string][]string{}}
+	v := rosterServerView{Members: []rosterServerMember{}, Boards: map[string][]string{}, Bots: []string{}}
 	kinds := map[string]string{}
 	var bots struct {
 		Bots []struct {
@@ -1131,8 +1188,11 @@ func (a *App) RosterServerView(boards []string) (rosterServerView, error) {
 		} `json:"bots"`
 	}
 	if err := a.doJSON("GET", "/api/bots", nil, &bots); err == nil {
+		v.BotsOK = true
 		for _, b := range bots.Bots {
-			kinds[strings.ToLower(b.PublicKey)] = map[bool]string{true: kindPlugin, false: kindBot}[b.Plugin]
+			k := strings.ToLower(b.PublicKey)
+			kinds[k] = map[bool]string{true: kindPlugin, false: kindBot}[b.Plugin]
+			v.Bots = append(v.Bots, k)
 		}
 	}
 	seen := map[string]bool{}
