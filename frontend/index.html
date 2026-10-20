@@ -335,6 +335,12 @@ img.plug-ico { border-radius:4px; }
 .pp-reply { margin:0 14px 12px; background:var(--bg-dark); }
 #plug-reply.error, .pp-reply.error { border-left-color:var(--red); }
 #plug-reply.hidden, .pp-reply.hidden { display:none; }
+/* Over the bottom of the chat rather than in line above the box: showing
+   and fading it doesn't move the messages. Mostly opaque, so a search's
+   answer stays easy to read. */
+#plug-reply { position:absolute; left:20px; right:20px; bottom:100%; margin:0 0 8px; z-index:5;
+  background:color-mix(in srgb, var(--bg-mid) 90%, transparent); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  box-shadow:0 6px 20px rgba(0,0,0,.35); max-height:40vh; overflow-y:auto; }
 /* Going away: a quick fade rather than vanishing (hideReplyBox). */
 #plug-reply, .pp-reply { transition:opacity .25s ease; }
 #plug-reply.fading, .pp-reply.fading { opacity:0; }
@@ -6030,7 +6036,7 @@ const textFileObserver=('IntersectionObserver' in window)?new IntersectionObserv
 },{rootMargin:'400px'}):null;
 function buildTextFile(a){
   const ext=textFileExt(a.name);
-  const el=document.createElement('div');el.className='text-file';
+  const el=document.createElement('div');el.className='text-file';el._att=a;
   el.innerHTML=`<div class="tf-head">${icon(fileTypeIcon(a.name,a.mime))}<span class="tf-name" title="${esc(a.name||'')}">${esc(a.name||'File')}</span><span class="tf-meta"></span>
     <span class="tf-btns"><button type="button" class="tf-btn tf-copy" title="Copy" disabled>${icon('content_copy')}</button><button type="button" class="tf-btn tf-full" title="View whole file" disabled>${icon('open_in_full')}</button><button type="button" class="tf-btn tf-dl" title="Download">${icon('download')}</button></span></div>
     <div class="tf-status">Loading\u2026</div>`;
@@ -6040,7 +6046,7 @@ function buildTextFile(a){
     try{d=await fetchTextPreview(a);}
     catch(err){
       // Not text after all, or it couldn't be fetched: the plain download chip.
-      const chip=document.createElement('div');chip.className='msg-file-chip';
+      const chip=document.createElement('div');chip.className='msg-file-chip';chip._att=a;
       chip.innerHTML=`${icon(fileTypeIcon(a.name,a.mime),'file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
       chip.addEventListener('click',()=>downloadAttachment(a));
       el.replaceWith(chip);return;
@@ -7168,14 +7174,13 @@ function buildMsgEl(msg,grouped){
 
   // Non-image attachments
   others.forEach(a=>{
-    if(a.mime?.startsWith('video/')){
-      body.appendChild(buildMediaPlayer(a,'video'));
-    }else if(a.mime?.startsWith('audio/')){
-      body.appendChild(buildMediaPlayer(a,'audio'));
+    if(a.mime?.startsWith('video/')||a.mime?.startsWith('audio/')){
+      const mp=buildMediaPlayer(a,a.mime.startsWith('video/')?'video':'audio');mp._att=a;
+      body.appendChild(mp);
     }else if(isTextPreviewable(a)){
       body.appendChild(buildTextFile(a));
     }else{
-      const chip=document.createElement('div');chip.className='msg-file-chip';
+      const chip=document.createElement('div');chip.className='msg-file-chip';chip._att=a;
       chip.innerHTML=`${icon(fileTypeIcon(a.name,a.mime),'file-ic')}<span class="fname">${esc(a.name||'File')}</span>${icon('download','dl-ic')}`;
       if(a.spoiler)coverSpoiler(chip);
       chip.addEventListener('click',()=>downloadAttachment(a));
@@ -11389,7 +11394,23 @@ function messageMenu(msgEl,msg,e){
   const selection=String(window.getSelection()||'').trim();
   const attachments=(msg.attachments||[]).filter(a=>!a.missing);
   const imgAttach=img?attachments.filter(a=>a.mime?.startsWith('image/'))[[...msgEl.querySelectorAll('.grid-img')].indexOf(img)]:null;
+  // A file right-clicked: its card (a text file's preview, a download chip,
+  // a player) carries its attachment.
+  let fileAttach=null;
+  for(let el=e.target;el&&el!==msgEl;el=el.parentElement)if(el._att){fileAttach=el._att;break;}
+  const textFile=fileAttach&&isTextPreviewable(fileAttach);
+  const fileItems=fileAttach?[
+    textFile?{label:'Copy File Contents',icon:'content_copy',action:async()=>{
+      try{const d=await fetchTextPreview(fileAttach);await copyText(d.text);toast(d.truncated?`Copied the first ${fmtBytes(TEXT_PREVIEW_MAX)} — download it for the rest`:'File contents copied');}
+      catch{toast('Couldn’t read that file as text',true);}
+    }}:null,
+    textFile?{label:'View Whole File',icon:'open_in_full',action:()=>fetchTextPreview(fileAttach).then(d=>openTextViewer(fileAttach,d)).catch(()=>toast('Couldn’t read that file as text',true))}:null,
+    {label:'Copy File Name',icon:'description',action:()=>{copyText(fileAttach.name||'');toast('File name copied');}},
+    {label:'Save File',icon:'download',action:()=>downloadAttachment(fileAttach)},
+    '-',
+  ]:[];
   return [
+    ...fileItems,
     selection?{label:'Copy',icon:'content_copy',action:()=>copyText(selection)}:null,
     link?{label:'Open Link',icon:'open_in_new',action:()=>openExternalURL(link.dataset.url)}:null,
     link?{label:'Copy Link',icon:'link',action:()=>{copyText(link.dataset.url);toast('Link copied');}}:null,
@@ -11405,7 +11426,7 @@ function messageMenu(msgEl,msg,e){
       try{await window.go.main.App.SetMessagePinned(msg.id,!msg.pinned);}catch(err){toast((msg.pinned?'Unpin':'Pin')+' failed: '+err,true);}
     }},
     isOwn&&!msg.kind?{label:'Edit Message',icon:'edit',action:()=>startEdit(msgEl,msg)}:null,
-    ...(!imgAttach?attachments.map(a=>({label:`Download ${a.name||'file'}`,icon:'download',action:()=>downloadAttachment(a)})):[]),
+    ...(!imgAttach&&!fileAttach?attachments.map(a=>({label:`Download ${a.name||'file'}`,icon:'download',action:()=>downloadAttachment(a)})):[]),
     !imgAttach&&attachments.filter(isServerFile).length>=2?{label:'Download All as .zip',icon:'folder_zip',action:()=>downloadAllAttachments(msg)}:null,
     (isOwn||can(PERM.MANAGE))?'-':null,
     (isOwn||can(PERM.MANAGE))?{label:'Delete Message',icon:'delete',danger:true,action:()=>showDeleteConfirm(msg.id)}:null,
