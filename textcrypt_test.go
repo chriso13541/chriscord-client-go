@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +24,8 @@ type fakeKeyServer struct {
 	gens    map[string]int                        // board → latest generation
 	boxes   map[string]map[int]map[string]fakeBox // board → gen → recipient → box
 	failNew int                                   // make the next N new-generation requests conflict
+	order   []string                              // usernames, in the order added (the first owns the list)
+	listFP  string                                // what the signed member list was last made from
 }
 
 type fakeBox struct{ sender, box string }
@@ -39,10 +42,74 @@ func (s *fakeKeyServer) add(t *testing.T, name string) *App {
 	a.text.call = func(method, path string, body, out interface{}) error {
 		return s.handle(name, method, path, body, out)
 	}
+	a.roster = newRosterClient(a)
+	a.roster.state = rosterLoading
 	s.mu.Lock()
 	s.users[name] = a
+	s.order = append(s.order, name)
+	s.syncListLocked()
 	s.mu.Unlock()
 	return a
+}
+
+// fakeListBoards: the channels the tests use.
+var fakeListBoards = []string{"b1", "b2", "other-board"}
+
+// syncListLocked gives every app a signed member list that says what this
+// server does — everyone a member, each channel readable by whoever it
+// lets see it — as a list its approvers had kept up to date. Without
+// one, no app shares keys at all.
+func (s *fakeKeyServer) syncListLocked() {
+	fp := strings.Join(s.order, ",")
+	for _, b := range fakeListBoards {
+		fp += "|" + b + ":"
+		if set, ok := s.access[b]; ok {
+			var who []string
+			for n, ok := range set {
+				if ok {
+					who = append(who, n)
+				}
+			}
+			sort.Strings(who)
+			fp += strings.Join(who, ",")
+		} else {
+			fp += "*"
+		}
+	}
+	if fp == s.listFP || len(s.order) == 0 {
+		return
+	}
+	s.listFP = fp
+	owner := s.users[s.order[0]].account
+	op := newRosterOp("", hex.EncodeToString(owner.PublicKey), opStart)
+	op.Policy = &RosterPolicy{Approvers: "owner", Need: "1"}
+	for _, n := range s.order {
+		op.Members = append(op.Members, RosterMember{Key: s.idOf(n), Kind: kindMember})
+	}
+	for _, b := range fakeListBoards {
+		set, ok := s.access[b]
+		acc := RosterAccess{Board: b, All: !ok}
+		for n, in := range set {
+			if in {
+				acc.Readers = append(acc.Readers, s.idOf(n))
+			}
+		}
+		op.Access = append(op.Access, acc)
+	}
+	e, err := makeRosterEntry(op, owner.PrivateKey)
+	if err != nil {
+		panic(err)
+	}
+	for _, a := range s.users {
+		r, err := BuildRoster([]RosterEntry{e})
+		if err != nil {
+			panic(err)
+		}
+		rc := a.roster
+		rc.mu.Lock()
+		rc.r, rc.state, rc.heads, rc.forks = r, rosterActive, map[string]bool{headPrefix(r.Head): true}, map[string]string{}
+		rc.mu.Unlock()
+	}
 }
 
 func (s *fakeKeyServer) idOf(name string) string {
@@ -65,6 +132,7 @@ func (s *fakeKeyServer) member(name string) map[string]interface{} {
 func (s *fakeKeyServer) handle(user, method, path string, body, out interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.syncListLocked()
 	var in map[string]interface{}
 	if body != nil {
 		raw, _ := json.Marshal(body)

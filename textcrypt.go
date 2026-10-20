@@ -685,7 +685,6 @@ func (t *textCrypto) openFullP(board, author, importedFrom, content string) (str
 	if err != nil {
 		return textBrokenMsg, "error", nil, nil, nil, msgWriter{}
 	}
-	t.app.rosterNoteHead(p.U, p.RH)
 	if p.I != nil {
 		// Imported: it has to be shown as that same person's (whoever
 		// has claimed them since).
@@ -701,6 +700,7 @@ func (t *textCrypto) openFullP(board, author, importedFrom, content string) (str
 	if why != "" {
 		return fmt.Sprintf("⚠ Claims to be from %s, but %s: %s", p.U, why, p.T), "forged", p.A, nil, nil, w
 	}
+	w.Head = p.RH
 	return p.T, "ok", p.A, nil, p.L, w
 }
 
@@ -722,6 +722,13 @@ func (t *textCrypto) open(m *ChatMessage) {
 	m.Content, m.E2EE, files, imp, lp, w = t.openFullP(m.BoardID, m.Username, m.ImportedFrom, m.Content)
 	m.Preview = lp.asLinkPreview()
 	m.AuthorKind = w.Kind
+	// The list the writer saw: only for a message that checked out (a
+	// forged one could otherwise make anyone look forked), and only here —
+	// with its time — not for replies' previews, edits or presence, which
+	// can carry the head of a list that has since been started over.
+	if m.E2EE == "ok" && !w.Unsigned {
+		t.app.rosterNoteHead(m.Username, w.Head, m.CreatedAt)
+	}
 	// Unsigned, but sent since this server's signed member list started (so
 	// by an app that signs): someone with the channel's key wrote it as them.
 	if w.Unsigned && m.E2EE == "ok" && t.app.rosterSignedSince(m.CreatedAt) {

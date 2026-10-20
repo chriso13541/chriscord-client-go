@@ -413,7 +413,15 @@ func (c *callCrypto) onHelloLocked(m *e2eeMsg) ([]outMsg, bool) {
 		}
 	}
 	if _, inCall := c.roster[m.From]; inCall {
-		if isNew {
+		if isNew && c.curUnusedLocked() {
+			// Nothing has been sent with the current key yet (this app
+			// just joined): there's nothing before them for it to open, so
+			// they get it now rather than a new one that only takes over
+			// a second later — that second's sound was dropped by everyone.
+			if km, ok := c.keyMsgLocked(m.From, p, c.cur); ok {
+				out = append(out, km)
+			}
+		} else if isNew {
 			// Someone new: a new key for everyone, which they get too —
 			// never the one in use before they arrived.
 			c.scheduleRotateLocked()
@@ -433,6 +441,29 @@ func (c *callCrypto) onHelloLocked(m *e2eeMsg) ([]outMsg, bool) {
 		}
 	}
 	return out, isNew
+}
+
+// curUnusedLocked: the current key hasn't sealed a frame, no new one is
+// on its way, and no rotation is waiting (someone leaving) — so giving it
+// to someone arriving reveals nothing sent before them.
+func (c *callCrypto) curUnusedLocked() bool {
+	return c.cur != nil && c.cur.counter == 0 && c.next == nil && c.rotate == nil
+}
+
+// rosterChanged: the signed member list changed (roster_app.go). Someone
+// in the call may have lost access to its channel — they mustn't hear
+// what's sent next — or gained it and need the key; and a plugin that was
+// just added shows as one. A new key for whoever the list allows now.
+func (c *callCrypto) rosterChanged() {
+	c.mu.Lock()
+	in := c.board != ""
+	if in {
+		c.scheduleRotateLocked()
+	}
+	c.mu.Unlock()
+	if in {
+		c.emitState()
+	}
 }
 
 func (c *callCrypto) onKeyLocked(m *e2eeMsg) bool {

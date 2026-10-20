@@ -49,7 +49,8 @@ const (
 // rosterPin is what this app remembers about a server's list.
 type rosterPin struct {
 	ID      string          `json:"id"`
-	Applied int             `json:"applied"` // entries this app had worked through
+	Applied int             `json:"applied"`        // entries this app had worked through
+	Head    string          `json:"head,omitempty"` // the list's head after them (first 16 characters)
 	Rotate  map[string]bool `json:"rotate,omitempty"`
 	Joins   []string        `json:"joins,omitempty"` // invite secrets waiting to be used (base64url)
 }
@@ -74,43 +75,78 @@ type rosterClient struct {
 	problem   string
 	heads     map[string]bool // every head (first 16 characters) the list has had
 	pin       *rosterPin
-	forks     map[string]bool // members whose messages say they see a different list
+	forks     map[string]string // member → the unknown head their message carried (a different list?)
 	refreshT  *time.Timer
 	loading   bool
 	again     bool
+	idle      *sync.Cond // signalled when a refresh (and any it owed) has finished
 }
 
-func newRosterClient(a *App) *rosterClient { return &rosterClient{app: a, state: rosterNone} }
+func newRosterClient(a *App) *rosterClient {
+	rc := &rosterClient{app: a, state: rosterNone}
+	rc.idle = sync.NewCond(&rc.mu)
+	return rc
+}
 
 func (a *App) rosterPinPath() string { return filepath.Join(chriscordConfigDir(), rosterPinsFile) }
 
 var rosterPinsMu sync.Mutex
 
+// readRosterPinsLocked reads every server's pin. A file that's there but
+// can't be read (from before writes were atomic, or damaged) is moved
+// aside rather than taken as empty: taken as empty, the next save wrote
+// over it and forgot every server's list, and each one was then accepted
+// as if seen for the first time.
+func readRosterPinsLocked(path string) map[string]*rosterPin {
+	all := map[string]*rosterPin{}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("roster: reading %s: %v", path, err)
+		}
+		return all
+	}
+	if err := json.Unmarshal(data, &all); err != nil {
+		to := quarantine(path)
+		log.Printf("roster: WARNING: %s is damaged (%v) — moved to %s; member lists here will be checked from scratch", path, err, to)
+		return map[string]*rosterPin{}
+	}
+	for k, p := range all {
+		if p == nil {
+			delete(all, k)
+		}
+	}
+	return all
+}
+
 func loadRosterPin(path, key string) *rosterPin {
 	rosterPinsMu.Lock()
 	defer rosterPinsMu.Unlock()
-	all := map[string]*rosterPin{}
-	if data, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(data, &all)
+	p := readRosterPinsLocked(path)[key]
+	if p == nil {
+		return nil
 	}
-	return all[key]
+	c := *p // its own copy: callers change it under rc.mu
+	return &c
 }
 
+// saveRosterPin writes key's pin (nil: forgets it), leaving the others as
+// they are. The whole file is replaced in one go (writeFileAtomic).
 func saveRosterPin(path, key string, p *rosterPin) {
 	rosterPinsMu.Lock()
 	defer rosterPinsMu.Unlock()
-	all := map[string]*rosterPin{}
-	if data, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(data, &all)
-	}
+	all := readRosterPinsLocked(path)
 	if p == nil {
 		delete(all, key)
 	} else {
 		all[key] = p
 	}
-	if data, err := json.MarshalIndent(all, "", "  "); err == nil {
-		os.MkdirAll(filepath.Dir(path), 0700)
-		os.WriteFile(path, data, 0600)
+	data, err := json.MarshalIndent(all, "", "  ")
+	if err == nil {
+		err = writeFileAtomic(path, data, 0600)
+	}
+	if err != nil {
+		log.Printf("roster: WARNING: couldn't save what this app knows of the member list (%s): %v", path, err)
 	}
 }
 
@@ -125,7 +161,7 @@ func (rc *rosterClient) begin() {
 	if rc.scope != scope {
 		rc.scope, rc.domain, rc.me = scope, id.domain, id.idHex
 		rc.entries, rc.lastSeq, rc.r, rc.proposals = nil, 0, nil, nil
-		rc.heads, rc.forks = map[string]bool{}, map[string]bool{}
+		rc.heads, rc.forks = map[string]bool{}, map[string]string{}
 		rc.pin = loadRosterPin(rc.app.rosterPinPath(), scope)
 		// Until the list is fetched and checked, nobody gets keys — not
 		// even on a server that (says it) has none.
@@ -157,27 +193,53 @@ type rosterResp struct {
 	} `json:"proposals"`
 }
 
-// refresh fetches what's new in the list and works it in.
+// refresh fetches what's new in the list and works it in. If a fetch is
+// already running, it fetches once more when that's done (a change may
+// have come after it started), and this returns straight away; waitIdle
+// waits for all of it.
 func (rc *rosterClient) refresh() {
 	rc.mu.Lock()
+	if rc.idle == nil {
+		rc.idle = sync.NewCond(&rc.mu)
+	}
 	if rc.loading {
 		rc.again = true
 		rc.mu.Unlock()
 		return
 	}
 	rc.loading = true
-	scope := rc.scope
 	rc.mu.Unlock()
-	defer func() {
+	for {
+		rc.refreshOnce()
 		rc.mu.Lock()
-		rc.loading = false
-		again := rc.again
+		if !rc.again {
+			rc.loading = false
+			rc.idle.Broadcast()
+			rc.mu.Unlock()
+			return
+		}
 		rc.again = false
 		rc.mu.Unlock()
-		if again {
-			rc.refresh()
-		}
-	}()
+	}
+}
+
+// waitIdle fetches the list and waits until it's done, including a fetch
+// that was already running (and any owed after it).
+func (rc *rosterClient) waitIdle() {
+	rc.refresh()
+	rc.mu.Lock()
+	for rc.loading && rc.idle != nil {
+		rc.idle.Wait()
+	}
+	rc.mu.Unlock()
+}
+
+// refreshOnce is one fetch: everything new, worked in together or not at
+// all (a failed fetch changes nothing).
+func (rc *rosterClient) refreshOnce() {
+	rc.mu.Lock()
+	scope := rc.scope
+	rc.mu.Unlock()
 	if scope == "" {
 		return
 	}
@@ -238,6 +300,9 @@ func (rc *rosterClient) refresh() {
 		rc.tryJoin(seed)
 	}
 	rc.app.text.changed() // who gets keys may have changed: share with newcomers, etc.
+	if rc.app.e2ee != nil {
+		rc.app.e2ee.rosterChanged() // and who may hear this app's call (e2ee.go)
+	}
 	rc.emit()
 }
 
@@ -269,6 +334,25 @@ func (rc *rosterClient) integrateLocked(fresh []RosterEntry, lastSeq int64) {
 			rc.state, rc.problem = rosterReplaced, "the member list doesn't check out: "+err.Error()
 			return
 		}
+		if rc.pin != nil && rc.pin.ID == r.ID && rc.pin.Applied > 0 {
+			// Same list: it has to hold at least what this app already
+			// worked through, the same way. Fewer entries means the server
+			// lost some (a restored backup) or is hiding them — a removal,
+			// say; a different head, that they were changed.
+			why := ""
+			switch {
+			case rc.pin.Applied > len(rc.entries):
+				why = fmt.Sprintf("is missing changes this app has already seen (it has %d, this app had %d) — it was rolled back, or is hiding some", len(rc.entries), rc.pin.Applied)
+			case rc.pin.Head != "" && headPrefix(r.Head) != rc.pin.Head:
+				why = "isn't the one this app saw before: changes it had seen were altered"
+			}
+			if why != "" {
+				rc.r, rc.entries, rc.lastSeq = nil, nil, 0
+				rc.state, rc.problem = rosterReplaced, "the server's member list "+why
+				log.Printf("roster: WARNING: %s", rc.problem)
+				return
+			}
+		}
 		rc.r = r
 		// Every head it has had, not just the newest: messages sent before
 		// the last change carry an earlier one.
@@ -283,7 +367,11 @@ func (rc *rosterClient) integrateLocked(fresh []RosterEntry, lastSeq int64) {
 	switch {
 	case rc.pin == nil || rc.pin.ID == "":
 		// The first time this app sees a list here: remember it.
-		rc.pin = &rosterPin{ID: rc.r.ID, Applied: rc.r.Applied + len(rc.r.Rejected)}
+		joins := []string(nil)
+		if rc.pin != nil {
+			joins = rc.pin.Joins // invites waiting to be used (RosterJoin)
+		}
+		rc.pin = &rosterPin{ID: rc.r.ID, Applied: rc.r.Applied + len(rc.r.Rejected), Head: headPrefix(rc.r.Head), Joins: joins}
 		rc.state, rc.problem = rosterActive, ""
 	case rc.pin.ID != rc.r.ID:
 		rc.state = rosterReplaced
@@ -292,6 +380,14 @@ func (rc *rosterClient) integrateLocked(fresh []RosterEntry, lastSeq int64) {
 	default:
 		rc.state, rc.problem = rosterActive, ""
 		rc.pin.Applied = rc.r.Applied + len(rc.r.Rejected)
+		rc.pin.Head = headPrefix(rc.r.Head)
+	}
+	// Someone whose message carried a head this app didn't have yet, which
+	// it has now: they weren't on a different list after all.
+	for u, h := range rc.forks {
+		if rc.heads[h] {
+			delete(rc.forks, u)
+		}
 	}
 	saveRosterPin(path, rc.scope, rc.pin)
 }
@@ -414,6 +510,9 @@ func (a *App) rosterKindOf(key string) (kind, state string) {
 // rosterKnew: whether key has ever been on the signed member list (a
 // member who has since left wrote their old messages legitimately).
 func (a *App) rosterKnew(key string) bool {
+	if a == nil || a.roster == nil {
+		return false
+	}
 	rc := a.roster
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
@@ -441,6 +540,9 @@ func (a *App) rosterKnew(key string) bool {
 // after this server's signed member list started — when every app that
 // could get keys signs its messages (allowing a few minutes either way).
 func (a *App) rosterSignedSince(createdAt string) bool {
+	if a == nil || a.roster == nil {
+		return false
+	}
 	rc := a.roster
 	rc.mu.Lock()
 	var start int64
@@ -492,6 +594,9 @@ func (a *App) rosterIsAutomated(key string) bool {
 
 // rosterWhyNoKeys: why this app won't share keys here yet ("" if it will).
 func (a *App) rosterWhyNoKeys() string {
+	if a == nil || a.roster == nil {
+		return "still checking this server's signed member list"
+	}
 	rc := a.roster
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
@@ -548,27 +653,30 @@ func (a *App) rosterHead() string {
 	return headPrefix(rc.r.Head)
 }
 
-// rosterNoteHead: a message from user says they see the list at head. One
-// this app has never had: fetch the list again; still unknown after that,
-// they're being shown a different list — warn.
-func (a *App) rosterNoteHead(user, head string) {
-	if a == nil || a.roster == nil || head == "" {
+// rosterNoteHead: a checked message from user, sent at createdAt, says
+// they saw the list at head. One this app has never had: fetch the list
+// (waiting for a fetch already running — a message often arrives with the
+// change it was sent after); still unknown after that, they're being shown
+// a different list — warn. Messages from before this list started carry
+// an earlier list's heads (one that was started over), so they don't count.
+func (a *App) rosterNoteHead(user, head, createdAt string) {
+	if a == nil || a.roster == nil || head == "" || user == "" {
 		return
 	}
 	rc := a.roster
 	rc.mu.Lock()
-	if rc.state != rosterActive || rc.heads[head] {
+	if rc.state != rosterActive || rc.r == nil || rc.heads[head] || !sentDuring(rc.r, createdAt) {
 		rc.mu.Unlock()
 		return
 	}
 	rc.mu.Unlock()
 	go func() {
-		rc.refresh()
+		rc.waitIdle()
 		rc.mu.Lock()
 		unknown := rc.state == rosterActive && !rc.heads[head]
-		fresh := unknown && !rc.forks[user]
+		fresh := unknown && rc.forks[user] == ""
 		if unknown {
-			rc.forks[user] = true
+			rc.forks[user] = head
 		}
 		rc.mu.Unlock()
 		if fresh {
@@ -576,6 +684,20 @@ func (a *App) rosterNoteHead(user, head string) {
 			rc.emit()
 		}
 	}()
+}
+
+// sentDuring: whether a message sent at createdAt (RFC 3339, the server's
+// clock) came after r was started (the owner's clock), allowing a couple
+// of minutes either way. Unknown times count as during.
+func sentDuring(r *Roster, createdAt string) bool {
+	if r.StartedAt == 0 || createdAt == "" {
+		return true
+	}
+	t, err := time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		t, err = time.Parse("2006-01-02 15:04:05", createdAt)
+	}
+	return err != nil || t.Unix() > r.StartedAt+2*60
 }
 
 func (rc *rosterClient) emit() {

@@ -91,6 +91,7 @@ func signPlain(p *textPlain, board string, gen int, id textIdentity) {
 type msgWriter struct {
 	Kind     string // "bot" or "plugin" (as the signed member list has them), else ""
 	Unsigned bool
+	Head     string // the signed member list's head the writer saw (textPlain.RH)
 }
 
 // checkWriter checks a message's signature: by the key it carries, over

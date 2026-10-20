@@ -240,6 +240,40 @@ func (s *fakeServer) add(t *testing.T, user string) *App {
 	return a
 }
 
+// sign gives everyone added so far the same signed member list (owned by
+// the first), all of them members who may use the call's channel —
+// without one, no app hands out its call key.
+func (s *fakeServer) sign(t *testing.T, apps ...*App) *Roster {
+	t.Helper()
+	var members []RosterMember
+	for _, a := range apps {
+		members = append(members, RosterMember{Key: hex.EncodeToString(a.account.PublicKey), Kind: kindMember})
+	}
+	return s.signWith(t, apps, members)
+}
+
+func (s *fakeServer) signWith(t *testing.T, apps []*App, members []RosterMember) *Roster {
+	t.Helper()
+	owner := apps[0].account
+	op := newRosterOp("", hex.EncodeToString(owner.PublicKey), opStart)
+	op.Policy = &RosterPolicy{Approvers: "owner", Need: "1"}
+	op.Members = members
+	op.Access = []RosterAccess{{Board: s.board, All: true}}
+	e, err := makeRosterEntry(op, owner.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range apps {
+		r, err := BuildRoster([]RosterEntry{e})
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.roster = &rosterClient{app: a, state: rosterActive, r: r}
+	}
+	r, _ := BuildRoster([]RosterEntry{e})
+	return r
+}
+
 // pump delivers everything queued to whoever it's for, like ws.rs does.
 func (s *fakeServer) pump() {
 	for {
@@ -301,6 +335,7 @@ func TestCallKeyExchange(t *testing.T) {
 	t.Setenv("AppData", t.TempDir())
 	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
 	alice, bob, carol := s.add(t, "alice"), s.add(t, "bob"), s.add(t, "carol")
+	s.sign(t, alice, bob, carol)
 
 	alice.e2ee.begin("vc1")
 	s.roster("alice")
@@ -394,6 +429,7 @@ func TestCallReconnect(t *testing.T) {
 	t.Setenv("AppData", t.TempDir())
 	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
 	alice, bob := s.add(t, "alice"), s.add(t, "bob")
+	s.sign(t, alice, bob)
 	alice.e2ee.begin("vc1")
 	s.roster("alice")
 	bob.e2ee.begin("vc1")
@@ -421,6 +457,7 @@ func TestJoinStateBeforeBegin(t *testing.T) {
 	t.Setenv("AppData", t.TempDir())
 	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
 	alice, bob := s.add(t, "alice"), s.add(t, "bob")
+	s.sign(t, alice, bob)
 	alice.e2ee.begin("vc1")
 	s.roster("alice")
 	s.settle()
@@ -443,6 +480,7 @@ func TestLostHelloRecovers(t *testing.T) {
 	t.Setenv("AppData", t.TempDir())
 	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
 	alice, bob := s.add(t, "alice"), s.add(t, "bob")
+	s.sign(t, alice, bob)
 	alice.e2ee.begin("vc1")
 	s.roster("alice", "bob")
 	bob.e2ee.begin("vc1")
@@ -459,5 +497,56 @@ func TestLostHelloRecovers(t *testing.T) {
 	mustOpen(t, alice, "bob", kindAudio, bob.e2ee.seal(kindAudio, msg), msg)
 	if alice.GetVoiceEncryption().Code != bob.GetVoiceEncryption().Code {
 		t.Fatal("codes differ")
+	}
+}
+
+// A plugin plays into the call but never gets anyone's key, and someone
+// losing access to the channel on the signed list gets no new key —
+// straight away, not at the next join or leave.
+func TestCallKeysFollowSignedList(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AppData", t.TempDir())
+	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
+	alice, bob, music := s.add(t, "alice"), s.add(t, "bob"), s.add(t, "Music")
+	key := func(a *App) string { return hex.EncodeToString(a.account.PublicKey) }
+	s.signWith(t, []*App{alice, bob, music}, []RosterMember{
+		{Key: key(alice), Kind: kindMember}, {Key: key(bob), Kind: kindMember}, {Key: key(music), Kind: kindPlugin, Name: "Music"},
+	})
+
+	alice.e2ee.begin("vc1")
+	s.roster("alice")
+	s.pump()
+	// Bob joins: nothing's been sent yet, so he gets alice's first key at
+	// once (no second of sound on a key nobody has).
+	bob.e2ee.begin("vc1")
+	s.roster("alice", "bob")
+	s.pump()
+	s.pump()
+	voice := []byte("first words")
+	mustOpen(t, bob, "alice", kindAudio, alice.e2ee.seal(kindAudio, voice), voice)
+
+	music.e2ee.begin("vc1")
+	s.roster("alice", "bob", "Music")
+	s.settle()
+	if _, ok := music.e2ee.open("alice", kindAudio, alice.e2ee.seal(kindAudio, voice)); ok {
+		t.Fatal("the plugin could hear alice")
+	}
+	mustOpen(t, bob, "alice", kindAudio, alice.e2ee.seal(kindAudio, voice), voice)
+
+	// Bob is taken off the list (alice's app sees the change).
+	rm := newRosterOp(alice.roster.r.ID, key(alice), opRemove)
+	rm.Key = key(bob)
+	e, err := makeRosterEntry(rm, alice.account.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := alice.roster.r.Apply(e); err != nil {
+		t.Fatal(err)
+	}
+	alice.e2ee.rosterChanged()
+	s.settle()
+	if _, ok := bob.e2ee.open("alice", kindAudio, alice.e2ee.seal(kindAudio, voice)); ok {
+		t.Fatal("bob still hears alice after losing access")
 	}
 }
