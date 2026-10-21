@@ -884,7 +884,7 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .msg-content { font-size:.9rem; line-height:1.5; color:var(--text); word-break:break-word; white-space:pre-wrap; user-select:text; }
 
 /* Inline links */
-.msg-link { color:var(--accent); text-decoration:none; }
+.msg-link { color:var(--accent); text-decoration:none; overflow-wrap:anywhere; } /* a long link wraps instead of running off the side */
 .msg-link:hover { text-decoration:underline; }
 
 /* Link preview card */
@@ -3334,6 +3334,23 @@ async function onCloudSynced(e){
 
 // ── URL detection ────────────────────────────────────────────────
 const URL_RE = /https?:\/\/[^\s<>"]+/g;
+// A link found in text, without what follows it but isn't part of it: a
+// full stop, a comma, a closing quote — and a ")" or "]" with no opening
+// one in the link ("(see https://x.com/a)"), while keeping the one in
+// wikipedia.org/wiki/Linux_(kernel). Returns [link, the rest].
+function splitLinkTail(url){
+  let end=url.length;
+  for(;;){
+    const c=url[end-1];
+    if(/[.,;:!?'"*_~]/.test(c)){end--;continue;}
+    if(c===')'||c===']'){
+      const open=c===')'?'(':'[',part=url.slice(0,end);
+      if(part.split(open).length-1<part.split(c).length-1){end--;continue;}
+    }
+    break;
+  }
+  return [url.slice(0,end),url.slice(end)];
+}
 
 // A message's text; one that's a plugin command ("/music play …", as sent
 // from the message box) has the command coloured as it was typed.
@@ -3351,9 +3368,15 @@ function renderTextWithLinks(text) {
   return stickers.length?html+`<div class="msg-stickers">${stickers.map(([n,id])=>stickerHTML(n,id)).join('')}</div>`:html;
 }
 function renderTextOnly(text) {
-  return emojify(mentionsOutsideLinks(esc(text).replace(/https?:\/\/[^\s&]+/g, match => {
-    // match is already escaped, unescape for the href
-    const raw = match.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+  // On the escaped text: a link runs on through its "&"s (now "&amp;") —
+  // stopping at the first one left tracking codes and the like after it as
+  // plain text — and ends at a space, <, > or quote.
+  return emojify(mentionsOutsideLinks(esc(text).replace(/https?:\/\/(?:[^\s&<>"]|&amp;)+/g, found => {
+    // found is escaped: unescape it for the href, and leave off what
+    // follows the link but isn't part of it (a full stop, a bracket…).
+    const [raw,tail]=splitLinkTail(found.replace(/&amp;/g,'&'));
+    const match=esc(raw),after=esc(tail);
+    if(!raw.replace(/^https?:\/\//,''))return found;
     // A link to a message on this server shows as a "#channel › message"
     // chip instead of the raw address (clicking still goes through
     // openExternalURL, which jumps to it).
@@ -3361,9 +3384,9 @@ function renderTextOnly(text) {
     if(ml&&ml.sameServer){
       const b=findBoardLocal(ml.boardId);
       if(!b)queueBoardNameLookup();
-      return `<a class="msg-link msg-jump" href="#" data-url="${esc(raw)}" data-board="${esc(ml.boardId)}">${icon('tag')}<span class="mj-name">${esc(b?.name||'message')}</span><span class="mj-sep">›</span>${icon('chat_bubble')}</a>`;
+      return `<a class="msg-link msg-jump" href="#" data-url="${esc(raw)}" data-board="${esc(ml.boardId)}">${icon('tag')}<span class="mj-name">${esc(b?.name||'message')}</span><span class="mj-sep">›</span>${icon('chat_bubble')}</a>`+after;
     }
-    return `<a class="msg-link" href="#" data-url="${esc(raw)}">${match}</a>`;
+    return `<a class="msg-link" href="#" data-url="${esc(raw)}">${match}</a>`+after;
   })));
 }
 
@@ -3783,7 +3806,7 @@ async function loadStickers(){
 
 // Extract raw URLs from text
 function extractURLs(text){
-  return [...(text.matchAll(URL_RE))].map(m=>m[0]);
+  return [...(text.matchAll(URL_RE))].map(m=>splitLinkTail(m[0])[0]);
 }
 
 // ── SERVER LIST ──────────────────────────────────────────────────

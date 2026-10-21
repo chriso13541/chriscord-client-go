@@ -47,13 +47,18 @@ type textLinkPreview struct {
 }
 
 const (
-	previewTimeout   = 4 * time.Second
-	previewMaxPage   = 1 << 20
+	previewTimeout   = 5 * time.Second
+	previewMaxPage   = 3 << 20 // shops' pages are big; what a preview needs is near the top
 	previewMaxImage  = 6 << 20
 	previewThumbSide = 480
 	previewMaxThumb  = 60 << 10
 	previewUA        = "Mozilla/5.0 (compatible; Chriscord/1.0; link preview)"
-	redditUA         = "desktop:chriscord-link-preview:1.0 (chat app)"
+	// The pages themselves are asked for as a browser (as the sender's own
+	// app, on their own connection), and failing that as a link-preview
+	// fetcher, which is how sites recognise the ones chat apps make.
+	browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+	crawlerUA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+	redditUA  = "desktop:chriscord-link-preview:1.0 (chat app)"
 )
 
 var (
@@ -67,7 +72,25 @@ var (
 // the page finds them (trailing punctuation dropped).
 func firstLink(text string) string {
 	m := reURL.FindString(text)
-	return strings.TrimRight(m, ".,;:!?)]}'\"")
+	// What follows a link but isn't part of it (as the page's
+	// splitLinkTail): punctuation, and a ")" or "]" it didn't open —
+	// wikipedia.org/wiki/Linux_(kernel) keeps its own.
+	for m != "" {
+		c := m[len(m)-1]
+		if strings.IndexByte(".,;:!?'\"*_~", c) >= 0 {
+			m = m[:len(m)-1]
+			continue
+		}
+		if (c == ')' && strings.Count(m, "(") < strings.Count(m, ")")) || (c == ']' && strings.Count(m, "[") < strings.Count(m, "]")) || c == '}' {
+			m = m[:len(m)-1]
+			continue
+		}
+		break
+	}
+	if strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(m, "https://"), "http://"), "/") == "" {
+		return ""
+	}
+	return m
 }
 
 func linkExt(u string) string {
@@ -105,29 +128,113 @@ func makeLinkPreview(ctx context.Context, client *http.Client, link string) (*te
 			return p, nil
 		}
 	}
-	req, _ := http.NewRequestWithContext(ctx, "GET", link, nil)
-	req.Header.Set("User-Agent", previewUA)
-	req.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5")
+	// As a browser first: many shops (Amazon, eBay) and Reddit turn away
+	// anything that doesn't look like one. Turned away anyway (an error, a
+	// robot check, a page with nothing to show), once more as a link-preview
+	// fetcher, which sites that do keep their previews for (they're made for
+	// chat apps' previews, and give their title and picture to those).
+	var best *textLinkPreview
+	for i, ua := range []string{browserUA, crawlerUA} {
+		if i > 0 && ctx.Err() != nil {
+			break
+		}
+		page, base, kind, err := fetchPage(ctx, client, link, ua)
+		if kind != "" {
+			return &textLinkPreview{U: link, K: kind}, nil
+		}
+		if err != nil {
+			if i == 0 {
+				continue
+			}
+			if best == nil {
+				return nil, err
+			}
+			break
+		}
+		if page == "" {
+			return nil, nil // not a web page (a PDF, say): no preview
+		}
+		p := pagePreview(ctx, client, link, page, base)
+		if p != nil && (best == nil || p.score() > best.score()) {
+			best = p
+		}
+		if best != nil && best.T != "" && best.I != "" {
+			break // all a card shows: no need to ask again
+		}
+	}
+	if best == nil || (best.T == "" && best.D == "" && best.I == "" && best.V == "") {
+		return nil, nil
+	}
+	if best.S == "" {
+		best.S = strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+	}
+	return best, nil
+}
+
+// How much a preview has to show (to keep the better of two tries).
+func (p *textLinkPreview) score() int {
+	n := 0
+	for _, f := range []string{p.T, p.D, p.I, p.V} {
+		if f != "" {
+			n++
+		}
+	}
+	if p.I != "" {
+		n += 2 // the picture is most of a card
+	}
+	return n
+}
+
+// fetchPage gets a page as ua ("" page and no error: not a web page).
+// kind is "image" or "video" when the link is that file itself.
+func fetchPage(ctx context.Context, client *http.Client, link, ua string) (page string, base *url.URL, kind string, err error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", link, nil)
+	if err != nil {
+		return "", nil, "", err
+	}
+	req.Header.Set("User-Agent", ua)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return "", nil, "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("the site answered %d", resp.StatusCode)
+		return "", nil, "", fmt.Errorf("the site answered %d", resp.StatusCode)
 	}
 	ct, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	switch {
 	case strings.HasPrefix(ct, "image/"):
-		return &textLinkPreview{U: link, K: "image"}, nil
+		return "", nil, "image", nil
 	case strings.HasPrefix(ct, "video/"):
-		return &textLinkPreview{U: link, K: "video"}, nil
+		return "", nil, "video", nil
 	case ct != "" && ct != "text/html" && ct != "application/xhtml+xml":
-		return nil, nil
+		return "", nil, "", nil
 	}
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, previewMaxPage))
-	page := string(body)
-	base := resp.Request.URL
+	page = string(body)
+	if robotCheck(page) {
+		return "", nil, "", errors.New("the site asked for a robot check")
+	}
+	return page, resp.Request.URL, "", nil
+}
+
+var reRobotTitle = regexp.MustCompile(`(?i)robot check|captcha|are you a (robot|human)|access denied|attention required|just a moment|pardon our interruption|security check|verify you are human|unusual traffic`)
+
+// robotCheck: whether page is a site's "are you a robot?" wall instead of
+// the page asked for.
+func robotCheck(page string) bool {
+	if m := reTitleTag.FindStringSubmatch(page); m != nil && reRobotTitle.MatchString(m[1]) {
+		return true
+	}
+	return len(page) < 20000 && strings.Contains(strings.ToLower(page), "captcha")
+}
+
+// pagePreview makes a page's preview from what it says about itself: its
+// Open Graph and Twitter tags, its structured data (shops' products), and
+// failing those its title, first paragraph and main picture.
+func pagePreview(ctx context.Context, client *http.Client, link, page string, base *url.URL) *textLinkPreview {
 	meta := pageMeta(page)
 	get := func(keys ...string) string {
 		for _, k := range keys {
@@ -137,13 +244,14 @@ func makeLinkPreview(ctx context.Context, client *http.Client, link string) (*te
 		}
 		return ""
 	}
+	ld := pageLD(page)
 	p := &textLinkPreview{U: link,
-		T: clip(get("og:title", "twitter:title"), 200),
-		D: clip(get("og:description", "twitter:description", "description"), 400),
+		T: clip(firstOf(get("og:title", "twitter:title"), ld.name, amazonTitle(page)), 200),
+		D: clip(firstOf(get("og:description", "twitter:description", "description"), ld.description), 400),
 		S: clip(get("og:site_name"), 80)}
 	if p.T == "" {
 		if m := reTitleTag.FindStringSubmatch(page); m != nil {
-			p.T = clip(strings.TrimSpace(html.UnescapeString(m[1])), 200)
+			p.T = clip(strings.TrimSpace(reSpaces.ReplaceAllString(html.UnescapeString(m[1]), " ")), 200)
 		}
 	}
 	if p.D == "" {
@@ -158,13 +266,170 @@ func makeLinkPreview(ctx context.Context, client *http.Client, link string) (*te
 			p.V = resolveLink(base, v)
 		}
 	}
-	if img := get("og:image:secure_url", "og:image", "twitter:image", "twitter:image:src"); img != "" {
-		p.I = thumbnailFrom(ctx, client, resolveLink(base, img))
+	// Its picture: the first of these that loads.
+	candidates := []string{get("og:image:secure_url"), get("og:image"), get("og:image:url"), get("twitter:image"), get("twitter:image:src"),
+		linkRel(page, "image_src"), ld.image, itempropImage(page), amazonImage(page)}
+	seen := map[string]bool{}
+	tried := 0
+	for _, c := range candidates {
+		c = resolveLink(base, html.UnescapeString(strings.TrimSpace(c)))
+		if c == "" || seen[c] || strings.HasPrefix(c, "data:") {
+			continue
+		}
+		seen[c] = true
+		if tried++; tried > 3 || ctx.Err() != nil {
+			break
+		}
+		if p.I = thumbnailFrom(ctx, client, c, link); p.I != "" {
+			break
+		}
 	}
 	if p.T == "" && p.D == "" && p.I == "" && p.V == "" {
-		return nil, nil
+		return nil
 	}
-	return p, nil
+	return p
+}
+
+func firstOf(vs ...string) string {
+	for _, v := range vs {
+		if v = strings.TrimSpace(v); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+var (
+	reLinkTag     = regexp.MustCompile(`(?is)<link\b[^>]*>`)
+	reItemprop    = regexp.MustCompile(`(?is)<(?:meta|img|link)\b[^>]*\bitemprop\s*=\s*["']?image["']?[^>]*>`)
+	reLDScript    = regexp.MustCompile(`(?is)<script[^>]*type\s*=\s*["']application/ld\+json["'][^>]*>(.*?)</script>`)
+	reAmazonTitle = regexp.MustCompile(`(?is)<span[^>]*id\s*=\s*["']productTitle["'][^>]*>(.*?)</span>`)
+	reAmazonImage = regexp.MustCompile(`(?i)(?:data-old-hires\s*=\s*"(https://[^"]+)"|"hiRes"\s*:\s*"(https://[^"]+)"|"large"\s*:\s*"(https://[^"]+)")`)
+)
+
+func tagAttrs(tag string) map[string]string {
+	attrs := map[string]string{}
+	for _, m := range reAttr.FindAllStringSubmatch(tag, -1) {
+		attrs[strings.ToLower(m[1])] = html.UnescapeString(m[3] + m[4] + m[5])
+	}
+	return attrs
+}
+
+// linkRel: the href of <link rel="rel"> ("" if none).
+func linkRel(page, rel string) string {
+	for _, tag := range reLinkTag.FindAllString(page, 300) {
+		a := tagAttrs(tag)
+		if strings.EqualFold(a["rel"], rel) && a["href"] != "" {
+			return a["href"]
+		}
+	}
+	return ""
+}
+
+// itempropImage: a microdata picture (itemprop="image").
+func itempropImage(page string) string {
+	for _, tag := range reItemprop.FindAllString(page, 10) {
+		a := tagAttrs(tag)
+		if v := firstOf(a["content"], a["src"], a["href"]); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func amazonTitle(page string) string {
+	if m := reAmazonTitle.FindStringSubmatch(page); m != nil {
+		return strings.TrimSpace(reSpaces.ReplaceAllString(html.UnescapeString(reTags.ReplaceAllString(m[1], "")), " "))
+	}
+	return ""
+}
+
+// amazonImage: an Amazon product's main picture (its pages have no
+// og:image).
+func amazonImage(page string) string {
+	if m := reAmazonImage.FindStringSubmatch(page); m != nil {
+		return firstOf(m[1], m[2], m[3])
+	}
+	return ""
+}
+
+type ldInfo struct{ name, description, image string }
+
+// pageLD: a page's structured data (JSON-LD) — a shop's product, an
+// article: its name, description and picture, the first of each found.
+func pageLD(page string) ldInfo {
+	var out ldInfo
+	var walk func(v interface{}, depth int)
+	str := func(v interface{}) string {
+		switch x := v.(type) {
+		case string:
+			return x
+		case []interface{}:
+			for _, e := range x {
+				if s := imageOf(e); s != "" {
+					return s
+				}
+			}
+		case map[string]interface{}:
+			return imageOf(x)
+		}
+		return ""
+	}
+	walk = func(v interface{}, depth int) {
+		if depth > 6 {
+			return
+		}
+		switch x := v.(type) {
+		case []interface{}:
+			for _, e := range x {
+				walk(e, depth+1)
+			}
+		case map[string]interface{}:
+			if g, ok := x["@graph"]; ok {
+				walk(g, depth+1)
+			}
+			typ := strings.ToLower(fmt.Sprint(x["@type"]))
+			if strings.Contains(typ, "breadcrumb") || strings.Contains(typ, "organization") || strings.Contains(typ, "website") {
+				return // the site's own logo and name, not the page's
+			}
+			if s, ok := x["name"].(string); ok && out.name == "" {
+				out.name = s
+			} else if s, ok := x["headline"].(string); ok && out.name == "" {
+				out.name = s
+			}
+			if s, ok := x["description"].(string); ok && out.description == "" {
+				out.description = html.UnescapeString(reTags.ReplaceAllString(s, ""))
+			}
+			if out.image == "" {
+				out.image = str(x["image"])
+				if out.image == "" {
+					out.image = str(x["thumbnailUrl"])
+				}
+			}
+		}
+	}
+	for _, m := range reLDScript.FindAllStringSubmatch(page, 10) {
+		var v interface{}
+		if json.Unmarshal([]byte(strings.TrimSpace(m[1])), &v) == nil {
+			walk(v, 0)
+		}
+	}
+	return out
+}
+
+// imageOf: a picture's address, from JSON-LD's ways of giving one.
+func imageOf(v interface{}) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case map[string]interface{}:
+		for _, k := range []string{"url", "contentUrl", "@id"} {
+			if s, ok := x[k].(string); ok && strings.HasPrefix(s, "http") {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func clip(s string, n int) string {
@@ -214,15 +479,21 @@ func pageMeta(page string) map[string]string {
 
 // thumbnailFrom fetches a picture and makes a small JPEG of it, as a data:
 // URL ("" if it can't: too big, or a kind Go can't read, like WebP).
-func thumbnailFrom(ctx context.Context, client *http.Client, link string) string {
+func thumbnailFrom(ctx context.Context, client *http.Client, link string, page ...string) string {
 	if link == "" {
 		return ""
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", link, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", jpegVersion(link), nil)
 	if err != nil {
 		return ""
 	}
-	req.Header.Set("User-Agent", previewUA)
+	req.Header.Set("User-Agent", browserUA)
+	// Not WebP or AVIF, which Go can't read: sites that pick the format by
+	// what's asked for (most picture servers) send JPEG or PNG instead.
+	req.Header.Set("Accept", "image/jpeg,image/png,image/gif;q=0.9,image/*;q=0.5")
+	if len(page) > 0 && page[0] != "" {
+		req.Header.Set("Referer", page[0]) // some refuse pictures to anyone else
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return ""
@@ -236,6 +507,23 @@ func thumbnailFrom(ctx context.Context, client *http.Client, link string) string
 		return ""
 	}
 	return thumbnail(data)
+}
+
+var (
+	reEbayImage = regexp.MustCompile(`(?i)^(https://i\.ebayimg\.com/.+/s-l\d+)\.(webp|avif)$`)
+	reFormatArg = regexp.MustCompile(`(?i)([?&](?:format|fm))=(webp|avif)\b`)
+)
+
+// jpegVersion: the JPEG of a picture that's named as WebP or AVIF, where the
+// site makes one (eBay, Reddit's previews, most image CDNs' format=).
+func jpegVersion(link string) string {
+	if m := reEbayImage.FindStringSubmatch(link); m != nil {
+		return m[1] + ".jpg"
+	}
+	if strings.Contains(link, "redd.it/") {
+		return reFormatArg.ReplaceAllString(link, "${1}=pjpg") // Reddit's name for it
+	}
+	return reFormatArg.ReplaceAllString(link, "${1}=jpg")
 }
 
 // thumbnail: a picture made at most previewThumbSide across, as a JPEG
