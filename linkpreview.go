@@ -100,6 +100,11 @@ func makeLinkPreview(ctx context.Context, client *http.Client, link string) (*te
 			return p, nil
 		}
 	}
+	if lang, title, ok := wikipediaArticle(u); ok {
+		if p := wikipediaPreview(ctx, client, link, lang, title); p != nil {
+			return p, nil
+		}
+	}
 	req, _ := http.NewRequestWithContext(ctx, "GET", link, nil)
 	req.Header.Set("User-Agent", previewUA)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5")
@@ -140,6 +145,11 @@ func makeLinkPreview(ctx context.Context, client *http.Client, link string) (*te
 		if m := reTitleTag.FindStringSubmatch(page); m != nil {
 			p.T = clip(strings.TrimSpace(html.UnescapeString(m[1])), 200)
 		}
+	}
+	if p.D == "" {
+		// No description given: its first real paragraph, as a search
+		// engine shows (an article's opening, say).
+		p.D = clip(firstParagraph(page), 300)
 	}
 	if v := get("og:video:secure_url", "og:video:url", "og:video"); v != "" {
 		vt := strings.ToLower(get("og:video:type"))
@@ -299,6 +309,103 @@ func scaleDown(img image.Image, side int) *image.RGBA {
 		}
 	}
 	return out
+}
+
+var (
+	reParagraph     = regexp.MustCompile(`(?is)<p\b[^>]*>(.*?)</p>`)
+	reTags          = regexp.MustCompile(`(?s)<[^>]*>`)
+	reFootnote      = regexp.MustCompile(`\[(\d+|[a-z]|citation needed|note \d+)\]`)
+	reSpaces        = regexp.MustCompile(`\s+`)
+	reWikiThumbSize = regexp.MustCompile(`/\d+px-`)
+	reNoText        = regexp.MustCompile(`(?is)<(script|style|noscript|nav|header|footer|aside|form)\b.*?</\s*(script|style|noscript|nav|header|footer|aside|form)\s*>`)
+)
+
+// firstParagraph: the text of the first paragraph on page that reads like
+// one (a sentence or two, not a menu, a caption or a cookie notice).
+func firstParagraph(page string) string {
+	body := page
+	if i := strings.Index(strings.ToLower(body), "<body"); i >= 0 {
+		body = body[i:]
+	}
+	body = reNoText.ReplaceAllString(body, " ")
+	for i, m := range reParagraph.FindAllStringSubmatch(body, 60) {
+		if i >= 60 {
+			break
+		}
+		t := html.UnescapeString(reTags.ReplaceAllString(m[1], ""))
+		t = reFootnote.ReplaceAllString(t, "")
+		t = strings.TrimSpace(reSpaces.ReplaceAllString(t, " "))
+		low := strings.ToLower(t)
+		if len([]rune(t)) < 80 || !strings.ContainsAny(t, ".!?") ||
+			strings.Contains(low, "cookie") || strings.Contains(low, "javascript") || strings.Contains(low, "subscribe") {
+			continue
+		}
+		return t
+	}
+	return ""
+}
+
+// wikipediaArticle: whether u is a Wikipedia article (en.wikipedia.org/wiki/
+// Linux, its mobile site too), and its language and title as in the link.
+func wikipediaArticle(u *url.URL) (lang, title string, ok bool) {
+	host := strings.ToLower(u.Hostname())
+	if !strings.HasSuffix(host, ".wikipedia.org") || !strings.HasPrefix(u.EscapedPath(), "/wiki/") {
+		return "", "", false
+	}
+	lang = strings.TrimSuffix(strings.TrimSuffix(host, ".wikipedia.org"), ".m")
+	title = strings.TrimPrefix(u.EscapedPath(), "/wiki/")
+	if lang == "" || title == "" || strings.ContainsAny(lang, "./") || strings.Contains(title, "/") && !strings.Contains(title, "%2F") {
+		return "", "", false
+	}
+	return lang, title, true
+}
+
+// wikipediaPreview: an article's opening paragraph and picture, from
+// Wikipedia's page summaries (its pages have no description of their own
+// for a preview to show).
+func wikipediaPreview(ctx context.Context, client *http.Client, link, lang, title string) *textLinkPreview {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+lang+".wikipedia.org/api/rest_v1/page/summary/"+title, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("User-Agent", previewUA)
+	req.Header.Set("Accept", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil
+	}
+	var d struct {
+		Title     string `json:"title"`
+		Extract   string `json:"extract"`
+		Thumbnail struct {
+			Source string `json:"source"`
+		} `json:"thumbnail"`
+		Original struct {
+			Source string `json:"source"`
+			Width  int    `json:"width"`
+		} `json:"originalimage"`
+	}
+	if json.NewDecoder(io.LimitReader(resp.Body, previewMaxPage)).Decode(&d) != nil || (d.Title == "" && d.Extract == "") {
+		return nil
+	}
+	p := &textLinkPreview{U: link, T: clip(d.Title, 200), D: clip(strings.TrimSpace(d.Extract), 300), S: "Wikipedia"}
+	// Its picture: Wikipedia's thumbnail asked for at the size previews
+	// use (it renders any size, SVGs included, as PNG or JPEG); else the
+	// original, if Go can read it.
+	if t := d.Thumbnail.Source; t != "" {
+		p.I = thumbnailFrom(ctx, client, reWikiThumbSize.ReplaceAllString(t, fmt.Sprintf("/%dpx-", previewThumbSide)))
+		if p.I == "" {
+			p.I = thumbnailFrom(ctx, client, t)
+		}
+	}
+	if p.I == "" && d.Original.Source != "" && d.Original.Width <= 2000 {
+		p.I = thumbnailFrom(ctx, client, d.Original.Source)
+	}
+	return p
 }
 
 func isRedditHost(host string) bool {

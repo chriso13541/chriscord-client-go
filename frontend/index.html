@@ -888,16 +888,18 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .msg-link:hover { text-decoration:underline; }
 
 /* Link preview card */
-.link-preview { --lp-colour:var(--accent); display:block; margin-top:8px; max-width:432px; padding:10px 16px 16px 14px; box-sizing:border-box;
+.link-preview { --lp-colour:var(--accent); /* your button colour (Appearance), for every site */ display:block; margin-top:8px; max-width:432px; padding:10px 16px 16px 14px; box-sizing:border-box;
   background:var(--bg-mid); border:1px solid var(--border); border-left:4px solid var(--lp-colour); border-radius:6px; cursor:pointer; transition:border-color .15s, background .15s; }
 .link-preview:hover { border-color:color-mix(in srgb, var(--lp-colour) 55%, var(--border)); border-left-color:var(--lp-colour); }
 .link-preview-site { font-size:.75rem; color:var(--text-muted); margin-top:2px; }
 .link-preview-title { font-size:.95rem; font-weight:600; color:var(--text-link, var(--accent)); margin-top:6px; line-height:1.3; overflow-wrap:anywhere; }
 .link-preview:hover .link-preview-title { text-decoration:underline; }
-.link-preview-desc { font-size:.82rem; color:var(--text); opacity:.85; margin-top:6px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
-/* Its picture: below the text, rounded, with room round it (like Discord's). */
-.link-preview-media { position:relative; margin-top:12px; border-radius:6px; overflow:hidden; background:var(--bg-darkest); line-height:0; }
-.link-preview-img { display:block; width:100%; height:auto; max-height:300px; object-fit:cover; }
+.link-preview-desc { font-size:.82rem; color:var(--text); opacity:.85; margin-top:6px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+/* Its picture: below the text, rounded, with room round it (like Discord's),
+   whole and at its own shape — never cropped: a tall one is narrower, a
+   small one stays small. */
+.link-preview-media { position:relative; margin-top:12px; border-radius:6px; overflow:hidden; line-height:0; width:fit-content; max-width:100%; }
+.link-preview-img { display:block; width:auto; height:auto; max-width:100%; max-height:300px; }
 .link-preview-play { position:absolute; inset:0; margin:auto; width:56px; height:56px; border-radius:50%; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; pointer-events:none; transition:background .15s, transform .15s; }
 .link-preview-play .ic { width:30px; height:30px; color:#fff; }
 .link-preview:hover .link-preview-play { background:rgba(0,0,0,.75); transform:scale(1.06); }
@@ -6319,12 +6321,8 @@ function appendPreviewCard(body,p,url){
   const card=document.createElement('div');card.className='link-preview';
   card.addEventListener('click',()=>window.go.main.App.GetFileURL(url).then(()=>{})); // open externally
   card.addEventListener('click',()=>openExternalURL(url));
-  // A site's own colour down the side, for the ones everyone knows; the
-  // theme's accent for the rest.
   const host=(()=>{try{return new URL(url).hostname.replace(/^www\./,'');}catch{return '';}})();
   const video=/(^|\.)(youtube\.com|youtu\.be|vimeo\.com|twitch\.tv)$/.test(host);
-  const colour={'youtube.com':'#ff0000','youtu.be':'#ff0000','m.youtube.com':'#ff0000','twitch.tv':'#9146ff','vimeo.com':'#1ab7ea','github.com':'#6e7681','reddit.com':'#ff4500','old.reddit.com':'#ff4500','x.com':'#1d9bf0','twitter.com':'#1d9bf0','soundcloud.com':'#ff5500','bandcamp.com':'#1da0c3','spotify.com':'#1db954','open.spotify.com':'#1db954'}[host];
-  if(colour)card.style.setProperty('--lp-colour',colour);
   let html='';
   if(p.site_name)html+=`<div class="link-preview-site">${esc(p.site_name)}</div>`;
   if(p.title)html+=`<div class="link-preview-title">${esc(p.title)}</div>`;
