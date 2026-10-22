@@ -3438,6 +3438,9 @@ function mentionsOutsideLinks(html){
   return html.split(/(<a\b[^>]*>[\s\S]*?<\/a>|<[^>]+>)/).map(part=>part.startsWith('<')?part:highlightMentions(part)).join('');
 }
 function highlightMentions(escapedHtml){
+  // No "@", no mention — skips rebuilding the member list for every message
+  // without one (every message drawn used to do it, from every loaded message).
+  if(!escapedHtml.includes('@'))return escapedHtml;
   const re=mentionRegex();if(!re)return escapedHtml;
   const byLower=new Map(knownUsernames().map(n=>[esc(n).toLowerCase(),n]));
   return escapedHtml.replace(re,(all,lead,name)=>{
@@ -6397,10 +6400,7 @@ function renderMessages(stickToBottom=true){
   const prevScrollTop=c.scrollTop,prevScrollHeight=c.scrollHeight;
   c.innerHTML='';
   if(!state.messages.length){c.innerHTML='<div class="msg-placeholder">No messages yet. Say hi!</div>';placePluginNotices(c,state.selectedBoardId);return;}
-  if(state.exhaustedBoards.has(state.selectedBoardId)){
-    const top=document.createElement('div');top.className='msg-placeholder';top.style.textAlign='center';
-    top.textContent='— Beginning of the channel —';c.appendChild(top);
-  }
+  if(state.exhaustedBoards.has(state.selectedBoardId))c.appendChild(beginningMarkerEl());
   state.messages.forEach((m,i)=>{
     const prevMsg=state.messages[i-1];
     if(!prevMsg||dayKey(prevMsg.created_at)!==dayKey(m.created_at))c.appendChild(buildDateSeparator(m.created_at));
@@ -6413,6 +6413,46 @@ function renderMessages(stickToBottom=true){
     c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
     keepAnchor();
   }
+}
+function beginningMarkerEl(){
+  const top=document.createElement('div');top.className='msg-placeholder';top.style.textAlign='center';
+  top.textContent='— Beginning of the channel —';
+  return top;
+}
+// Puts a page of older messages above the ones already drawn, leaving those —
+// their pictures, players and previews — as they are, instead of drawing the
+// whole list again (which also made every picture flash back to loading and
+// got slower the further back you went). state.messages must already have
+// `older` in front. The result is the same as renderMessages(false). Returns
+// false, having changed nothing, if the list isn't in the shape this expects
+// (the caller then draws it all).
+function prependOlderMessages(older){
+  const c=document.getElementById('messages'),k=older?.length||0;
+  const first=state.messages[k],last=state.messages[k-1];
+  if(!c||!k||!first||!last||!isFinite(Date.parse(first.created_at)))return false;
+  // The list as it was drawn starts with the first message and its day heading.
+  const firstEl=c.querySelector('.msg-group[data-ts]'),sep=firstEl?.previousElementSibling;
+  if(!firstEl||firstEl.dataset.id!==String(first.id)||!sep||!sep.classList.contains('date-separator')||c.firstElementChild!==sep)return false;
+  const prevScrollTop=c.scrollTop,prevScrollHeight=c.scrollHeight;
+  const frag=document.createDocumentFragment();
+  if(state.exhaustedBoards.has(state.selectedBoardId))frag.appendChild(beginningMarkerEl());
+  older.forEach((m,i)=>{
+    const prevMsg=older[i-1];
+    if(!prevMsg||dayKey(prevMsg.created_at)!==dayKey(m.created_at))frag.appendChild(buildDateSeparator(m.created_at));
+    frag.appendChild(buildMsgEl(m,isGroupedWith(prevMsg,m)));
+  });
+  // Where the two meet: the old first message keeps its day heading only if
+  // it's a new day, and starts a group only if it still does.
+  if(dayKey(last.created_at)===dayKey(first.created_at))sep.remove();
+  const grouped=isGroupedWith(last,first);
+  if(grouped!==firstEl.classList.contains('grouped'))firstEl.replaceWith(buildMsgEl(first,grouped));
+  c.insertBefore(frag,c.firstChild);
+  // Announcements from before what was drawn, that now fall inside it.
+  placePluginNotices(c,state.selectedBoardId,Date.parse(first.created_at));
+  chatPinned=false;
+  c.scrollTop=prevScrollTop+(c.scrollHeight-prevScrollHeight); // keep whatever was on screen in place
+  keepAnchor();
+  return true;
 }
 // ── STAYING ON A MESSAGE YOU JUMPED TO ──
 // After jumping to a message (a search result, a reply), everything around
@@ -6562,7 +6602,7 @@ async function loadOlderMessages(){
     state.messages=older.concat(state.messages);
     state.oldestByBoard[boardId]=older[0].id;
     if(older.length<HISTORY_PAGE)state.exhaustedBoards.add(boardId);
-    renderMessages(false);
+    if(!prependOlderMessages(older))renderMessages(false);
   }catch(err){spinner.remove();toast('Failed to load older messages: '+err,true);}
   finally{state.loadingOlder=false;}
 }
@@ -9611,7 +9651,7 @@ function configureDecoder(user,r,codec){
       if(r.lagUser&&frame.timestamp>0&&r.lags.length<240)r.lags.push(Date.now()-frame.timestamp/1000+16);
       // A watched screen with sound plays to the sound's clock: each frame
       // waits for its moment (see showDueFrames).
-      if(r.lagUser&&frame.timestamp>0&&streamAudioLag.has(r.lagUser)){r.queue.push(frame);showDue(r);return;}
+      if(r.lagUser&&frame.timestamp>0&&streamAudioLag.has(r.lagUser)){r.queue.push(frame);showDue(r);if(r.queue.length)wakeShowDue();return;}
       r.write(frame);
     },
     error:e=>{
@@ -9778,7 +9818,17 @@ function showDue(r){
   for(const f of due){r.stats.dropShow++;try{f.close();}catch{}}
   r.write(show);
 }
-(function tick(){for(const r of vRemote.values())showDue(r);requestAnimationFrame(tick);})();
+// Only runs while a watched stream has frames waiting for their moment, and
+// stops when they've been shown. It used to run on every screen refresh for
+// as long as the app was open, keeping the web view awake with nothing playing.
+let showDueRaf=0;
+function showDueTick(){
+  showDueRaf=0;
+  let waiting=false;
+  for(const r of vRemote.values()){showDue(r);if(r.queue&&r.queue.length)waiting=true;}
+  if(waiting)showDueRaf=requestAnimationFrame(showDueTick);
+}
+function wakeShowDue(){if(!showDueRaf)showDueRaf=requestAnimationFrame(showDueTick);}
 
 // ── The video area above the messages ──
 // Shown while you're in a call where someone (you included) has a camera
@@ -12726,18 +12776,22 @@ function addPluginNotice(v){
 }
 function pluginNoticeEl(n){
   const p=pluginById(n.plugin),d=document.createElement('div');
-  d.className='plug-notice';d.dataset.at=n.at;
+  d.className='plug-notice';d.dataset.at=n.at;d.dataset.nid=n.plugin+'|'+n.id;
   const when=new Date(n.at).toISOString();
   d.innerHTML=`<span class="pn-ic">${p?pluginIcon(p):icon('extension')}</span><span class="pn-text"><span class="pn-who">${esc(p?pluginTitle(p):n.plugin)}</span><span class="bot-tag plugin" title="${PLUGIN_TIP}">PLUGIN</span> ${esc(n.text)}</span><span class="pn-time" title="${esc(formatHoverTime(when))} — from the plugin, not a chat message: it isn’t kept in the channel’s history">${formatTime(when)}</span>`;
   return d;
 }
 // The channel's announcements, among its messages by time.
-function placePluginNotices(c,board){
-  const list=(plugNotices.get(board)||[]).filter(n=>!pluginBlocked(n.plugin));
+// olderThan: only those from before this time (ms) — for when messages were
+// just added above the ones drawn, and the rest are already in place.
+function placePluginNotices(c,board,olderThan=Infinity){
+  const list=(plugNotices.get(board)||[]).filter(n=>!pluginBlocked(n.plugin)&&n.at<olderThan);
   if(!list.length)return;
   const rows=[...c.querySelectorAll('.msg-group[data-ts]')];
   const oldest=rows.length?Date.parse(rows[0].dataset.ts):Infinity;
+  const shown=new Set([...c.querySelectorAll('.plug-notice[data-nid]')].map(e=>e.dataset.nid)); // none, when everything was just redrawn
   for(const n of list){
+    if(shown.has(n.plugin+'|'+n.id))continue;
     if(n.at<oldest&&rows.length&&!state.exhaustedBoards.has(board))continue; // from before what's loaded
     const after=rows.find(r=>Date.parse(r.dataset.ts)>n.at);
     const el=pluginNoticeEl(n);
