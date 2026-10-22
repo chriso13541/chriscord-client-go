@@ -8,7 +8,10 @@ package main
 // message box ("music::play …"). Commands and clicks go to the plugin
 // through the server, on this connection, rather than as chat messages:
 // sealed for the plugin when it takes lanes (lanes_app.go), else as they
-// are (the plugin runs on the server, so the server sees them anyway).
+// are (the plugin runs on the server, so the server sees them anyway) —
+// except for a plugin this app has already seen take lanes, which never
+// gets anything in the clear (laneClient.refuseClear): a server that wanted
+// to read or forge commands could otherwise just say it has none.
 
 import (
 	"bytes"
@@ -40,8 +43,12 @@ func (a *App) PluginCommand(plugin, command string, args map[string]string, boar
 	if args == nil {
 		args = map[string]string{}
 	}
-	if lc := a.laneClient(); lc.uses(plugin) {
+	lc := a.laneClient()
+	if lc.uses(plugin) {
 		return lc.command(plugin, command, args, boardID) // sealed (lanes_app.go)
+	}
+	if err := lc.refuseClear(plugin); err != nil {
+		return err
 	}
 	return a.sendWSChecked(map[string]interface{}{"type": "plugin_command", "plugin": plugin, "command": command,
 		"data": args, "board_id": boardID})
@@ -54,8 +61,12 @@ func (a *App) PluginAction(plugin, action, value, boardID string) error {
 	if plugin == "" || action == "" {
 		return errors.New("which plugin and action?")
 	}
-	if lc := a.laneClient(); lc.uses(plugin) {
+	lc := a.laneClient()
+	if lc.uses(plugin) {
 		return lc.action(plugin, action, value, boardID)
+	}
+	if err := lc.refuseClear(plugin); err != nil {
+		return err
 	}
 	m := map[string]interface{}{"type": "plugin_action", "plugin": plugin, "action": action}
 	if value != "" {

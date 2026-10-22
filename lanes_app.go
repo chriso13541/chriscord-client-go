@@ -11,6 +11,14 @@ package main
 // plugin's identity key, and its encryption key signed by it). On a server
 // with a signed member list, the identity key has to be on it as a plugin:
 // otherwise the server could put its own key there and read everything.
+//
+// Whether a plugin takes lanes at all comes from that list too, so a server
+// could say it doesn't and have the app send commands in the clear (which it
+// could read, or make up). To stop that, the app remembers each plugin
+// (by identity key, per server) it has seen take lanes, and never sends one
+// of those anything in the clear afterwards: refuseClear. (The plugin
+// ignores commands in the clear as well, if it takes lanes: the music
+// plugin's pluginui.go.)
 
 import (
 	"crypto/ed25519"
@@ -71,6 +79,13 @@ type laneClient struct {
 	pinger bool
 	// Plugins this person blocked: no lane, nothing shown (SetBlockedPlugins).
 	blocked map[string]bool
+	// Identity keys (lower-case hex) of plugins the server has listed as
+	// taking lanes, on this server: one that did can't be downgraded to
+	// commands in the clear later (refuseClear). domain is that server, kept
+	// here because a.mu can't be taken while holding mu (connect holds a.mu,
+	// then takes mu).
+	pinned map[string]bool
+	domain string
 }
 
 func newLaneClient(a *App) *laneClient {
@@ -107,8 +122,11 @@ func (lc *laneClient) begin() {
 	domain := lc.a.domain
 	lc.a.mu.Unlock()
 	blocked := loadBlocked(domain)
+	pinned := loadLanePins(domain)
 	lc.mu.Lock()
 	lc.blocked = blocked
+	lc.pinned = pinned
+	lc.domain = domain
 	lc.mu.Unlock()
 	if data, err := lc.a.serverBotCall("GET", "/api/plugins", nil); err == nil {
 		lc.listed(data)
@@ -128,6 +146,7 @@ func (lc *laneClient) listed(data []byte) []byte {
 	var open []string
 	lc.mu.Lock()
 	seen := map[string]bool{}
+	newPin := false
 	for _, raw := range d.Plugins {
 		b, _ := json.Marshal(raw)
 		var p lanePlugin
@@ -140,6 +159,9 @@ func (lc *laneClient) listed(data []byte) []byte {
 		if !p.Lanes {
 			lc.dropLocked(p.ID)
 			continue
+		}
+		if lc.pinLocked(p.PublicKey) {
+			newPin = true
 		}
 		// It restarted, or its keys changed: its lanes are gone.
 		if had && (!old.Connected && p.Connected || !strings.EqualFold(old.PublicKey, p.PublicKey) || encOf(old) != encOf(p)) {
@@ -163,6 +185,9 @@ func (lc *laneClient) listed(data []byte) []byte {
 		}
 	}
 	lc.mu.Unlock()
+	if newPin {
+		lc.savePins()
+	}
 	for _, id := range open {
 		go func(id string) {
 			if _, err := lc.lane(id); err != nil {
@@ -283,6 +308,101 @@ func (a *App) SetPluginBlocked(id string, on bool) {
 	}
 }
 
+// ── Remembering which plugins take lanes (no downgrade) ─────────────────────
+
+const lanePinsFile = "chriscord_lane_plugins.json"
+
+var lanePinsMu sync.Mutex
+
+// loadLanePins: the identity keys of the plugins seen taking lanes on domain.
+func loadLanePins(domain string) map[string]bool {
+	lanePinsMu.Lock()
+	defer lanePinsMu.Unlock()
+	all := map[string][]string{}
+	if data, err := os.ReadFile(filepath.Join(chriscordConfigDir(), lanePinsFile)); err == nil {
+		_ = json.Unmarshal(data, &all)
+	}
+	out := map[string]bool{}
+	for _, k := range all[domain] {
+		out[strings.ToLower(k)] = true
+	}
+	return out
+}
+
+func saveLanePins(domain string, set map[string]bool) {
+	lanePinsMu.Lock()
+	defer lanePinsMu.Unlock()
+	path := filepath.Join(chriscordConfigDir(), lanePinsFile)
+	all := map[string][]string{}
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &all)
+	}
+	var keys []string
+	for k := range set {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	if len(keys) == 0 {
+		delete(all, domain)
+	} else {
+		all[domain] = keys
+	}
+	if data, err := json.MarshalIndent(all, "", "  "); err == nil {
+		os.MkdirAll(filepath.Dir(path), 0700)
+		os.WriteFile(path, data, 0600)
+	}
+}
+
+// pinLocked notes that the plugin with this identity key was listed as
+// taking lanes. Returns whether that's news (so it should be saved). mu held.
+func (lc *laneClient) pinLocked(key string) bool {
+	key = strings.ToLower(strings.TrimSpace(key))
+	if key == "" || lc.pinned[key] {
+		return false
+	}
+	if lc.pinned == nil {
+		lc.pinned = map[string]bool{}
+	}
+	lc.pinned[key] = true
+	return true
+}
+
+// savePins writes what's been noted for this server to disk (mu not held:
+// it's file work).
+func (lc *laneClient) savePins() {
+	lc.mu.Lock()
+	domain := lc.domain
+	set := make(map[string]bool, len(lc.pinned))
+	for k := range lc.pinned {
+		set[k] = true
+	}
+	lc.mu.Unlock()
+	if domain != "" {
+		saveLanePins(domain, set)
+	}
+}
+
+// refuseClear: nil if a command or click may go to this plugin in the clear
+// — it has never been seen taking lanes — else why not. The server's plugin
+// list says whether a plugin takes lanes, so a server that wants to read
+// commands, or make them up in a member's name, only has to say a plugin
+// doesn't. Once this app has seen the same plugin (by its identity key) take
+// lanes, that no longer works: it says so, and sends nothing.
+func (lc *laneClient) refuseClear(id string) error {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	p, ok := lc.plugins[id]
+	if !ok || p.Lanes || !lc.pinned[strings.ToLower(strings.TrimSpace(p.PublicKey))] {
+		return nil
+	}
+	name := p.Name
+	if name == "" {
+		name = id
+	}
+	return errors.New(name + " takes encrypted lanes, but this server now says it doesn't — nothing is sent to it in the clear. " +
+		"The server may be downgrading it. (If the plugin really did drop lanes, remove its entry from " + lanePinsFile + " in this app's settings folder.)")
+}
+
 // uses: whether a plugin takes lanes (as far as the list said).
 func (lc *laneClient) uses(id string) bool {
 	lc.mu.Lock()
@@ -363,6 +483,7 @@ func (lc *laneClient) refreshPlugin(id string) (lanePlugin, bool) {
 	}
 	var out lanePlugin
 	found := false
+	newPin := false
 	lc.mu.Lock()
 	for _, p := range d.Plugins {
 		if p.ID == "" {
@@ -372,11 +493,17 @@ func (lc *laneClient) refreshPlugin(id string) (lanePlugin, bool) {
 			lc.dropLocked(p.ID) // its keys changed: its lane is gone
 		}
 		lc.plugins[p.ID] = p
+		if p.Lanes && lc.pinLocked(p.PublicKey) {
+			newPin = true
+		}
 		if p.ID == id {
 			out, found = p, true
 		}
 	}
 	lc.mu.Unlock()
+	if newPin {
+		lc.savePins()
+	}
 	return out, found
 }
 
