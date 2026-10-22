@@ -1030,6 +1030,34 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 #text-viewer .tv-btns .tf-btn .ic { width:19px; height:19px; }
 #text-viewer .tv-body { overflow:auto; background:var(--bg-darkest); font-size:.84rem; flex:1; min-height:120px; }
 #text-viewer .tf-btn.on { color:var(--accent); }
+.text-file .tf-btn.on { color:var(--accent); }
+.text-file .tf-more[hidden] { display:none; }
+/* Rendered markdown */
+.md-wrap { padding:10px 16px 12px; }
+#text-viewer .tv-body.md-view { padding:14px 22px 20px; }
+.md { font-size:.9rem; line-height:1.55; color:var(--text); overflow-wrap:anywhere; user-select:text; }
+.md > :first-child { margin-top:0; } .md > :last-child { margin-bottom:0; }
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6 { color:var(--text-strong); line-height:1.25; margin:1.1em 0 .45em; font-weight:700; }
+.md h1 { font-size:1.55em; padding-bottom:.25em; border-bottom:1px solid var(--border); }
+.md h2 { font-size:1.3em; padding-bottom:.2em; border-bottom:1px solid var(--border); }
+.md h3 { font-size:1.12em; } .md h4 { font-size:1em; } .md h5 { font-size:.92em; } .md h6 { font-size:.88em; color:var(--text-muted); }
+.md p { margin:.55em 0; } .md p.t { margin:0; }
+.md ul,.md ol { margin:.5em 0; padding-left:1.6em; } .md li { margin:.2em 0; } .md li > ul,.md li > ol { margin:.2em 0; }
+.md li.md-task { list-style:none; margin-left:-1.2em; } .md .md-box { color:var(--text-muted); }
+.md li.md-task > .md-box + p.t { display:inline; }
+.md blockquote { margin:.6em 0; padding:.1em 0 .1em 12px; border-left:3px solid var(--border); color:var(--text-muted); }
+.md hr { border:none; border-top:1px solid var(--border); margin:1em 0; }
+.md code { font-family:Consolas,'Cascadia Mono','SF Mono',Menlo,monospace; font-size:.88em; background:var(--bg-light); padding:.12em .38em; border-radius:4px; }
+.md pre.md-code { margin:.6em 0; padding:10px 12px; background:var(--bg-light); border-radius:6px; overflow:auto; font-size:.82rem; line-height:1.45; counter-reset:none; }
+.md pre.md-code code { background:none; padding:0; font-size:inherit; white-space:pre; }
+.md a.md-a,.md .md-img[data-u] { color:var(--accent); cursor:pointer; text-decoration:none; }
+.md a.md-a:hover,.md .md-img[data-u]:hover { text-decoration:underline; }
+.md .md-img { display:inline-block; font-size:.8em; padding:0 .5em; border:1px solid var(--border); border-radius:4px; color:var(--text-muted); }
+.md .md-table { overflow:auto; margin:.6em 0; }
+.md table { border-collapse:collapse; font-size:.95em; }
+.md th,.md td { border:1px solid var(--border); padding:4px 10px; text-align:left; }
+.md th { background:var(--bg-light); color:var(--text-strong); }
+.md .al-r { text-align:right; } .md .al-c { text-align:center; }
 /* A long paste: offered as a .txt file instead. */
 #paste-offer { display:flex; align-items:center; gap:8px; padding:8px 10px 8px 12px; margin:0 0 -6px; border-radius:8px 8px 0 0; background:var(--bg-dark); border:1px solid var(--border); border-bottom:none; font-size:.85rem; color:var(--text-muted); }
 #paste-offer .ic { width:16px; height:16px; flex-shrink:0; }
@@ -2102,7 +2130,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 <div class="modal-overlay hidden" id="text-viewer">
   <div class="modal tv" role="dialog" aria-label="File">
     <div class="tv-head"><span class="tv-name"></span><span class="tf-meta"></span>
-      <span class="tv-btns"><button type="button" class="tf-btn tv-wrap" title="Wrap long lines"><svg class="ic" aria-hidden="true"><use href="#ic-description"/></svg></button><button type="button" class="tf-btn tv-copy" title="Copy"><svg class="ic" aria-hidden="true"><use href="#ic-content_copy"/></svg></button><button type="button" class="tf-btn tv-dl" title="Download"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button><button type="button" class="tf-btn tv-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></span></div>
+      <span class="tv-btns"><button type="button" class="tf-btn tv-md hidden" title="Show it rendered"><svg class="ic" aria-hidden="true"><use href="#ic-visibility"/></svg></button><button type="button" class="tf-btn tv-wrap" title="Wrap long lines"><svg class="ic" aria-hidden="true"><use href="#ic-description"/></svg></button><button type="button" class="tf-btn tv-copy" title="Copy"><svg class="ic" aria-hidden="true"><use href="#ic-content_copy"/></svg></button><button type="button" class="tf-btn tv-dl" title="Download"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button><button type="button" class="tf-btn tv-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></span></div>
     <div class="tv-body"></div>
     <div class="tf-note hidden"></div>
   </div>
@@ -6105,6 +6133,230 @@ function highlightLines(text,ext,maxLines=Infinity){
 function codeHTML(lines,wrap){
   return `<pre class="tf-code${wrap?' wrap':''}"><code>${lines.map(l=>`<span class="l">${l||' '}</span>`).join('')}</code></pre>`;
 }
+// ── MARKDOWN PREVIEW ─────────────────────────────────────────────
+// A .md file can be shown rendered instead of as text. Everything is built
+// from escaped text plus a fixed set of tags: raw HTML in the file is shown
+// as text, not run; links carry their address in a data attribute (no href,
+// so nothing navigates by itself) and open through openExternalURL; and
+// pictures are never fetched — a file someone sends you can't make your
+// client contact a server of theirs just by being looked at.
+const MD_EXT=new Set(['md','markdown']);
+const MD_LANG={javascript:'js',typescript:'ts',python:'py',golang:'go',rust:'rs',shell:'sh',console:'sh',zsh:'sh',yml:'yaml',powershell:'ps1',csharp:'cs',kotlin:'kt','c++':'cpp',jsonc:'json',text:'txt',plaintext:'txt',markdown:'md'};
+const MD_MAX_INLINE=5000;  // longer paragraphs are shown as plain text (keeps odd input fast)
+const MD_MAX_DEPTH=10;     // nested quotes/lists deeper than this are shown as plain text
+function mdPreviewPref(){try{return localStorage.getItem('mdPreview')==='1';}catch{return false;}}
+function mdSetPreviewPref(on){try{localStorage.setItem('mdPreview',on?'1':'0');}catch{}}
+function mdSafeUrl(u){
+  u=String(u||'').trim();
+  if(u.startsWith('<')&&u.endsWith('>'))u=u.slice(1,-1).trim();
+  if(/^https?:\/\/[^\s]+$/i.test(u)||/^mailto:[^\s]+$/i.test(u))return {kind:'ext',url:u};
+  if(/^#[^\s]*$/.test(u))return {kind:'anchor',url:u.slice(1)};
+  return null; // relative paths, javascript:, data: … are never made clickable
+}
+function mdSlug(t){
+  return String(t).toLowerCase().replace(/!?\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/[`*_~]/g,'')
+    .replace(/[^\p{L}\p{N}\s-]/gu,'').trim().replace(/\s/g,'-');
+}
+function mdLinkHTML(label,u){
+  if(u.kind==='ext')return `<a class="md-a" role="link" tabindex="0" data-u="${esc(u.url)}" title="${esc(u.url)}">${label}</a>`;
+  return `<a class="md-a" role="link" tabindex="0" data-a="${esc(u.url)}">${label}</a>`;
+}
+function mdInl(s,st,inLink){
+  const hold=h=>{st.push(h);return '\u0001'+(st.length-1)+'\u0002';};
+  // code spans
+  s=s.replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g,(m,t,c)=>hold('<code>'+esc(c.replace(/\n/g,' ').replace(/^ (.*[^ ].*) $/,'$1'))+'</code>'));
+  s=s.replace(/(?: {2,}|\\)\n/g,()=>hold('<br>'));
+  s=s.replace(/\\([\\`*_{}\[\]()#+\-.!~|<>])/g,(m,c)=>hold(esc(c)));
+  // pictures: never loaded, shown as a small tag (clickable if it has a web address)
+  s=s.replace(/!\[([^\[\]]*)\]\(\s*(<[^>\s]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,(m,alt,url)=>{
+    const u=mdSafeUrl(url),a=alt.replace(/[\u0001\u0002]/g,'').trim();
+    const attrs=u&&u.kind==='ext'?` role="link" tabindex="0" data-u="${esc(u.url)}" title="${esc(u.url)}"`:'';
+    return hold(`<span class="md-img"${attrs}>Image${a?': '+esc(a):''}</span>`);
+  });
+  s=s.replace(/\[([^\[\]]*)\]\(\s*(<[^>\s]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,(m,label,url)=>{
+    const u=mdSafeUrl(url),inner=mdInl(label,st,true);
+    return hold(u&&!inLink?mdLinkHTML(inner,u):`<span class="md-rel"${url.trim()?` title="${esc(url.trim())}"`:''}>${inner}</span>`);
+  });
+  if(!inLink){
+    s=s.replace(/<((?:https?:\/\/|mailto:)[^\s<>]+)>/gi,(m,url)=>hold(mdLinkHTML(esc(url),mdSafeUrl(url))));
+    s=s.replace(/\bhttps?:\/\/[^\s<>\u0001\u0002]+/gi,m=>{
+      let url=m,tail='';
+      const t=/[.,;:!?'"*_~]+$/.exec(url);if(t){tail=t[0];url=url.slice(0,-tail.length);}
+      while(url.endsWith(')')&&(url.match(/\)/g).length>(url.match(/\(/g)||[]).length)){url=url.slice(0,-1);tail=')'+tail;}
+      const u=mdSafeUrl(url);
+      return u?hold(mdLinkHTML(esc(url),u))+tail:m;
+    });
+  }
+  s=esc(s);
+  s=s.replace(/\*\*\*(?=[^\s*])((?:(?!\*\*\*)[\s\S])+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+  s=s.replace(/\*\*(?=\S)((?:(?!\*\*)[\s\S])+?)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/(^|[^\w])__(?=\S)((?:(?!__)[\s\S])+?)__(?!\w)/g,'$1<strong>$2</strong>');
+  s=s.replace(/\*(?=[^\s*])((?:(?!\*)[\s\S])+?)\*/g,'<em>$1</em>');
+  s=s.replace(/(^|[^\w])_(?=[^\s_])((?:(?!_)[\s\S])+?)_(?!\w)/g,'$1<em>$2</em>');
+  s=s.replace(/~~(?=[^\s~])((?:(?!~~)[\s\S])+?)~~/g,'<del>$1</del>');
+  return s;
+}
+function mdInline(src){
+  src=String(src).replace(/[\u0001\u0002]/g,'');
+  if(src.length>MD_MAX_INLINE)return esc(src).replace(/\n/g,' ');
+  const st=[];
+  let s=mdInl(src,st,false).replace(/\n/g,' ');
+  for(let n=0;n<8&&/\u0001\d+\u0002/.test(s);n++)s=s.replace(/\u0001(\d+)\u0002/g,(m,i)=>st[+i]??'');
+  return s;
+}
+function mdRender(text){
+  const slugs=new Map();
+  // (\u0001 and \u0002 mark spots inside the inline renderer; they're never real text.)
+  const html=mdBlocks(String(text).replace(/[\u0001\u0002]/g,'').replace(/\r\n?/g,'\n').replace(/\t/g,'    ').split('\n'),{slugs},0,false);
+  return `<div class="md">${html}</div>`;
+}
+function mdBlocks(lines,ctx,depth,tight){
+  if(depth>MD_MAX_DEPTH)return `<p>${esc(lines.join('\n')).replace(/\n/g,'<br>')}</p>`;
+  const blank=l=>!/\S/.test(l);
+  const fenceRe=/^ {0,3}(`{3,}|~{3,})[ ]*([^\s`]*)/;
+  const hrRe=/^ {0,3}([-*_])(?:[ ]*\1){2,}[ ]*$/;
+  const atxRe=/^ {0,3}(#{1,6})(?:[ ]+(.*?))?(?:[ ]+#+)?[ ]*$/;
+  const quoteRe=/^ {0,3}>/;
+  const itemRe=/^( *)([-*+]|\d{1,9}[.)])(?:[ ]+(.*)|$)/;
+  const sepRe=/^[ ]*\|?[ ]*:?-+:?[ ]*(?:\|[ ]*:?-+:?[ ]*)*\|?[ ]*$/;
+  const indentOf=l=>l.length-l.trimStart().length;
+  const splitRow=l=>{
+    let t=l.trim();if(t.startsWith('|'))t=t.slice(1);
+    if(t.endsWith('|')&&!t.endsWith('\\|'))t=t.slice(0,-1);
+    const cells=[];let cur='';
+    for(let k=0;k<t.length;k++){
+      if(t[k]==='\\'&&t[k+1]==='|'){cur+='|';k++;}
+      else if(t[k]==='|'){cells.push(cur.trim());cur='';}
+      else cur+=t[k];
+    }
+    cells.push(cur.trim());return cells;
+  };
+  const tableAt=k=>k+1<lines.length&&lines[k].includes('|')&&sepRe.test(lines[k+1])&&lines[k+1].includes('-')&&splitRow(lines[k]).length===splitRow(lines[k+1]).length;
+  const startsBlock=(l,k)=>{
+    if(fenceRe.test(l)||atxRe.test(l)||hrRe.test(l)||quoteRe.test(l))return true;
+    const m=itemRe.exec(l);
+    if(m&&indentOf(l)<4&&(m[3]!==undefined&&m[3]!==''))return /^[-*+]$/.test(m[2])||/^1[.)]$/.test(m[2]);
+    return tableAt(k);
+  };
+  const heading=(n,raw)=>{
+    let slug=mdSlug(raw)||'section';const c=ctx.slugs.get(slug)||0;ctx.slugs.set(slug,c+1);
+    if(c)slug+='-'+c;
+    return `<h${n} data-slug="${esc(slug)}">${mdInline(raw)}</h${n}>`;
+  };
+  let out='',i=0;
+  while(i<lines.length){
+    const line=lines[i];
+    if(blank(line)){i++;continue;}
+    let m;
+    // a hidden comment
+    if(/^ {0,3}<!--/.test(line)){
+      while(i<lines.length&&!lines[i].includes('-->'))i++;
+      i++;continue;
+    }
+    // fenced code
+    if((m=fenceRe.exec(line))){
+      const ch=m[1][0],len=m[1].length,lang=m[2].toLowerCase();
+      const body=[];i++;
+      while(i<lines.length&&!new RegExp('^ {0,3}'+(ch==='`'?'`':'~')+'{'+len+',}[ ]*$').test(lines[i])){body.push(lines[i]);i++;}
+      i++;
+      const ext=MD_LANG[lang]||lang||'txt';
+      const hl=highlightLines(body.join('\n'),ext).join('\n');
+      out+=`<pre class="tf-code md-code"><code>${hl}</code></pre>`;
+      continue;
+    }
+    // headings
+    if((m=atxRe.exec(line))){out+=heading(m[1].length,m[2]||'');i++;continue;}
+    if(hrRe.test(line)){out+='<hr>';i++;continue;}
+    // quote
+    if(quoteRe.test(line)){
+      const q=[];
+      while(i<lines.length&&!blank(lines[i])&&(quoteRe.test(lines[i])||(q.length&&!startsBlock(lines[i],i)))){q.push(lines[i].replace(/^ {0,3}> ?/,''));i++;}
+      out+=`<blockquote>${mdBlocks(q,ctx,depth+1,false)}</blockquote>`;
+      continue;
+    }
+    // table
+    if(tableAt(i)){
+      const head=splitRow(lines[i]),aligns=splitRow(lines[i+1]).map(c=>/^:-+:$/.test(c)?'c':/^-+:$/.test(c)?'r':'');
+      const cell=(t,k,tag)=>`<${tag}${aligns[k]?` class="al-${aligns[k]}"`:''}>${mdInline(t||'')}</${tag}>`;
+      let h='<div class="md-table"><table><thead><tr>'+head.map((t,k)=>cell(t,k,'th')).join('')+'</tr></thead><tbody>';
+      i+=2;
+      while(i<lines.length&&!blank(lines[i])&&!fenceRe.test(lines[i])&&!atxRe.test(lines[i])&&!quoteRe.test(lines[i])){
+        const r=splitRow(lines[i]);
+        h+='<tr>'+head.map((_,k)=>cell(r[k],k,'td')).join('')+'</tr>';i++;
+      }
+      out+=h+'</tbody></table></div>';
+      continue;
+    }
+    // list
+    if((m=itemRe.exec(line))&&indentOf(line)<4&&m[3]!==undefined){
+      const base=m[1].length,ordered=/\d/.test(m[2]);
+      const items=[];let cur=null;
+      while(i<lines.length){
+        const l=lines[i];
+        if(blank(l)){
+          let k=i;while(k<lines.length&&blank(lines[k]))k++;
+          if(k<lines.length&&cur&&(indentOf(lines[k])>=base+2||(itemRe.test(lines[k])&&indentOf(lines[k])<base+2&&!hrRe.test(lines[k])&&/\d/.test(itemRe.exec(lines[k])[2])===ordered))){
+            for(;i<k;i++)cur.lines.push('');continue;
+          }
+          break;
+        }
+        const im=itemRe.exec(l),ind=indentOf(l);
+        if(hrRe.test(l)&&ind<base+2)break;
+        if(im&&ind<base+2){
+          if(/\d/.test(im[2])!==ordered)break;
+          const pre=/^ *(?:[-*+]|\d{1,9}[.)]) +/.exec(l);
+          cur={start:ordered?parseInt(im[2],10):0,ci:Math.min(pre?pre[0].length:im[1].length+2,4+base),lines:[im[3]||'']};items.push(cur);i++;continue;
+        }
+        if(!cur)break;
+        if(ind>=base+2){cur.lines.push(l.replace(new RegExp('^ {0,'+cur.ci+'}'),''));i++;continue;}
+        // lazy continuation of the item's last paragraph
+        if(!blank(lines[i-1])&&!fenceRe.test(l)&&!atxRe.test(l)&&!quoteRe.test(l)){cur.lines.push(l.trimStart());i++;continue;}
+        break;
+      }
+      const tag=ordered?'ol':'ul',startAttr=ordered&&items[0].start!==1?` start="${items[0].start}"`:'';
+      out+=`<${tag}${startAttr}>`+items.map(it=>{
+        let first=it.lines[0],box='';
+        const tm=/^\[( |x|X)\][ ]+/.exec(first);
+        if(tm){box=`<span class="md-box">${tm[1]===' '?'☐':'☑'}</span> `;it.lines[0]=first.slice(tm[0].length);}
+        return `<li${tm?' class="md-task"':''}>${box}${mdBlocks(it.lines,ctx,depth+1,true)}</li>`;
+      }).join('')+`</${tag}>`;
+      continue;
+    }
+    // indented code
+    if(/^ {4}/.test(line)){
+      const code=[];
+      while(i<lines.length&&(/^ {4}/.test(lines[i])||(blank(lines[i])&&i+1<lines.length&&/^ {4}/.test(lines[i+1])))){code.push(lines[i].slice(4));i++;}
+      out+=`<pre class="tf-code md-code"><code>${esc(code.join('\n'))}</code></pre>`;
+      continue;
+    }
+    // paragraph (or a heading underlined with === / ---)
+    const para=[line];i++;
+    let setext=0;
+    while(i<lines.length&&!blank(lines[i])){
+      if(/^ {0,3}=+[ ]*$/.test(lines[i])){setext=1;i++;break;}
+      if(/^ {0,3}-+[ ]*$/.test(lines[i])){setext=2;i++;break;}
+      if(startsBlock(lines[i],i)||/^ {0,3}<!--/.test(lines[i]))break;
+      para.push(lines[i]);i++;
+    }
+    const raw=para.map(l=>l.trim()).join('\n');
+    out+=setext?heading(setext,raw.replace(/\n/g,' ')):`<p${tight?' class="t"':''}>${mdInline(para.map((l,k)=>k<para.length-1?l.replace(/^\s+/,''):l.trim()).join('\n'))}</p>`;
+  }
+  return out;
+}
+// Clicks inside a rendered preview: links open through the app, in-page
+// links scroll to their heading.
+function mdWire(root){
+  const act=t=>{
+    const a=t.closest('[data-u],[data-a]');if(!a||!root.contains(a))return false;
+    if(a.dataset.u){openExternalURL(a.dataset.u);return true;}
+    const want=a.dataset.a.toLowerCase();
+    const h=[...root.querySelectorAll('[data-slug]')].find(x=>x.dataset.slug===want);
+    if(h)h.scrollIntoView({block:'start',behavior:'smooth'});
+    return true;
+  };
+  root.addEventListener('click',e=>{if(act(e.target)){e.preventDefault();e.stopPropagation();}});
+  root.addEventListener('keydown',e=>{if(e.key==='Enter'&&act(e.target)){e.preventDefault();e.stopPropagation();}});
+}
 const textFileObserver=('IntersectionObserver' in window)?new IntersectionObserver(entries=>{
   for(const e of entries)if(e.isIntersecting){textFileObserver.unobserve(e.target);e.target._loadText?.();}
 },{rootMargin:'400px'}):null;
@@ -6112,7 +6364,7 @@ function buildTextFile(a){
   const ext=textFileExt(a.name);
   const el=document.createElement('div');el.className='text-file';el._att=a;
   el.innerHTML=`<div class="tf-head">${icon(fileTypeIcon(a.name,a.mime))}<span class="tf-name" title="${esc(a.name||'')}">${esc(a.name||'File')}</span><span class="tf-meta"></span>
-    <span class="tf-btns"><button type="button" class="tf-btn tf-copy" title="Copy" disabled>${icon('content_copy')}</button><button type="button" class="tf-btn tf-full" title="View whole file" disabled>${icon('open_in_full')}</button><button type="button" class="tf-btn tf-dl" title="Download">${icon('download')}</button></span></div>
+    <span class="tf-btns">${MD_EXT.has(ext)?`<button type="button" class="tf-btn tf-md" title="Show it rendered" disabled>${icon('visibility')}</button>`:''}<button type="button" class="tf-btn tf-copy" title="Copy" disabled>${icon('content_copy')}</button><button type="button" class="tf-btn tf-full" title="View whole file" disabled>${icon('open_in_full')}</button><button type="button" class="tf-btn tf-dl" title="Download">${icon('download')}</button></span></div>
     <div class="tf-status">Loading\u2026</div>`;
   el.querySelector('.tf-dl').addEventListener('click',e=>{e.stopPropagation();downloadAttachment(a);});
   el._loadText=async()=>{
@@ -6129,16 +6381,40 @@ function buildTextFile(a){
     el.querySelector('.tf-meta').textContent=[d.total!=null?fmtBytes(d.total):'',`${lineCount.toLocaleString()}${d.truncated?'+':''} line${lineCount===1?'':'s'}`].filter(Boolean).join(' \u00b7 ');
     const lines=highlightLines(d.text,ext,TEXT_PREVIEW_LINES);
     const body=document.createElement('div');body.className='tf-body';
-    body.innerHTML=codeHTML(lines,HL_PLAIN.has(ext))+'<div class="tf-fade"></div>';
     el.querySelector('.tf-status').replaceWith(body);
-    const short=lines.length<=9;
-    body.classList.toggle('short',short);
-    if(!short){
-      const more=document.createElement('button');more.type='button';more.className='tf-more';
-      const label=()=>{more.textContent=el.classList.contains('open')?'Collapse':`Expand \u2014 ${lineCount.toLocaleString()}${d.truncated?'+':''} lines`;};
+    const more=document.createElement('button');more.type='button';more.className='tf-more';
+    el.appendChild(more);
+    // A markdown file can be shown rendered (Preview) or as text (Source).
+    const isMd=MD_EXT.has(ext);
+    let preview=isMd&&mdPreviewPref();
+    const mdBtn=el.querySelector('.tf-md');
+    const label=()=>{more.textContent=el.classList.contains('open')?'Collapse':preview?'Expand':`Expand \u2014 ${lineCount.toLocaleString()}${d.truncated?'+':''} lines`;};
+    const draw=()=>{
+      el.classList.remove('open');body.scrollTop=0;body.classList.remove('short');
+      let short;
+      if(preview){
+        body.innerHTML='<div class="md-wrap">'+mdRender(d.text)+'</div><div class="tf-fade"></div>';
+        mdWire(body);
+        // Short enough to show whole? (Measured; before it's on screen, assume not.)
+        short=el.isConnected&&body.scrollHeight<=body.clientHeight+4;
+      }else{
+        body.innerHTML=codeHTML(lines,HL_PLAIN.has(ext))+'<div class="tf-fade"></div>';
+        short=lines.length<=9;
+      }
+      body.classList.toggle('short',short);
+      more.hidden=short;
       label();
-      more.addEventListener('click',e=>{e.stopPropagation();el.classList.toggle('open');label();if(!el.classList.contains('open'))body.scrollTop=0;});
-      el.appendChild(more);
+      if(mdBtn){
+        mdBtn.innerHTML=icon(preview?'code':'visibility');
+        mdBtn.title=preview?'Show the markdown source':'Show it rendered';
+        mdBtn.classList.toggle('on',preview);
+      }
+    };
+    draw();
+    more.addEventListener('click',e=>{e.stopPropagation();el.classList.toggle('open');label();if(!el.classList.contains('open'))body.scrollTop=0;});
+    if(mdBtn){
+      mdBtn.disabled=false;
+      mdBtn.addEventListener('click',e=>{e.stopPropagation();preview=!preview;mdSetPreviewPref(preview);draw();});
     }
     if(d.truncated||lineCount>TEXT_PREVIEW_LINES){
       const note=document.createElement('div');note.className='tf-note';
@@ -6163,8 +6439,22 @@ function openTextViewer(a,d){
   ov.querySelector('.tv-head').insertAdjacentHTML('afterbegin',icon(fileTypeIcon(a.name,a.mime)));
   ov.querySelector('.tf-meta').textContent=d.total!=null?fmtBytes(d.total):'';
   const body=ov.querySelector('.tv-body'),lines=highlightLines(d.text,ext);
-  const draw=()=>{body.innerHTML=codeHTML(lines,wrap);ov.querySelector('.tv-wrap').classList.toggle('on',wrap);};
+  const isMd=MD_EXT.has(ext);
+  let preview=isMd&&mdPreviewPref();
+  const mdBtn=ov.querySelector('.tv-md'),wrapBtn=ov.querySelector('.tv-wrap');
+  mdBtn.classList.toggle('hidden',!isMd);
+  const draw=()=>{
+    if(preview){body.innerHTML=mdRender(d.text);mdWire(body);}
+    else body.innerHTML=codeHTML(lines,wrap);
+    body.classList.toggle('md-view',preview);
+    wrapBtn.classList.toggle('on',wrap&&!preview);
+    wrapBtn.classList.toggle('hidden',preview);
+    mdBtn.innerHTML=icon(preview?'code':'visibility');
+    mdBtn.title=preview?'Show the markdown source':'Show it rendered';
+    mdBtn.classList.toggle('on',preview);
+  };
   draw();body.scrollTop=0;
+  mdBtn.onclick=()=>{preview=!preview;mdSetPreviewPref(preview);draw();body.scrollTop=0;};
   ov.querySelector('.tf-note').classList.toggle('hidden',!d.truncated);
   ov.querySelector('.tf-note').textContent=`Showing the first ${fmtBytes(TEXT_PREVIEW_MAX)} \u2014 download it for the rest.`;
   ov.querySelector('.tv-wrap').onclick=()=>{wrap=!wrap;draw();};
