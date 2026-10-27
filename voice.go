@@ -40,6 +40,12 @@ type voiceRemoteSource struct {
 	decoder  *opus.Decoder
 	mu       sync.Mutex
 	buf      []int16
+	// A voice sent in stereo (a music bot, say — people's microphones are
+	// mono): buf holds the middle of the sound, (L+R)/2, so smoothing and
+	// skipping work on it as on any voice, and side the difference,
+	// (L-R)/2, sample for sample beside it; whatever's taken off the front
+	// of buf is taken off side too (keepSide). nil for a mono voice.
+	side []int16
 
 	// Stream sound only (avsync.go): whose share it is, and the capture
 	// time (sharer's clock, ms) of the first sample still in buf.
@@ -923,7 +929,9 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				// Smooth playback (playout.go): trims built-up delay out of
 				// pauses, and waits for a little to queue after running dry.
 				if voiceSmoothing.Load() {
+					before := len(r.buf)
 					play, fade := r.po.next(&r.buf)
+					r.keepSide(before)
 					if fade {
 						r.fadeIn = true
 					}
@@ -946,18 +954,26 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				if !deafened && g > 0 {
 					for i := 0; i < n; i++ {
 						v := float64(r.buf[i]) * g
+						d := 0.0 // a stereo voice: left is v+d, right v-d
+						if r.side != nil && i < len(r.side) {
+							d = float64(r.side[i]) * g
+						}
 						if i < fade {
-							v *= float64(i) / float64(fade)
+							f := float64(i) / float64(fade)
+							v, d = v*f, d*f
 						}
 						if outCh == 2 {
-							mixInto(&s.playBuf[2*i], v)
-							mixInto(&s.playBuf[2*i+1], v)
+							mixInto(&s.playBuf[2*i], v+d)
+							mixInto(&s.playBuf[2*i+1], v-d)
 						} else {
 							mixInto(&s.playBuf[i], v)
 						}
 					}
 				}
 				r.buf = r.buf[n:]
+				if r.side != nil {
+					r.side = r.side[min(n, len(r.side)):]
+				}
 				r.mu.Unlock()
 			}
 			s.remotesMu.Unlock()
@@ -1002,7 +1018,10 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 		s.remotesMu.Unlock()
 	}()
 
-	pcm := make([]int16, 5760*channels) // room for the longest Opus packet (120 ms)
+	pcm := make([]int16, 5760*2) // room for the longest Opus packet (120 ms), in stereo
+	// A voice's decoder is mono until its packets turn out to be stereo
+	// (the flag in each Opus packet's first byte): then stereo from there on.
+	voiceStereo := false
 	for {
 		select {
 		case <-s.stopped:
@@ -1044,7 +1063,7 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 				for i := 0; i < lost; i++ {
 					if decoder.DecodePLC(plc) == nil {
 						source.mu.Lock()
-						source.buf = append(source.buf, plc...)
+						source.add(plc, voiceStereo)
 						source.mu.Unlock()
 					}
 				}
@@ -1055,6 +1074,17 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 		payload, ok := s.app.e2ee.open(source.sharer, kindAudio, packet.Payload)
 		if !ok {
 			continue
+		}
+		if !stereo && !voiceStereo && len(payload) > 0 && payload[0]&0x04 != 0 {
+			// This voice is in stereo (a music bot): decode it so, from here.
+			if d, err := opus.NewDecoder(voiceSampleRate, 2); err == nil {
+				decoder, channels, voiceStereo = d, 2, true
+				source.mu.Lock()
+				source.decoder = d
+				source.side = make([]int16, len(source.buf), len(source.buf)+voiceFrameSize*4)
+				source.mu.Unlock()
+				log.Printf("voice: %s is sending stereo — playing it in stereo", source.username)
+			}
 		}
 		n, err := decoder.Decode(payload, pcm)
 		if err != nil {
@@ -1072,9 +1102,15 @@ func (s *VoiceSession) handleRemoteTrack(track *webrtc.TrackRemote) {
 				source.headCap = capMs - queued
 			}
 		}
-		source.buf = append(source.buf, pcm[:n*channels]...)
+		if stereo {
+			source.buf = append(source.buf, pcm[:n*channels]...)
+		} else {
+			source.add(pcm[:n*channels], voiceStereo)
+		}
 		if !stereo && !voiceSmoothing.Load() {
+			before := len(source.buf)
 			source.trimVoiceQueue() // smoothing's off: the plain skip-ahead
+			source.keepSide(before)
 		}
 		source.mu.Unlock()
 	}
@@ -1091,6 +1127,34 @@ const (
 	voiceQueueHigh   = 48 * 120 // more than this for 2 s straight: catch up
 	voiceQueueMax    = 48 * 250 // more than this: catch up straight away
 )
+
+// add queues a voice's decoded sound (call with r.mu held): mono as it
+// is, stereo (interleaved) split into its middle (buf) and difference (side).
+func (r *voiceRemoteSource) add(pcm []int16, stereo bool) {
+	if !stereo {
+		r.buf = append(r.buf, pcm...)
+		if r.side != nil { // was stereo: no difference
+			r.side = append(r.side, make([]int16, len(pcm))...)
+		}
+		return
+	}
+	for i := 0; i+1 < len(pcm); i += 2 {
+		l, rr := int32(pcm[i]), int32(pcm[i+1])
+		r.buf = append(r.buf, int16((l+rr)/2))
+		r.side = append(r.side, int16((l-rr)/2))
+	}
+}
+
+// keepSide: buf was before samples long and has had some taken off its
+// front (smoothing, a skip): side loses the same ones.
+func (r *voiceRemoteSource) keepSide(before int) {
+	if r.side == nil {
+		return
+	}
+	if gone := before - len(r.buf); gone > 0 {
+		r.side = r.side[min(gone, len(r.side)):]
+	}
+}
 
 // trimVoiceQueue drops the oldest queued sound when too much has built up
 // (call with r.mu held, after adding to it). The next sound played is

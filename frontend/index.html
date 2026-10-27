@@ -271,6 +271,7 @@ img.plug-ico { border-radius:4px; }
 .pp-btn { background:var(--bg-light); border:none; color:var(--text); width:36px; height:36px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s,color .15s,filter .15s; }
 .pp-btn:not(.has-ic) { width:auto; border-radius:18px; padding:0 14px; font-size:.8rem; font-weight:600; }
 .pp-btn.primary { background:var(--accent); color:#fff; width:44px; height:44px; }
+.pp-btn.on { color:var(--accent); background:color-mix(in srgb, var(--accent) 18%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
 .pp-btn.primary:not(.has-ic) { width:auto; }
 .pp-btn:hover:not(:disabled) { filter:brightness(1.18); }
 .pp-btn.danger:hover:not(:disabled) { background:var(--red); color:#fff; filter:none; }
@@ -294,6 +295,13 @@ img.plug-ico { border-radius:4px; }
 .pp-iact .ic { width:16px; height:16px; }
 .pp-empty, .pp-more { color:var(--text-muted); font-size:.8rem; padding:2px 6px; }
 .pp-text { line-height:1.45; overflow-wrap:anywhere; } .pp-text.muted { color:var(--text-muted); }
+.pp-vol { display:flex; align-items:center; gap:8px; padding:0 14px 8px; }
+.pp-vol .pp-vmute { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:3px; border-radius:4px; display:flex; }
+.pp-vol .pp-vmute:hover { background:var(--bg-light); color:var(--text); }
+.pp-vol .pp-vmute.off { color:var(--red-light); }
+.pp-vol .pp-vmute .ic { width:18px; height:18px; }
+.pp-vol input[type=range] { flex:1; min-width:0; accent-color:var(--accent); }
+.pp-vol .pp-vval { font-size:.75rem; color:var(--text-muted); min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
 .pp-foot { border-top:1px solid var(--border); padding:8px 14px 10px; font-size:.75rem; color:var(--text-muted); line-height:1.4; }
 .pp-foot a { color:var(--accent); text-decoration:none; }
 .pp-foot code, .pt-desc code { background:var(--bg-light); border-radius:3px; padding:0 3px; font-size:.95em; color:var(--text); }
@@ -13161,6 +13169,7 @@ function openPluginPop(id,anchor){
   renderPluginPop();renderPluginBar();
 }
 function closePluginPop(){
+  plug.volDrag=plug.redrawAfterDrag=false;
   plug.open=null;plug.anchor=null;
   document.getElementById('plugin-pop')?.classList.add('hidden');
   renderPluginBar();
@@ -13226,7 +13235,8 @@ function fmtClock(ms){
 function plugBtnHTML(b,cls){
   const ic=b.icon&&document.getElementById('ic-'+b.icon)?icon(b.icon):'';
   const label=String(b.label||b.action||'');
-  return `<button type="button" class="${cls}${b.style==='primary'?' primary':b.style==='danger'?' danger':''}${ic?' has-ic':''}" data-act="${esc(b.action||'')}" data-val="${esc(b.value??'')}"${b.disabled?' disabled':''} title="${esc(label)}">${ic||esc(label)}</button>`;
+  // style: "primary" (the main button), "danger", or "on" (a switch that's on).
+  return `<button type="button" class="${cls}${b.style==='primary'?' primary':b.style==='danger'?' danger':b.style==='on'?' on':''}${ic?' has-ic':''}" data-act="${esc(b.action||'')}" data-val="${esc(b.value??'')}"${b.disabled?' disabled':''} title="${esc(label)}">${ic||esc(label)}</button>`;
 }
 function renderPanelBlocks(panel,at){
   const out=[];
@@ -13264,6 +13274,9 @@ function renderPanelBlocks(panel,at){
   return out.join('');
 }
 function renderPluginPanel(pop,p){
+  // Dragging its volume slider: redraw once it's let go (a redraw now would
+  // pull the slider out from under the pointer).
+  if(plug.volDrag){plug.redrawAfterDrag=true;return;}
   // What's typed in its boxes survives the panel changing.
   const typed={};let focused=null,caret=0;
   pop.querySelectorAll('.pp-input').forEach(f=>{const i=f.querySelector('input');typed[f.dataset.act]=i.value;if(document.activeElement===i){focused=f.dataset.act;caret=i.selectionStart;}});
@@ -13274,11 +13287,13 @@ function renderPluginPanel(pop,p){
   pop.innerHTML=`<div class="pp-head"><span class="pp-ic">${pluginIcon(p)}</span><span class="pp-name">${esc(pluginTitle(p))}</span><span class="bot-tag plugin" title="${esc(PLUGIN_TIP)}">PLUGIN</span>
       <button class="pp-pin${isPinned(p)?' on':''}" title="${isPinned(p)?'Unpin from the bar':'Pin to the bar'}">${icon('keep')}</button>
       <button class="pp-x" title="Close">${icon('close')}</button></div>
+    ${p.username?pluginVolumeHTML(p):''}
     <div class="pp-body">${!p.connected?`<div class="pp-text muted">${esc(pluginTitle(p))} isn’t running right now.</div>`
       :x?renderPanelBlocks(x.panel,x.at):`<div class="pp-text muted">Nothing to show yet.</div>`}</div>
     <div class="pp-reply hidden"></div>
     ${p.commands?.length?`<div class="pp-foot">Or type <a href="#" class="pp-cmds"><code>/${esc(p.id)}</code></a> in a channel for its commands.</div>`:''}`;
   pop.querySelector('.pp-x').onclick=closePluginPop;
+  if(p.username)wirePluginVolume(pop,p);
   pop.querySelector('.pp-pin').onclick=e=>{e.stopPropagation();setPinned(p.id,!isPinned(p));renderPluginPop();};
   pop.querySelector('.pp-cmds')?.addEventListener('click',e=>{e.preventDefault();closePluginPop();startPluginCommand(p.id);});
   pop.querySelectorAll('[data-link]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();openExternalURL(a.dataset.link);}));
@@ -13295,6 +13310,40 @@ function renderPluginPanel(pop,p){
   });
   if(plug.reply&&plug.reply.plugin===p.id&&plug.reply.where==='panel')showReplyIn(pop.querySelector('.pp-reply'),plug.reply);
   tickPluginProgress();
+}
+// How loud a plugin is in calls, for you: the same setting as its slider in
+// the call's right-click menu (per person, on this computer).
+function pluginVolumeHTML(p){
+  const ua=getUserAudio(p.username),pct=Math.round(ua.volume*100);
+  return `<div class="pp-vol"><button type="button" class="pp-vmute${ua.muted?' off':''}" title="${ua.muted?'Unmute':'Mute'} (just for you)">${icon(ua.muted?'volume_off':'volume_up')}</button>
+    <input type="range" min="0" max="200" step="1" value="${pct}" aria-label="${esc(pluginTitle(p))} volume, just for you" title="Volume — just for you, like in the call">
+    <span class="pp-vval">${pct}%</span></div>`;
+}
+function wirePluginVolume(pop,p){
+  const row=pop.querySelector('.pp-vol');if(!row)return;
+  const slider=row.querySelector('input'),val=row.querySelector('.pp-vval'),mute=row.querySelector('.pp-vmute');
+  const endDrag=()=>{
+    if(!plug.volDrag)return;
+    plug.volDrag=false;
+    if(plug.redrawAfterDrag){plug.redrawAfterDrag=false;renderPluginPop();}
+  };
+  slider.addEventListener('pointerdown',()=>{plug.volDrag=true;document.addEventListener('pointerup',endDrag,{once:true,capture:true});});
+  slider.addEventListener('pointerup',endDrag);slider.addEventListener('pointercancel',endDrag);slider.addEventListener('change',endDrag);
+  slider.addEventListener('input',()=>{
+    val.textContent=slider.value+'%';
+    // Turning it up unmutes it, like a volume knob.
+    const patch={volume:+slider.value/100};
+    if(getUserAudio(p.username).muted&&+slider.value>0){patch.muted=false;mute.classList.remove('off');mute.innerHTML=icon('volume_up');}
+    setUserAudio(p.username,patch);
+  });
+  slider.addEventListener('dblclick',()=>{slider.value='100';val.textContent='100%';setUserAudio(p.username,{volume:1});}); // back to 100%
+  mute.addEventListener('click',()=>{
+    const muted=!getUserAudio(p.username).muted;
+    setUserAudio(p.username,{muted});
+    mute.classList.toggle('off',muted);mute.innerHTML=icon(muted?'volume_off':'volume_up');
+    mute.title=`${muted?'Unmute':'Mute'} (just for you)`;
+    renderSidebar(); // its icon in the call list
+  });
 }
 async function pluginAction(p,action,value,board,btn){
   if(!action)return;
