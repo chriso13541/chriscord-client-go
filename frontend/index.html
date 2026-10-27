@@ -13037,6 +13037,18 @@ async function loadPlugins(){
   if(plug.open)renderPluginPop();
 }
 function pluginById(id){return plug.list.find(p=>p.id===id)||null;}
+// A plugin started or stopped (its account came online or went): load the
+// list again, which opens a lane to one that's now running — else it stayed
+// "not running" here until someone typed one of its commands. Once more a
+// few seconds on: a plugin's very first start publishes its key just after
+// it connects, and a lane needs that key.
+let pluginsOnlineTimer=0;
+function pluginsOnlineChanged(payload){
+  const online=new Set(payload?.online||[]);
+  if(!plug.list.some(p=>p.username&&online.has(p.username)!==!!p.connected))return;
+  clearTimeout(pluginsOnlineTimer);
+  pluginsOnlineTimer=setTimeout(()=>{loadPlugins();pluginsOnlineTimer=setTimeout(loadPlugins,4000);},500);
+}
 function pluginBlocked(id){return !!plug.blocked?.has(id);}
 // The plugin whose account a username is, if it's one.
 function pluginOfUser(u){return plug.list.find(p=>p.username&&p.username===u)||null;}
@@ -14268,7 +14280,7 @@ function init(){
     refreshPinsIfOpen(ev.board_id);
     if(ev.pinned&&ev.by&&ev.by!==state.username)toast(`${ev.by} pinned a message`);
   });
-  window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshDisplayNames();refreshPresenceBadges();renderComposerHighlight();});
+  window.runtime.EventsOn('chat:users',payload=>{lastUsersPayload=payload||{};renderMembers(lastUsersPayload);refreshDisplayNames();refreshPresenceBadges();renderComposerHighlight();pluginsOnlineChanged(lastUsersPayload);});
   window.runtime.EventsOn('server:updated',()=>refreshServerMeta());
   // Roles changed: colours/permissions, and which channels you can see.
   window.runtime.EventsOn('server:roles',()=>{loadRoles();refreshRoomsAndBoards();});
