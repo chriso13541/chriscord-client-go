@@ -62,6 +62,9 @@ type App struct {
 	// roster is the server's signed member list (roster_app.go).
 	roster           *rosterClient
 	lanes            *laneClient
+	// dl is the downloads manager (downloads.go).
+	dlOnce           sync.Once
+	dlm              *downloadManager
 }
 
 func NewApp() *App {

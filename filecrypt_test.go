@@ -9,6 +9,8 @@ import (
 	mrand "math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -303,9 +305,9 @@ func TestUploadEncrypted(t *testing.T) {
 	}
 }
 
-// Downloads: the browser gets a link to this app, which streams the file
-// (or a zip of a message's files) decrypted.
-func TestBrowserDownloadLinks(t *testing.T) {
+// Downloads: an encrypted file is decrypted straight into the file saved
+// (by the downloads manager), and "Download all" zips a message's files.
+func TestEncryptedDownloads(t *testing.T) {
 	plain := make([]byte, 3*fileChunk+99)
 	rand.Read(plain)
 	blob, e := encryptedBlob(t, plain)
@@ -313,54 +315,46 @@ func TestBrowserDownloadLinks(t *testing.T) {
 		http.ServeContent(w, r, "x", time.Time{}, bytes.NewReader(blob))
 	}))
 	defer srv.Close()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AppData", t.TempDir())
+	dir := t.TempDir()
+	updateDownloadPrefs(func(p *downloadPrefs) { p.Folder = dir })
 	a := &App{domain: srv.URL}
 	a.text = newTextCrypto(a)
 	e.meta.Name, e.meta.Mime = "holiday clip.mp4", "video/mp4"
 	a.text.files["x.e2ee"] = e
 	a.text.msgFiles["m1"] = []fileMeta{e.meta, e.meta}
 
-	link, err := a.AttachmentDownloadLink(fileLocalPrefix+"x.e2ee", "holiday clip.mp4")
-	if err != nil || !strings.HasPrefix(link, "http://127.0.0.1:") {
-		t.Fatalf("link %q: %v", link, err)
-	}
-	resp, err := http.Get(link)
+	d, err := a.StartDownload(DownloadSource{Kind: "file", URL: fileLocalPrefix + "x.e2ee", Name: "holiday clip.mp4"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got bytes.Buffer
-	got.ReadFrom(resp.Body)
-	resp.Body.Close()
-	if resp.StatusCode != 200 || !bytes.Equal(got.Bytes(), plain) ||
-		!strings.Contains(resp.Header.Get("Content-Disposition"), "attachment") {
-		t.Fatalf("download: %d, %d bytes, %q", resp.StatusCode, got.Len(), resp.Header.Get("Content-Disposition"))
+	if r := waitDownload(t, a, d.ID, dlDone, dlFailed); r.State != dlDone || r.Total != int64(len(plain)) {
+		t.Fatalf("%+v", r)
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "holiday clip.mp4"))
+	if !bytes.Equal(got, plain) {
+		t.Fatal("the decrypted file differs")
 	}
 
-	zlink, err := a.AttachmentsZipLink("m1")
+	z, err := a.StartDownload(DownloadSource{Kind: "zip", MessageID: "m1", Name: "attachments.zip"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err = http.Get(zlink)
-	if err != nil {
-		t.Fatal(err)
+	if r := waitDownload(t, a, z.ID, dlDone, dlFailed); r.State != dlDone {
+		t.Fatalf("%+v", r)
 	}
-	got.Reset()
-	got.ReadFrom(resp.Body)
-	resp.Body.Close()
-	zr, err := zip.NewReader(bytes.NewReader(got.Bytes()), int64(got.Len()))
+	data, _ := os.ReadFile(filepath.Join(dir, "attachments.zip"))
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil || len(zr.File) != 2 || zr.File[1].Name != "holiday clip (2).mp4" {
-		t.Fatalf("zip: %v %d", err, len(zr.File))
+		t.Fatalf("zip: %v", err)
 	}
 	f, _ := zr.File[0].Open()
 	var one bytes.Buffer
 	one.ReadFrom(f)
 	if !bytes.Equal(one.Bytes(), plain) {
 		t.Fatal("zipped file differs")
-	}
-
-	// A made-up or expired token doesn't work.
-	bad := zlink[:strings.Index(zlink, "/dl/")+4] + "00000000000000000000000000000000/x"
-	if r, _ := http.Get(bad); r == nil || r.StatusCode != http.StatusGone {
-		t.Fatal("unknown token accepted")
 	}
 }
 

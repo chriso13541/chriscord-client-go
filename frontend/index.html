@@ -757,6 +757,54 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .header-icon-btn:hover:not(:disabled) { background:var(--bg-light); color:var(--text); }
 .header-icon-btn.active { color:var(--accent); }
 #mute-mentions-btn + #toggle-pins-btn { margin-left:2px; }
+/* Downloads (top right, between pinned and plugins) */
+#toggle-pins-btn + #downloads-btn { margin-left:2px; }
+#downloads-btn { position:relative; }
+#downloads-btn.busy { color:var(--accent); }
+#downloads-btn .dl-ring { position:absolute; inset:0; margin:auto; width:30px; height:30px; transform:rotate(-90deg); pointer-events:none; display:none; }
+#downloads-btn.busy .dl-ring { display:block; }
+#downloads-btn .dl-ring circle { fill:none; stroke-width:2.5; }
+#downloads-btn .dl-ring .bg { stroke:var(--bg-light); }
+#downloads-btn .dl-ring .fg { stroke:var(--accent); stroke-linecap:round; transition:stroke-dashoffset .25s; }
+#downloads-btn .dl-dot { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--green); border:2px solid var(--bg-darkest); display:none; }
+#downloads-btn.fresh .dl-dot { display:block; }
+#downloads-btn.failed .dl-dot { display:block; background:var(--red); }
+#downloads-btn.pop { animation:dl-pop .5s cubic-bezier(.3,1.6,.5,1); }
+@keyframes dl-pop { 0%{transform:scale(1)} 40%{transform:scale(1.28)} 100%{transform:scale(1)} }
+#downloads-pop { position:fixed; z-index:200; width:min(380px,calc(100vw - 16px)); max-height:min(520px,calc(100vh - 80px)); display:flex; flex-direction:column; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.45); color:var(--text); font-size:.86rem; }
+#downloads-pop.hidden { display:none; }
+.dlp-head { display:flex; align-items:center; gap:6px; padding:12px 10px 8px 14px; }
+.dlp-head .dlp-title { font-weight:700; color:var(--text-strong); flex:1; }
+.dlp-icon-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:6px; display:inline-flex; align-items:center; gap:4px; font:inherit; font-size:.78rem; }
+.dlp-icon-btn:hover:not(:disabled) { color:var(--text-strong); background:var(--bg-light); }
+.dlp-icon-btn:disabled { opacity:.35; cursor:default; }
+.dlp-icon-btn .ic { width:18px; height:18px; }
+.dlp-list { overflow-y:auto; padding:0 6px 8px; display:flex; flex-direction:column; gap:2px; }
+.dlp-empty { color:var(--text-muted); text-align:center; padding:22px 12px 26px; font-size:.84rem; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.dlp-empty .ic { width:30px; height:30px; opacity:.6; }
+.dlp-row { display:flex; align-items:center; gap:10px; padding:8px; border-radius:8px; }
+.dlp-row:hover { background:var(--bg-light); }
+.dlp-row.done .dlp-main { cursor:pointer; }
+.dlp-row > .ic { width:26px; height:26px; flex-shrink:0; color:var(--text-muted); }
+.dlp-row.done > .ic { color:var(--accent); }
+.dlp-row.failed > .ic { color:var(--red); }
+.dlp-main { flex:1; min-width:0; }
+.dlp-name { color:var(--text-strong); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dlp-row.cancelled .dlp-name, .dlp-row.failed .dlp-name { color:var(--text-muted); }
+.dlp-row.cancelled .dlp-name { text-decoration:line-through; }
+.dlp-sub { color:var(--text-muted); font-size:.75rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dlp-row.failed .dlp-sub { color:var(--red-light, var(--red)); white-space:normal; }
+.dlp-bar { height:4px; border-radius:2px; background:var(--bg-darkest); margin-top:6px; overflow:hidden; }
+.dlp-bar > i { display:block; height:100%; background:var(--accent); border-radius:2px; transition:width .25s; }
+.dlp-bar.indet > i { width:30% !important; animation:dl-indet 1.2s ease-in-out infinite; }
+@keyframes dl-indet { 0%{transform:translateX(-100%)} 100%{transform:translateX(340%)} }
+.dlp-acts { display:flex; gap:2px; flex-shrink:0; opacity:.75; }
+.dlp-row:hover .dlp-acts { opacity:1; }
+/* Settings > System > Downloads */
+.dl-folder { display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
+.dl-folder code { flex:1; min-width:180px; background:var(--bg-darkest); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:.8rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:rtl; text-align:left; }
+.dl-folder .settings-secondary-btn { margin-top:0; display:inline-flex; align-items:center; gap:6px; }
+.dl-folder .settings-secondary-btn .ic { width:16px; height:16px; }
 #mute-mentions-btn.muted { color:var(--red); }
 .header-icon-btn:disabled { opacity:.35; cursor:default; }
 .header-icon-btn .ic { width:20px; height:20px; }
@@ -2147,6 +2195,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <div class="signed-in-as" id="signed-in-as"></div>
 </div>
 
+<div id="downloads-pop" class="hidden" role="dialog" aria-label="Downloads"></div>
+
 <div class="modal-overlay hidden" id="modal-account-key">
   <div class="modal ak-modal" role="dialog" aria-labelledby="ak-title">
     <div class="ak-head"><h2 id="ak-title">Your account key</h2><button type="button" class="ak-x" id="ak-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
@@ -2349,6 +2399,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <button id="call-mode-btn" class="hidden" type="button" title="Switch to the call view"><svg class="ic" aria-hidden="true"><use href="#ic-grid_view"/></svg><span>Call</span></button>
       <button id="mute-mentions-btn" class="header-icon-btn" title="Mute @mention sounds on this server" disabled><svg class="ic" aria-hidden="true"><use href="#ic-notifications"/></svg></button>
       <button id="toggle-pins-btn" class="header-icon-btn" title="Pinned messages" disabled><svg class="ic" aria-hidden="true"><use href="#ic-keep"/></svg></button>
+      <button id="downloads-btn" class="header-icon-btn" type="button" title="Downloads" aria-haspopup="dialog"><svg class="dl-ring" viewBox="0 0 30 30" aria-hidden="true"><circle class="bg" cx="15" cy="15" r="13"/><circle class="fg" cx="15" cy="15" r="13" stroke-dasharray="81.68" stroke-dashoffset="81.68"/></svg><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg><span class="dl-dot"></span></button>
       <div id="plugin-bar" class="hidden"></div>
       <button id="toggle-members-btn" title="Toggle member list"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg> Members</button>
       <div id="search-box">
@@ -2724,6 +2775,10 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div class="sys-games-head"><label class="settings-label">Your games</label><button class="settings-secondary-btn" type="button" id="sys-games-add"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg>Add a game</button></div>
       <p class="settings-hint" style="margin:4px 0 0">Add a program that isn’t found by itself, call a game something else, or hide one you’d rather not show (the eye).</p>
       <div id="sys-games-list"></div>
+      <label class="settings-label">Downloads</label>
+      <label class="check-row"><input type="checkbox" id="sys-dl-ask"> Ask where to save each file</label>
+      <p class="settings-hint" style="margin-top:0">Off: files go straight to the folder below (a name that's taken gets “(2)”). Either way, they're saved by Chriscord itself — follow them with the download button at the top right.</p>
+      <div class="dl-folder"><code id="sys-dl-folder" title=""></code><button class="settings-secondary-btn" type="button" id="sys-dl-change"><svg class="ic" aria-hidden="true"><use href="#ic-folder_open"/></svg>Change…</button><button class="settings-secondary-btn hidden" type="button" id="sys-dl-reset">Use Downloads</button></div>
     </div>
 
     <div id="settings-tab-search" class="settings-tab-pane">
@@ -3065,6 +3120,152 @@ function renderAccountKey(){
 document.getElementById('ak-close').addEventListener('click',closeAccountKeyBrowser);
 document.getElementById('modal-account-key').addEventListener('mousedown',e=>{if(e.target.id==='modal-account-key')closeAccountKeyBrowser();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('modal-account-key').classList.contains('hidden')){e.stopImmediatePropagation();closeAccountKeyBrowser();}},true);
+
+// ── DOWNLOADS MANAGER ────────────────────────────────────────────
+// The download button (top right) shows what's downloading: a ring with
+// the overall progress while anything is, a green dot when something has
+// finished since you last looked (red if one failed). Click for the list:
+// open a finished file, show it in its folder, cancel, retry, clear.
+let dlList=[],dlSeen=new Set(),dlFirst=true;
+const dlPop=()=>document.getElementById('downloads-pop');
+const dlRunning=d=>d.state==='queued'||d.state==='preparing'||d.state==='downloading';
+function dlBytes(n){if(!(n>0))return '0 B';const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i===0?n:n.toFixed(n<10?1:0))+' '+u[i];}
+function dlTime(sec){sec=Math.round(sec);if(sec<60)return sec+' s';if(sec<3600)return Math.floor(sec/60)+' min '+(sec%60?(sec%60)+' s':'');return Math.floor(sec/3600)+' h '+Math.floor(sec%3600/60)+' min';}
+function dlSub(d){
+  switch(d.state){
+    case 'queued':return 'Waiting for another download to finish\u2026';
+    case 'preparing':return d.name.endsWith('.zip')?'Zipping the files\u2026':'Starting\u2026';
+    case 'downloading':{
+      const parts=[d.total>0?`${dlBytes(d.done)} of ${dlBytes(d.total)}`:dlBytes(d.done)];
+      if(d.speed>0){parts.push(dlBytes(d.speed)+'/s');if(d.total>d.done)parts.push(dlTime((d.total-d.done)/d.speed)+' left');}
+      return parts.join(' \u00b7 ');}
+    case 'done':return `${dlBytes(d.total||d.done)} \u00b7 ${d.risky?'Program \u2014 opens in its folder':'Done'}`;
+    case 'failed':return d.error||'Failed';
+    case 'cancelled':return 'Cancelled';
+  }
+  return '';
+}
+async function startDownload(src){
+  try{
+    const d=await window.go.main.App.StartDownload(src);
+    if(!d)return; // "Save as" was cancelled
+    dlUpsert(d);
+    const btn=document.getElementById('downloads-btn');
+    btn.classList.remove('pop');void btn.offsetWidth;btn.classList.add('pop');
+    if(dlFirst){dlFirst=false;openDownloadsPop();} // the first one: show where downloads are now
+  }catch(err){toast('Download failed: '+err,true);}
+}
+function dlUpsert(d){
+  const i=dlList.findIndex(x=>x.id===d.id);
+  if(i>=0)dlList[i]=d;else dlList.unshift(d);
+  if(!dlRunning(d)&&dlPop().classList.contains('hidden'))dlSeen.delete(d.id); // finished while you weren't looking
+  else if(!dlRunning(d))dlSeen.add(d.id);
+  renderDownloadsBtn();
+  if(!dlPop().classList.contains('hidden'))renderDownloadsPop();
+}
+function renderDownloadsBtn(){
+  const btn=document.getElementById('downloads-btn');if(!btn)return;
+  const run=dlList.filter(dlRunning);
+  btn.classList.toggle('busy',run.length>0);
+  const unseen=dlList.filter(d=>!dlRunning(d)&&d.state!=='cancelled'&&!dlSeen.has(d.id));
+  btn.classList.toggle('failed',run.length===0&&unseen.some(d=>d.state==='failed'));
+  btn.classList.toggle('fresh',run.length===0&&unseen.length>0&&!unseen.some(d=>d.state==='failed'));
+  const tot=run.reduce((s,d)=>s+(d.total||0),0),done=run.reduce((s,d)=>s+Math.min(d.done,d.total||0),0);
+  const frac=run.length&&tot>0?done/tot:0;
+  btn.querySelector('.dl-ring .fg').setAttribute('stroke-dashoffset',String(81.68*(1-frac)));
+  btn.dataset.tip=run.length?`Downloading ${run.length===1?run[0].name:run.length+' files'}${tot>0?' \u2014 '+Math.round(frac*100)+'%':''}`:'Downloads';
+}
+function openDownloadsPop(){
+  const pop=dlPop();
+  dlList.forEach(d=>{if(!dlRunning(d))dlSeen.add(d.id);});
+  renderDownloadsPop();pop.classList.remove('hidden');placeDownloadsPop();
+  document.getElementById('downloads-btn').classList.add('active');
+  renderDownloadsBtn();
+}
+function closeDownloadsPop(){
+  dlPop().classList.add('hidden');
+  document.getElementById('downloads-btn')?.classList.remove('active');
+}
+function placeDownloadsPop(){
+  const pop=dlPop(),btn=document.getElementById('downloads-btn');
+  const r=btn.getBoundingClientRect(),w=pop.offsetWidth;
+  pop.style.top=Math.round(r.bottom+6)+'px';
+  pop.style.left=Math.round(Math.max(8,Math.min(window.innerWidth-w-8,r.right-w)))+'px';
+}
+function renderDownloadsPop(){
+  const pop=dlPop();
+  const finished=dlList.some(d=>!dlRunning(d));
+  const scroll=pop.querySelector('.dlp-list')?.scrollTop||0;
+  pop.innerHTML=`<div class="dlp-head"><span class="dlp-title">Downloads</span>
+      <button type="button" class="dlp-icon-btn" data-act="folder" title="Open your downloads folder">${icon('folder_open')}</button>
+      <button type="button" class="dlp-icon-btn" data-act="clear" ${finished?'':'disabled'} title="Take finished downloads off the list (the files stay)">Clear</button>
+      <button type="button" class="dlp-icon-btn" data-act="close" title="Close (Esc)">${icon('close')}</button></div>
+    <div class="dlp-list">${dlList.length?dlList.map(d=>{
+      const pct=d.total>0?Math.min(100,d.done/d.total*100):0;
+      const bar=dlRunning(d)?`<div class="dlp-bar${d.state!=='downloading'||!(d.total>0)?' indet':''}"><i style="width:${pct}%"></i></div>`:'';
+      let acts='';
+      if(dlRunning(d))acts=`<button type="button" class="dlp-icon-btn" data-act="cancel" title="Cancel">${icon('close')}</button>`;
+      else if(d.state==='done')acts=`<button type="button" class="dlp-icon-btn" data-act="show" title="Show in folder">${icon('folder_open')}</button><button type="button" class="dlp-icon-btn" data-act="remove" title="Take off the list (the file stays)">${icon('close')}</button>`;
+      else acts=`<button type="button" class="dlp-icon-btn" data-act="retry" title="Try again">${icon('refresh')}</button><button type="button" class="dlp-icon-btn" data-act="remove" title="Take off the list">${icon('close')}</button>`;
+      const ic=d.state==='failed'?'error':/\.(png|jpe?g|gif|webp|avif|bmp|heic)$/i.test(d.name)?'image':fileTypeIcon(d.name,'');
+      return `<div class="dlp-row ${d.state}" data-id="${esc(d.id)}">${icon(ic)}<div class="dlp-main" ${d.state==='done'?`title="${esc(d.risky?'Show '+d.path+' in its folder':'Open '+d.path)}"`:`title="${esc(d.path)}"`}><div class="dlp-name">${esc(d.name)}</div><div class="dlp-sub">${esc(dlSub(d))}</div>${bar}</div><div class="dlp-acts">${acts}</div></div>`;
+    }).join(''):`<div class="dlp-empty">${icon('download')}Files you download show up here.</div>`}</div>`;
+  const list=pop.querySelector('.dlp-list');if(list)list.scrollTop=scroll;
+}
+async function downloadAction(act,id){
+  const A=window.go.main.App;
+  try{
+    switch(act){
+      case 'close':closeDownloadsPop();break;
+      case 'folder':await A.OpenDownloadsFolder();break;
+      case 'clear':await A.ClearDownloads();break;
+      case 'cancel':await A.CancelDownload(id);break;
+      case 'retry':await A.RetryDownload(id);break;
+      case 'remove':await A.RemoveDownload(id);break;
+      case 'show':await A.ShowDownload(id);break;
+      case 'open':await A.OpenDownload(id);break;
+    }
+  }catch(err){toast(String(err),true);}
+}
+function initDownloads(){
+  const btn=document.getElementById('downloads-btn'),pop=dlPop();
+  btn.addEventListener('click',e=>{e.stopPropagation();if(pop.classList.contains('hidden'))openDownloadsPop();else closeDownloadsPop();});
+  pop.addEventListener('click',e=>{
+    e.stopPropagation();
+    const b=e.target.closest('[data-act]');
+    const row=e.target.closest('.dlp-row');
+    if(b){downloadAction(b.dataset.act,row?.dataset.id);return;}
+    if(row&&row.classList.contains('done')&&e.target.closest('.dlp-main'))downloadAction('open',row.dataset.id);
+  });
+  pop.addEventListener('contextmenu',e=>e.stopPropagation());
+  document.addEventListener('mousedown',e=>{if(!pop.classList.contains('hidden')&&!e.target.closest('#downloads-pop,#downloads-btn'))closeDownloadsPop();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!pop.classList.contains('hidden')){e.stopImmediatePropagation();closeDownloadsPop();}},true);
+  window.addEventListener('resize',()=>{if(!pop.classList.contains('hidden'))placeDownloadsPop();});
+  window.runtime.EventsOn('downloads:item',d=>dlUpsert(d));
+  window.runtime.EventsOn('downloads:list',l=>{
+    dlList=l||[];
+    renderDownloadsBtn();if(!pop.classList.contains('hidden'))renderDownloadsPop();
+  });
+  window.go.main.App.GetDownloads().then(l=>{dlList=l||[];dlList.forEach(d=>dlSeen.add(d.id));renderDownloadsBtn();}).catch(()=>{});
+  // Settings > System > Downloads
+  const ask=document.getElementById('sys-dl-ask');
+  ask.addEventListener('change',async()=>{
+    try{await window.go.main.App.SetDownloadAsk(ask.checked);settingsSaved(ask.checked?'Asks where to save':'Saves to your folder');}
+    catch(err){settingsSaved('Couldn\u2019t save that','fail');}
+  });
+  document.getElementById('sys-dl-change').addEventListener('click',async()=>{
+    try{renderDownloadSettings(await window.go.main.App.ChooseDownloadFolder());}catch(err){toast(String(err),true);}
+  });
+  document.getElementById('sys-dl-reset').addEventListener('click',async()=>{
+    try{renderDownloadSettings(await window.go.main.App.ResetDownloadFolder());settingsSaved('Back to Downloads');}catch(err){toast(String(err),true);}
+  });
+}
+function renderDownloadSettings(st){
+  if(!st)return;
+  document.getElementById('sys-dl-ask').checked=!!st.ask;
+  const f=document.getElementById('sys-dl-folder');f.textContent='\u200e'+st.folder+'\u200e';f.dataset.tip=st.folder;
+  document.getElementById('sys-dl-reset').classList.toggle('hidden',!!st.is_default);
+}
 
 // ── AUTO-JOIN ────────────────────────────────────────────────────
 // One server per account can be set to join by itself right after signing
@@ -5190,6 +5391,7 @@ async function renderSystemSettings(){
   document.getElementById('sys-games-add').disabled=!g.supported;
   renderNowPlaying(g.supported?g.current:null);
   try{renderCustomGames(await window.go.main.App.GetCustomGames());}catch{}
+  try{renderDownloadSettings(await window.go.main.App.GetDownloadSettings());}catch{}
 }
 // What's detected right now (Settings > System), kept current.
 function renderNowPlaying(name){
@@ -7740,71 +7942,23 @@ function toggleDropdown(msgEl,msg){
   showContextMenu(messageMenu(msgEl,msg,fake),r.right,r.bottom+4,{alignRight:true});
   dotsMenuFor=msg.id;
 }
-// Downloads go through the user's own browser, Discord-style: the server
-// is the CDN, and ?download=1 makes it answer with Content-Disposition:
-// attachment (under the original filename), so the browser saves the file
-// with its normal download UI/progress instead of opening it. The client
-// itself never touches the bytes — previously the Go side re-fetched the
-// whole file into a Save dialog on top of whatever the chat view had
-// already loaded to display it.
-// Downloads open in your browser, which saves the file the usual way. The
-// link goes to the browser through the app's Go side (OpenURL), not Wails'
-// BrowserOpenURL — that one refuses URLs with characters like ( ) ! ~ — and
-// the file name is fully percent-encoded so nothing in it is left raw.
-const strictEncode=v=>encodeURIComponent(v).replace(/[!'()*~]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
+// Downloads are saved by the app itself (downloads.go): no browser. Each
+// one shows in the downloads button at the top right, going to your
+// downloads folder — or where you pick, with "Ask where to save each file"
+// on (Settings → System). Encrypted files are decrypted straight into the
+// file; nothing is ever saved unencrypted anywhere else.
 const isEncryptedFile=a=>typeof a?.url==='string'&&a.url.startsWith('/e2ee-file/');
+const isServerFile=a=>!a.external&&typeof a.url==='string'&&(a.url.startsWith('/api/files/')||a.url.startsWith('/e2ee-file/'));
 async function downloadAttachment(a){
   if(a.external){window.go.main.App.OpenURL(a.url).catch(()=>{});return;} // a linked video: open its link
-  if(isEncryptedFile(a)){
-    // Encrypted end to end: the browser downloads it from this app, which
-    // decrypts it as it goes (a link to this computer, valid 5 minutes).
-    try{await window.go.main.App.OpenURL(await window.go.main.App.AttachmentDownloadLink(a.url,a.name||'file'));}
-    catch(err){toast('Download failed: '+err,true);}
-    return;
-  }
-  try{
-    // Always a brand-new link (not the cached one used for display), so
-    // the browser gets the full 5 minutes to start the download.
-    const base=await getAttachLink(a.url,true);
-    const sep=base.includes('?')?'&':'?';
-    await window.go.main.App.OpenURL(`${base}${sep}download=1&name=${strictEncode(a.name||'file')}`);
-  }catch(err){toast('Download failed: '+err,true);}
+  if(!isServerFile(a)){toast('That file can\u2019t be downloaded.',true);return;}
+  await startDownload({kind:'file',url:a.url,name:a.name||'file'});
 }
-// "Download all": the server zips every file in the message and hands back
-// a short-lived link (5 minutes, like single files), which opens in the
-// browser like any other download. The zip is deleted on the server once
-// that link expires. Building it can take a moment for big files, so the
-// button says what's happening meanwhile.
-const isServerFile=a=>!a.external&&typeof a.url==='string'&&(a.url.startsWith('/api/files/')||a.url.startsWith('/e2ee-file/'));
-async function downloadAllAttachments(msg,btn){
-  btn=btn||document.querySelector(`.msg-group[data-id="${CSS.escape(msg.id)}"] .msg-zip-chip`);
-  if(btn?.classList.contains('busy'))return;
-  const label=btn?.querySelector('span'),icn=btn?.querySelector('.ic');
-  const oldIcon=icn?.outerHTML;
-  if(btn){
-    btn.classList.add('busy');
-    label.textContent='Zipping files\u2026';
-    icn.outerHTML=icon('progress_activity','spin');
-  }else toast('Zipping files\u2026');
-  try{
-    if((msg.attachments||[]).some(isEncryptedFile)){
-      // Encrypted files: the server only has the encrypted blobs, so this
-      // app makes the zip, decrypted, as the browser downloads it.
-      await window.go.main.App.OpenURL(await window.go.main.App.AttachmentsZipLink(msg.id));
-      return;
-    }
-    const z=await window.go.main.App.GetMessageZipLink(msg.id);
-    await window.go.main.App.OpenURL(z.url); // the server always sends it as a download, named for you
-  }catch(err){
-    const m=String(err);
-    toast(/HTTP 404/.test(m)?'This server needs an update before it can zip files.':'Download all failed: '+m,true);
-  }finally{
-    if(btn){
-      btn.classList.remove('busy');
-      label.textContent='Download all';
-      btn.querySelector('.ic').outerHTML=oldIcon;
-    }
-  }
+// "Download all": every file in the message as one .zip — made here for
+// encrypted files (the server only has their encrypted blobs), by the
+// server otherwise.
+async function downloadAllAttachments(msg){
+  await startDownload({kind:'zip',message_id:msg.id,name:'attachments.zip'});
 }
 function closeDropdown(){if(dotsMenuFor)closeContextMenu();state.activeDropdown=null;}
 
@@ -14725,6 +14879,7 @@ function init(){
   document.getElementById('sys-start-min').addEventListener('change',onWindowSettingToggle);
   document.getElementById('sys-game').addEventListener('change',onGameToggle);
   document.getElementById('sys-games-add').addEventListener('click',openAddGame);
+  initDownloads();
   window.runtime.EventsOn('game:changed',name=>renderNowPlaying(name||''));
   loadMyCustomStatus();
   window.runtime.EventsOn('customstatus:changed',()=>{myCustomStatus=null;loadMyCustomStatus();});

@@ -17,8 +17,8 @@ package main
 // own asset handler answers (serveE2EEFile) by fetching the encrypted
 // chunks from the server and decrypting them. A Range request (a video
 // seeking) fetches and decrypts only the chunks it covers. Downloading one,
-// or a zip of all of a message's files, goes through the browser as before,
-// from a link to this app that decrypts as it streams (serveDownload).
+// or a zip of all of a message's files, is the downloads manager's
+// (downloads.go): decrypted straight into the file being saved.
 
 import (
 	"archive/zip"
@@ -27,7 +27,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,14 +34,11 @@ import (
 	"log"
 	"mime"
 	"mime/multipart"
-	"net"
 	"net/http"
-	"net/url"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -467,6 +463,11 @@ var errNotConnected = errors.New("not connected to a server")
 // fetchBlob gets bytes from..to (inclusive) of an encrypted file from the
 // server (to < 0: through the end).
 func (a *App) fetchBlob(serverURL string, from, to int64) (io.ReadCloser, error) {
+	return a.fetchBlobCtx(context.Background(), serverURL, from, to)
+}
+
+// fetchBlobCtx is fetchBlob, given up on when ctx is (a cancelled download).
+func (a *App) fetchBlobCtx(ctx context.Context, serverURL string, from, to int64) (io.ReadCloser, error) {
 	a.mu.Lock()
 	domain, token := a.domain, a.token
 	a.mu.Unlock()
@@ -475,7 +476,7 @@ func (a *App) fetchBlob(serverURL string, from, to int64) (io.ReadCloser, error)
 		// that was still loading. It asks again once it's back.
 		return nil, errNotConnected
 	}
-	req, err := http.NewRequest("GET", normaliseHTTP(domain)+serverURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", normaliseHTTP(domain)+serverURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +600,12 @@ func (a *App) serveE2EEFile(w http.ResponseWriter, r *http.Request) {
 
 // decryptTo writes a whole encrypted file, decrypted, to dst.
 func (a *App) decryptTo(dst io.Writer, e *fileEntry) error {
-	body, err := a.fetchBlob(e.meta.URL, 0, -1)
+	return a.decryptToCtx(context.Background(), dst, e)
+}
+
+// decryptToCtx is decryptTo, stopped when ctx is.
+func (a *App) decryptToCtx(ctx context.Context, dst io.Writer, e *fileEntry) error {
+	body, err := a.fetchBlobCtx(ctx, e.meta.URL, 0, -1)
 	if err != nil {
 		return err
 	}
@@ -612,147 +618,32 @@ func (a *App) decryptTo(dst io.Writer, e *fileEntry) error {
 	return decryptChunks(dst, body, e.aead, size, 0, fileChunks(size)-1, 0, size-1)
 }
 
-// ── Downloads through the browser ─────────────────────────────────────────────
+// ── Downloads ─────────────────────────────────────────────────────────────────
 //
-// Downloads open in your browser like before, so it saves them its usual
-// way (download bar, progress, your downloads folder). The browser can't
-// decrypt the server's blobs, though, so the link it's given is to this
-// app: a small web server on this computer only (127.0.0.1, a random port),
-// which decrypts as it streams. Each link is a random token for one file
-// (or one message's zip), usable for linkTTL — like the server's own
-// download links — and only works while Chriscord is open.
+// Saved by the app itself (downloads.go): decrypted straight into the file.
 
-const linkTTL = 5 * time.Minute
-
-type localLink struct {
-	name    string       // what the browser saves it as
-	files   []*fileEntry // one file, or a message's files
-	zip     bool
-	expires time.Time
-}
-
-type localDownloads struct {
-	mu    sync.Mutex
-	addr  string // "127.0.0.1:<port>" once started
-	links map[string]*localLink
-}
-
-var downloads localDownloads
-
-// link starts the local server if needed and returns a download link for l.
-func (a *App) downloadLink(l *localLink) (string, error) {
-	downloads.mu.Lock()
-	defer downloads.mu.Unlock()
-	if downloads.addr == "" {
-		ln, err := net.Listen("tcp", "127.0.0.1:0") // this computer only
-		if err != nil {
-			return "", fmt.Errorf("couldn't start the download link: %w", err)
-		}
-		downloads.addr = ln.Addr().String()
-		downloads.links = map[string]*localLink{}
-		srv := &http.Server{Handler: http.HandlerFunc(a.serveDownload), ReadHeaderTimeout: 10 * time.Second}
-		go srv.Serve(ln)
-	}
-	now := time.Now()
-	for t, old := range downloads.links { // tidy up expired ones
-		if now.After(old.expires) {
-			delete(downloads.links, t)
-		}
-	}
-	tok := make([]byte, 16)
-	if _, err := rand.Read(tok); err != nil {
-		return "", err
-	}
-	token := hex.EncodeToString(tok)
-	l.expires = now.Add(linkTTL)
-	downloads.links[token] = l
-	return "http://" + downloads.addr + "/dl/" + token + "/" + url.PathEscape(l.name), nil
-}
-
-// serveDownload: the browser fetching one of those links.
-func (a *App) serveDownload(w http.ResponseWriter, r *http.Request) {
-	rest, ok := strings.CutPrefix(r.URL.Path, "/dl/")
-	token, _, _ := strings.Cut(rest, "/")
-	downloads.mu.Lock()
-	l := downloads.links[token]
-	downloads.mu.Unlock()
-	if !ok || l == nil || time.Now().After(l.expires) {
-		http.Error(w, "This download link has expired — click Download in Chriscord again.", http.StatusGone)
-		return
-	}
-	h := w.Header()
-	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": l.name}))
-	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Cache-Control", "no-store")
-	if !l.zip {
-		e := l.files[0]
-		h.Set("Content-Type", e.meta.Mime)
-		h.Set("Content-Length", strconv.FormatInt(e.meta.Size, 10))
-		if r.Method == http.MethodHead {
-			return
-		}
-		if err := a.decryptTo(w, e); err != nil {
-			log.Printf("e2ee: download of %s: %v", e.meta.Name, err) // the browser sees it fail
-		}
-		return
-	}
-	h.Set("Content-Type", "application/zip")
-	if r.Method == http.MethodHead {
-		return
-	}
+// writeE2EEZip writes files, decrypted, as one zip (stored, not
+// compressed: media doesn't shrink, and it keeps this as fast as the
+// download). The same name twice becomes "photo (2).png".
+func (a *App) writeE2EEZip(ctx context.Context, w io.Writer, files []*fileEntry) error {
 	zw := zip.NewWriter(w)
 	used := map[string]int{}
-	for _, e := range l.files {
+	for _, e := range files {
 		name := safeFileName(e.meta.Name)
 		if n := used[name]; n > 0 { // the same name twice: "photo (2).png"
 			ext := filepath.Ext(name)
 			name = fmt.Sprintf("%s (%d)%s", strings.TrimSuffix(name, ext), n+1, ext)
 		}
 		used[safeFileName(e.meta.Name)]++
-		// Stored, not compressed: like the server's zips (media doesn't
-		// shrink, and it keeps this as fast as the download).
 		fw, err := zw.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store, Modified: time.Now()})
 		if err != nil {
-			return
+			return err
 		}
-		if err := a.decryptTo(fw, e); err != nil {
-			log.Printf("e2ee: zipping %s: %v", e.meta.Name, err)
-			return // cut short: the browser shows the download as failed
-		}
-	}
-	zw.Close()
-}
-
-// AttachmentDownloadLink gives a link for the browser to download one
-// encrypted attachment (its /e2ee-file/ address) from, decrypted.
-func (a *App) AttachmentDownloadLink(local, name string) (string, error) {
-	e := a.text.fileFor(local)
-	if e == nil {
-		return "", errors.New("that file isn't available — reopen the channel and try again")
-	}
-	if name == "" {
-		name = e.meta.Name
-	}
-	return a.downloadLink(&localLink{name: safeFileName(name), files: []*fileEntry{e}})
-}
-
-// AttachmentsZipLink gives a link for the browser to download all of a
-// message's encrypted attachments as one .zip, made here (the server only
-// has the encrypted blobs, so it can't make it).
-func (a *App) AttachmentsZipLink(msgID string) (string, error) {
-	a.text.mu.Lock()
-	files := append([]fileMeta(nil), a.text.msgFiles[msgID]...)
-	a.text.mu.Unlock()
-	entries := make([]*fileEntry, 0, len(files))
-	for _, f := range files {
-		if e := a.text.fileFor(fileLocalPrefix + path.Base(f.URL)); e != nil {
-			entries = append(entries, e)
+		if err := a.decryptToCtx(ctx, fw, e); err != nil {
+			return fmt.Errorf("%s: %w", e.meta.Name, err)
 		}
 	}
-	if len(entries) == 0 {
-		return "", errors.New("this message has no encrypted files")
-	}
-	return a.downloadLink(&localLink{name: "attachments.zip", files: entries, zip: true})
+	return zw.Close()
 }
 
 // safeFileName keeps a file name from pointing anywhere else.
