@@ -1904,6 +1904,32 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .signed-in-as .logout-btn { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:none; color:var(--text-muted); font:inherit; cursor:pointer; }
 .signed-in-as .logout-btn .ic { width:15px; height:15px; }
 .signed-in-as .logout-btn:hover { color:var(--red-light); border-color:var(--red-light); }
+/* Account key browser (server list): what's in your account key */
+.ak-modal { width:720px; max-width:95%; display:flex; flex-direction:column; max-height:calc(100vh - 40px); }
+.ak-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.ak-head h2 { margin:0; flex:1; }
+.ak-head .ak-x { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; border-radius:6px; display:inline-flex; }
+.ak-head .ak-x:hover { color:var(--text-strong); background:var(--bg-light); }
+.ak-sub { color:var(--text-muted); font-size:.82rem; margin:0 0 14px; }
+.ak-body { display:flex; gap:14px; min-height:0; flex:1; }
+.ak-list { width:230px; flex-shrink:0; display:flex; flex-direction:column; gap:2px; overflow-y:auto; }
+.ak-item { display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:6px; border:none; background:none; color:var(--text); font:inherit; font-size:.85rem; text-align:left; cursor:pointer; }
+.ak-item:hover { background:var(--bg-mid); }
+.ak-item.on { background:var(--bg-light); color:var(--text-strong); }
+.ak-item .ic { width:18px; height:18px; flex-shrink:0; color:var(--text-muted); }
+.ak-item.sub { padding-left:26px; }
+.ak-item .ak-n { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ak-item .ak-s { font-size:.72rem; color:var(--text-muted); flex-shrink:0; }
+.ak-view { flex:1; min-width:0; display:flex; flex-direction:column; gap:10px; background:var(--bg-darkest); border:1px solid var(--border); border-radius:8px; padding:12px; min-height:320px; }
+.ak-view-top { display:flex; align-items:center; gap:8px; }
+.ak-view-top b { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-strong); font-size:.9rem; }
+.ak-note { color:var(--text-muted); font-size:.8rem; line-height:1.45; }
+.ak-img { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.ak-img img { max-width:100%; max-height:100%; object-fit:contain; border-radius:4px; }
+.ak-text { flex:1; min-height:0; overflow:auto; margin:0; font-family:ui-monospace,Consolas,monospace; font-size:.76rem; line-height:1.45; color:var(--text); white-space:pre-wrap; word-break:break-word; }
+.ak-empty { margin:auto; color:var(--text-muted); font-size:.85rem; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; }
+.ak-empty .ic { width:32px; height:32px; }
+@media (max-width:620px){ .ak-body { flex-direction:column; } .ak-list { width:auto; max-height:160px; } }
 /* "Keep me signed in" on the unlock screen */
 .gate-remember { display:flex; align-items:center; gap:8px; margin:12px 0 2px; font-size:.85rem; color:var(--text); cursor:pointer; user-select:none; }
 .gate-remember input { width:16px; height:16px; margin:0; accent-color:var(--accent); cursor:pointer; }
@@ -2119,6 +2145,15 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <button class="btn-add-server" id="open-add-btn"><svg class="ic" aria-hidden="true"><use href="#ic-add"/></svg> Add a Server</button>
   <p class="empty-hint hidden" id="no-servers-hint">No servers yet — add one above to get started.</p>
   <div class="signed-in-as" id="signed-in-as"></div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-account-key">
+  <div class="modal ak-modal" role="dialog" aria-labelledby="ak-title">
+    <div class="ak-head"><h2 id="ak-title">Your account key</h2><button type="button" class="ak-x" id="ak-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
+    <p class="ak-sub">What Export Account Key puts in the .zip, straight from this computer. Pick a file to see it, and save any of them on its own.</p>
+    <div class="error-msg hidden" id="ak-error"></div>
+    <div class="ak-body"><div class="ak-list" id="ak-list"></div><div class="ak-view" id="ak-view"></div></div>
+  </div>
 </div>
 
 <div class="modal-overlay hidden" id="modal-add">
@@ -2970,14 +3005,66 @@ async function enterApp(accountView){
   await loadClientSettings();
   const el=document.getElementById('signed-in-as');
   if(el){
-    el.innerHTML=state.account?`<span>Signed in as <strong>${esc(state.account.username)}</strong> · <a id="export-account-link">Export Account Key</a></span><button type="button" class="logout-btn" id="logout-btn" title="Log out to switch to another account">${icon('logout')}Log out</button>`:'';
+    el.innerHTML=state.account?`<span>Signed in as <strong>${esc(state.account.username)}</strong> · <a id="export-account-link">Export Account Key</a> · <a id="browse-account-link">Browse Account Key</a></span><button type="button" class="logout-btn" id="logout-btn" title="Log out to switch to another account">${icon('logout')}Log out</button>`:'';
     document.getElementById('export-account-link')?.addEventListener('click',openExportModal);
+    document.getElementById('browse-account-link')?.addEventListener('click',openAccountKeyBrowser);
     document.getElementById('logout-btn')?.addEventListener('click',switchAccount);
   }
   showScreen('screen-servers');
   await loadServers();
   autoJoinServer();
 }
+
+// ── ACCOUNT KEY BROWSER ──────────────────────────────────────────
+// "Browse Account Key" on the server list: the files Export Account Key
+// puts in the .zip, read from this computer for the account that's
+// unlocked (the Go side refuses otherwise). Images kept inside
+// client-settings.json (your background) are listed as files of their own,
+// so the picture itself can be saved.
+let akFiles=[],akSel='';
+function akSize(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(n<10240?1:0)+' KB':(n/1048576).toFixed(1)+' MB';}
+function akIcon(f){return f.kind==='image'?'image':f.kind==='key'?'lock':'description';}
+async function openAccountKeyBrowser(){
+  if(!state.account)return;
+  const ov=document.getElementById('modal-account-key'),err=document.getElementById('ak-error');
+  err.classList.add('hidden');
+  document.getElementById('ak-list').innerHTML='';
+  document.getElementById('ak-view').innerHTML=`<div class="ak-empty">Reading your account key…</div>`;
+  ov.classList.remove('hidden');
+  try{akFiles=await window.go.main.App.AccountKeyContents()||[];}
+  catch(e){akFiles=[];err.textContent='Couldn\u2019t read your account key: '+e;err.classList.remove('hidden');}
+  const bg=akFiles.find(f=>f.from&&/^background\./.test(f.name));
+  akSel=(bg||akFiles.find(f=>f.kind!=='key')||akFiles[0]||{}).name||'';
+  renderAccountKey();
+}
+function closeAccountKeyBrowser(){
+  document.getElementById('modal-account-key').classList.add('hidden');
+  akFiles=[];document.getElementById('ak-view').innerHTML='';document.getElementById('ak-list').innerHTML=''; // let the previews go
+}
+function renderAccountKey(){
+  const list=document.getElementById('ak-list'),view=document.getElementById('ak-view');
+  list.innerHTML=akFiles.map(f=>`<button type="button" class="ak-item${f.from?' sub':''}${f.name===akSel?' on':''}" data-name="${esc(f.name)}" title="${esc(f.from?f.name+' (kept in '+f.from+')':f.name)}">${icon(akIcon(f))}<span class="ak-n">${esc(f.name)}</span><span class="ak-s">${akSize(f.size)}</span></button>`).join('');
+  list.querySelectorAll('.ak-item').forEach(b=>b.addEventListener('click',()=>{akSel=b.dataset.name;renderAccountKey();}));
+  const f=akFiles.find(x=>x.name===akSel);
+  if(!f){view.innerHTML=`<div class="ak-empty">${icon('folder_zip')}Nothing to show.</div>`;return;}
+  const save=f.kind==='key'?'':`<button type="button" class="btn btn-primary btn-sm" id="ak-save">${icon('download')} Save</button>`;
+  const copy=f.kind==='text'?`<button type="button" class="btn btn-ghost btn-sm" id="ak-copy" title="Copy">${icon('content_copy')}</button>`:'';
+  const from=f.from?`Kept inside ${esc(f.from)}. `:'';
+  let body='';
+  if(f.kind==='image')body=`<div class="ak-img"><img alt="${esc(f.name)}" src="${f.preview}"></div>`;
+  else if(f.kind==='text')body=`<pre class="ak-text"></pre>`;
+  else body=`<div class="ak-empty">${icon('lock')}Encrypted with your passphrase \u2014 nothing to show.</div>`;
+  view.innerHTML=`<div class="ak-view-top">${icon(akIcon(f))}<b>${esc(f.name)}</b>${copy}${save}</div>${(from||f.note)?`<div class="ak-note">${from}${esc(f.note||'')}</div>`:''}${body}`;
+  const pre=view.querySelector('.ak-text');if(pre)pre.textContent=f.preview||'';
+  view.querySelector('#ak-copy')?.addEventListener('click',()=>{navigator.clipboard.writeText(f.preview||'').then(()=>toast('Copied')).catch(()=>{});});
+  view.querySelector('#ak-save')?.addEventListener('click',async()=>{
+    try{const where=await window.go.main.App.SaveAccountKeyFile(f.name);if(where)toast('Saved '+f.name);}
+    catch(e){toast('Couldn\u2019t save '+f.name+': '+e,true);}
+  });
+}
+document.getElementById('ak-close').addEventListener('click',closeAccountKeyBrowser);
+document.getElementById('modal-account-key').addEventListener('mousedown',e=>{if(e.target.id==='modal-account-key')closeAccountKeyBrowser();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('modal-account-key').classList.contains('hidden')){e.stopImmediatePropagation();closeAccountKeyBrowser();}},true);
 
 // ── AUTO-JOIN ────────────────────────────────────────────────────
 // One server per account can be set to join by itself right after signing
