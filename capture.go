@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -582,11 +581,6 @@ func (a *App) SetCameraOutputs(send, preview bool) {
 	}
 }
 
-type previewFrame struct {
-	Key  bool   `json:"key"`
-	Data string `json:"data"`
-}
-
 // pumpFLV reads FFmpeg's FLV output: each video tag is one encoded frame.
 func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct{}) error {
 	br := bufio.NewReaderSize(r, 1<<20)
@@ -697,7 +691,11 @@ func (a *App) pumpFLV(c *nativeCamera, r io.Reader, fps int, first chan<- struct
 			lastWhy = why
 		}
 		if c.preview.Load() {
-			wailsruntime.EventsEmit(a.ctx, c.kind+":preview", previewFrame{Key: key, Data: base64.StdEncoding.EncodeToString(au)})
+			mk := mediaCameraPreview // to the page as raw bytes (media.go)
+			if c.kind == "screen" {
+				mk = mediaScreenPreview
+			}
+			videoOut.push(mk, "", "h264", key, 0, au)
 		}
 		frames++
 		if el := time.Since(statT); el >= time.Second {

@@ -10242,6 +10242,49 @@ function dropRemoteVideo(user){
   try{r.gen?.stop();}catch{}
 }
 // Your own camera's encoded frames (native capture), for your preview.
+// ── Video frames from the app, as raw bytes (media.go) ───────────
+// One request is always waiting at /cc-media/frames: it comes back with
+// every frame since the last one (people's cameras and screens, and your
+// own previews), and the next goes out straight away. No base64, no JSON:
+// the frames go to the decoders as they arrived. Frames dropped because
+// the page fell behind (X-Media-Gap) mean every picture waits for its
+// next keyframe, which is asked for.
+let mediaRunning=false;
+async function startMediaFrames(){
+  if(mediaRunning)return;mediaRunning=true;
+  const dec=new TextDecoder();
+  let after='0',fails=0;
+  for(;;){
+    let buf,gap=false;
+    try{
+      const res=await fetch('/cc-media/frames?after='+after,{cache:'no-store'});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      after=res.headers.get('X-Media-Last')||after;
+      gap=res.headers.get('X-Media-Gap')==='1';
+      buf=await res.arrayBuffer();
+      fails=0;
+    }catch(err){
+      if(++fails===3)console.warn('video frames: '+err);
+      await new Promise(r=>setTimeout(r,Math.min(2000,100*fails)));
+      continue;
+    }
+    if(gap)vRemote.forEach((r,key)=>{r.needKey=true;askKeyframe(key,r);});
+    const dv=new DataView(buf),u8=new Uint8Array(buf);
+    for(let p=0;p+16<=buf.byteLength;){
+      const kind=dv.getUint8(p),flags=dv.getUint8(p+1),ulen=dv.getUint16(p+2,true),cap=dv.getFloat64(p+4,true),size=dv.getUint32(p+12,true);
+      p+=16;
+      if(p+ulen+size>buf.byteLength)break; // cut short: shouldn't happen
+      const user=ulen?dec.decode(u8.subarray(p,p+ulen)):'';p+=ulen;
+      const data=u8.subarray(p,p+size);p+=size; // the decoder copies what it needs
+      const key=!!(flags&1),codec=flags&2?'h264':'vp8';
+      try{
+        if(kind===0||kind===1)onVideoFrame({user,kind:kind===1?'screen':'camera',codec,key,cap,data});
+        else if(kind===2)onSelfPreview({key,data});
+        else if(kind===3){if(scr.on&&scr.preview)onVideoFrame({key,data,user:SELF_SCR,codec:'h264'},true);}
+      }catch(err){console.warn('video frame:',err);}
+    }
+  }
+}
 function onSelfPreview(f){
   if(!f?.data||!((cam.on&&cam.native)||camPreview.native))return;
   onVideoFrame({...f,user:SELF,codec:'h264'},true);
@@ -10262,14 +10305,15 @@ function onVideoFrame(f,self){
   if(vsSolo&&key!==(vsSolo===state.username?SELF:vsSolo===scrKey(state.username)?SELF_SCR:vsSolo))return;
   const r=remoteVideo(key);if(!r)return;
   const codec=f.codec||'vp8';
-  r.stats.recv++;r.stats.bytes+=f.data.length*3/4;if(f.key)r.stats.keys++;r.stats.codec=codec;
+  const bytes=typeof f.data==='string'?b64ToBytes(f.data):f.data;
+  r.stats.recv++;r.stats.bytes+=bytes.length;if(f.key)r.stats.keys++;r.stats.codec=codec;
   if(r.codec!==codec||!r.decoder||r.decoder.state==='closed')configureDecoder(key,r,codec);
   if(r.decoder.state!=='configured')return;
   if(r.needKey&&!f.key){r.stats.dropWait++;askKeyframe(key,r);return;}
   if(r.decoder.decodeQueueSize>6){r.stats.dropBusy++;r.needKey=true;askKeyframe(key,r);return;} // fallen behind: skip to the next keyframe
   try{
     const ts=f.cap>0?Math.round(f.cap*1000):(r.ts+=33333); // screens: their capture time
-    r.decoder.decode(new EncodedVideoChunk({type:f.key?'key':'delta',timestamp:ts,data:b64ToBytes(f.data)}));
+    r.decoder.decode(new EncodedVideoChunk({type:f.key?'key':'delta',timestamp:ts,data:bytes}));
     r.needKey=false;
   }catch(err){r.needKey=true;askKeyframe(key,r);}
 }
@@ -10642,7 +10686,7 @@ function initVideo(){
   });
   document.getElementById('voice-video-btn').addEventListener('click',toggleCamera);
   initScreenShare();
-  window.runtime.EventsOn('video:frame',onVideoFrame);
+  startMediaFrames(); // everyone's video, and your previews, as raw bytes (media.go)
   window.runtime.EventsOn('video:keyframe',()=>{cam.forceKey=true;});
   updateCameraButton();
   initCameraSettings();
@@ -11061,7 +11105,6 @@ function initScreenShare(){
   document.getElementById('sp-res').addEventListener('change',updateScreenHint);
   document.getElementById('sp-fps').addEventListener('change',updateScreenHint);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('modal-screen').classList.contains('hidden'))closeScreenPicker();});
-  window.runtime.EventsOn('screen:preview',f=>{if(f?.data&&scr.on&&scr.preview)onVideoFrame({...f,user:SELF_SCR,codec:'h264'},true);});
   window.runtime.EventsOn('screen:stats',st=>{vStats.screen=st;});
   window.runtime.EventsOn('screen:audio',r=>{
     scr.audio=r?.ok?'on':'';
@@ -11241,7 +11284,6 @@ function initCameraSettings(){
     await populateCameraSettings();
     applyCameraSetting();
   });
-  window.runtime.EventsOn('camera:preview',onSelfPreview);
   window.runtime.EventsOn('camera:stats',s=>{vStats.native=s;});
   window.runtime.EventsOn('camera:stopped',reason=>{
     if(cam.on&&cam.native){toast(reason||'Your camera stopped',true);stopCamera();playSound('webcam_stop');}

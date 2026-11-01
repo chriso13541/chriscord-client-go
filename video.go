@@ -33,24 +33,14 @@ import (
 // says which at startup (SetVideoCodec); each person's choice travels
 // with their stream, so senders don't have to agree.
 // Everyone else's video arrives here as RTP, is put back together into
-// whole frames (samplebuilder), and goes to the page as "video:frame"
-// events for it to decode and draw. So the server only ever forwards
+// whole frames (samplebuilder), and goes to the page as raw bytes
+// (media.go) for it to decode and draw. So the server only ever forwards
 // packets, and nothing here decodes or encodes video.
 //
 // The offer carries one send-only video section after all the audio ones
 // (see startVoiceSession); packets only flow while the camera is on.
 // Whether it's on is signalled separately (SetVideoEnabled), which is
 // what everyone's app goes by.
-
-// videoFrameEvent is one whole encoded frame from someone else's camera.
-type videoFrameEvent struct {
-	User  string  `json:"user"`
-	Kind  string  `json:"kind"`  // "camera" or "screen"
-	Codec string  `json:"codec"` // "h264" (Annex B) or "vp8"
-	Key   bool    `json:"key"`
-	Cap   float64 `json:"cap,omitempty"` // screens: capture time on the sharer's clock, ms (avsync.go)
-	Data  string  `json:"data"`          // base64 frame
-}
 
 // The codec this app sends its camera in, as chosen by the page.
 var (
@@ -385,14 +375,12 @@ func (s *VoiceSession) handleRemoteVideo(track *webrtc.TrackRemote) {
 			if kind == "screen" {
 				capMs = unwrap.ms(sample.PacketTimestamp, 90000)
 			}
-			wailsruntime.EventsEmit(s.ctx, "video:frame", videoFrameEvent{
-				User:  user,
-				Kind:  kind,
-				Codec: codec,
-				Cap:   capMs,
-				Key:   isKey(sample.Data),
-				Data:  base64.StdEncoding.EncodeToString(sample.Data),
-			})
+			// To the page as raw bytes (media.go).
+			mk := mediaCamera
+			if kind == "screen" {
+				mk = mediaScreen
+			}
+			videoOut.push(mk, user, codec, isKey(sample.Data), capMs, sample.Data)
 		}
 	}
 }

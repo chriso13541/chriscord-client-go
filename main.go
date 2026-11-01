@@ -49,6 +49,10 @@ func main() {
 					app.serveE2EEFile(w, r)
 					return
 				}
+				if r.URL.Path == mediaPath { // video frames, as raw bytes (media.go)
+					serveMedia(w, r)
+					return
+				}
 				app.serveEmojiAsset(w, r)
 			}),
 		},
