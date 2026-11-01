@@ -390,7 +390,11 @@ func (c *callCrypto) onHelloLocked(m *e2eeMsg) ([]outMsg, bool) {
 	isNew := p == nil || p.eph != ephArr || p.identityHex != idHex
 	if isNew {
 		p = &e2eePeer{identity: identity, identityHex: idHex, eph: ephArr}
-		p.changed = !pinIdentity(c.domain, m.From, idHex)
+		// A new key for this name is flagged — unless the signed member list
+		// has it as a bot or plugin (its approvers signed it in): a
+		// reinstalled plugin has a new identity under the same name, and
+		// that's not someone pretending to be it (as keycheck.go).
+		p.changed = !pinIdentity(c.domain, m.From, idHex) && !c.app.rosterIsAutomated(idHex)
 		if p.changed {
 			log.Printf("e2ee: WARNING: %s's identity key is different from the one seen before", m.From)
 		}
@@ -686,6 +690,42 @@ func (a *App) handleVoiceE2EE(raw []byte) { a.e2ee.handleMessage(raw) }
 const e2eePinsFile = "chriscord_e2ee_keys.json"
 
 var pinsMu sync.Mutex
+
+// forgetIdentityKeys drops what's remembered for these keys on domain (a
+// bot or plugin taken off the signed member list): whoever turns up under
+// its name next — a reinstalled plugin — is someone new, not "changed".
+func forgetIdentityKeys(domain string, keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+	pinsMu.Lock()
+	defer pinsMu.Unlock()
+	path := filepath.Join(chriscordConfigDir(), e2eePinsFile)
+	pins := map[string]map[string]string{}
+	data, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(data, &pins) != nil {
+		return
+	}
+	gone := map[string]bool{}
+	for _, k := range keys {
+		gone[strings.ToLower(k)] = true
+	}
+	changed := false
+	for user, k := range pins[domain] {
+		if gone[strings.ToLower(k)] {
+			delete(pins[domain], user)
+			changed = true
+		}
+	}
+	if !changed {
+		return
+	}
+	if data, err := json.MarshalIndent(pins, "", "  "); err == nil {
+		if err := writeFileAtomic(path, data, 0600); err != nil {
+			log.Printf("e2ee: forgetting a removed plugin's key: %v", err)
+		}
+	}
+}
 
 // pinIdentity remembers the identity key seen for user on this server, and
 // reports whether it matches the one seen before (true the first time). A

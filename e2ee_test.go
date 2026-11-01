@@ -550,3 +550,30 @@ func TestCallKeysFollowSignedList(t *testing.T) {
 		t.Fatal("bob still hears alice after losing access")
 	}
 }
+
+// A plugin reinstalled under the same name has a new identity: once the
+// old one is taken off the signed member list (or the new one is on it as a
+// plugin), the call doesn't flag its key as changed.
+func TestReinstalledPluginNotChanged(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AppData", t.TempDir())
+	oldKey, newKey := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	if !pinIdentity("srv", "Music", oldKey) {
+		t.Fatal("first sight should match")
+	}
+	if pinIdentity("srv", "Music", newKey) {
+		t.Fatal("a new key should be flagged")
+	}
+	pinIdentity("srv", "Music", oldKey) // back to the old one
+	forgetIdentityKeys("srv", []string{oldKey})
+	if !pinIdentity("srv", "Music", newKey) {
+		t.Fatal("the removed plugin's key was forgotten: the new one is first sight")
+	}
+	// Someone else's pin is left alone.
+	pinIdentity("srv", "alice", strings.Repeat("c", 64))
+	forgetIdentityKeys("srv", []string{newKey})
+	if pinIdentity("srv", "alice", strings.Repeat("d", 64)) {
+		t.Fatal("alice's pin was forgotten too")
+	}
+}

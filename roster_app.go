@@ -398,14 +398,29 @@ func (rc *rosterClient) integrateLocked(fresh []RosterEntry, lastSeq int64) {
 // channels it affects as needing a new key.
 func (rc *rosterClient) applyLocked(es []RosterEntry, notice bool) {
 	r := rc.r
+	var botsGone []string // bots and plugins taken off: their remembered keys go (e2ee.go)
+	defer func() {
+		if len(botsGone) > 0 {
+			go forgetIdentityKeys(rc.domain, botsGone)
+		}
+	}()
 	for _, e := range es {
 		var losing []string
 		if notice {
 			losing = rc.losingAccess(e)
 		}
+		botGone := ""
+		if op, err := e.op(); err == nil && notice && op.Op == opRemove {
+			if m, ok := r.Members[op.Key]; ok && (m.Kind == kindBot || m.Kind == kindPlugin) {
+				botGone = op.Key
+			}
+		}
 		if err := r.Apply(e); err != nil {
 			r.Rejected = append(r.Rejected, RosterRejected{Index: r.Applied + len(r.Rejected), Why: err.Error()})
 			continue
+		}
+		if botGone != "" {
+			botsGone = append(botsGone, botGone)
 		}
 		rc.heads[headPrefix(r.Head)] = true
 		if len(losing) > 0 && rc.pin != nil {
