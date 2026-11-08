@@ -50,9 +50,16 @@ var (
 
 // findFFmpeg unpacks the bundled FFmpeg into the user's cache folder the
 // first time (named by its hash, so an app update brings a fresh copy), or
-// falls back to one on the PATH. "" if there's none.
+// falls back to one on the PATH. "" if there's none. On Linux the one on
+// the PATH (the distro's) comes first (ffmpegPreferSystem).
 func findFFmpeg() string {
 	ffmpegOnce.Do(func() {
+		if ffmpegPreferSystem {
+			if p, err := exec.LookPath("ffmpeg"); err == nil {
+				ffmpegPath, ffmpegFrom = p, "system"
+				return
+			}
+		}
 		if p, err := unpackBundledFFmpeg(); err == nil && p != "" {
 			ffmpegPath, ffmpegFrom = p, "bundled"
 			return

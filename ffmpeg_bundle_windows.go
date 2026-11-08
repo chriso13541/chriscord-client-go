@@ -11,3 +11,6 @@ import "embed"
 var bundledFFmpeg embed.FS
 
 const bundledFFmpegDir, bundledFFmpegFile, ffmpegExeName = "ffmpeg/windows", "ffmpeg.exe.gz", "ffmpeg.exe"
+
+// ffmpegPreferSystem: the bundled build comes first (transcode.go).
+const ffmpegPreferSystem = false

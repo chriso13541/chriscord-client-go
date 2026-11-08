@@ -8,3 +8,5 @@ import "embed"
 var bundledFFmpeg embed.FS
 
 const bundledFFmpegDir, bundledFFmpegFile, ffmpegExeName = "", "", "ffmpeg"
+
+const ffmpegPreferSystem = true

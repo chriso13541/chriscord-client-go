@@ -108,8 +108,10 @@ else
   EXE=ffmpeg
   EXTRA_LIBS=""
   # Capture: webcams (V4L2), X11 screens (also XWayland windows). The
-  # rawvideo writer is for the share picker's small pictures of each screen.
-  CAPTURE="--enable-indev=v4l2,xcbgrab --enable-libxcb --enable-libxcb-shm --enable-libxcb-xfixes --enable-libxcb-shape --enable-filter=hwupload --enable-encoder=rawvideo --enable-muxer=rawvideo"
+  # rawvideo writer is for the share picker's small pictures of each screen;
+  # the rawvideo reader takes Wayland shares, whose pictures the app reads
+  # from PipeWire and pipes in (pwcapture_linux.go).
+  CAPTURE="--enable-indev=v4l2,xcbgrab --enable-libxcb --enable-libxcb-shm --enable-libxcb-xfixes --enable-libxcb-shape --enable-filter=hwupload --enable-encoder=rawvideo --enable-muxer=rawvideo --enable-demuxer=rawvideo"
 fi
 
 echo "== nv-codec-headers"
@@ -204,6 +206,7 @@ else
   echo "  X11 screens (xcbgrab):   $(have CONFIG_XCBGRAB_INDEV)"
   echo "  mouse pointer (xfixes):  $(have CONFIG_LIBXCB_XFIXES)"
   echo "  screen pictures (raw):   $(have CONFIG_RAWVIDEO_ENCODER)"
+  echo "  Wayland shares (raw in): $(have CONFIG_RAWVIDEO_DEMUXER)"
   echo "  FLV writer (sharing):    $(have CONFIG_FLV_MUXER)"
   echo "  NVIDIA encoder:          $(have CONFIG_H264_NVENC_ENCODER)"
 fi

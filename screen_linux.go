@@ -88,6 +88,9 @@ func screenShareUnavailable() string {
 		return "this FFmpeg was built without the FLV muxer — rebuild it with ffmpeg/build-ffmpeg.sh linux"
 	}
 	if portalMode() {
+		if !strings.Contains(in["rawvideo"], "D") {
+			return "this FFmpeg can't read raw video, which sharing on Wayland needs — install your distro's FFmpeg (e.g. sudo apt install ffmpeg), or rebuild the bundled one with ffmpeg/build-ffmpeg.sh linux"
+		}
 		if why := pwStreamAvailable(); why != "" {
 			return "Sharing your screen on Wayland needs PipeWire: " + why
 		}
