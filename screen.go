@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os/exec"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -196,7 +197,9 @@ func (a *App) startScreenShare(opts ScreenStart) (string, error) {
 	// Windows 10, the borderless setting on Windows 11).
 	opts.HideBorder = true
 	label, err := a.startScreen(opts)
-	if err != nil && opts.HideBorder {
+	// (Windows only: elsewhere trying again the same way would only fail
+	// the same way — or, on Wayland, show the share dialog a second time.)
+	if err != nil && opts.HideBorder && goruntime.GOOS == "windows" {
 		// The border-free way (Desktop Duplication for a screen, GDI for a
 		// window on Windows 10) didn't work on this computer: share with
 		// Windows Graphics Capture instead, and say so.

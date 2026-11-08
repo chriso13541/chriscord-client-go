@@ -75,8 +75,8 @@ func linuxCustomTitlebar() bool {
 
 // linuxOptions: the window's icon (the taskbar, Alt+Tab) and its program
 // name — WM_CLASS on X11, the app id on Wayland — which matches
-// StartupWMClass in build/linux/chriscord.desktop so docks group it with
-// its launcher. The program name also names WebKit's data folder
+// the chriscord.desktop entry desktop_linux.go installs, so docks show its
+// icon. The program name also names WebKit's data folder
 // (~/.local/share/chriscord: the page's saved settings), so it stays the
 // same whatever the executable is called.
 func linuxOptions() *linux.Options {

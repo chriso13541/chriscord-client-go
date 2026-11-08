@@ -32,18 +32,20 @@ import (
 //     voices are taken back out of it (echo.go). A window's share sends
 //     everything you hear too, not just that app.
 //
-// Wayland doesn't let programs capture the screen this way (only through
-// the desktop's screen-sharing portal and PipeWire, which FFmpeg can't do
-// yet). Chriscord itself runs fine on Wayland, but sharing there says so —
-// unless CHRISCORD_X11_CAPTURE=1, which shares through XWayland anyway:
-// only programs running on XWayland can be seen then (most games through
-// Wine/Proton, older apps), native Wayland windows come out black.
+// Wayland doesn't let programs capture the screen themselves: there the
+// desktop's own "share your screen" dialog picks a screen or window, and
+// the picture comes over PipeWire (portal_linux.go, pwcapture_linux.go).
+// Chriscord's picker then shows a single card that opens that dialog.
+// CHRISCORD_X11_CAPTURE=1 shares through XWayland instead, with
+// Chriscord's own picker: only programs running on XWayland can be seen
+// then (most games through Wine/Proton), native Wayland windows come out
+// black.
 
 func init() {
 	screenAudioNoteText = "— everything you hear (the call's own sound is taken back out)"
 }
 
-func screenWindowsSupported() bool  { return true }
+func screenWindowsSupported() bool  { return !portalMode() }
 func screenGDIFallback(string) bool { return false }
 
 // sharedWindowState: for a window share, whether it's in front, behind
@@ -71,19 +73,32 @@ func onWayland() bool {
 // xCaptureOnWayland: CHRISCORD_X11_CAPTURE=1 — share through XWayland.
 func xCaptureOnWayland() bool { return os.Getenv("CHRISCORD_X11_CAPTURE") == "1" }
 
+// portalMode: sharing goes through the desktop's dialog (Wayland).
+func portalMode() bool { return onWayland() && !xCaptureOnWayland() }
+
+// portalShareID: the picker's one card on Wayland.
+const portalShareID = "portal"
+
 func screenShareUnavailable() string {
-	if onWayland() && !xCaptureOnWayland() {
-		return "Sharing your screen from a Wayland session isn't available yet — sign in with an X11 session instead (on the login screen, e.g. “GNOME on Xorg” or “Plasma (X11)”). You can still watch other people's. (Starting Chriscord with CHRISCORD_X11_CAPTURE=1 shares through XWayland, which only sees X11 programs such as most games.)"
-	}
-	if xDisplay() == "" {
-		return "There's no X11 display to share (DISPLAY isn't set)"
-	}
 	if findFFmpeg() == "" {
 		return "FFmpeg isn't available"
 	}
 	in := ffmpegInputs()
 	if !strings.Contains(in["flv"], "E") {
 		return "this FFmpeg was built without the FLV muxer — rebuild it with ffmpeg/build-ffmpeg.sh linux"
+	}
+	if portalMode() {
+		if why := pwStreamAvailable(); why != "" {
+			return "Sharing your screen on Wayland needs PipeWire: " + why
+		}
+		if why := portalAvailable(); why != "" {
+			return "Sharing your screen on Wayland goes through the desktop's screen sharing, but " + why +
+				" (install xdg-desktop-portal and the one for your desktop, e.g. xdg-desktop-portal-gnome)"
+		}
+		return ""
+	}
+	if xDisplay() == "" {
+		return "There's no X11 display to share (DISPLAY isn't set)"
 	}
 	if !strings.Contains(in["x11grab"], "D") {
 		return "this FFmpeg can't capture X11 screens — rebuild it with ffmpeg/build-ffmpeg.sh linux"
@@ -190,6 +205,13 @@ func parseXWindowID(id string) (uint32, bool) {
 }
 
 func listShareSources() ([]ShareSource, error) {
+	if portalMode() {
+		// The picker opened: what's shared next is a new choice, made in
+		// the desktop's own dialog.
+		portalNewChoice()
+		return []ShareSource{{ID: portalShareID, Kind: "screen", Name: "Screen or window",
+			App: "You'll pick it in the desktop's dialog next", Primary: true}}, nil
+	}
 	var out []ShareSource
 	mons := xMonitors()
 	if len(mons) == 0 {
@@ -257,7 +279,10 @@ func jpegDataURL(img image.Image) string {
 
 // screenInput: FFmpeg's X11 capture of that part of the screen (or that
 // window), at the share's frame rate, scaled to the size to send.
-func screenInput(o ScreenStart, _ *frameTee) ([]string, int, int, screenFeed, error) {
+func screenInput(o ScreenStart, tee *frameTee) ([]string, int, int, screenFeed, error) {
+	if o.ID == portalShareID {
+		return portalInput(o, tee)
+	}
 	if win, ok := parseXWindowID(o.ID); ok {
 		return xWindowInput(o, win)
 	}
@@ -294,4 +319,29 @@ func xWindowInput(o ScreenStart, win uint32) ([]string, int, int, screenFeed, er
 		"-vf", fmt.Sprintf("scale=%d:%d:flags=bilinear", w, h)}
 	log.Printf("screen: sharing X11 window 0x%x %dx%d (sent at %dx%d)", win, ww, wh, w, h)
 	return args, w, h, nil, nil
+}
+
+// portalInput: the desktop's dialog (or the stream picked a moment ago, for
+// a share that's restarting), its pictures fed to FFmpeg raw.
+func portalInput(o ScreenStart, tee *frameTee) ([]string, int, int, screenFeed, error) {
+	if !portalMode() {
+		return nil, 0, 0, nil, errors.New("that share needs a Wayland session")
+	}
+	pc, err := portalAcquire(o.FPS)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	sw, sh, err := pc.cap.waitFirstFrame(5 * time.Second)
+	if err != nil {
+		if pc.ps.w > 0 && pc.ps.h > 0 {
+			sw, sh = pc.ps.w, pc.ps.h // it may still come; send black meanwhile
+		} else {
+			pc.release()
+			return nil, 0, 0, nil, err
+		}
+	}
+	w, h := shareSize(sw, sh, o.Height)
+	log.Printf("screen: sharing through the desktop's portal, %dx%d (sent at %dx%d)", sw, sh, w, h)
+	return []string{"-f", "rawvideo", "-pixel_format", "bgra", "-video_size", fmt.Sprintf("%dx%d", w, h),
+		"-framerate", strconv.Itoa(o.FPS), "-i", "pipe:0"}, w, h, portalFeed(pc, w, h, o.FPS, tee), nil
 }
