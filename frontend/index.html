@@ -621,6 +621,13 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .vs-tile .vs-rwarn .ic { width:15px; height:15px; flex-shrink:0; }
 .vs-tile .vs-unsup { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; text-align:center; color:rgba(255,255,255,.7); font-size:.82rem; }
 .vs-tile:fullscreen { border-radius:0; cursor:default; width:100% !important; height:100% !important; }
+/* Linux's stand-in for fullscreen (fsEnter): the tile or player stretched
+   over the whole window, which itself goes fullscreen. --pfs-w/h are the
+   window's size in the zoomed page's CSS pixels. */
+.pseudo-fs { position:fixed !important; left:0 !important; top:0 !important; width:var(--pfs-w,100vw) !important; height:var(--pfs-h,100vh) !important;
+  max-width:none !important; max-height:none !important; margin:0 !important; z-index:2147483000 !important; border:none !important; border-radius:0 !important; background:#000; }
+body.pseudo-fs-on #titlebar { display:none; }
+.vs-tile.pseudo-fs { cursor:default; }
 .vs-tile .vs-name .vs-av { width:18px; height:18px; font-size:.65rem; }
 /* Screen shares: click to watch */
 .vs-live { background:#e5383b; color:#fff; font-size:.62rem; font-weight:800; letter-spacing:.04em; padding:1px 5px; border-radius:3px; }
@@ -1025,6 +1032,9 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .mp-video.playing.idle video { cursor:none; }
 .mp-video:fullscreen { width:100%; border:none; border-radius:0; display:flex; align-items:center; }
 .mp-video:fullscreen video { max-height:none; height:100%; aspect-ratio:auto; }
+.mp-video.pseudo-fs { display:flex; align-items:center; }
+.mp-video.pseudo-fs video { max-height:none; height:100%; aspect-ratio:auto; }
+.mp-video.pseudo-fs .mp-title { font-size:1rem; padding:14px 18px 30px; }
 /* A file the app can't play: say so, offer the system player / download */
 .mp.unplayable.mp-video { background:var(--bg-mid); aspect-ratio:auto; }
 .mp-unplayable { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px; }
@@ -2955,6 +2965,42 @@ function uiScale(){
   const b=document.body;
   return (b&&b.offsetWidth)?(b.getBoundingClientRect().width/b.offsetWidth)||1:1;
 }
+// Fullscreen for a stream tile or a video player. Normally the browser's
+// own (requestFullscreen). On Linux, WebKitGTK's can leave the window stuck
+// fullscreen — no title bar, Esc and double-click not bringing it back —
+// so there the element is stretched over the page instead (.pseudo-fs)
+// and the window itself goes fullscreen; Esc, double-click or the button
+// bring it back. fsElement() is the one that's fullscreen either way, and
+// 'fullscreenchange' fires for both.
+let pseudoFs=null,pseudoFsTimer=0,usePseudoFs=false;
+(function detect(){try{window.runtime.Environment().then(e=>{usePseudoFs=e.platform==='linux';}).catch(()=>{});}catch{setTimeout(detect,200);}})();
+function fsElement(){return pseudoFs||document.fullscreenElement||null;}
+function fsSize(){
+  const z=uiScale(),r=document.documentElement.style;
+  r.setProperty('--pfs-w',(window.innerWidth/z)+'px');r.setProperty('--pfs-h',(window.innerHeight/z)+'px');
+}
+function fsEnter(el){
+  if(!usePseudoFs){el.requestFullscreen?.()?.catch?.(()=>{});return;}
+  if(pseudoFs)fsExit(true);
+  pseudoFs=el;el.classList.add('pseudo-fs');document.body.classList.add('pseudo-fs-on');fsSize();
+  try{window.runtime.WindowFullscreen();}catch{}
+  // Taken off the page meanwhile (the call ended, the share stopped): back to normal.
+  clearInterval(pseudoFsTimer);pseudoFsTimer=setInterval(()=>{if(pseudoFs&&!pseudoFs.isConnected)fsExit();},500);
+  document.dispatchEvent(new Event('fullscreenchange'));
+}
+function fsExit(keepWindow){
+  if(!pseudoFs){if(document.fullscreenElement)document.exitFullscreen?.()?.catch?.(()=>{});return;}
+  const el=pseudoFs;pseudoFs=null;clearInterval(pseudoFsTimer);
+  el.classList.remove('pseudo-fs');document.body.classList.remove('pseudo-fs-on');
+  if(!keepWindow){try{window.runtime.WindowUnfullscreen();}catch{}}
+  document.dispatchEvent(new Event('fullscreenchange'));
+  requestAnimationFrame(()=>{try{layoutVideoStage();}catch{}});
+}
+function fsToggle(el){fsElement()===el?fsExit():fsEnter(el);}
+window.addEventListener('resize',()=>{if(pseudoFs)fsSize();});
+window.addEventListener('keydown',e=>{
+  if(pseudoFs&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();fsExit();}
+},true);
 document.addEventListener('keydown',e=>{
   if(!(e.ctrlKey||e.metaKey))return;
   if(e.key==='='||e.key==='+'||e.code==='NumpadAdd'){e.preventDefault();applyZoom(state.zoomLevel+ZOOM_STEP);}
@@ -8277,7 +8323,7 @@ function buildMediaPlayer(a,kind){
     let idleT=null;
     const wake=()=>{wrap.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!media.paused)wrap.classList.add('idle');},2200);};
     wrap.addEventListener('pointermove',wake);
-    wrap.addEventListener('mouseleave',()=>{if(document.fullscreenElement===wrap)return;clearTimeout(idleT);wrap.classList.add('idle');});
+    wrap.addEventListener('mouseleave',()=>{if(fsElement()===wrap)return;clearTimeout(idleT);wrap.classList.add('idle');});
     // Keyboard: clicking the player gives it the keys (see initMediaKeys).
     wrap.tabIndex=-1;
     wrap.addEventListener('pointerdown',()=>{if(!wrap.contains(document.activeElement)||document.activeElement===wrap)wrap.focus({preventScroll:true});});
@@ -8292,9 +8338,9 @@ function buildMediaPlayer(a,kind){
     wrap._mp={skip,toggle:()=>{toggle();wake();},wake};
     initMediaKeys();
     const fsBtn=$('.mp-fs');
-    fsBtn.addEventListener('click',e=>{e.stopPropagation();document.fullscreenElement===wrap?document.exitFullscreen():wrap.requestFullscreen?.().catch(()=>{});});
+    fsBtn.addEventListener('click',e=>{e.stopPropagation();fsToggle(wrap);});
     document.addEventListener('fullscreenchange',()=>{
-      const on=document.fullscreenElement===wrap;fsBtn.innerHTML=icon(on?'fullscreen_exit':'fullscreen');fsBtn.dataset.tip=fsBtn.title=on?'Exit fullscreen':'Fullscreen';
+      const on=fsElement()===wrap;fsBtn.innerHTML=icon(on?'fullscreen_exit':'fullscreen');fsBtn.dataset.tip=fsBtn.title=on?'Exit fullscreen':'Fullscreen';
       if(on){wrap.focus({preventScroll:true});wake();}
     });
     media.addEventListener('dblclick',e=>{e.preventDefault();fsBtn.click();});
@@ -8320,7 +8366,7 @@ function initMediaKeys(){
   if(mediaKeysReady)return;mediaKeysReady=true;
   document.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.metaKey||e.altKey)return;
-    const fs=document.fullscreenElement,t=e.target;
+    const fs=fsElement(),t=e.target;
     const wrap=fs?._mp?fs:t.closest?.('.mp-video');
     if(!wrap?._mp)return;
     if(!fs&&t.matches?.('input,textarea,select,[contenteditable="true"]'))return;
@@ -8331,7 +8377,7 @@ function initMediaKeys(){
     else return;
     e.preventDefault();e.stopPropagation();
   });
-  document.addEventListener('pointermove',()=>{document.fullscreenElement?._mp?.wake();},true);
+  document.addEventListener('pointermove',()=>{fsElement()?._mp?.wake();},true);
 }
 // onUnplayable(code) is called if the file still won't load with a fresh
 // link — i.e. the format itself can't be played here, not an expired link.
@@ -10673,7 +10719,7 @@ function initVideo(){
   });
   grid.addEventListener('dblclick',e=>{
     const t=e.target.closest('.vs-tile');if(!t||e.target.closest('[data-act]'))return;
-    document.fullscreenElement===t?document.exitFullscreen():t.requestFullscreen?.().catch(()=>{});
+    fsToggle(t);
   });
   new ResizeObserver(()=>layoutVideoStage()).observe(grid);
   const savedH=+localStorage.getItem('videoStageH');
