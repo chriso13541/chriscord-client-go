@@ -56,8 +56,12 @@ func findFFmpeg() string {
 	ffmpegOnce.Do(func() {
 		if ffmpegPreferSystem {
 			if p, err := exec.LookPath("ffmpeg"); err == nil {
-				ffmpegPath, ffmpegFrom = p, "system"
-				return
+				why := systemFFmpegLacks(p)
+				if why == "" {
+					ffmpegPath, ffmpegFrom = p, "system"
+					return
+				}
+				fmt.Println("transcode: skipping the system ffmpeg:", why)
 			}
 		}
 		if p, err := unpackBundledFFmpeg(); err == nil && p != "" {
@@ -71,6 +75,21 @@ func findFFmpeg() string {
 		}
 	})
 	return ffmpegPath
+}
+
+// systemFFmpegLacks: what the distro's FFmpeg at p is missing that sharing
+// needs ("" if nothing) — then the bundled one is used instead, when there
+// is one. Fedora's default "ffmpeg-free" is the usual case: it has no
+// x264 (H.264 on the CPU), so a share would fail as soon as it started.
+func systemFFmpegLacks(p string) string {
+	enc, err := exec.Command(p, "-hide_banner", "-encoders").Output()
+	if err != nil {
+		return "it doesn't run"
+	}
+	if !strings.Contains(string(enc), " libx264 ") {
+		return "it has no libx264 (H.264) encoder — e.g. Fedora's ffmpeg-free"
+	}
+	return ""
 }
 
 func unpackBundledFFmpeg() (string, error) {

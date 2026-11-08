@@ -671,6 +671,10 @@ func (a *App) screenKeyframeRequested(out *rtpOut) {
 func screenReason(stderr string, errs ...error) string {
 	low := strings.ToLower(stderr)
 	switch {
+	case strings.Contains(low, "unknown encoder") || strings.Contains(low, "encoder not found"):
+		return "This FFmpeg can't encode H.264 (Fedora's ffmpeg-free can't) — install the full FFmpeg (on Fedora, from RPM Fusion), or use a build with FFmpeg bundled"
+	case strings.Contains(low, "can't find window"):
+		return "The window you were sharing was closed"
 	case strings.Contains(low, "closed") || strings.Contains(low, "invalid window") || strings.Contains(low, "no longer"):
 		return "The window you were sharing was closed"
 	case strings.Contains(low, "no matching") || strings.Contains(low, "not found"):

@@ -29,6 +29,13 @@ html { height:100%; background:var(--bg-darkest); }
 /* No native text-box styling (macOS adds its own margins and inner offset,
    which put the text out of line with the highlight layer behind it). */
 #msg-input, .msg-edit-input { -webkit-appearance:none; appearance:none; margin:0; box-sizing:border-box; }
+/* WebKit (macOS, Linux) lays out each line by the FIRST font in the list —
+   even one, like OpenMojiInput, that only covers emoji — so its made-up
+   ascent/descent put the text above or below the middle of the box, by a
+   different amount at each zoom level. There the text font goes first;
+   emoji the text font doesn't have still come from OpenMojiInput. (Set on
+   <html> by the script, from the platform.) */
+html.wk #msg-input, html.wk .msg-edit-input, html.wk #msg-hl { font-family:system-ui,-apple-system,'Segoe UI','OpenMojiInput',sans-serif; }
 body { font-family:'OpenMojiColor','Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg-darkest); color:var(--text); height:100%; overflow:hidden; user-select:none; }
 .hidden { display:none !important; }
 /* ── Appearance: optional background image behind the whole app ── */
@@ -2423,7 +2430,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <div id="chat-main">
         <div id="drop-overlay" class="hidden"><svg class="ic" aria-hidden="true"><use href="#ic-folder_open"/></svg> Drop files to attach</div>
         <div id="video-stage" class="hidden">
-          <div class="vs-head"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg><span class="vs-count"></span><span class="vs-who"></span><button class="vs-unsolo hidden" type="button" title="Show everyone in the call again"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg>Show everyone</button><button class="vs-callmode" type="button" title="Call view — hide the chat"><svg class="ic" aria-hidden="true"><use href="#ic-fullscreen"/></svg></button><button class="vs-collapse" type="button" title="Hide cameras"><svg class="ic" aria-hidden="true"><use href="#ic-expand_less"/></svg></button></div>
+          <div class="vs-head"><svg class="ic" aria-hidden="true"><use href="#ic-videocam"/></svg><span class="vs-count"></span><span class="vs-who"></span><button class="vs-unsolo hidden" type="button" title="Show everyone in the call again"><svg class="ic" aria-hidden="true"><use href="#ic-group"/></svg>Show everyone</button><button class="vs-callmode" type="button" title="Call view — hide the chat"><svg class="ic" aria-hidden="true"><use href="#ic-grid_view"/></svg></button><button class="vs-collapse" type="button" title="Hide cameras"><svg class="ic" aria-hidden="true"><use href="#ic-expand_less"/></svg></button></div>
           <div class="vs-grid"></div>
           <div class="vs-resize" title="Drag to resize"></div>
         </div>
@@ -2965,15 +2972,19 @@ function uiScale(){
   const b=document.body;
   return (b&&b.offsetWidth)?(b.getBoundingClientRect().width/b.offsetWidth)||1:1;
 }
-// Fullscreen for a stream tile or a video player. Normally the browser's
-// own (requestFullscreen). On Linux, WebKitGTK's can leave the window stuck
-// fullscreen — no title bar, Esc and double-click not bringing it back —
-// so there the element is stretched over the page instead (.pseudo-fs)
-// and the window itself goes fullscreen; Esc, double-click or the button
-// bring it back. fsElement() is the one that's fullscreen either way, and
-// 'fullscreenchange' fires for both.
-let pseudoFs=null,pseudoFsTimer=0,usePseudoFs=false;
-(function detect(){try{window.runtime.Environment().then(e=>{usePseudoFs=e.platform==='linux';}).catch(()=>{});}catch{setTimeout(detect,200);}})();
+// Fullscreen for a stream tile or a video player. Not the browser's own
+// (requestFullscreen): WebKitGTK's leaves the window stuck fullscreen on
+// Linux, and macOS's web view doesn't have it at all. Instead the element
+// is stretched over the page (.pseudo-fs) and the window itself goes
+// fullscreen; Esc, double-click or the button bring it back — as does
+// leaving fullscreen from the system (F11, the green button…).
+// fsElement() is the one that's fullscreen, and 'fullscreenchange' fires.
+let pseudoFs=null,pseudoFsTimer=0,pseudoFsSince=0;
+// WebKit-based web views (macOS, Linux): see html.wk in the styles.
+(function detectEngine(){try{window.runtime.Environment().then(e=>{
+  if(e.platform==='linux'||e.platform==='darwin'){document.documentElement.classList.add('wk');try{document.querySelectorAll('#msg-input,.msg-edit-input').forEach(autoResize);}catch{}}
+}).catch(()=>{});}catch{setTimeout(detectEngine,200);}})();
+const usePseudoFs=true;
 function fsElement(){return pseudoFs||document.fullscreenElement||null;}
 function fsSize(){
   const z=uiScale(),r=document.documentElement.style;
@@ -2982,7 +2993,7 @@ function fsSize(){
 function fsEnter(el){
   if(!usePseudoFs){el.requestFullscreen?.()?.catch?.(()=>{});return;}
   if(pseudoFs)fsExit(true);
-  pseudoFs=el;el.classList.add('pseudo-fs');document.body.classList.add('pseudo-fs-on');fsSize();
+  pseudoFs=el;pseudoFsSince=Date.now();el.classList.add('pseudo-fs');document.body.classList.add('pseudo-fs-on');fsSize();
   try{window.runtime.WindowFullscreen();}catch{}
   // Taken off the page meanwhile (the call ended, the share stopped): back to normal.
   clearInterval(pseudoFsTimer);pseudoFsTimer=setInterval(()=>{if(pseudoFs&&!pseudoFs.isConnected)fsExit();},500);
@@ -2997,7 +3008,23 @@ function fsExit(keepWindow){
   requestAnimationFrame(()=>{try{layoutVideoStage();}catch{}});
 }
 function fsToggle(el){fsElement()===el?fsExit():fsEnter(el);}
-window.addEventListener('resize',()=>{if(pseudoFs)fsSize();});
+// A stream tile's buttons change with it (Fullscreen ↔ Exit fullscreen).
+document.addEventListener('fullscreenchange',()=>{
+  document.querySelectorAll('#video-stage .vs-tools').forEach(x=>{
+    const tile=x.closest('.vs-tile');if(tile)try{vsTools(tile,tile.dataset.user,x.dataset.unwatch==='1');}catch{}
+  });
+});
+let pseudoFsCheck=0;
+window.addEventListener('resize',()=>{
+  if(!pseudoFs)return;
+  fsSize();
+  // The window left fullscreen some other way: put the element back too.
+  clearTimeout(pseudoFsCheck);
+  pseudoFsCheck=setTimeout(()=>{
+    if(!pseudoFs||Date.now()-pseudoFsSince<1500)return;
+    try{window.runtime.WindowIsFullscreen().then(f=>{if(!f&&pseudoFs)fsExit(true);}).catch(()=>{});}catch{}
+  },400);
+});
 window.addEventListener('keydown',e=>{
   if(pseudoFs&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();fsExit();}
 },true);
@@ -10616,12 +10643,13 @@ function refreshTileTints(u){
 // A tile's hover buttons: expand (just this tile) or back, and for someone
 // else's stream, stop watching it.
 function vsTools(tile,id,unwatch){
-  const solo=vsSolo===id,sig=`${solo}|${unwatch}`;
+  const solo=vsSolo===id,full=fsElement()===tile,sig=`${solo}|${unwatch}|${full}`;
   let t=tile.querySelector('.vs-tools');
   if(t&&t.dataset.sig===sig)return;
   if(!t){t=document.createElement('div');t.className='vs-tools';t.dataset.act='noop';tile.appendChild(t);}
-  t.dataset.sig=sig;
-  t.innerHTML=`<button type="button" data-act="expand" title="${solo?'Show everyone again':'Expand — show just this, as big as it goes'}">${icon(solo?'fullscreen_exit':'open_in_full')}</button>`+
+  t.dataset.sig=sig;t.dataset.unwatch=unwatch?'1':'';
+  t.innerHTML=(full?'':`<button type="button" data-act="expand" title="${solo?'Show everyone again':'Expand — show just this, as big as it goes'}">${icon(solo?'fullscreen_exit':'open_in_full')}</button>`)+
+    `<button type="button" data-act="fullscreen" title="${full?'Exit fullscreen (Esc)':'Fullscreen'}">${icon(full?'fullscreen_exit':'fullscreen')}</button>`+
     (unwatch?`<button type="button" class="danger" data-act="unwatch" title="Stop receiving this stream">${icon('stop_screen_share')}Stop watching</button>`:'');
 }
 // Their profile picture (or coloured initial) in their name chip — the
@@ -10706,7 +10734,7 @@ function updateCallModeUI(){
   const fs=document.querySelector('#video-stage .vs-callmode');
   if(fs){
     fs.title=callMode?'Back to the chat':'Call view — hide the chat';
-    fs.innerHTML=icon(callMode?'fullscreen_exit':'fullscreen');
+    fs.innerHTML=icon(callMode?'chat_bubble':'grid_view');
   }
 }
 function initVideo(){
@@ -11101,6 +11129,7 @@ function screenTileAction(act,tile){
       if(vsSolo)vsFocus=null;
       renderVideoStage();requestAnimationFrame(layoutVideoStage);break;
     case 'noop':break;
+    case 'fullscreen':fsToggle(tile);break;
     case 'stream-mute':{
       const m=!streamAudio(u).muted;localStorage.setItem('streamMute:'+u,m?'1':'0');applyStreamAudio(u);
       const b=tile.querySelector('[data-act="stream-mute"]');if(b){b.innerHTML=icon(m?'volume_off':'volume_up');b.title=m?'Unmute stream':'Mute stream';}

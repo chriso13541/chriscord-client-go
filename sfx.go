@@ -10,7 +10,10 @@ package main
 //   - In a call, they're mixed into the call's own output (VoiceSession.sfx,
 //     in the playback loop in voice.go): same device, nothing else opened.
 //   - Otherwise a small output stream is opened on the chosen speaker while
-//     sounds are playing, and closed again a second after the last one.
+//     sounds are playing, and kept open for 20 seconds after the last one:
+//     opening a speaker takes a noticeable moment on some systems (Fedora's
+//     PipeWire), so sounds in quick succession (mute, unmute…) don't each
+//     wait for it.
 //
 // The .wav files are read from the page's own files (frontend/sounds,
 // embedded in the app), decoded once and kept, resampled to 48 kHz.
@@ -220,6 +223,10 @@ type sfxPlayer struct {
 
 var sfxOut sfxPlayer
 
+// sfxKeepOpenFrames: how long the speaker stays open after the last sound
+// (20 s, in 20 ms frames).
+const sfxKeepOpenFrames = 20 * 50
+
 // ensure: the stream is open (opening it if not), playing what's queued.
 func (o *sfxPlayer) ensure(speaker string) error {
 	o.mu.Lock()
@@ -270,7 +277,7 @@ func (o *sfxPlayer) ensure(speaker string) error {
 		started <- nil
 		idle := 0
 		for {
-			if idle >= 50 { // a second of nothing: close (unless one just came)
+			if idle >= sfxKeepOpenFrames { // nothing for a while: close (unless one just came)
 				o.mu.Lock()
 				if !o.queue.busy() {
 					o.running, finished = false, true
