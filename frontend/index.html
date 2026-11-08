@@ -3820,7 +3820,11 @@ function toggleMentionMute(){
 function playSound(name){
   if(name==='mention'?!soundSettings.mention||mentionsMutedHere():!soundSettings.voice)return;
   const vol=Math.max(0,Math.min(1,soundSettings.volume/100));
-  if(webAudioSounds){playSoundWebAudio(name,vol);return;}
+  if(nativeSounds){
+    // Linux: played by the app itself, on the speaker chosen in Settings (sfx.go).
+    window.go.main.App.PlaySound(name,vol,localStorage.getItem('audioSpeakerLabel')||'').catch(()=>{});
+    return;
+  }
   try{
     const base=soundCache[name]||(soundCache[name]=new Audio(`sounds/${name}.wav`));
     const a=base.cloneNode(); // overlapping plays don't cut each other off
@@ -3828,75 +3832,13 @@ function playSound(name){
     a.play().catch(()=>{}); // empty placeholder / autoplay quirks: stay silent
   }catch{}
 }
-// Linux: WebKitGTK's <audio> can't load anything from the app's own pages
-// (wails://… — a long-standing WebKitGTK bug: its GStreamer player doesn't
-// handle custom URL schemes), so the sounds stay silent there. Instead
-// they're fetched (which works), decoded here — they're plain PCM .wav
-// files — and played with Web Audio. Windows and macOS keep <audio>.
-let webAudioSounds=false,soundCtx=null;
-const soundBuffers={}; // name -> Promise<AudioBuffer|null>
-(async()=>{
-  try{
-    if((await window.runtime.Environment()).platform!=='linux')return;
-    const AC=window.AudioContext||window.webkitAudioContext;
-    if(!AC)return;
-    soundCtx=new AC();
-    webAudioSounds=true;
-    // A context made before anyone has clicked may start paused.
-    const wake=()=>{if(soundCtx.state==='suspended')soundCtx.resume().catch(()=>{});};
-    ['pointerdown','keydown'].forEach(t=>document.addEventListener(t,wake,{capture:true,passive:true}));
-  }catch{}
-})();
-function soundBuffer(name){
-  return soundBuffers[name]||(soundBuffers[name]=fetch(`sounds/${name}.wav`)
-    .then(r=>r.ok?r.arrayBuffer():null)
-    .then(b=>b&&b.byteLength?decodeWav(b):null)
-    .catch(()=>null));
-}
-// decodeWav: a PCM (8/16/24/32-bit) or float .wav into an AudioBuffer; null
-// if it's anything else (or an empty placeholder).
-function decodeWav(buf){
-  const dv=new DataView(buf);
-  const tag=o=>String.fromCharCode(dv.getUint8(o),dv.getUint8(o+1),dv.getUint8(o+2),dv.getUint8(o+3));
-  if(buf.byteLength<12||tag(0)!=='RIFF'||tag(8)!=='WAVE')return null;
-  let fmt=null,data=null;
-  for(let o=12;o+8<=buf.byteLength;){
-    const id=tag(o),len=dv.getUint32(o+4,true),body=o+8;
-    if(id==='fmt ')fmt={format:dv.getUint16(body,true),ch:dv.getUint16(body+2,true),rate:dv.getUint32(body+4,true),bits:dv.getUint16(body+14,true)};
-    else if(id==='data'){data={off:body,len:Math.min(len,buf.byteLength-body)};break;}
-    o=body+len+(len&1);
-  }
-  if(!fmt||!data||!fmt.ch||!fmt.rate)return null;
-  if(fmt.format===0xFFFE)fmt.format=1; // "extensible" header: treat as integer PCM
-  const bytes=fmt.bits/8,frames=Math.floor(data.len/(bytes*fmt.ch));
-  if(!frames||![1,3].includes(fmt.format)||![1,2,3,4].includes(bytes))return null;
-  const out=soundCtx.createBuffer(fmt.ch,frames,fmt.rate);
-  for(let c=0;c<fmt.ch;c++){
-    const ch=out.getChannelData(c);
-    for(let i=0;i<frames;i++){
-      const o=data.off+(i*fmt.ch+c)*bytes;
-      let v;
-      if(fmt.format===3)v=bytes===4?dv.getFloat32(o,true):0;
-      else if(bytes===1)v=(dv.getUint8(o)-128)/128;
-      else if(bytes===2)v=dv.getInt16(o,true)/32768;
-      else if(bytes===3){const x=dv.getUint8(o)|dv.getUint8(o+1)<<8|dv.getInt8(o+2)<<16;v=x/8388608;}
-      else v=dv.getInt32(o,true)/2147483648;
-      ch[i]=v;
-    }
-  }
-  return out;
-}
-async function playSoundWebAudio(name,vol){
-  try{
-    if(soundCtx.state==='suspended')soundCtx.resume().catch(()=>{});
-    const b=await soundBuffer(name);
-    if(!b)return;
-    const src=soundCtx.createBufferSource(),gain=soundCtx.createGain();
-    src.buffer=b;gain.gain.value=vol;
-    src.connect(gain).connect(soundCtx.destination);
-    src.start();
-  }catch{}
-}
+// Linux: WebKitGTK can't play these well — its <audio> can't load the
+// app's own files at all (a long-standing WebKitGTK bug with custom URL
+// schemes), and its Web Audio output crackles and gives up. So the app
+// plays them itself, the same way it plays the call (sfx.go). Windows and
+// macOS keep <audio>.
+let nativeSounds=false;
+(function detect(){try{window.runtime.Environment().then(e=>{nativeSounds=e.platform==='linux';}).catch(()=>{});}catch{setTimeout(detect,200);}})();
 function saveSoundSettings(){
   localStorage.setItem('soundSettings',JSON.stringify(soundSettings));
   persistClientSettings();

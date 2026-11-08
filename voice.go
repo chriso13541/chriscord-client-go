@@ -116,6 +116,7 @@ type VoiceSession struct {
 
 	playStream *portaudio.Stream
 	playBuf    []int16
+	sfx        sfxQueue // the app's own sounds, mixed into the call's output (sfx.go)
 
 	remotesMu sync.Mutex
 	remotes   map[string]*voiceRemoteSource // keyed by remote track ID
@@ -977,6 +978,9 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				r.mu.Unlock()
 			}
 			s.remotesMu.Unlock()
+			// The app's own sounds (Linux: sfx.go) — heard even when
+			// deafened, as a mute or leave sound should be.
+			s.sfx.mixInto(s.playBuf, outCh)
 			lagTick++
 			if err := stream.Write(); err != nil {
 				return

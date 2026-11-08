@@ -402,6 +402,10 @@ export function PingServer() {
   return window['go']['main']['App']['PingServer']();
 }
 
+export function PlaySound(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PlaySound'](arg1, arg2, arg3);
+}
+
 export function PrepareAccountExport(arg1, arg2) {
   return window['go']['main']['App']['PrepareAccountExport'](arg1, arg2);
 }

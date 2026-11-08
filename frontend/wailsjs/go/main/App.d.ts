@@ -202,6 +202,8 @@ export function PickPfp():Promise<string>;
 
 export function PingServer():Promise<number>;
 
+export function PlaySound(arg1:string,arg2:number,arg3:string):Promise<void>;
+
 export function PrepareAccountExport(arg1:string,arg2:string):Promise<string>;
 
 export function PushVideoFrame(arg1:string,arg2:number):Promise<void>;
