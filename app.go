@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -199,8 +200,12 @@ func (a *App) UnlockAccount(passphrase string) (*AccountView, error) {
 }
 
 // RememberAvailable says whether "Keep me signed in" can be offered here
-// (Windows, for now: remember.go).
+// (Windows and Linux, for now: remember.go).
 func (a *App) RememberAvailable() bool { return rememberSupported }
+
+// RememberDescription is the "Keep me signed in" tooltip: where the saved
+// sign-in is kept on this system.
+func (a *App) RememberDescription() string { return rememberDescription() }
 
 // RememberAccount turns "Keep me signed in" on or off for the account
 // that's signed in now.
@@ -233,7 +238,9 @@ func (a *App) AutoLogin() *AccountView {
 	acct, err := loadRemembered(slug)
 	if err != nil {
 		log.Printf("account: automatic sign-in failed, asking for the passphrase: %v", err)
-		forgetRemembered(slug)
+		if !errors.Is(err, errRememberTemporary) {
+			forgetRemembered(slug) // broken for good; a temporary failure keeps it for next time
+		}
 		return nil
 	}
 	a.mu.Lock()

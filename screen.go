@@ -116,12 +116,18 @@ func ffmpegFilters() map[string]bool {
 	return ffFilters
 }
 
+// screenAudioNoteText: what "share sound" sends on this system, when it
+// isn't the Windows behaviour the page describes by default (set by
+// screen_linux.go).
+var screenAudioNoteText string
+
 // ScreenShareInfo says whether screens can be shared from here.
 func (a *App) ScreenShareInfo() map[string]interface{} {
 	if reason := screenShareUnavailable(); reason != "" {
 		return map[string]interface{}{"available": false, "reason": reason}
 	}
-	return map[string]interface{}{"available": true, "windows": screenWindowsSupported(), "encoderLabel": encoderLabel(captureEncoder())}
+	return map[string]interface{}{"available": true, "windows": screenWindowsSupported(), "encoderLabel": encoderLabel(captureEncoder()),
+		"audioNote": screenAudioNoteText}
 }
 
 // ListShareSources lists the screens and windows that can be shared, each

@@ -104,6 +104,11 @@ func (a *App) SetWindowSettings(minimizeToTray, startMinimized bool) error {
 	return err
 }
 
+// CustomTitlebar: the page should draw the window's title bar (no system
+// frame: Windows, and Linux unless CHRISCORD_SYSTEM_TITLEBAR=1). macOS
+// keeps its own traffic lights over the page's bar, handled separately.
+func (a *App) CustomTitlebar() bool { return useCustomTitlebar() }
+
 // CloseWindow is the title bar's X: to the tray with minimize to tray on,
 // otherwise Chriscord closes.
 func (a *App) CloseWindow() {

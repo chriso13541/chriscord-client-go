@@ -2998,7 +2998,12 @@ async function boot(){
   if(auto){await enterApp(auto);return;}
   showScreen('screen-account-gate');
   const hasAccount=await window.go.main.App.HasAccount();
-  window.go.main.App.RememberAvailable().then(ok=>document.getElementById('unlock-remember-row').classList.toggle('hidden',!ok)).catch(()=>{});
+  window.go.main.App.RememberAvailable().then(ok=>{
+    const row=document.getElementById('unlock-remember-row');
+    row.classList.toggle('hidden',!ok);
+    // Where it's kept differs per system (Windows sign-in, Linux keyring or key file).
+    if(ok)window.go.main.App.RememberDescription().then(t=>{if(t)row.title=t;}).catch(()=>{});
+  }).catch(()=>{});
   showGateView(hasAccount?'unlock':'onboard');
 }
 
@@ -10738,6 +10743,7 @@ async function openScreenPicker(){
   if(!info?.available){toast(info?.reason||'Screen sharing isn’t available here',true);return;}
   document.querySelector('#sp-tabs [data-tab="window"]').classList.toggle('hidden',!info.windows);
   if(!info.windows)spState.tab='screen';
+  spState.audioNote=info.audioNote||''; // Linux: everything you hear, screens and windows alike
   const res=document.getElementById('sp-res'),fps=document.getElementById('sp-fps');
   res.value=localStorage.getItem('screenRes')||'1080';if(!res.value)res.value='1080';
   fps.value=localStorage.getItem('screenFps')||'30';if(!fps.value)fps.value='30';
@@ -10761,7 +10767,7 @@ async function loadShareSources(){
 function renderSharePicker(){
   document.querySelectorAll('#sp-tabs [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===spState.tab));
   const selKind=spState.sources.find(s=>s.id===spState.sel)?.kind||spState.tab;
-  document.getElementById('sp-audio-hint').textContent=selKind==='window'
+  document.getElementById('sp-audio-hint').textContent=spState.audioNote?spState.audioNote:selKind==='window'
     ?'— only this app’s sound'
     :'— everything you hear, except chriscord (so nobody hears the call twice)';
   const grid=document.getElementById('sp-grid');
@@ -12502,15 +12508,20 @@ function limitBannerAnimation(header,url){
 }
 
 // ── TITLE BAR ────────────────────────────────────────────────────
-// A themed title bar replaces the white system one (main.go turns the
-// system frame off on Windows and hides the title on macOS). It follows
+// A themed title bar replaces the system one (main.go turns the system
+// frame off on Windows and Linux, and hides the title on macOS). It follows
 // the app's theme colours automatically. The middle shows where you are.
+// On Linux the desktop's own bar can be kept (CHRISCORD_SYSTEM_TITLEBAR=1):
+// then this one isn't shown.
 async function initTitlebar(){
   let platform='';
   try{platform=(await window.runtime.Environment()).platform;}catch{}
-  if(platform!=='windows'&&platform!=='darwin')return; // Linux: the desktop's own bar
+  let custom=platform==='darwin';
+  if(!custom){try{custom=await window.go.main.App.CustomTitlebar();}catch{}}
+  if(!custom)return;
   const bar=document.getElementById('titlebar');
   document.body.classList.add('custom-titlebar',platform==='darwin'?'tb-mac':'tb-windows');
+  if(platform==='linux')document.body.classList.add('tb-linux');
   bar.classList.remove('hidden');
   const max=document.getElementById('tb-max');
   const RESTORE='<svg viewBox="0 0 10 10"><path d="M2.5 2.5V.5h7v7h-2" fill="none" stroke="currentColor" stroke-width="1"/><rect x=".5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/></svg>';

@@ -122,6 +122,10 @@ export function CreateInvite() {
   return window['go']['main']['App']['CreateInvite']();
 }
 
+export function CustomTitlebar() {
+  return window['go']['main']['App']['CustomTitlebar']();
+}
+
 export function DeleteEmoji(arg1) {
   return window['go']['main']['App']['DeleteEmoji'](arg1);
 }
@@ -436,6 +440,10 @@ export function RememberAccount(arg1) {
 
 export function RememberAvailable() {
   return window['go']['main']['App']['RememberAvailable']();
+}
+
+export function RememberDescription() {
+  return window['go']['main']['App']['RememberDescription']();
 }
 
 export function RemoveBot(arg1) {

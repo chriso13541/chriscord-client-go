@@ -11,6 +11,11 @@ import (
 
 const rememberSupported = true
 
+// rememberDescription: the "Keep me signed in" tooltip.
+func rememberDescription() string {
+	return "Your account key is saved encrypted with your Windows sign-in, so only you, on this computer, can use it. Log out to undo."
+}
+
 var (
 	crypt32                = syscall.NewLazyDLL("crypt32.dll")
 	procCryptProtectData   = crypt32.NewProc("CryptProtectData")

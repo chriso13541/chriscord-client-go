@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Chriscord
+GenericName=Voice and Text Chat
+Comment=Self-hosted voice, video and text chat
+# Where the app (or, once there is one, the Linux launcher) is installed.
+Exec=chriscord
+Icon=chriscord
+Terminal=false
+Categories=Network;Chat;InstantMessaging;AudioVideo;
+Keywords=chat;voice;discord;
+# Matches the window's WM_CLASS / Wayland app id (webview_linux.go), so docks
+# and taskbars group the window with this entry.
+StartupWMClass=chriscord
+StartupNotify=true

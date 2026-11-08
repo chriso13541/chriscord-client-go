@@ -95,6 +95,7 @@ func openWithDefaultApp(file string) error {
 	default:
 		cmd = exec.Command("xdg-open", file)
 	}
+	cmd.Env = childEnv() // Linux: without Chriscord's own GTK theme (webview_linux.go)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("couldn't open it: %w", err)
 	}

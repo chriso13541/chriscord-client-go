@@ -20,6 +20,12 @@ var assets embed.FS
 // in every build, or an old and a new copy could run side by side.
 const singleInstanceID = "app.chriscord.client"
 
+// useCustomTitlebar: the window has no system frame and the page draws its
+// own title bar — Windows always, Linux unless turned off (webview_linux.go).
+func useCustomTitlebar() bool {
+	return goruntime.GOOS == "windows" || linuxCustomTitlebar()
+}
+
 func main() {
 	// The uninstaller asks the app to take out its own "open when you sign
 	// in" entry (Settings > System): that code lives here, not in the
@@ -67,9 +73,12 @@ func main() {
 		//             "inset" style: that adds a toolbar-height strip,
 		//             putting the buttons ~26 px down — below a normal-
 		//             height bar, over the app itself.)
-		//   Linux   — the desktop's own title bar is kept: window managers
-		//             differ too much for a drawn one to behave well.
-		Frameless: goruntime.GOOS == "windows",
+		//   Linux   — no frame from the window manager either, as on
+		//             Windows: the app's own bar, drag-to-move and edge
+		//             resizing come from Wails/GTK. CHRISCORD_SYSTEM_TITLEBAR=1
+		//             keeps the desktop's bar instead (webview_linux.go).
+		Frameless: useCustomTitlebar(),
+		Linux: linuxOptions(), // icon, WM_CLASS (webview_linux.go)
 		Mac: &mac.Options{
 			TitleBar:   mac.TitleBarHidden(),
 			Appearance: mac.NSAppearanceNameDarkAqua,

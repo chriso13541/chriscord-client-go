@@ -44,6 +44,7 @@ func showInFolder(path string) error {
 	} else {
 		cmd = exec.Command("xdg-open", filepath.Dir(path))
 	}
+	cmd.Env = childEnv() // Linux: without Chriscord's own GTK theme (webview_linux.go)
 	if err := cmd.Start(); err != nil {
 		return err
 	}

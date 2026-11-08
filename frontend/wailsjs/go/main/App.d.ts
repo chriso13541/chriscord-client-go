@@ -62,6 +62,8 @@ export function CreateBot(arg1:string,arg2:string,arg3:number):Promise<main.NewB
 
 export function CreateInvite():Promise<main.InviteInfo>;
 
+export function CustomTitlebar():Promise<boolean>;
+
 export function DeleteEmoji(arg1:string):Promise<void>;
 
 export function DeleteMessage(arg1:string):Promise<void>;
@@ -219,6 +221,8 @@ export function ReconnectVoice(arg1:Array<string>):Promise<void>;
 export function RememberAccount(arg1:boolean):Promise<void>;
 
 export function RememberAvailable():Promise<boolean>;
+
+export function RememberDescription():Promise<string>;
 
 export function RemoveBot(arg1:string):Promise<void>;
 

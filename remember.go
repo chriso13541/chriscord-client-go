@@ -1,8 +1,12 @@
 package main
 
 // "Keep me signed in": the account key is saved locked to this computer's
-// Windows user (DPAPI, see remember_windows.go), so the next start can
+// user — Windows' DPAPI (remember_windows.go), or on Linux the desktop's
+// keyring or a private key file (remember_linux.go) — so the next start can
 // sign in without the passphrase.
+//
+// (The rest of this note describes Windows; remember_linux.go has the
+// Linux details.)
 //
 // What's saved is the 32-byte key itself, encrypted by Windows with a key
 // derived from your Windows sign-in; the passphrase is never stored. The
@@ -20,12 +24,18 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 )
 
 const rememberFileName = "remember.bin"
+
+// errRememberTemporary: the saved sign-in couldn't be unlocked right now
+// (Linux: the keyring isn't answering yet), but may well work next time —
+// so it's kept, and the passphrase is asked for just this once.
+var errRememberTemporary = errors.New("the saved sign-in can't be unlocked right now")
 
 func rememberPath(slug string) string { return filepath.Join(accountsDir(), slug, rememberFileName) }
 
@@ -74,6 +84,9 @@ func loadRemembered(slug string) (*Account, error) {
 		return nil, err
 	}
 	seed, err := osUnprotect(blob, rememberEntropy(slug))
+	if errors.Is(err, errRememberTemporary) {
+		return nil, err
+	}
 	if err != nil {
 		return nil, fmt.Errorf("the saved sign-in can't be unlocked on this computer: %w", err)
 	}

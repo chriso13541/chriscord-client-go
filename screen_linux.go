@@ -18,22 +18,47 @@ import (
 	"time"
 )
 
-// Sharing a screen from Linux: X11, through FFmpeg's X11 capture
-// (xcbgrab, "-f x11grab"). Each monitor can be shared on its own — found
-// with xrandr, cut out of the X screen by its position — or, without
-// xrandr, the whole X screen at once. Single windows and the screen's
-// sound aren't shared from Linux yet.
+// Sharing from Linux goes through X11, with FFmpeg's X11 capture
+// (xcbgrab, "-f x11grab"):
+//
+//   - A screen: each monitor on its own — found with xrandr, cut out of the
+//     X screen by its position — or, without xrandr, the whole X screen.
+//   - A window: any application window the window manager lists
+//     (x11windows.go), captured by its X window id, so it's just that
+//     window — no frame, nothing over it — wherever it moves.
+//   - Its sound: everything the computer plays, from PulseAudio/PipeWire's
+//     monitor of the output (sysaudio_linux.go). Linux can't leave
+//     Chriscord itself out of that the way Windows can, so the call's own
+//     voices are taken back out of it (echo.go). A window's share sends
+//     everything you hear too, not just that app.
 //
 // Wayland doesn't let programs capture the screen this way (only through
 // the desktop's screen-sharing portal and PipeWire, which FFmpeg can't do
-// yet), so on a Wayland session it says so; an X11 session works.
+// yet). Chriscord itself runs fine on Wayland, but sharing there says so —
+// unless CHRISCORD_X11_CAPTURE=1, which shares through XWayland anyway:
+// only programs running on XWayland can be seen then (most games through
+// Wine/Proton, older apps), native Wayland windows come out black.
 
-func screenWindowsSupported() bool    { return false }
-func screenGDIFallback(string) bool   { return false }
-func sharedWindowState(string) string { return "" }
+func init() {
+	screenAudioNoteText = "— everything you hear (the call's own sound is taken back out)"
+}
 
-func screenAudioTarget(string) (uint32, bool, error) {
-	return 0, false, errors.New("sharing a screen's sound from Linux isn't available yet")
+func screenWindowsSupported() bool  { return true }
+func screenGDIFallback(string) bool { return false }
+
+// sharedWindowState: for a window share, whether it's in front, behind
+// others, minimised or gone (screen.go warns the sharer and the watchers).
+func sharedWindowState(id string) string {
+	if win, ok := parseXWindowID(id); ok {
+		return xWindowState(win)
+	}
+	return ""
+}
+
+// screenAudioTarget: Linux records everything the computer plays, for a
+// screen and a window alike (see the top of this file).
+func screenAudioTarget(id string) (uint32, bool, error) {
+	return uint32(os.Getpid()), true, nil
 }
 
 // xDisplay: the X display to capture ("" if there isn't one).
@@ -43,9 +68,12 @@ func onWayland() bool {
 	return strings.EqualFold(os.Getenv("XDG_SESSION_TYPE"), "wayland") || os.Getenv("WAYLAND_DISPLAY") != ""
 }
 
+// xCaptureOnWayland: CHRISCORD_X11_CAPTURE=1 — share through XWayland.
+func xCaptureOnWayland() bool { return os.Getenv("CHRISCORD_X11_CAPTURE") == "1" }
+
 func screenShareUnavailable() string {
-	if onWayland() {
-		return "Sharing your screen from a Wayland session isn't available yet — sign in with an X11 session instead (on the login screen, e.g. “GNOME on Xorg” or “Plasma (X11)”). You can still watch other people's."
+	if onWayland() && !xCaptureOnWayland() {
+		return "Sharing your screen from a Wayland session isn't available yet — sign in with an X11 session instead (on the login screen, e.g. “GNOME on Xorg” or “Plasma (X11)”). You can still watch other people's. (Starting Chriscord with CHRISCORD_X11_CAPTURE=1 shares through XWayland, which only sees X11 programs such as most games.)"
 	}
 	if xDisplay() == "" {
 		return "There's no X11 display to share (DISPLAY isn't set)"
@@ -137,14 +165,28 @@ func lastLine(b []byte) string {
 }
 
 // Share ids: "x:<w>x<h>+<x>+<y>" (a part of the X screen: a monitor, or
-// all of it).
+// all of it), or "xw:<window id>" (one application window).
 func xShareID(w, h, x, y int) string { return fmt.Sprintf("x:%dx%d+%d+%d", w, h, x, y) }
 
 func parseXShareID(id string) (w, h, x, y int, err error) {
+	if !strings.HasPrefix(id, "x:") {
+		return 0, 0, 0, 0, errors.New("that isn't a screen this app knows")
+	}
 	if _, err = fmt.Sscanf(id, "x:%dx%d+%d+%d", &w, &h, &x, &y); err != nil || w <= 0 || h <= 0 {
 		return 0, 0, 0, 0, errors.New("that isn't a screen this app knows")
 	}
 	return w, h, x, y, nil
+}
+
+func xWindowShareID(win uint32) string { return "xw:" + strconv.FormatUint(uint64(win), 10) }
+
+func parseXWindowID(id string) (uint32, bool) {
+	rest, ok := strings.CutPrefix(id, "xw:")
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(rest, 10, 32)
+	return uint32(n), err == nil && n != 0
 }
 
 func listShareSources() ([]ShareSource, error) {
@@ -164,6 +206,17 @@ func listShareSources() ([]ShareSource, error) {
 		}
 		out = append(out, ShareSource{ID: xShareID(m.w, m.h, m.x, m.y), Kind: "screen", Name: name, App: m.name,
 			W: m.w, H: m.h, Primary: m.primary, Index: i, Thumb: xThumb(m)})
+	}
+	wins, err := xWindows()
+	if err != nil {
+		log.Printf("screen: couldn't list X windows: %v", err) // screens still work
+	}
+	for i, w := range wins {
+		s := ShareSource{ID: xWindowShareID(w.id), Kind: "window", Name: w.title, App: w.class, W: w.w, H: w.h, Index: i, Thumb: w.thumb}
+		if w.hidden {
+			s.Note = "Minimized"
+		}
+		out = append(out, s)
 	}
 	return out, nil
 }
@@ -191,6 +244,10 @@ func xThumb(m xMonitor) string {
 		return ""
 	}
 	img := &image.RGBA{Pix: buf.Bytes()[:tw*th*4], Stride: tw * 4, Rect: image.Rect(0, 0, tw, th)}
+	return jpegDataURL(img)
+}
+
+func jpegDataURL(img image.Image) string {
 	var j bytes.Buffer
 	if jpeg.Encode(&j, img, &jpeg.Options{Quality: 70}) != nil {
 		return ""
@@ -198,9 +255,12 @@ func xThumb(m xMonitor) string {
 	return "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(j.Bytes())
 }
 
-// screenInput: FFmpeg's X11 capture of that part of the screen, at the
-// share's frame rate, scaled to the size to send.
+// screenInput: FFmpeg's X11 capture of that part of the screen (or that
+// window), at the share's frame rate, scaled to the size to send.
 func screenInput(o ScreenStart, _ *frameTee) ([]string, int, int, screenFeed, error) {
+	if win, ok := parseXWindowID(o.ID); ok {
+		return xWindowInput(o, win)
+	}
 	mw, mh, x, y, err := parseXShareID(o.ID)
 	if err != nil {
 		return nil, 0, 0, nil, err
@@ -212,5 +272,26 @@ func screenInput(o ScreenStart, _ *frameTee) ([]string, int, int, screenFeed, er
 		args = append(args, "-vf", fmt.Sprintf("scale=%d:%d:flags=bilinear", w, h))
 	}
 	log.Printf("screen: sharing X11 %s %dx%d at %d,%d (sent at %dx%d)", xDisplay(), mw, mh, x, y, w, h)
+	return args, w, h, nil, nil
+}
+
+// xWindowInput: one window, by its X id (xcbgrab's window_id, FFmpeg 6.1
+// and later). Always scaled to a fixed size, so the picture keeps going at
+// that size if the window is resized.
+func xWindowInput(o ScreenStart, win uint32) ([]string, int, int, screenFeed, error) {
+	ww, wh, err := xWindowSize(win)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	if st := xWindowState(win); st == "minimized" {
+		return nil, 0, 0, nil, errors.New("that window is minimized — bring it back up, then share it")
+	} else if st == "closed" {
+		return nil, 0, 0, nil, errors.New("that window has closed")
+	}
+	w, h := shareSize(ww, wh, o.Height)
+	args := []string{"-f", "x11grab", "-window_id", strconv.FormatUint(uint64(win), 10), "-framerate", strconv.Itoa(o.FPS),
+		"-draw_mouse", "1", "-thread_queue_size", "64", "-i", xDisplay(),
+		"-vf", fmt.Sprintf("scale=%d:%d:flags=bilinear", w, h)}
+	log.Printf("screen: sharing X11 window 0x%x %dx%d (sent at %dx%d)", win, ww, wh, w, h)
 	return args, w, h, nil, nil
 }

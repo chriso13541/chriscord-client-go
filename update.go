@@ -11,13 +11,23 @@ package main
 //	    state.json         which build it installed (channel, sha256, …)
 //	    app\chriscord.exe  this program
 //
+// and on Linux the same shape, without the .exe (e.g. under
+// ~/.local/share/Chriscord/):
+//
+//	Chriscord          the launcher / updater
+//	state.json
+//	app/chriscord      this program
+//
+// The manifest's builds are keyed by system and processor ("windows-amd64",
+// "linux-amd64"), so a Linux launcher only needs its own entry published.
+//
 // The launcher already updates everything each time it starts, so all the
 // running app has to do is notice when a newer build has come out since it
 // was started, and offer to restart through the launcher to pick it up.
 //
 // It's kept as cheap as possible:
 //   - It only runs when started from an install like the one above. A dev
-//     build, or a Linux/macOS build, never checks anything.
+//     build, or a copy not installed by the launcher, never checks anything.
 //   - It's a single goroutine asleep on a timer between checks; no CPU in
 //     between. The first check is a minute after start (the launcher has
 //     only just checked), then once an hour.
@@ -55,9 +65,17 @@ const (
 	updateManifestBase = "https://chriscord.app/dl" // same as the launcher's
 	updateFirstCheck   = 1 * time.Minute
 	updateCheckEvery   = 1 * time.Hour
-	launcherExeName    = "Chriscord.exe"
 	launcherStateName  = "state.json"
 )
+
+// launcherExeName: the launcher next to app/ — Chriscord.exe on Windows,
+// plain Chriscord elsewhere.
+var launcherExeName = func() string {
+	if goruntime.GOOS == "windows" {
+		return "Chriscord.exe"
+	}
+	return "Chriscord"
+}()
 
 // launcherState is the part of the launcher's state.json this needs.
 type launcherState struct {
@@ -332,6 +350,7 @@ func (a *App) RestartToUpdate() error {
 	}
 	cmd := exec.Command(filepath.Join(dir, launcherExeName), "--wait-pid", strconv.Itoa(os.Getpid()))
 	cmd.Dir = dir
+	cmd.Env = childEnv() // Linux: as Chriscord was started, not with its own GTK settings
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("couldn't start the updater: %w", err)
 	}
