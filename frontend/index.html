@@ -8241,15 +8241,30 @@ async function getAttachLink(rel,fresh=false){
 // back to).
 const IMAGE_CACHE_MAX=300;
 const imageBlobs=new Map(); // rel → Promise<blob URL>
+// Linux: pictures are loaded two at a time. Each one comes through the
+// app's own request handler, and WebKitGTK can lock up when a channel's
+// worth of them (plus emoji, video frames…) are answered all at once.
+// Elsewhere there's no limit.
+const IMAGE_FETCH_MAX=/Linux/.test(navigator.userAgent)&&!/Android/.test(navigator.userAgent)?2:Infinity;
+let imageFetchesActive=0;const imageFetchWaiting=[];
+function imageFetchSlot(){
+  return new Promise(resolve=>{
+    const go=()=>{imageFetchesActive++;let done=false;resolve(()=>{if(done)return;done=true;imageFetchesActive--;const next=imageFetchWaiting.shift();if(next)next();});};
+    if(imageFetchesActive<IMAGE_FETCH_MAX)go();else imageFetchWaiting.push(go);
+  });
+}
 function getImageBlobURL(rel){
   if(imageBlobs.has(rel)){
     const p=imageBlobs.get(rel);imageBlobs.delete(rel);imageBlobs.set(rel,p); // mark most recent
     return p;
   }
   const p=(async()=>{
-    const res=await fetch(await getAttachLink(rel));
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    return URL.createObjectURL(await res.blob());
+    const release=await imageFetchSlot();
+    try{
+      const res=await fetch(await getAttachLink(rel));
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      return URL.createObjectURL(await res.blob());
+    }finally{release();}
   })();
   p.catch(()=>imageBlobs.delete(rel)); // let a failed load be retried later
   imageBlobs.set(rel,p);
@@ -8707,7 +8722,16 @@ function buildProfileCard(p){
   const avatar=card.querySelector('.pc-avatar');
   if(p.pfp){
     setAvatarImage(avatar,p.pfp);
-    avatar.addEventListener('click',()=>openLightbox(p.pfp,null,null));
+    avatar.addEventListener('click',()=>{
+      // Shown at once from the small copy, then swapped for the full-size
+      // picture (avatars everywhere else get a smaller one: imgshrink.go).
+      openLightbox(p.pfp,null,null);
+      if(p.own)return; // your own is already full size
+      window.go.main.App.FetchUserPfpFull(p.username).then(full=>{
+        const img=document.getElementById('lightbox-img');
+        if(full&&img&&img.src===p.pfp&&!document.getElementById('lightbox').classList.contains('hidden'))img.src=full;
+      }).catch(()=>{});
+    });
   }else{setAvatarFallback(avatar,p.username);avatar.style.cursor='default';}
   const banner=card.querySelector('.pc-banner');
   if(p.banner)banner.style.backgroundImage=`url("${p.banner}")`;
@@ -10273,7 +10297,7 @@ function remoteVideo(user){
 function configureDecoder(user,r,codec){
   try{if(r.decoder&&r.decoder.state!=='closed')r.decoder.close();}catch{}
   r.codec=codec;r.needKey=true;
-  // Known not to work here (checked at start, below): say so straight away.
+  // Known not to work here (found with an earlier stream): say so straight away.
   if(decodeSupport[codec]===false){r.decoder=null;showDecodeUnsupported(user,codec);return;}
   const cfg={codec:codec==='h264'?'avc1.640034':'vp8',optimizeForLatency:true,hardwareAcceleration:'no-preference'};
   r.decoder=new VideoDecoder({
@@ -10299,20 +10323,11 @@ function configureDecoder(user,r,codec){
   });
   r.decoder.configure(cfg);
   // Ask up front too: a web view without a decoder for this codec says so.
-  VideoDecoder.isConfigSupported(cfg).then(res=>{if(!res.supported&&vRemote.get(user)===r)showDecodeUnsupported(user,codec);}).catch(()=>{});
+  VideoDecoder.isConfigSupported(cfg).then(res=>{if(!res.supported){decodeSupport[codec]=false;if(vRemote.get(user)===r)showDecodeUnsupported(user,codec);}}).catch(()=>{});
 }
-// Which codecs this web view can decode, asked once at start (undefined
-// until it answers). On Linux that's whichever GStreamer plugins are
-// installed, so it's worth knowing before the first picture arrives.
+// Codecs found not to decode here (by the check in configureDecoder), so
+// later streams in the same codec say so straight away.
 const decodeSupport={};
-setTimeout(()=>{
-  if(!window.VideoDecoder?.isConfigSupported)return;
-  for(const [codec,c] of [['h264','avc1.640034'],['vp8','vp8']]){
-    VideoDecoder.isConfigSupported({codec:c,optimizeForLatency:true,hardwareAcceleration:'no-preference'})
-      .then(res=>{decodeSupport[codec]=!!res.supported;if(!res.supported)console.warn('video: this web view can\u2019t decode',codec);})
-      .catch(()=>{});
-  }
-},1500);
 // Shown on someone's tile when this computer can't decode their video. On
 // Linux the app's web view (WebKitGTK) decodes through GStreamer, which
 // needs its decoder plugins installed.

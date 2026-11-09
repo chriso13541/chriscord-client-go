@@ -48,13 +48,6 @@ func init() {
 	if _, set := os.LookupEnv("WEBKIT_DISABLE_DMABUF_RENDERER"); !set {
 		os.Setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
 	}
-	// A missing video decoder makes GStreamer ask the desktop to install
-	// one (PackageKit / GNOME Software) — from inside the web view, which
-	// can hang the window while it waits. The page says what to install
-	// instead (showDecodeUnsupported in index.html).
-	if _, set := os.LookupEnv("GST_INSTALL_PLUGINS_HELPER"); !set {
-		os.Setenv("GST_INSTALL_PLUGINS_HELPER", "/bin/false")
-	}
 	if os.Getenv("WEBKIT_DISABLE_COMPOSITING_MODE") != "" {
 		log.Printf("webview: WEBKIT_DISABLE_COMPOSITING_MODE is set — drawing without the graphics card")
 	}

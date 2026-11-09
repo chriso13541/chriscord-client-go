@@ -92,6 +92,8 @@ export function FetchServerThemeBackground():Promise<string>;
 
 export function FetchUserPfp(arg1:string):Promise<string>;
 
+export function FetchUserPfpFull(arg1:string):Promise<string>;
+
 export function FetchUserProfile(arg1:string):Promise<main.UserProfile>;
 
 export function ForgetBot(arg1:string):Promise<void>;

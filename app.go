@@ -297,7 +297,7 @@ func (a *App) AccountAvatar(slug string) string {
 	if err != nil {
 		return ""
 	}
-	return pfpDataURL(data)
+	return imageDataURL(data, pfpMaxDim)
 }
 
 // LogOut signs the current account out: leaves the server (and any call,
@@ -465,7 +465,7 @@ func (a *App) ReadImageAsDataURL(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return pfpDataURL(data), nil
+	return imageDataURL(data, pickedMaxDim), nil
 }
 
 // GetProfilePicture returns the current account's own profile picture as
@@ -488,7 +488,7 @@ func (a *App) GetProfilePicture() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("pfp is set (%s) but couldn't be read: %w", path, err)
 	}
-	return pfpDataURL(data), nil
+	return pfpDataURL(data), nil // full size: shown for editing and cropping
 }
 
 // maxPfpBytes caps a saved/uploaded pfp. The cropper's output is far
@@ -655,7 +655,7 @@ func (a *App) GetOwnProfile() (*OwnProfile, error) {
 	p := &OwnProfile{Bio: a.account.Bio, Tint: a.account.Tint, Nickname: a.account.Nickname}
 	a.mu.Unlock()
 	if data, err := os.ReadFile(bannerPath(dir)); err == nil {
-		p.Banner = pfpDataURL(data)
+		p.Banner = imageDataURL(data, bannerMaxDim)
 	}
 	return p, nil
 }
@@ -829,7 +829,7 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 	}
 	if raw.HasBanner {
 		if data, err := a.fetchAuthed("/api/banner/" + url.PathEscape(username)); err == nil && len(data) > 0 {
-			p.Banner = pfpDataURL(data)
+			p.Banner = imageDataURL(data, bannerMaxDim)
 		}
 	}
 	return p, nil
@@ -884,34 +884,53 @@ func (a *App) PickBackgroundImage() (string, error) {
 // server and returns it as a data URL, or "" if they have none cached —
 // nil error either way, since "no pfp" is a normal state, not a failure.
 func (a *App) FetchUserPfp(username string) (string, error) {
+	data, err := a.fetchUserPfpBytes(username)
+	if err != nil || data == nil {
+		return "", err
+	}
+	return imageDataURL(data, pfpMaxDim), nil
+}
+
+// FetchUserPfpFull is FetchUserPfp at the picture's full size — for
+// looking at it on its own (clicking someone's picture on their profile).
+func (a *App) FetchUserPfpFull(username string) (string, error) {
+	data, err := a.fetchUserPfpBytes(username)
+	if err != nil || data == nil {
+		return "", err
+	}
+	return pfpDataURL(data), nil
+}
+
+// fetchUserPfpBytes: their picture as stored, or nil if they have none.
+func (a *App) fetchUserPfpBytes(username string) ([]byte, error) {
 	a.mu.Lock()
 	domain, token := a.domain, a.token
 	a.mu.Unlock()
 	if domain == "" || token == "" {
-		return "", fmt.Errorf("not connected")
+		return nil, fmt.Errorf("not connected")
 	}
 	req, err := http.NewRequest("GET", normaliseHTTP(domain)+"/api/pfp/"+url.PathEscape(username), nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("X-Session-Token", token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("network error: %w", err)
+		return nil, fmt.Errorf("network error: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return "", nil // this user simply has no pfp cached — not an error
+		return nil, nil // this user simply has no pfp cached — not an error
 	}
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	log.Printf("pfp: fetched %d bytes for %s", len(data), username)
-	return pfpDataURL(data), nil
+	return data, nil
 }
 
 func (a *App) GetServerInfo(domain string) (*ServerInfo, error) {
@@ -1604,7 +1623,7 @@ func (a *App) FetchServerIcon(domain string) (string, error) {
 	if err != nil || len(data) == 0 {
 		return "", err
 	}
-	return pfpDataURL(data), nil
+	return imageDataURL(data, pfpMaxDim), nil
 }
 
 // FetchServerThemeBackground returns the connected server's theme
@@ -1614,7 +1633,7 @@ func (a *App) FetchServerThemeBackground() (string, error) {
 	if err != nil || len(data) == 0 {
 		return "", err
 	}
-	return pfpDataURL(data), nil
+	return imageDataURL(data, backgroundMaxDim), nil
 }
 
 // FetchServerBanner returns the connected server's banner as a data URL,
@@ -1630,7 +1649,7 @@ func (a *App) FetchServerBanner() (string, error) {
 		return "", nil
 	}
 	log.Printf("server banner: fetched %d bytes", len(data))
-	return pfpDataURL(data), nil
+	return imageDataURL(data, bannerMaxDim), nil
 }
 
 // ── Presence ────────────────────────────────────────────────────────────

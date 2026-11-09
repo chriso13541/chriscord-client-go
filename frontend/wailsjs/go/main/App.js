@@ -182,6 +182,10 @@ export function FetchUserPfp(arg1) {
   return window['go']['main']['App']['FetchUserPfp'](arg1);
 }
 
+export function FetchUserPfpFull(arg1) {
+  return window['go']['main']['App']['FetchUserPfpFull'](arg1);
+}
+
 export function FetchUserProfile(arg1) {
   return window['go']['main']['App']['FetchUserProfile'](arg1);
 }
