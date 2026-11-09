@@ -6,10 +6,13 @@
 #
 # Needs (build machine only):
 #   Debian/Ubuntu:  sudo apt install build-essential pkg-config libgtk-3-dev \
-#                     libwebkit2gtk-4.1-dev portaudio19-dev libopus-dev libpipewire-0.3-dev
+#                     libwebkit2gtk-4.1-dev portaudio19-dev libopus-dev libpipewire-0.3-dev \
+#                     nasm curl libxcb1-dev libxcb-shm0-dev libxcb-xfixes0-dev libxcb-shape0-dev
 #                   (older releases: libwebkit2gtk-4.0-dev instead of 4.1)
-#   Arch:           sudo pacman -S --needed base-devel gtk3 webkit2gtk-4.1 portaudio opus pipewire
-#   Fedora:         sudo dnf install gcc pkgconf gtk3-devel webkit2gtk4.1-devel portaudio-devel opus-devel pipewire-devel
+#   Arch:           sudo pacman -S --needed base-devel gtk3 webkit2gtk-4.1 portaudio opus pipewire nasm curl libxcb
+#   Fedora:         sudo dnf install gcc gcc-c++ make pkgconf gtk3-devel webkit2gtk4.1-devel portaudio-devel opus-devel \
+#                     pipewire-devel nasm curl libxcb-devel
+#   (nasm, curl and the xcb headers are for building the bundled FFmpeg.)
 #   plus Go and the wails CLI (go install github.com/wailsapp/wails/v2/cmd/wails@latest).
 #
 # The people you send it to need the same libraries' runtime parts — GTK 3,
@@ -50,11 +53,32 @@ for pc in gtk+-3.0 portaudio-2.0 opus libpipewire-0.3; do
   pkg-config --exists "$pc" || { echo "missing library: $pc — install the packages at the top of this file" >&2; exit 1; }
 done
 
-if [ -f ffmpeg/linux/ffmpeg.gz ]; then
-  echo "== FFmpeg: built in ($(du -h ffmpeg/linux/ffmpeg.gz | cut -f1))"
-else
-  echo "== FFmpeg: not built in — the app will use ffmpeg from the PATH (sh ffmpeg/build-ffmpeg-linux-portable.sh to build it in)"
+# The bundled FFmpeg: built here, with this machine's tools, when there
+# isn't one yet or the one there is older than what the app needs (no raw
+# video reader — Wayland sharing). REBUILD_FFMPEG=1 builds it again anyway.
+# Fine for testing; for builds you hand out, ffmpeg/build-ffmpeg-linux-portable.sh
+# makes one that also runs on older distros.
+ffmpeg_ok() {
+  [ -f ffmpeg/linux/ffmpeg.gz ] || return 1
+  t=$(mktemp)
+  gzip -dc ffmpeg/linux/ffmpeg.gz > "$t" && chmod +x "$t"
+  ok=1
+  "$t" -hide_banner -demuxers 2>/dev/null | grep -q ' rawvideo ' || ok=0
+  "$t" -hide_banner -encoders 2>/dev/null | grep -q ' libx264 ' || ok=0
+  rm -f "$t"
+  [ "$ok" = 1 ]
+}
+if [ "${REBUILD_FFMPEG:-0}" = 1 ] || ! ffmpeg_ok; then
+  echo "== FFmpeg: building it (a few minutes the first time; later runs reuse ffmpeg/.build-linux)"
+  for tool in nasm curl make; do
+    command -v "$tool" >/dev/null 2>&1 || { echo "missing: $tool — needed to build FFmpeg (Ubuntu: sudo apt install nasm curl; Fedora: sudo dnf install nasm curl)" >&2; exit 1; }
+  done
+  for pc in xcb xcb-shm xcb-xfixes xcb-shape; do
+    pkg-config --exists "$pc" || { echo "missing library: $pc — Ubuntu: sudo apt install libxcb1-dev libxcb-shm0-dev libxcb-xfixes0-dev libxcb-shape0-dev; Fedora: sudo dnf install libxcb-devel" >&2; exit 1; }
+  done
+  sh ffmpeg/build-ffmpeg.sh linux
 fi
+echo "== FFmpeg: built in ($(du -h ffmpeg/linux/ffmpeg.gz | cut -f1))"
 
 wails build -platform linux/amd64 -tags "$TAGS" "$@"
 
