@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -66,4 +67,11 @@ func quarantine(path string) string {
 		return ""
 	}
 	return to
+}
+
+// lastLine: the last non-empty line of a program's output (its error,
+// usually).
+func lastLine(b []byte) string {
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }

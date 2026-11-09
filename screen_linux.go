@@ -177,11 +177,6 @@ func runFFmpegFor(d time.Duration, args ...string) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-func lastLine(b []byte) string {
-	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
-	return strings.TrimSpace(lines[len(lines)-1])
-}
-
 // Share ids: "x:<w>x<h>+<x>+<y>" (a part of the X screen: a monitor, or
 // all of it), or "xw:<window id>" (one application window).
 func xShareID(w, h, x, y int) string { return fmt.Sprintf("x:%dx%d+%d+%d", w, h, x, y) }
