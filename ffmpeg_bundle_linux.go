@@ -12,8 +12,9 @@ var bundledFFmpeg embed.FS
 
 const bundledFFmpegDir, bundledFFmpegFile, ffmpegExeName = "ffmpeg/linux", "ffmpeg.gz", "ffmpeg"
 
-// ffmpegPreferSystem: on Linux the distro's FFmpeg comes first when it's
-// installed (sudo apt install ffmpeg): it's kept up to date, has every
-// format and hardware encoder, and nothing has to be unpacked. The bundled
-// one is for computers without it.
-const ffmpegPreferSystem = true
+// ffmpegPreferSystem: the bundled FFmpeg comes first on Linux too, as on
+// Windows: the same build everywhere, with everything sharing needs —
+// distros' differ (Fedora's ffmpeg-free has no x264, Debian's may be too
+// old to share single windows). The distro's is only used when the app was
+// built without one (or it can't be unpacked).
+const ffmpegPreferSystem = false

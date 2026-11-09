@@ -17,7 +17,7 @@
 # (the package names above without -dev / -devel). PipeWire's headers are
 # only for building: the library itself is opened when sharing on Wayland,
 # so the app still runs where it isn't installed. FFmpeg is built in
-# (ffmpeg/build-ffmpeg.sh linux makes ffmpeg/linux/ffmpeg.gz first).
+# (ffmpeg/build-ffmpeg-linux-portable.sh makes ffmpeg/linux/ffmpeg.gz first).
 #
 # On their computer, optionally:
 #   xdg-desktop-portal(-gnome/-kde…)  to share on Wayland (desktops include it)
@@ -53,7 +53,7 @@ done
 if [ -f ffmpeg/linux/ffmpeg.gz ]; then
   echo "== FFmpeg: built in ($(du -h ffmpeg/linux/ffmpeg.gz | cut -f1))"
 else
-  echo "== FFmpeg: not built in — the app will use ffmpeg from the PATH (sh ffmpeg/build-ffmpeg.sh linux to build it in)"
+  echo "== FFmpeg: not built in — the app will use ffmpeg from the PATH (sh ffmpeg/build-ffmpeg-linux-portable.sh to build it in)"
 fi
 
 wails build -platform linux/amd64 -tags "$TAGS" "$@"
