@@ -297,7 +297,7 @@ func (a *App) AccountAvatar(slug string) string {
 	if err != nil {
 		return ""
 	}
-	return imageDataURL(data, pfpMaxDim)
+	return sizedDataURL(data, pfpMaxDim)
 }
 
 // LogOut signs the current account out: leaves the server (and any call,
@@ -465,7 +465,7 @@ func (a *App) ReadImageAsDataURL(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return imageDataURL(data, pickedMaxDim), nil
+	return sizedDataURL(data, pickedMaxDim), nil
 }
 
 // GetProfilePicture returns the current account's own profile picture as
@@ -655,7 +655,7 @@ func (a *App) GetOwnProfile() (*OwnProfile, error) {
 	p := &OwnProfile{Bio: a.account.Bio, Tint: a.account.Tint, Nickname: a.account.Nickname}
 	a.mu.Unlock()
 	if data, err := os.ReadFile(bannerPath(dir)); err == nil {
-		p.Banner = imageDataURL(data, bannerMaxDim)
+		p.Banner = sizedDataURL(data, bannerMaxDim)
 	}
 	return p, nil
 }
@@ -829,7 +829,7 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 	}
 	if raw.HasBanner {
 		if data, err := a.fetchAuthed("/api/banner/" + url.PathEscape(username)); err == nil && len(data) > 0 {
-			p.Banner = imageDataURL(data, bannerMaxDim)
+			p.Banner = sizedDataURL(data, bannerMaxDim)
 		}
 	}
 	return p, nil
@@ -888,7 +888,7 @@ func (a *App) FetchUserPfp(username string) (string, error) {
 	if err != nil || data == nil {
 		return "", err
 	}
-	return imageDataURL(data, pfpMaxDim), nil
+	return sizedDataURL(data, pfpMaxDim), nil
 }
 
 // FetchUserPfpFull is FetchUserPfp at the picture's full size — for
@@ -1623,7 +1623,7 @@ func (a *App) FetchServerIcon(domain string) (string, error) {
 	if err != nil || len(data) == 0 {
 		return "", err
 	}
-	return imageDataURL(data, pfpMaxDim), nil
+	return sizedDataURL(data, pfpMaxDim), nil
 }
 
 // FetchServerThemeBackground returns the connected server's theme
@@ -1633,7 +1633,7 @@ func (a *App) FetchServerThemeBackground() (string, error) {
 	if err != nil || len(data) == 0 {
 		return "", err
 	}
-	return imageDataURL(data, backgroundMaxDim), nil
+	return sizedDataURL(data, backgroundMaxDim), nil
 }
 
 // FetchServerBanner returns the connected server's banner as a data URL,
@@ -1649,7 +1649,7 @@ func (a *App) FetchServerBanner() (string, error) {
 		return "", nil
 	}
 	log.Printf("server banner: fetched %d bytes", len(data))
-	return imageDataURL(data, bannerMaxDim), nil
+	return sizedDataURL(data, bannerMaxDim), nil
 }
 
 // ── Presence ────────────────────────────────────────────────────────────

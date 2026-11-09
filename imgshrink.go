@@ -37,9 +37,9 @@ var shrinkCache = struct {
 	m map[[32]byte][]byte
 }{m: map[[32]byte][]byte{}}
 
-// imageDataURL: data as a data: URL, shrunk to fit maxDim×maxDim first if
+// sizedDataURL: data as a data: URL, shrunk to fit maxDim×maxDim first if
 // it's a big still PNG or JPEG.
-func imageDataURL(data []byte, maxDim int) string {
+func sizedDataURL(data []byte, maxDim int) string {
 	return pfpDataURL(shrinkImage(data, maxDim))
 }
 
