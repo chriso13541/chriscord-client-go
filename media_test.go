@@ -91,9 +91,9 @@ func TestMediaGap(t *testing.T) {
 
 // The bytes, as the page reads them, through the asset handler.
 func TestMediaServe(t *testing.T) {
-	old := videoOut
-	videoOut = newTestHub()
-	defer func() { videoOut = old }()
+	old, oldNative := videoOut, nativeH264
+	videoOut, nativeH264 = newTestHub(), false // H.264 to the page as it is (not videodec.go)
+	defer func() { videoOut, nativeH264 = old, oldNative }()
 	videoOut.push(mediaCamera, "x", "vp8", false, 0, []byte{0}) // seq 1
 	go func() {
 		time.Sleep(30 * time.Millisecond)

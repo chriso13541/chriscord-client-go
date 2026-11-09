@@ -1014,6 +1014,9 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .mp-video video { display:block; width:100%; max-height:360px; aspect-ratio:16/9; object-fit:contain; background:#000; cursor:pointer; }
 .mp-video .mp-big { position:absolute; left:50%; top:50%; transform:translate(-50%,-60%); width:56px; height:56px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:opacity .15s, background .15s; }
 .mp-video .mp-big:hover { background:var(--accent); }
+.mp-converting { position:absolute; inset:0; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:8px; background:rgba(0,0,0,.7); color:#fff; font-size:.85rem; z-index:3; pointer-events:none; }
+.mp-converting .ic { width:20px; height:20px; animation:mp-spin 1s linear infinite; }
+@keyframes mp-spin { to { transform:rotate(360deg); } }
 .mp-video .mp-big .ic { width:32px; height:32px; }
 .mp-video.playing .mp-big { opacity:0; pointer-events:none; }
 .mp-video .mp-bar { position:absolute; left:0; right:0; bottom:0; padding:22px 10px 6px; background:linear-gradient(transparent,rgba(0,0,0,.75)); transition:opacity .2s; }
@@ -6298,7 +6301,7 @@ function renderAttachQueue(){
 // its video-file icon.
 async function loadVideoThumb(item){
   try{
-    const src=await getAttachLink(item.url);
+    const src=await getMediaLink(item.url);
     const v=document.createElement('video');
     v.muted=true;v.preload='metadata';v.playsInline=true;
     v.addEventListener('loadeddata',()=>{
@@ -8394,7 +8397,7 @@ function buildMediaPlayer(a,kind){
   if(a.external){ // a linked video, loaded from where it's hosted: if it won't play, the embed goes
     media.src=a.url;
     media.addEventListener('error',()=>wrap.remove(),{once:true});
-  }else attachMediaSource(media,a.url,()=>showUnplayable(wrap,a,kind));
+  }else attachMediaSource(media,a.url,()=>playConverted(media,wrap,a,kind));
   if(kind==='video')watchPartialPlayback(wrap,media,a);
   paintPlay();paintVol();
   if(a.spoiler)coverSpoiler(wrap); // before it's on screen (the caller adds it)
@@ -8502,9 +8505,34 @@ function showUnplayable(wrap,a,kind){
   if(kind==='video'){wrap.innerHTML='';wrap.appendChild(box);}
   else wrap.querySelector('.mp-bar')?.replaceWith(box);
 }
+// Linux: <video>/<audio> can't load the app's own addresses (WebKitGTK
+// plays them through GStreamer), so they get a local one (localmedia.go).
+const IS_LINUX=/Linux/.test(navigator.userAgent)&&!/Android/.test(navigator.userAgent);
+function getMediaLink(rel,fresh=false){
+  return IS_LINUX?window.go.main.App.GetMediaLink(rel):getAttachLink(rel,fresh);
+}
+// Linux: a video this computer can't play is converted once by the app
+// (WebM, which every distro plays) and played from that. Elsewhere, or if
+// that fails too: the "can't be played here" box.
+async function playConverted(media,wrap,a,kind){
+  if(!IS_LINUX||wrap._converted||!wrap.isConnected){showUnplayable(wrap,a,kind);return;}
+  wrap._converted=true;
+  const note=document.createElement('div');note.className='mp-converting';
+  note.innerHTML=`${icon('sync')}<span>Converting so it plays here…</span>`;
+  wrap.appendChild(note);
+  try{
+    const url=await window.go.main.App.PlayableMedia(a.url,kind);
+    note.remove();
+    media.src=url;media.load();
+  }catch(err){
+    note.remove();
+    console.warn('media: converting failed:',err);
+    showUnplayable(wrap,a,kind);
+  }
+}
 function attachMediaSource(el,rel,onUnplayable){
   let retrying=false,refreshed=false;
-  getAttachLink(rel).then(u=>{el.src=u;}).catch(err=>console.error('media link failed:',err));
+  getMediaLink(rel).then(u=>{el.src=u;}).catch(err=>console.error('media link failed:',err));
   el.addEventListener('loadeddata',()=>{retrying=false;refreshed=false;});
   el.addEventListener('error',async()=>{
     // Failing again right after a fresh link: it's the file, not the link.
@@ -8513,7 +8541,7 @@ function attachMediaSource(el,rel,onUnplayable){
     retrying=true;refreshed=true;
     const t=el.currentTime,wasPlaying=!el.paused;
     try{
-      el.src=await getAttachLink(rel,true);
+      el.src=await getMediaLink(rel,true);
       el.addEventListener('loadedmetadata',()=>{
         if(t)el.currentTime=t;
         if(wasPlaying)el.play().catch(()=>{});
@@ -10263,7 +10291,7 @@ function updateCameraButton(){
 function remoteVideo(user){
   let r=vRemote.get(user);
   if(r)return r;
-  if(!decodeSupported())return null;
+  if(!decodeSupported()&&!jpegVideoSeen)return null;
   r={needKey:true,lastKeyReq:0,ts:0,decoder:null,codec:null,pending:0,el:null,write:null,errs:0,unsupported:false,stats:newVideoStats(),
     lagUser:isScrKey(user)?user.slice(1):null,lags:[],queue:[]}; // screens: how far behind capture the picture shows, and frames waiting for their moment
   const markLive=()=>{if(!r.live){r.live=true;r.el.closest('.vs-tile')?.classList.add('live');}};
@@ -10398,18 +10426,43 @@ async function startMediaFrames(){
       if(p+ulen+size>buf.byteLength)break; // cut short: shouldn't happen
       const user=ulen?dec.decode(u8.subarray(p,p+ulen)):'';p+=ulen;
       const data=u8.subarray(p,p+size);p+=size; // the decoder copies what it needs
-      const key=!!(flags&1),codec=flags&2?'h264':'vp8';
+      // flags 4: a JPEG picture the app decoded itself (Linux: videodec.go).
+      const key=!!(flags&1),codec=flags&4?'jpeg':flags&2?'h264':'vp8';
       try{
         if(kind===0||kind===1)onVideoFrame({user,kind:kind===1?'screen':'camera',codec,key,cap,data});
-        else if(kind===2)onSelfPreview({key,data});
-        else if(kind===3){if(scr.on&&scr.preview)onVideoFrame({key,data,user:SELF_SCR,codec:'h264'},true);}
+        else if(kind===2)onSelfPreview({key,data,codec:codec==='jpeg'?'jpeg':'h264'});
+        else if(kind===3){if(scr.on&&scr.preview)onVideoFrame({key,data,cap,user:SELF_SCR,codec:codec==='jpeg'?'jpeg':'h264'},true);}
       }catch(err){console.warn('video frame:',err);}
     }
   }
 }
+// Pictures the app decoded itself (Linux, videodec.go) — JPEGs, drawn with
+// the web view's ordinary image decoder. One at a time per stream: if the
+// last is still being decoded, this one is skipped.
+let jpegVideoSeen=false;
+function showJpegFrame(r,f){
+  r.stats.recv++;r.stats.bytes+=f.data.length;r.stats.keys++;r.stats.codec='h264 (app)';
+  if(r.jpegBusy){r.stats.dropBusy++;return;}
+  r.jpegBusy=true;
+  createImageBitmap(new Blob([f.data],{type:'image/jpeg'})).then(bmp=>{
+    r.jpegBusy=false;
+    if(r.lagUser&&f.cap>0&&r.lags.length<240)r.lags.push(Date.now()-f.cap+16);
+    if(r.gen&&window.VideoFrame){
+      // The <video> path: the picture as a frame for its track.
+      let frame;try{frame=new VideoFrame(bmp,{timestamp:f.cap>0?Math.round(f.cap*1000):Math.round(performance.now()*1000)});}finally{bmp.close();}
+      r.write(frame);return;
+    }
+    const c=r.el;
+    if(!(c instanceof HTMLCanvasElement)){bmp.close();return;}
+    r.stats.decoded++;
+    if(c.width!==bmp.width||c.height!==bmp.height){c.width=bmp.width;c.height=bmp.height;}
+    c.getContext('2d').drawImage(bmp,0,0);bmp.close();
+    if(!r.live){r.live=true;c.closest('.vs-tile')?.classList.add('live');}
+  }).catch(()=>{r.jpegBusy=false;r.stats.dropWait++;});
+}
 function onSelfPreview(f){
   if(!f?.data||!((cam.on&&cam.native)||camPreview.native))return;
-  onVideoFrame({...f,user:SELF,codec:'h264'},true);
+  onVideoFrame({...f,user:SELF,codec:f.codec||'h264'},true);
 }
 function onVideoFrame(f,self){
   let key=f?.user;
@@ -10425,7 +10478,9 @@ function onVideoFrame(f,self){
   // While one tile is expanded, the hidden ones aren't decoded (they're
   // picked up from their next keyframe when shown again).
   if(vsSolo&&key!==(vsSolo===state.username?SELF:vsSolo===scrKey(state.username)?SELF_SCR:vsSolo))return;
+  if(f.codec==='jpeg')jpegVideoSeen=true;
   const r=remoteVideo(key);if(!r)return;
+  if(f.codec==='jpeg'){showJpegFrame(r,f);return;}
   // Can't be decoded here (message on the tile): don't make a new decoder
   // for every frame — on Linux each one starts a GStreamer pipeline, and
   // dozens a second freeze the window.

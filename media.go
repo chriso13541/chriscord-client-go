@@ -21,7 +21,8 @@ package main
 // The response body is the frames one after another, each:
 //
 //	u8  kind    0 camera, 1 screen, 2 your camera's preview, 3 your screen's preview
-//	u8  flags   1 keyframe, 2 H.264 (else VP8)
+//	u8  flags   1 keyframe, 2 H.264 (else VP8), 4 a JPEG picture (decoded
+//	            by the app: videodec.go)
 //	u16 user    length of the user name, in bytes
 //	f64 cap     screens: capture time on the sharer's clock, ms (0: none)
 //	u32 size    the frame's length
@@ -62,6 +63,7 @@ type mediaFrame struct {
 	kind byte
 	key  bool
 	h264 bool
+	jpeg bool
 	cap  float64
 	user string
 	data []byte
@@ -80,9 +82,24 @@ var videoOut = &mediaHub{wake: make(chan struct{})}
 // push adds a frame for the page. data is kept as it is (not copied): the
 // caller mustn't change it afterwards.
 func (h *mediaHub) push(kind byte, user, codec string, key bool, capMs float64, data []byte) {
+	// Linux: H.264 is decoded by the app, and the page gets pictures.
+	if nativeH264 && codec == "h264" && h == videoOut && nativeDecode(kind, user, key, capMs, data) {
+		return
+	}
+	h.add(mediaFrame{kind: kind, key: key, h264: codec == "h264", cap: capMs, user: user, data: data})
+}
+
+// pushJPEG adds a decoded picture (videodec.go).
+func (h *mediaHub) pushJPEG(kind byte, user string, capMs float64, jpg []byte) {
+	h.add(mediaFrame{kind: kind, key: true, jpeg: true, cap: capMs, user: user, data: jpg})
+}
+
+func (h *mediaHub) add(f mediaFrame) {
+	data := f.data
 	h.mu.Lock()
 	h.seq++
-	h.frames = append(h.frames, mediaFrame{seq: h.seq, kind: kind, key: key, h264: codec == "h264", cap: capMs, user: user, data: data})
+	f.seq = h.seq
+	h.frames = append(h.frames, f)
 	h.bytes += len(data)
 	// Nobody's reading fast enough (or at all: the page is reloading):
 	// drop the oldest. The page notices the gap and waits for keyframes.
@@ -165,6 +182,9 @@ func encodeMediaFrames(frames []mediaFrame) []byte {
 		}
 		if f.h264 {
 			flags |= 2
+		}
+		if f.jpeg {
+			flags |= 4
 		}
 		user := f.user
 		if len(user) > math.MaxUint16 {

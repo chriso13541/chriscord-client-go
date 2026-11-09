@@ -55,7 +55,7 @@ done
 
 # The bundled FFmpeg: built here, with this machine's tools, when there
 # isn't one yet or the one there is older than what the app needs (no raw
-# video reader — Wayland sharing). REBUILD_FFMPEG=1 builds it again anyway.
+# video reader — Wayland sharing — or JPEG writer — showing video). REBUILD_FFMPEG=1 builds it again anyway.
 # Fine for testing; for builds you hand out, ffmpeg/build-ffmpeg-linux-portable.sh
 # makes one that also runs on older distros.
 ffmpeg_ok() {
@@ -65,6 +65,8 @@ ffmpeg_ok() {
   ok=1
   "$t" -hide_banner -demuxers 2>/dev/null | grep -q ' rawvideo ' || ok=0
   "$t" -hide_banner -encoders 2>/dev/null | grep -q ' libx264 ' || ok=0
+  "$t" -hide_banner -encoders 2>/dev/null | grep -q ' mjpeg ' || ok=0   # showing video (videodec.go)
+  "$t" -hide_banner -encoders 2>/dev/null | grep -q ' libvpx ' || ok=0  # playing chat videos (localmedia.go)
   rm -f "$t"
   [ "$ok" = 1 ]
 }

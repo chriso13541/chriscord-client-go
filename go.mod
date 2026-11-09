@@ -1,9 +1,9 @@
 module chriscord-client
 
-go 1.25.0
+go 1.26.0
 
 require (
-	github.com/godbus/dbus/v5 v5.1.0
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/gordonklaus/portaudio v0.0.0-20260203164431-765aa7dfa631
 	github.com/gorilla/websocket v1.5.3
 	github.com/hraban/opus v0.0.0-20260708213942-bde8e4304501
@@ -12,8 +12,8 @@ require (
 	github.com/pion/rtcp v1.2.14
 	github.com/pion/rtp v1.8.7
 	github.com/pion/webrtc/v3 v3.3.6
-	github.com/wailsapp/wails/v2 v2.12.0
-	golang.org/x/crypto v0.53.0
+	github.com/wailsapp/wails/v2 v2.17.1
+	golang.org/x/crypto v0.58.0
 )
 
 require (

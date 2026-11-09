@@ -230,6 +230,10 @@ export function GetFingerprint() {
   return window['go']['main']['App']['GetFingerprint']();
 }
 
+export function GetMediaLink(arg1) {
+  return window['go']['main']['App']['GetMediaLink'](arg1);
+}
+
 export function GetMessageZipLink(arg1) {
   return window['go']['main']['App']['GetMessageZipLink'](arg1);
 }
@@ -408,6 +412,10 @@ export function PingServer() {
 
 export function PlaySound(arg1, arg2, arg3) {
   return window['go']['main']['App']['PlaySound'](arg1, arg2, arg3);
+}
+
+export function PlayableMedia(arg1, arg2) {
+  return window['go']['main']['App']['PlayableMedia'](arg1, arg2);
 }
 
 export function PrepareAccountExport(arg1, arg2) {

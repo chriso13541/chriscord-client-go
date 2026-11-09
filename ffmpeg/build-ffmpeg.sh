@@ -41,6 +41,7 @@
 #   ffmpeg.exe can't use. Without cmake, Quick Sync is simply left out.)
 #   Linux build:
 #     sudo apt install build-essential nasm pkg-config curl libxcb1-dev libxcb-shm0-dev libxcb-xfixes0-dev libxcb-shape0-dev
+#     (Fedora: sudo dnf install gcc gcc-c++ make nasm pkgconf curl libxcb-devel perl)
 # From WSL, building inside /mnt/c is slow; point WORK at the Linux side:
 #   WORK=~/ffmpeg-build-windows sh ffmpeg/build-ffmpeg.sh windows
 # After changing any version below, delete the WORK folder first: sources
@@ -58,6 +59,7 @@ case "$TARGET" in windows|linux) ;; *) echo "usage: $0 windows|linux" >&2; exit 
 FFMPEG_VER=n9.0.2        # FFmpeg release tag
 X264_REF=stable          # x264 branch
 VPL_REF=v2.17.0          # Intel libvpl (Quick Sync) tag, Windows only
+VPX_REF=v1.15.0          # libvpx (VP8 encoder) tag, Linux only
 NVHDR_REF=n12.1.14.0     # nv-codec-headers (NVENC) tag. This sets the OLDEST NVIDIA driver
                          # NVENC will work with: 12.1 needs 531.61+ (Windows) / 530.41+ (Linux);
                          # 13.0 would need 570+. FFmpeg 8 still accepts 12.1.
@@ -110,8 +112,24 @@ else
   # Capture: webcams (V4L2), X11 screens (also XWayland windows). The
   # rawvideo writer is for the share picker's small pictures of each screen;
   # the rawvideo reader takes Wayland shares, whose pictures the app reads
-  # from PipeWire and pipes in (pwcapture_linux.go).
-  CAPTURE="--enable-indev=v4l2,xcbgrab --enable-libxcb --enable-libxcb-shm --enable-libxcb-xfixes --enable-libxcb-shape --enable-filter=hwupload --enable-encoder=rawvideo --enable-muxer=rawvideo --enable-demuxer=rawvideo"
+  # from PipeWire and pipes in (pwcapture_linux.go). The JPEG writer is for
+  # showing video: on Linux the app decodes H.264 itself and hands the page
+  # JPEG pictures (videodec.go), as the web view's own decoding depends on
+  # the distro's GStreamer plugins.
+  CAPTURE="--enable-indev=v4l2,xcbgrab --enable-libxcb --enable-libxcb-shm --enable-libxcb-xfixes --enable-libxcb-shape --enable-filter=hwupload --enable-encoder=rawvideo,mjpeg --enable-muxer=rawvideo,mjpeg --enable-demuxer=rawvideo"
+fi
+
+VPX=""
+if [ "$TARGET" = linux ]; then
+  # VP8 + Opus (Opus is FFmpeg's own encoder): videos in chat that this
+  # computer's web view can't play are converted to WebM, which every
+  # distro's GStreamer plays (localmedia.go).
+  echo "== libvpx (VP8)"
+  get "https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/$VPX_REF" libvpx-src
+  (cd libvpx-src && ./configure --prefix="$PREFIX" --as=nasm --enable-static --disable-shared --enable-pic \
+     --enable-vp8 --disable-vp9 --disable-examples --disable-tools --disable-docs --disable-unit-tests >/dev/null \
+   && make -j"$JOBS" >/dev/null && make install >/dev/null)
+  VPX="--enable-libvpx --enable-encoder=libvpx_vp8,opus"
 fi
 
 echo "== nv-codec-headers"
@@ -168,7 +186,7 @@ PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure $FF_TARGET \
   --enable-hwaccel=h264_nvdec,hevc_nvdec,vp9_nvdec,av1_nvdec,mpeg2_nvdec,vc1_nvdec \
   --disable-everything --disable-autodetect --disable-doc --disable-debug --disable-network \
   --disable-ffplay --disable-ffprobe --enable-small \
-  $CAPTURE \
+  $CAPTURE $VPX \
   $( [ "$TARGET" = windows ] && echo --enable-mediafoundation --enable-d3d11va \
        --enable-hwaccel=h264_d3d11va,h264_d3d11va2,hevc_d3d11va,hevc_d3d11va2,vp9_d3d11va,vp9_d3d11va2,av1_d3d11va,av1_d3d11va2,mpeg2_d3d11va,mpeg2_d3d11va2,vc1_d3d11va,vc1_d3d11va2 ) \
   --enable-protocol=file,pipe \
@@ -207,6 +225,8 @@ else
   echo "  mouse pointer (xfixes):  $(have CONFIG_LIBXCB_XFIXES)"
   echo "  screen pictures (raw):   $(have CONFIG_RAWVIDEO_ENCODER)"
   echo "  Wayland shares (raw in): $(have CONFIG_RAWVIDEO_DEMUXER)"
+  echo "  showing video (JPEG out): $(have CONFIG_MJPEG_ENCODER)"
+  echo "  playing chat videos (VP8/Opus): $(have CONFIG_LIBVPX_VP8_ENCODER) / $(have CONFIG_OPUS_ENCODER)"
   echo "  FLV writer (sharing):    $(have CONFIG_FLV_MUXER)"
   echo "  NVIDIA encoder:          $(have CONFIG_H264_NVENC_ENCODER)"
 fi

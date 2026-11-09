@@ -116,6 +116,8 @@ export function GetFileURL(arg1:string):Promise<string>;
 
 export function GetFingerprint():Promise<string>;
 
+export function GetMediaLink(arg1:string):Promise<string>;
+
 export function GetMessageZipLink(arg1:string):Promise<main.MessageZip>;
 
 export function GetMessagesAround(arg1:string,arg2:string):Promise<Array<main.ChatMessage>>;
@@ -205,6 +207,8 @@ export function PickPfp():Promise<string>;
 export function PingServer():Promise<number>;
 
 export function PlaySound(arg1:string,arg2:number,arg3:string):Promise<void>;
+
+export function PlayableMedia(arg1:string,arg2:string):Promise<string>;
 
 export function PrepareAccountExport(arg1:string,arg2:string):Promise<string>;
 

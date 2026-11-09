@@ -52,6 +52,20 @@ func init() {
 		log.Printf("webview: WEBKIT_DISABLE_COMPOSITING_MODE is set — drawing without the graphics card")
 	}
 
+	// H.264 is decoded by the app's FFmpeg, not the web view (videodec.go):
+	// unless CHRISCORD_VIDEO_DECODE=webview.
+	nativeH264 = !strings.EqualFold(strings.TrimSpace(os.Getenv("CHRISCORD_VIDEO_DECODE")), "webview")
+	// GStreamer's OpenH264 decoder (Fedora's only H.264 decoder by default)
+	// locks the window up when the web view uses it. Switched off for this
+	// app, an H.264 video the distro can't otherwise play just counts as
+	// unplayable, and is converted instead (localmedia.go).
+	if rank := os.Getenv("GST_PLUGIN_FEATURE_RANK"); !strings.Contains(rank, "openh264dec") {
+		if rank != "" {
+			rank += ","
+		}
+		os.Setenv("GST_PLUGIN_FEATURE_RANK", rank+"openh264dec:NONE")
+	}
+
 	switch theme := strings.TrimSpace(os.Getenv("CHRISCORD_GTK_THEME")); {
 	case strings.EqualFold(theme, "system"):
 		// leave the desktop's theme
