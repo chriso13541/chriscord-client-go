@@ -8397,6 +8397,19 @@ function buildMediaPlayer(a,kind){
   if(a.external){ // a linked video, loaded from where it's hosted: if it won't play, the embed goes
     media.src=a.url;
     media.addEventListener('error',()=>wrap.remove(),{once:true});
+  }else if(IS_LINUX){
+    // Linux: nothing is loaded until it's played. Each <video>/<audio> the
+    // web view loads starts a GStreamer pipeline that opens and decodes
+    // the file — a channel with a dozen videos made a slow computer crawl.
+    // The first play attaches the file and starts it once it's ready.
+    media.preload='none';
+    let attached=false;const realPlay=media.play.bind(media);
+    media.play=function(){
+      if(attached)return realPlay();
+      attached=true;media.preload='auto';media.autoplay=true;
+      attachMediaSource(media,a.url,()=>playConverted(media,wrap,a,kind));
+      return Promise.resolve();
+    };
   }else attachMediaSource(media,a.url,()=>playConverted(media,wrap,a,kind));
   if(kind==='video')watchPartialPlayback(wrap,media,a);
   paintPlay();paintVol();
@@ -14652,8 +14665,10 @@ function initVideoConvert(){
   document.getElementById('pf-lowprio').addEventListener('change',e=>{perfSettings.lowPriority=e.target.checked;applyPerfSettings(true);});
   document.getElementById('pf-gpu').addEventListener('change',e=>{perfSettings.gpu=e.target.checked;applyPerfSettings(true);});
   applyPerfSettings(false);
-  // What this computer has (checked once, a little after start-up).
-  setTimeout(async()=>{try{convInfo=await window.go.main.App.VideoConversionInfo();renderPerfSettings();}catch{}},3000);
+  // What this computer has (checked once, half a minute after start-up:
+  // it runs FFmpeg test encodes, which a slow computer feels while the
+  // app is still loading).
+  setTimeout(async()=>{try{convInfo=await window.go.main.App.VideoConversionInfo();renderPerfSettings();}catch{}},30000);
   document.getElementById('pf-gpu-recheck').addEventListener('click',async e=>{
     const btn=e.currentTarget;btn.disabled=true;btn.textContent='Checking\u2026';
     settingsSaved('Checking your graphics card\u2026','busy');

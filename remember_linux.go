@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -243,6 +244,8 @@ func keyringKey(create bool) ([]byte, error) {
 			return nil, err
 		}
 	}
+	// (A key left in the memory-only "session" collection doesn't count.)
+	unlocked = withoutSessionItems(unlocked)
 	if len(unlocked) > 0 {
 		var s ssSecret
 		if err := ssCall(bus.Object(ssDest, unlocked[0]), ssItem+".GetSecret", session).Store(&s); err != nil {
@@ -261,6 +264,13 @@ func keyringKey(create bool) ([]byte, error) {
 	var coll dbus.ObjectPath
 	if err := ssCall(svc, ssService+".ReadAlias", "default").Store(&coll); err != nil || coll == "/" || coll == "" {
 		return nil, errors.New("the keyring has no default collection")
+	}
+	// The "session" collection is kept in memory only, gone at the next
+	// sign-in (the keyring's default when it wasn't started with your login
+	// — common outside GNOME/KDE). A key there would make the saved sign-in
+	// useless next time: use the key file instead.
+	if strings.HasSuffix(string(coll), "/collection/session") {
+		return nil, errors.New("the keyring only keeps things until you sign out")
 	}
 	if _, err := ssUnlock(bus, []dbus.ObjectPath{coll}); err != nil {
 		return nil, err
@@ -282,6 +292,16 @@ func keyringKey(create bool) ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
+}
+
+func withoutSessionItems(items []dbus.ObjectPath) []dbus.ObjectPath {
+	out := items[:0:0]
+	for _, it := range items {
+		if !strings.Contains(string(it), "/collection/session/") {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 // ssUnlock unlocks items or a collection, showing the keyring's own
