@@ -25,6 +25,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/png"
@@ -73,22 +75,6 @@ func installDesktopEntry() error {
 	}
 
 	data := xdgDataHome()
-	// The icons first, so the entry never points at a missing one.
-	src, err := png.Decode(bytes.NewReader(linuxAppIcon))
-	if err != nil {
-		return fmt.Errorf("the built-in icon: %w", err)
-	}
-	for _, size := range []int{64, 128, 256, 512} {
-		var buf bytes.Buffer
-		if err := png.Encode(&buf, scaleIcon(src, size)); err != nil {
-			return err
-		}
-		p := filepath.Join(data, "icons", "hicolor", fmt.Sprintf("%dx%d", size, size), "apps", "chriscord.png")
-		if err := writeIfChanged(p, buf.Bytes(), 0644); err != nil {
-			return err
-		}
-	}
-
 	entry := "[Desktop Entry]\n" +
 		"Type=Application\n" +
 		"Name=Chriscord\n" +
@@ -102,7 +88,36 @@ func installDesktopEntry() error {
 		"Keywords=chat;voice;discord;\n" +
 		"StartupWMClass=chriscord\n" +
 		"StartupNotify=true\n"
-	return writeIfChanged(filepath.Join(data, "applications", "chriscord.desktop"), []byte(entry), 0644)
+	entryPath := filepath.Join(data, "applications", "chriscord.desktop")
+	iconPath := func(size int) string {
+		return filepath.Join(data, "icons", "hicolor", fmt.Sprintf("%dx%d", size, size), "apps", "chriscord.png")
+	}
+	// Already there, from this program: nothing to do (the usual case —
+	// no need to make the icons again at every start).
+	stamp := filepath.Join(chriscordConfigDir(), "desktop-icon.id") // which icon was installed
+	sum := sha256.Sum256(linuxAppIcon)
+	iconID := hex.EncodeToString(sum[:8])
+	if old, err := os.ReadFile(entryPath); err == nil && string(old) == entry {
+		if id, err := os.ReadFile(stamp); err == nil && string(id) == iconID && fileExists(iconPath(512)) {
+			return nil
+		}
+	}
+	// The icons first, so the entry never points at a missing one.
+	src, err := png.Decode(bytes.NewReader(linuxAppIcon))
+	if err != nil {
+		return fmt.Errorf("the built-in icon: %w", err)
+	}
+	for _, size := range []int{64, 128, 256, 512} {
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, scaleIcon(src, size)); err != nil {
+			return err
+		}
+		if err := writeIfChanged(iconPath(size), buf.Bytes(), 0644); err != nil {
+			return err
+		}
+	}
+	writeIfChanged(stamp, []byte(iconID), 0644)
+	return writeIfChanged(entryPath, []byte(entry), 0644)
 }
 
 func fileExists(p string) bool {

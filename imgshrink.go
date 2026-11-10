@@ -7,7 +7,8 @@ package main
 // through the window's main thread, and every avatar on screen decodes it
 // into a 64 MB bitmap — enough, with a few people like that, to freeze the
 // window or run a small machine (a VM) out of memory. Shrunk once here (and
-// kept), it's a few tens of KB.
+// kept — in memory, and in the cache folder so the next start doesn't
+// decode it again), it's a few tens of KB.
 //
 // Animated pictures (GIF, WebP, animated PNG) and anything Go can't read
 // are passed on as they are, as are pictures already small enough.
@@ -15,21 +16,24 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"image"
 	"image/draw"
 	"image/jpeg"
 	"image/png"
+	"os"
+	"path/filepath"
 	"sync"
 
 	_ "image/gif"
 )
 
 const (
-	pfpMaxDim        = 512  // avatars, server icons (shown at most ~128 px, sharp on HiDPI)
-	bannerMaxDim     = 1600 // profile and server banners
-	backgroundMaxDim = 2560 // theme backgrounds (the whole window)
-	pickedMaxDim     = 2048 // a picture just picked, for cropping
-	shrinkMinBytes   = 200 << 10
+	pfpMaxDim        = 512      // avatars, server icons (shown at most ~128 px, sharp on HiDPI)
+	bannerMaxDim     = 1600     // profile and server banners
+	backgroundMaxDim = 2560     // theme backgrounds (the whole window)
+	pickedMaxDim     = 2048     // a picture just picked, for cropping
+	shrinkMinBytes   = 16 << 10 // smaller: too small to be worth looking at (the size, not the bytes, is what costs)
 )
 
 var shrinkCache = struct {
@@ -67,6 +71,11 @@ func shrinkImage(data []byte, maxDim int) []byte {
 		return out
 	}
 	shrinkCache.Unlock()
+	diskPath := shrinkDiskPath(key)
+	if out, err := os.ReadFile(diskPath); err == nil && len(out) > 0 {
+		shrinkRemember(key, out)
+		return out
+	}
 
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
@@ -93,13 +102,31 @@ func shrinkImage(data []byte, maxDim int) []byte {
 		return data
 	}
 	out := buf.Bytes()
+	shrinkRemember(key, out)
+	if os.MkdirAll(filepath.Dir(diskPath), 0700) == nil {
+		writeFileAtomic(diskPath, out, 0600)
+	}
+	return out
+}
+
+func shrinkRemember(key [32]byte, out []byte) {
 	shrinkCache.Lock()
 	if len(shrinkCache.m) > 256 {
 		shrinkCache.m = map[[32]byte][]byte{}
 	}
 	shrinkCache.m[key] = out
 	shrinkCache.Unlock()
-	return out
+}
+
+// shrinkDiskPath: where a shrunk copy is kept between starts (the cache
+// folder: safe to delete). Named by the original's hash and size, so a
+// changed picture gets a new file.
+func shrinkDiskPath(key [32]byte) string {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		dir = os.TempDir()
+	}
+	return filepath.Join(dir, "chriscord", "pictures", hex.EncodeToString(key[:16]))
 }
 
 // shrinkRGBA: src (premultiplied RGBA) at w×h, each pixel the average of

@@ -8244,11 +8244,11 @@ async function getAttachLink(rel,fresh=false){
 // back to).
 const IMAGE_CACHE_MAX=300;
 const imageBlobs=new Map(); // rel → Promise<blob URL>
-// Linux: pictures are loaded two at a time. Each one comes through the
-// app's own request handler, and WebKitGTK can lock up when a channel's
-// worth of them (plus emoji, video frames…) are answered all at once.
+// Linux: at most six pictures load at once (as a browser does per site).
+// Each comes through the app's own request handler, and WebKitGTK can lock
+// up when a whole channel's worth are answered at the same moment.
 // Elsewhere there's no limit.
-const IMAGE_FETCH_MAX=/Linux/.test(navigator.userAgent)&&!/Android/.test(navigator.userAgent)?2:Infinity;
+const IMAGE_FETCH_MAX=/Linux/.test(navigator.userAgent)&&!/Android/.test(navigator.userAgent)?6:Infinity;
 let imageFetchesActive=0;const imageFetchWaiting=[];
 function imageFetchSlot(){
   return new Promise(resolve=>{
@@ -9995,8 +9995,13 @@ const native={available:false,encoder:'',label:'',reason:''};
 const SELF='\u0000self'; // the preview decoder's key in vRemote
 const useNative=()=>native.available&&localStorage.getItem('camNative')!=='0';
 const camDevKey=()=>useNative()?'camDeviceN':'camDevice';
-async function loadNativeCapture(){
-  try{Object.assign(native,await window.go.main.App.NativeCaptureInfo()||{});native.label=native.encoderLabel||'';}catch{}
+// Asked once — it runs FFmpeg (and a test encode), so not at start but a
+// little later, or straight away when the camera or its settings need it.
+let nativeLoading=null;
+function loadNativeCapture(){
+  return nativeLoading||(nativeLoading=(async()=>{
+    try{Object.assign(native,await window.go.main.App.NativeCaptureInfo()||{});native.label=native.encoderLabel||'';}catch{}
+  })());
 }
 
 // Until camera access has been allowed, the system lists each camera with
@@ -10005,6 +10010,7 @@ async function loadNativeCapture(){
 // it's per kind.) So when that's the case, ask for camera access once,
 // close it straight away, and list again to get the real ids and names.
 async function listCameras({unlock=true}={}){
+  await loadNativeCapture();
   if(useNative()){
     const cams=await window.go.main.App.ListCameras().catch(err=>{throw new Error(String(err));});
     return (cams||[]).map(c=>({deviceId:c.id,label:c.name}));
@@ -10038,6 +10044,7 @@ async function pickCamera(){
 // Which sizes (and the best frame rate at each) this camera really has.
 // onProgress(done,total) for the settings page; cached per camera.
 async function probeCameraModes(deviceId,{force=false,onProgress}={}){
+  await loadNativeCapture();
   if(useNative()){
     // The driver says exactly what it supports: no need to try sizes.
     const modes=await window.go.main.App.CameraModes(deviceId).catch(err=>{throw new Error(String(err));});
@@ -10100,7 +10107,11 @@ const inMyCall=()=>!!state.voiceHere&&(state.voiceChannels[state.voiceHere]||[])
 // encodes in whatever the CURRENT call's track is, so a call joined before
 // this finished still works.
 const camCodec={send:'h264',hw:null};
-async function chooseCamCodec(){
+// Asked once, a little after start (on Linux it makes the web view load
+// GStreamer's encoders), or when the camera is turned on.
+let camCodecChosen=null;
+function chooseCamCodec(){return camCodecChosen||(camCodecChosen=pickCamCodec());}
+async function pickCamCodec(){
   if(!window.VideoEncoder)return;
   const base={codec:'avc1.42e01f',width:1280,height:720,bitrate:1.8e6,framerate:30,latencyMode:'realtime',avc:{format:'annexb'}};
   let ok=false;
@@ -10133,6 +10144,7 @@ const codecLabel=cfg=>!cfg?'':cfg.codec.startsWith('avc1')?(cfg.hardwareAccelera
 
 async function toggleCamera(){
   if(cam.on||cam.starting){const was=cam.on;stopCamera();if(was)playSound('webcam_stop');return;}
+  await Promise.all([loadNativeCapture(),chooseCamCodec()]);
   if(!inMyCall()){toast('Join a voice channel to turn on your camera',true);return;}
   if(!can(PERM.VIDEO)){toast('You don\u2019t have permission to use video on this server',true);return;}
   if(!camSupported()&&!useNative()){toast('Cameras aren\u2019t supported in this version of the app\u2019s web view',true);return;}
@@ -10145,6 +10157,7 @@ async function toggleCamera(){
 // you're in the call again (after your own snapshot shows you in it).
 async function restoreCameraAfterRejoin(){
   for(let i=0;i<20&&!inMyCall();i++)await new Promise(r=>setTimeout(r,250));
+  await Promise.all([loadNativeCapture(),chooseCamCodec()]);
   if(!inMyCall()||cam.on||cam.starting)return;
   if(!camSupported()&&!useNative())return;
   cam.starting=true;updateCameraButton();
@@ -10872,7 +10885,7 @@ function initVideo(){
   window.runtime.EventsOn('video:keyframe',()=>{cam.forceKey=true;});
   updateCameraButton();
   initCameraSettings();
-  chooseCamCodec();
+  setTimeout(chooseCamCodec,IS_LINUX?10000:0); // (Linux: native capture sends H.264 anyway, video.go)
 }
 // From voice:state — who has a camera on. Also re-announces ours if the
 // server lost track (e.g. after a dropped connection rejoined the call).
@@ -11314,6 +11327,7 @@ const camPreview={stream:null};
 async function populateCameraSettings({force=false}={}){
   const sel=document.getElementById('settings-cam-select'),hint=document.getElementById('cam-status');
   const resSel=document.getElementById('settings-cam-res'),fpsSel=document.getElementById('settings-cam-fps');
+  await loadNativeCapture();
   renderNativeHint();
   if(!camSupported()&&!useNative()){
     sel.innerHTML='<option>Not available</option>';sel.disabled=resSel.disabled=fpsSel.disabled=true;
@@ -11391,6 +11405,7 @@ async function applyCameraSetting(){
 }
 async function startCameraPreview(){
   stopCameraPreview(true);
+  await loadNativeCapture();
   if(useNative()){
     const btn=document.getElementById('settings-cam-test-btn'),box=document.getElementById('cam-preview');
     if(cam.on&&cam.native){toast('Your camera is already on in the call \u2014 your own tile shows what everyone sees',true);return;}
@@ -11457,7 +11472,7 @@ async function fillEncoderMenu(){
 }
 function initCameraSettings(){
   const nat=document.getElementById('cam-native');
-  loadNativeCapture().then(()=>renderNativeHint(false));
+  setTimeout(()=>loadNativeCapture().then(()=>renderNativeHint(false)),12000);
   document.getElementById('settings-cam-enc').addEventListener('change',e=>{
     localStorage.setItem('camEncoder',e.target.value);
     applyCameraSetting();
