@@ -13,11 +13,13 @@ import (
 
 // The window on Linux: a GTK window holding a WebKitGTK web view.
 //
-// Rendering. WebKitGTK's newer DMA-BUF renderer (2.42 and later) is known
-// to lose the page on many graphics drivers — older Intel chips and NVIDIA
-// especially: everything stops drawing and the window turns plain grey.
-// Turned off here, before the web view starts, unless it's already been
-// set either way. If it still happens, starting Chriscord with
+// Rendering. WebKitGTK's DMA-BUF renderer (2.42 and later) is its fast,
+// graphics-card path — without it a weak computer draws everything on the
+// CPU and the app crawls (an AMD A4 laptop: 100% CPU, smooth with it on).
+// But on some systems it loses the page (the window turns plain grey):
+// NVIDIA's own driver, and virtual machines' graphics. So it's left on,
+// except there (dmabufRendererRisky). Set WEBKIT_DISABLE_DMABUF_RENDERER
+// yourself (1 or 0) to decide. If the window still goes grey,
 // WEBKIT_DISABLE_COMPOSITING_MODE=1 (drawing without the graphics card) is
 // the next thing to try.
 //
@@ -46,7 +48,10 @@ func init() {
 	originalEnv = os.Environ()
 
 	if _, set := os.LookupEnv("WEBKIT_DISABLE_DMABUF_RENDERER"); !set {
-		os.Setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+		if why := dmabufRendererRisky(); why != "" {
+			os.Setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+			log.Printf("webview: graphics-card rendering off (%s) — WEBKIT_DISABLE_DMABUF_RENDERER=0 turns it on", why)
+		}
 	}
 	if os.Getenv("WEBKIT_DISABLE_COMPOSITING_MODE") != "" {
 		log.Printf("webview: WEBKIT_DISABLE_COMPOSITING_MODE is set — drawing without the graphics card")
@@ -74,6 +79,24 @@ func init() {
 	default:
 		os.Setenv("GTK_THEME", "Adwaita:dark")
 	}
+}
+
+// dmabufRendererRisky: why WebKitGTK's DMA-BUF renderer shouldn't be used
+// here ("" if it's fine): NVIDIA's own driver, or a virtual machine.
+func dmabufRendererRisky() string {
+	if _, err := os.Stat("/proc/driver/nvidia/version"); err == nil {
+		return "NVIDIA's driver"
+	}
+	for _, f := range []string{"/sys/class/dmi/id/sys_vendor", "/sys/class/dmi/id/product_name"} {
+		b, _ := os.ReadFile(f)
+		v := strings.ToLower(string(b))
+		for _, vm := range []string{"qemu", "vmware", "virtualbox", "innotek", "kvm", "bochs", "parallels", "virtual machine", "xen"} { // Hyper-V: "Virtual Machine"
+			if strings.Contains(v, vm) {
+				return "a virtual machine"
+			}
+		}
+	}
+	return ""
 }
 
 // childEnv: the environment for a program Chriscord starts for you

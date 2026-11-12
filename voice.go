@@ -147,6 +147,19 @@ type VoiceSession struct {
 // practical bridge between them. Falls back to the default device for
 // that direction if no match is found or name is empty.
 func findDeviceByName(name string, wantInput bool) (*portaudio.DeviceInfo, error) {
+	logAudioDevices()
+	d, err := pickDevice(name, wantInput)
+	if err == nil && d != nil && runtime.GOOS == "linux" {
+		dir := "output"
+		if wantInput {
+			dir = "input"
+		}
+		log.Printf("audio: %s %q (asked for %q)", dir, d.Name, name)
+	}
+	return d, err
+}
+
+func pickDevice(name string, wantInput bool) (*portaudio.DeviceInfo, error) {
 	if name != "" {
 		devices, err := portaudio.Devices()
 		if err == nil {
@@ -164,10 +177,63 @@ func findDeviceByName(name string, wantInput bool) (*portaudio.DeviceInfo, error
 			}
 		}
 	}
+	// Linux: ALSA's "default" is often the sound card itself, which the
+	// desktop's sound server (PipeWire or PulseAudio) already has open — so
+	// it fails ("unable to open slave") or falls through to the wrong
+	// device. The sound server's own ALSA device, when there is one, is
+	// what the rest of the desktop uses: prefer it.
+	if d := soundServerDevice(wantInput); d != nil {
+		return d, nil
+	}
 	if wantInput {
 		return portaudio.DefaultInputDevice()
 	}
 	return portaudio.DefaultOutputDevice()
+}
+
+// soundServerDevice: Linux's "pipewire" or "pulse" ALSA device (in that
+// order) if PortAudio lists it; nil elsewhere or if there's neither.
+func soundServerDevice(wantInput bool) *portaudio.DeviceInfo {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	devices, err := portaudio.Devices()
+	if err != nil {
+		return nil
+	}
+	for _, want := range []string{"pipewire", "pulse"} {
+		for _, d := range devices {
+			if !strings.EqualFold(d.Name, want) {
+				continue
+			}
+			if (wantInput && d.MaxInputChannels > 0) || (!wantInput && d.MaxOutputChannels > 0) {
+				return d
+			}
+		}
+	}
+	return nil
+}
+
+// logAudioDevices writes PortAudio's devices to the log once (Linux), to
+// tell which one a call opened when sound goes missing.
+var logAudioDevicesOnce sync.Once
+
+func logAudioDevices() {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	logAudioDevicesOnce.Do(func() {
+		devices, err := portaudio.Devices()
+		if err != nil {
+			log.Printf("audio: couldn't list devices: %v", err)
+			return
+		}
+		var names []string
+		for _, d := range devices {
+			names = append(names, fmt.Sprintf("%q (in %d, out %d)", d.Name, d.MaxInputChannels, d.MaxOutputChannels))
+		}
+		log.Printf("audio: devices: %s", strings.Join(names, ", "))
+	})
 }
 
 // JoinVoiceChannel connects presence to a voice board AND establishes the
