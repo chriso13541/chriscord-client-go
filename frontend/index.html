@@ -1097,6 +1097,35 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .tf-code.wrap .l { padding-left:calc(3.2em + 16px); text-indent:calc(-3.2em - 16px); }
 .tf-code .k { color:#c792ea; } .tf-code .s { color:#c3e88d; } .tf-code .c { color:#7f8c98; font-style:italic; } .tf-code .n { color:#f78c6c; } .tf-code .t { color:#82aaff; }
 [data-theme="light"] .tf-code .k { color:#7b30d0; } [data-theme="light"] .tf-code .s { color:#2e7d32; } [data-theme="light"] .tf-code .c { color:#6a737d; } [data-theme="light"] .tf-code .n { color:#c2410c; } [data-theme="light"] .tf-code .t { color:#1d4ed8; }
+/* PDFs: the first page in the chat, the whole thing in a viewer (pdf.js) */
+.pdf-file .pdf-thumb { position:relative; display:flex; justify-content:center; align-items:flex-start; padding:12px; max-height:340px; overflow:hidden; background:var(--bg-mid); cursor:zoom-in; }
+.pdf-file .pdf-thumb canvas { display:block; background:#fff; border-radius:2px; box-shadow:0 2px 10px rgba(0,0,0,.35); max-width:100%; flex-shrink:0; }
+.pdf-file .pdf-thumb .tf-fade { background:linear-gradient(transparent, var(--bg-mid)); }
+.pdf-file .pdf-thumb.short .tf-fade { display:none; }
+.pdf-file .tf-status { cursor:default; }
+#pdf-viewer .modal.pv { width:min(1100px,96vw); max-width:none; height:92vh; max-height:none; padding:0; overflow:hidden; display:flex; flex-direction:column; }
+#pdf-viewer .tv-head { display:flex; align-items:center; gap:10px; padding:10px 12px 10px 18px; border-bottom:1px solid var(--border); background:var(--bg-mid); flex-wrap:wrap; row-gap:6px; }
+#pdf-viewer .tv-head > .ic { width:20px; height:20px; color:var(--text-muted); flex-shrink:0; }
+#pdf-viewer .tv-name { font-weight:700; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:60px; flex:0 1 auto; }
+#pdf-viewer .tf-meta { font-size:.78rem; color:var(--text-muted); white-space:nowrap; }
+#pdf-viewer .pv-tools { margin-left:auto; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+#pdf-viewer .pv-group { display:flex; align-items:center; gap:2px; padding:0 6px; border-right:1px solid var(--border); }
+#pdf-viewer .pv-group:last-child { border-right:none; padding-right:0; }
+#pdf-viewer .tf-btn .ic { width:19px; height:19px; }
+#pdf-viewer .tf-btn.on { color:var(--accent); }
+#pdf-viewer .tf-btn:disabled { opacity:.35; cursor:default; background:none; }
+#pdf-viewer .pv-pagebox { display:flex; align-items:center; gap:5px; font-size:.8rem; color:var(--text-muted); white-space:nowrap; }
+#pdf-viewer .pv-pagebox input { width:46px; padding:3px 5px; border-radius:5px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text-strong); font:inherit; text-align:center; -moz-appearance:textfield; }
+#pdf-viewer .pv-pagebox input::-webkit-inner-spin-button { -webkit-appearance:none; }
+#pdf-viewer .pv-zoom-pct { min-width:46px; text-align:center; font-size:.8rem; color:var(--text); background:none; border:none; cursor:pointer; padding:4px; border-radius:5px; font-variant-numeric:tabular-nums; }
+#pdf-viewer .pv-zoom-pct:hover { background:var(--bg-light); }
+#pdf-viewer .pv-pages { flex:1; min-height:0; overflow:auto; background:#3c3f45; display:flex; flex-direction:column; align-items:flex-start; gap:14px; padding:18px 16px 28px; }
+[data-theme="light"] #pdf-viewer .pv-pages { background:#d6d8dc; }
+#pdf-viewer .pv-page { position:relative; flex-shrink:0; margin:0 auto; background:#fff; /* centred, but a page wider than the window still scrolls to its left edge */ box-shadow:0 2px 12px rgba(0,0,0,.4); }
+#pdf-viewer .pv-page canvas { position:absolute; inset:0; width:100%; height:100%; }
+#pdf-viewer .pv-msg { margin:auto; color:#d8dadd; font-size:.9rem; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:20px; }
+[data-theme="light"] #pdf-viewer .pv-msg { color:#3a3d42; }
+#pdf-viewer .pv-msg .ic { width:34px; height:34px; opacity:.7; }
 #text-viewer .modal.tv { width:min(1100px,94vw); max-width:none; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:88vh; }
 #text-viewer .tv-head { display:flex; align-items:center; gap:10px; padding:12px 12px 12px 18px; border-bottom:1px solid var(--border); background:var(--bg-mid); }
 #text-viewer .tv-head > .ic { width:20px; height:20px; color:var(--text-muted); }
@@ -2124,6 +2153,8 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
   <symbol id="ic-stop" viewBox="0 -960 960 960"><path d="M320-640v320-320Zm-80 400v-480h480v480H240Zm80-80h320v-320H320v320Z"/></symbol>
   <symbol id="ic-volume_up" viewBox="0 -960 960 960"><path d="M560-131v-82q90-26 145-100t55-168q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 127-78 224.5T560-131ZM120-360v-240h160l200-200v640L280-360H120Zm440 40v-322q47 22 73.5 66t26.5 96q0 51-26.5 94.5T560-320ZM400-606l-86 86H200v80h114l86 86v-252ZM300-480Z"/></symbol>
+  <symbol id="ic-zoom_out" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400ZM280-540v-80h200v80H280Z"/></symbol>
+  <symbol id="ic-fit_width" viewBox="0 -960 960 960"><path d="M120-120v-720h80v720h-80Zm640 0v-720h80v720h-80ZM360-320 200-480l160-160 56 56-64 64h256l-64-64 56-56 160 160-160 160-56-56 64-64H352l64 64-56 56Z"/></symbol>
   <symbol id="ic-zoom_in" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Zm-40-60v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></symbol>
 </svg>
 
@@ -2246,6 +2277,17 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
       <span class="tv-btns"><button type="button" class="tf-btn tv-md hidden" title="Show it rendered"><svg class="ic" aria-hidden="true"><use href="#ic-visibility"/></svg></button><button type="button" class="tf-btn tv-wrap" title="Wrap long lines"><svg class="ic" aria-hidden="true"><use href="#ic-description"/></svg></button><button type="button" class="tf-btn tv-copy" title="Copy"><svg class="ic" aria-hidden="true"><use href="#ic-content_copy"/></svg></button><button type="button" class="tf-btn tv-dl" title="Download"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button><button type="button" class="tf-btn tv-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></span></div>
     <div class="tv-body"></div>
     <div class="tf-note hidden"></div>
+  </div>
+</div>
+<div class="modal-overlay hidden" id="pdf-viewer">
+  <div class="modal pv" role="dialog" aria-label="PDF">
+    <div class="tv-head"><svg class="ic" aria-hidden="true"><use href="#ic-picture_as_pdf"/></svg><span class="tv-name"></span><span class="tf-meta"></span>
+      <span class="pv-tools">
+        <span class="pv-group pv-pagebox">Page <input type="number" class="pv-page-in" min="1" value="1" aria-label="Page"> of <span class="pv-count">–</span></span>
+        <span class="pv-group"><button type="button" class="tf-btn pv-out" title="Zoom out (Ctrl −)"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_out"/></svg></button><button type="button" class="pv-zoom-pct" title="Actual size (Ctrl 0)">100%</button><button type="button" class="tf-btn pv-in" title="Zoom in (Ctrl +)"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_in"/></svg></button><button type="button" class="tf-btn pv-fit" title="Fit to width"><svg class="ic" aria-hidden="true"><use href="#ic-fit_width"/></svg></button></span>
+        <span class="pv-group"><button type="button" class="tf-btn pv-dl" title="Download"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button><button type="button" class="tf-btn pv-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></span>
+      </span></div>
+    <div class="pv-pages" tabindex="-1"></div>
   </div>
 </div>
 <div class="modal-overlay hidden" id="modal-screen">
@@ -6857,6 +6899,290 @@ function openTextViewer(a,d){
 }
 function closeTextViewer(){document.getElementById('text-viewer').classList.add('hidden');document.querySelector('#text-viewer .tv-body').innerHTML='';}
 
+// ── PDFs ─────────────────────────────────────────────────────────
+// A PDF shows its first page in the chat; click it (or the expand button)
+// for the whole thing in a viewer: scroll through, zoom, jump to a page.
+// Drawn by pdf.js (frontend/pdfjs: Mozilla's, bundled, loaded the first
+// time a PDF is shown), the same on Windows, macOS and Linux. Only ever
+// drawn as pictures: no links, forms or scripts in a PDF do anything, and
+// nothing in it can run code. Encrypted PDFs are decrypted by the app as
+// they're fetched, as for any attachment, and only ever kept in memory.
+const PDF_VIEW_MAX=100*1024*1024; // bigger: download it
+const PDF_ASSETS=new URL('/pdfjs/',location.href).href;
+let pdfjsLib=null,pdfWorker=null;
+function loadPdfjs(){
+  return pdfjsLib??=import(PDF_ASSETS+'pdf.min.mjs').then(m=>{
+    m.GlobalWorkerOptions.workerSrc=PDF_ASSETS+'pdf.worker.min.mjs';
+    pdfWorker=new m.PDFWorker({name:'chriscord-pdf'}); // one for every PDF (started once)
+    return m;
+  }).catch(err=>{pdfjsLib=null;throw err;});
+}
+function isPdfAttachment(a){
+  if(!a||a.spoiler||a.external||!a.url)return false;
+  return textFileExt(a.name)==='pdf'||String(a.mime||'').toLowerCase()==='application/pdf';
+}
+class PdfError extends Error{constructor(kind,msg){super(msg);this.kind=kind;}}
+const pdfBytesCache=new Map(); // attachment url → Promise<Uint8Array> (a few, newest last)
+function fetchPdfBytes(a){
+  if(pdfBytesCache.has(a.url)){const p=pdfBytesCache.get(a.url);pdfBytesCache.delete(a.url);pdfBytesCache.set(a.url,p);return p;}
+  const p=(async()=>{
+    const res=await fetch(await getAttachLink(a.url));
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const len=+res.headers.get('Content-Length')||0;
+    if(len>PDF_VIEW_MAX){res.body?.cancel().catch(()=>{});throw new PdfError('big',fmtBytes(len));}
+    const reader=res.body.getReader(),parts=[];let n=0;
+    for(;;){
+      const {done,value}=await reader.read();if(done)break;
+      parts.push(value);n+=value.length;
+      if(n>PDF_VIEW_MAX){reader.cancel().catch(()=>{});throw new PdfError('big','over '+fmtBytes(PDF_VIEW_MAX));}
+    }
+    const buf=new Uint8Array(n);let o=0;for(const c of parts){buf.set(c,o);o+=c.length;}
+    // "%PDF-" near the start, as every PDF has.
+    if(!new TextDecoder('latin1').decode(buf.subarray(0,1024)).includes('%PDF-'))throw new PdfError('bad','not a PDF');
+    return buf;
+  })();
+  p.catch(()=>pdfBytesCache.delete(a.url));
+  pdfBytesCache.set(a.url,p);
+  while(pdfBytesCache.size>4)pdfBytesCache.delete(pdfBytesCache.keys().next().value);
+  return p;
+}
+async function openPdfDoc(a){
+  const [lib,bytes]=await Promise.all([loadPdfjs(),fetchPdfBytes(a)]);
+  const task=lib.getDocument({
+    data:bytes.slice(), // pdf.js takes the buffer it's given; the cached copy stays
+    standardFontDataUrl:PDF_ASSETS+'standard_fonts/',cMapUrl:PDF_ASSETS+'cmaps/',cMapPacked:true,
+    wasmUrl:PDF_ASSETS+'wasm/',iccUrl:PDF_ASSETS+'iccs/',
+    enableXfa:false,verbosity:0,worker:pdfWorker,
+  });
+  try{return await task.promise;}
+  catch(err){
+    task.destroy();
+    if(err?.name==='PasswordException')throw new PdfError('password','password-protected');
+    if(err?.name==='InvalidPDFException')throw new PdfError('bad','damaged');
+    throw err;
+  }
+}
+// Done with a document: its memory, in the worker too (the worker stays).
+function closePdfDoc(doc){doc?.loadingTask?.destroy().catch(()=>{});}
+function pdfErrorText(err){
+  switch(err?.kind){
+    case 'big':return `Too big to view here (${err.message}) \u2014 download it to open.`;
+    case 'password':return 'Password-protected \u2014 download it to open.';
+    case 'bad':return 'This PDF couldn\u2019t be read \u2014 it may be damaged. Download it to try another app.';
+  }
+  return 'Couldn\u2019t show this PDF \u2014 download it to open.';
+}
+// Draws a page into a new canvas; the canvas is at most maxPx pixels (the
+// rest is scaled by CSS), so a huge page or zoom can't use up memory.
+async function drawPdfPage(page,scale,maxPx=16e6){
+  const vp=page.getViewport({scale});
+  let dpr=window.devicePixelRatio||1;
+  if(vp.width*vp.height*dpr*dpr>maxPx)dpr=Math.sqrt(maxPx/(vp.width*vp.height));
+  const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.floor(vp.width*dpr));c.height=Math.max(1,Math.floor(vp.height*dpr));
+  const task=page.render({canvasContext:c.getContext('2d'),viewport:vp,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null});
+  return {canvas:c,vp,task,done:task.promise.then(()=>c)};
+}
+
+const pdfThumbObserver=('IntersectionObserver' in window)?new IntersectionObserver(entries=>{
+  for(const e of entries)if(e.isIntersecting){pdfThumbObserver.unobserve(e.target);e.target._loadPdf?.();}
+},{rootMargin:'400px'}):null;
+function buildPdfFile(a){
+  const el=document.createElement('div');el.className='text-file pdf-file';el._att=a;
+  el.innerHTML=`<div class="tf-head">${icon('picture_as_pdf')}<span class="tf-name" title="${esc(a.name||'')}">${esc(a.name||'File')}</span><span class="tf-meta"></span>
+    <span class="tf-btns"><button type="button" class="tf-btn tf-full" title="Open" disabled>${icon('open_in_full')}</button><button type="button" class="tf-btn tf-dl" title="Download">${icon('download')}</button></span></div>
+    <div class="tf-status">Loading\u2026</div>`;
+  el.querySelector('.tf-dl').addEventListener('click',e=>{e.stopPropagation();downloadAttachment(a);});
+  el._loadPdf=async()=>{
+    const status=el.querySelector('.tf-status');
+    let doc;
+    try{
+      doc=await openPdfDoc(a);
+      const pages=doc.numPages,size=(await fetchPdfBytes(a)).length;
+      el.querySelector('.tf-meta').textContent=`${pages.toLocaleString()} page${pages===1?'':'s'} \u00b7 ${fmtBytes(size)}`;
+      const page=await doc.getPage(1);
+      const w0=page.getViewport({scale:1}).width;
+      const width=Math.min(Math.max(200,(el.clientWidth||520)-24),536);
+      const d=await drawPdfPage(page,width/w0,4e6);
+      await d.done;
+      const thumb=document.createElement('div');thumb.className='pdf-thumb';thumb.title='Open';
+      d.canvas.style.width=Math.round(d.vp.width)+'px';d.canvas.style.height=Math.round(d.vp.height)+'px';
+      thumb.append(d.canvas);
+      const fade=document.createElement('div');fade.className='tf-fade';thumb.append(fade);
+      thumb.classList.toggle('short',d.vp.height+24<=340);
+      thumb.addEventListener('click',()=>openPdfViewer(a));
+      status.replaceWith(thumb);
+      const full=el.querySelector('.tf-full');full.disabled=false;
+      full.addEventListener('click',e=>{e.stopPropagation();openPdfViewer(a);});
+    }catch(err){
+      if(!err?.kind)console.warn('pdf preview:',a.name,err);
+      status.textContent=pdfErrorText(err);
+    }finally{closePdfDoc(doc);}
+  };
+  if(pdfThumbObserver)pdfThumbObserver.observe(el);else el._loadPdf();
+  return el;
+}
+
+// The viewer. Pages are laid out at their size straight away and drawn
+// as they scroll into view (the dozen nearest are kept drawn, the rest
+// let go), so a long PDF opens as fast as a short one.
+const pv={doc:null,a:null,gen:0,scale:1,fit:true,sizes:[],io:null,drawn:new Map(),tasks:new Map(),cur:1,resizeT:0};
+function pvEls(){const ov=document.getElementById('pdf-viewer');return {ov,pages:ov.querySelector('.pv-pages'),pageIn:ov.querySelector('.pv-page-in'),count:ov.querySelector('.pv-count'),pct:ov.querySelector('.pv-zoom-pct')};}
+async function openPdfViewer(a){
+  closePdfViewer(true);
+  const gen=++pv.gen,E=pvEls();
+  pv.a=a;
+  E.ov.querySelector('.tv-name').textContent=a.name||'File';
+  E.ov.querySelector('.tf-meta').textContent='';
+  E.count.textContent='\u2013';E.pageIn.value=1;
+  E.pages.innerHTML=`<div class="pv-msg">Opening\u2026</div>`;
+  E.ov.classList.remove('hidden');
+  E.pages.focus({preventScroll:true});
+  let doc;
+  try{doc=await openPdfDoc(a);}
+  catch(err){
+    if(gen!==pv.gen)return;
+    if(!err?.kind)console.warn('pdf viewer:',a.name,err);
+    E.pages.innerHTML=`<div class="pv-msg">${icon('picture_as_pdf')}${esc(pdfErrorText(err))}</div>`;
+    return;
+  }
+  if(gen!==pv.gen){closePdfDoc(doc);return;}
+  pv.doc=doc;
+  const n=doc.numPages;
+  E.count.textContent=n.toLocaleString();E.pageIn.max=n;
+  fetchPdfBytes(a).then(b=>{if(gen===pv.gen)E.ov.querySelector('.tf-meta').textContent=fmtBytes(b.length);}).catch(()=>{});
+  // Every page sized like the first until it's looked at.
+  const first=(await doc.getPage(1)).getViewport({scale:1});
+  if(gen!==pv.gen)return;
+  pv.sizes=Array.from({length:n},()=>({w:first.width,h:first.height,known:false}));
+  pv.sizes[0].known=true;
+  pv.fit=true;pv.scale=pvFitScale();
+  E.pages.innerHTML='';
+  for(let i=1;i<=n;i++){const d=document.createElement('div');d.className='pv-page';d.dataset.page=i;E.pages.append(d);}
+  pv.io=new IntersectionObserver(entries=>{
+    for(const e of entries)if(e.isIntersecting)pvDraw(+e.target.dataset.page);
+  },{root:E.pages,rootMargin:'600px 0px'});
+  E.pages.querySelectorAll('.pv-page').forEach(d=>pv.io.observe(d));
+  pvLayout();
+}
+function pvFitScale(){
+  const E=pvEls(),w=pv.sizes[0]?.w||612;
+  return Math.max(0.25,Math.min(4,(E.pages.clientWidth-40)/w));
+}
+// Sizes every page for the current zoom (drawn ones are redrawn sharp).
+function pvLayout(keepPage){
+  const E=pvEls(),s=pv.scale;
+  E.pages.querySelectorAll('.pv-page').forEach(d=>{
+    const z=pv.sizes[d.dataset.page-1];
+    d.style.width=Math.round(z.w*s)+'px';d.style.height=Math.round(z.h*s)+'px';
+  });
+  E.pct.textContent=Math.round(s*100)+'%';
+  E.ov.querySelector('.pv-fit').classList.toggle('on',pv.fit);
+  if(keepPage)pvGoto(keepPage,false);
+  // Redraw what's on screen at the new size (the old drawing, stretched,
+  // stays up until then).
+  for(const [i] of pv.drawn)if(pvNear(i))pvDraw(i,true);
+}
+function pvNear(i){
+  const E=pvEls(),d=E.pages.children[i-1];if(!d)return false;
+  const r=d.getBoundingClientRect(),R=E.pages.getBoundingClientRect();
+  return r.bottom>R.top-600&&r.top<R.bottom+600;
+}
+async function pvDraw(i,force){
+  const doc=pv.doc,gen=pv.gen,s=pv.scale;
+  const have=pv.drawn.get(i);
+  if(!doc||(!force&&have&&have.scale===s))return;
+  if(pv.tasks.get(i)?.scale===s)return; // already being drawn at this size
+  pv.tasks.get(i)?.task.cancel();
+  let page;
+  try{page=await doc.getPage(i);}catch{return;}
+  if(gen!==pv.gen||s!==pv.scale)return;
+  const z=pv.sizes[i-1];
+  if(!z.known){
+    const v=page.getViewport({scale:1});z.w=v.width;z.h=v.height;z.known=true;
+    const d=pvEls().pages.children[i-1];d.style.width=Math.round(z.w*s)+'px';d.style.height=Math.round(z.h*s)+'px';
+  }
+  const d=await drawPdfPage(page,s);
+  pv.tasks.set(i,{scale:s,task:d.task});
+  try{await d.done;}
+  catch{return;} // cancelled (zoomed again, or closed)
+  finally{if(pv.tasks.get(i)?.task===d.task)pv.tasks.delete(i);}
+  if(gen!==pv.gen||s!==pv.scale)return;
+  const box=pvEls().pages.children[i-1];
+  box.querySelector('canvas')?.remove();box.append(d.canvas);
+  pv.drawn.delete(i);pv.drawn.set(i,{scale:s});
+  // Keep the dozen most recently drawn; let the rest go.
+  for(const [j] of pv.drawn){
+    if(pv.drawn.size<=12)break;
+    if(pvNear(j))continue;
+    const c=pvEls().pages.children[j-1]?.querySelector('canvas');if(c){c.width=c.height=0;c.remove();}
+    pv.drawn.delete(j);
+  }
+}
+function pvGoto(i,smooth){
+  const E=pvEls(),d=E.pages.children[i-1];if(!d)return;
+  E.pages.scrollTo({top:d.offsetTop-14,behavior:smooth?'smooth':'auto'});
+}
+function pvCurrentPage(){
+  const E=pvEls(),mid=E.pages.scrollTop+E.pages.clientHeight/3;
+  const kids=E.pages.children;let lo=0,hi=kids.length-1;
+  while(lo<hi){const m=(lo+hi+1)>>1;if(kids[m].offsetTop<=mid)lo=m;else hi=m-1;}
+  return lo+1;
+}
+function pvZoom(to,fit=false){
+  if(!pv.doc)return;
+  const page=pvCurrentPage();
+  pv.fit=fit;
+  pv.scale=Math.max(0.25,Math.min(5,fit?pvFitScale():to));
+  pvLayout(page);
+}
+function closePdfViewer(reopening){
+  pv.gen++;
+  pv.io?.disconnect();pv.io=null;
+  for(const [,t] of pv.tasks)t.task.cancel();
+  pv.tasks.clear();pv.drawn.clear();
+  closePdfDoc(pv.doc);pv.doc=null;
+  const E=pvEls();
+  E.pages.querySelectorAll('canvas').forEach(c=>{c.width=c.height=0;});
+  E.pages.innerHTML='';
+  if(!reopening)E.ov.classList.add('hidden');
+}
+(()=>{
+  const E=pvEls();
+  E.ov.querySelector('.pv-close').addEventListener('click',()=>closePdfViewer());
+  E.ov.querySelector('.pv-dl').addEventListener('click',()=>{if(pv.a)downloadAttachment(pv.a);});
+  E.ov.querySelector('.pv-in').addEventListener('click',()=>pvZoom(pv.scale*1.2));
+  E.ov.querySelector('.pv-out').addEventListener('click',()=>pvZoom(pv.scale/1.2));
+  E.ov.querySelector('.pv-fit').addEventListener('click',()=>pvZoom(0,true));
+  E.pct.addEventListener('click',()=>pvZoom(1));
+  E.ov.addEventListener('mousedown',e=>{if(e.target===E.ov)closePdfViewer();});
+  E.pageIn.addEventListener('change',()=>{const n=Math.max(1,Math.min(pv.doc?.numPages||1,parseInt(E.pageIn.value,10)||1));E.pageIn.value=n;pvGoto(n,false);});
+  E.pageIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();E.pageIn.dispatchEvent(new Event('change'));E.pages.focus({preventScroll:true});}});
+  E.pages.addEventListener('scroll',()=>{
+    const p=pvCurrentPage();
+    if(p!==pv.cur){pv.cur=p;if(document.activeElement!==E.pageIn)E.pageIn.value=p;}
+  },{passive:true});
+  E.pages.addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();pvZoom(pv.scale*(e.deltaY<0?1.1:1/1.1));}},{passive:false});
+  document.addEventListener('keydown',e=>{
+    if(E.ov.classList.contains('hidden'))return;
+    if(e.key==='Escape'){e.stopImmediatePropagation();e.preventDefault();closePdfViewer();return;}
+    if(e.ctrlKey||e.metaKey){
+      if(e.key==='='||e.key==='+'){e.preventDefault();e.stopImmediatePropagation();pvZoom(pv.scale*1.2);}
+      else if(e.key==='-'){e.preventDefault();e.stopImmediatePropagation();pvZoom(pv.scale/1.2);}
+      else if(e.key==='0'){e.preventDefault();e.stopImmediatePropagation();pvZoom(1);}
+      return;
+    }
+    if(e.target===E.pageIn)return;
+    if(e.key==='PageDown'||e.key==='PageUp'){e.preventDefault();pvGoto(Math.max(1,Math.min(pv.doc?.numPages||1,pvCurrentPage()+(e.key==='PageDown'?1:-1))),false);}
+    else if(e.key==='Home'){e.preventDefault();pvGoto(1,false);}
+    else if(e.key==='End'){e.preventDefault();pvGoto(pv.doc?.numPages||1,false);}
+  },true);
+  window.addEventListener('resize',()=>{
+    if(E.ov.classList.contains('hidden')||!pv.fit||!pv.doc)return;
+    clearTimeout(pv.resizeT);pv.resizeT=setTimeout(()=>pvZoom(0,true),150);
+  });
+})();
+
 // ── LONG PASTES ──────────────────────────────────────────────────
 // Pasting more than PASTE_OFFER_CHARS characters into the message box
 // offers to send it as a .txt file instead (it pastes as usual either way).
@@ -7973,6 +8299,8 @@ function buildMsgEl(msg,grouped){
     if(a.mime?.startsWith('video/')||a.mime?.startsWith('audio/')){
       const mp=buildMediaPlayer(a,a.mime.startsWith('video/')?'video':'audio');mp._att=a;
       body.appendChild(mp);
+    }else if(isPdfAttachment(a)){
+      body.appendChild(buildPdfFile(a));
     }else if(isTextPreviewable(a)){
       body.appendChild(buildTextFile(a));
     }else{
