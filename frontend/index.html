@@ -1103,7 +1103,12 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .pdf-file .pdf-thumb .tf-fade { background:linear-gradient(transparent, var(--bg-mid)); }
 .pdf-file .pdf-thumb.short .tf-fade { display:none; }
 .pdf-file .tf-status { cursor:default; }
-#pdf-viewer .modal.pv { width:min(1100px,96vw); max-width:none; height:92vh; max-height:none; padding:0; overflow:hidden; display:flex; flex-direction:column; }
+/* Sized to the window as measured (--pv-w/h, pvSize()), not vh or inset:0:
+   with the app zoomed (body zoom) those come out bigger than the window,
+   and the viewer's bottom ended up off the screen. It fills the window
+   below the title bar with a margin all round. */
+#pdf-viewer.modal-overlay { inset:auto; left:0; top:0; width:var(--pv-w,100vw); height:var(--pv-h,100vh); padding:calc(var(--titlebar-h, 0px) + 16px) 16px 16px; align-items:stretch; overflow:hidden; }
+#pdf-viewer .modal.pv { width:min(1100px,100%); max-width:none; height:auto; max-height:none; padding:0; overflow:hidden; display:flex; flex-direction:column; }
 #pdf-viewer .tv-head { display:flex; align-items:center; gap:10px; padding:10px 12px 10px 18px; border-bottom:1px solid var(--border); background:var(--bg-mid); flex-wrap:wrap; row-gap:6px; }
 #pdf-viewer .tv-head > .ic { width:20px; height:20px; color:var(--text-muted); flex-shrink:0; }
 #pdf-viewer .tv-name { font-weight:700; color:var(--text-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:60px; flex:0 1 auto; }
@@ -1117,9 +1122,19 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 #pdf-viewer .pv-pagebox { display:flex; align-items:center; gap:5px; font-size:.8rem; color:var(--text-muted); white-space:nowrap; }
 #pdf-viewer .pv-pagebox input { width:46px; padding:3px 5px; border-radius:5px; border:1px solid var(--border); background:var(--bg-darkest); color:var(--text-strong); font:inherit; text-align:center; -moz-appearance:textfield; }
 #pdf-viewer .pv-pagebox input::-webkit-inner-spin-button { -webkit-appearance:none; }
-#pdf-viewer .pv-zoom-pct { min-width:46px; text-align:center; font-size:.8rem; color:var(--text); background:none; border:none; cursor:pointer; padding:4px; border-radius:5px; font-variant-numeric:tabular-nums; }
-#pdf-viewer .pv-zoom-pct:hover { background:var(--bg-light); }
-#pdf-viewer .pv-pages { flex:1; min-height:0; overflow:auto; background:#3c3f45; display:flex; flex-direction:column; align-items:flex-start; gap:14px; padding:18px 16px 28px; }
+#pdf-viewer .pv-zoomsel { position:relative; }
+#pdf-viewer .pv-zoom-pct { min-width:96px; display:inline-flex; align-items:center; justify-content:space-between; gap:4px; font:inherit; font-size:.8rem; color:var(--text); background:var(--bg-darkest); border:1px solid var(--border); cursor:pointer; padding:3px 4px 3px 9px; border-radius:6px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#pdf-viewer .pv-zoom-pct:hover, #pdf-viewer .pv-zoom-pct[aria-expanded="true"] { border-color:var(--accent); }
+#pdf-viewer .pv-zoom-pct .ic { width:16px; height:16px; color:var(--text-muted); }
+#pdf-viewer .pv-menu { position:absolute; top:calc(100% + 4px); left:50%; transform:translateX(-50%); z-index:5; min-width:170px; padding:4px; background:var(--bg-mid); border:1px solid var(--border); border-radius:8px; box-shadow:0 10px 28px rgba(0,0,0,.45); display:flex; flex-direction:column; }
+#pdf-viewer .pv-menu.hidden { display:none; }
+#pdf-viewer .pv-menu button { display:flex; align-items:center; gap:8px; padding:6px 10px 6px 8px; border:none; background:none; color:var(--text); font:inherit; font-size:.82rem; text-align:left; border-radius:5px; cursor:pointer; white-space:nowrap; }
+#pdf-viewer .pv-menu button:hover, #pdf-viewer .pv-menu button:focus-visible { background:var(--bg-light); outline:none; }
+#pdf-viewer .pv-menu button .ic { width:16px; height:16px; color:var(--accent); visibility:hidden; flex-shrink:0; }
+#pdf-viewer .pv-menu button.on .ic { visibility:visible; }
+#pdf-viewer .pv-menu button kbd { margin-left:auto; padding-left:14px; font:inherit; font-size:.72rem; color:var(--text-muted); }
+#pdf-viewer .pv-menu hr { border:none; border-top:1px solid var(--border); margin:4px 2px; }
+#pdf-viewer .pv-pages { position:relative; /* pages' offsetTop is from here */ flex:1; min-height:0; overflow:auto; background:#3c3f45; display:flex; flex-direction:column; align-items:flex-start; gap:14px; padding:18px 16px 28px; }
 [data-theme="light"] #pdf-viewer .pv-pages { background:#d6d8dc; }
 #pdf-viewer .pv-page { position:relative; flex-shrink:0; margin:0 auto; background:#fff; /* centred, but a page wider than the window still scrolls to its left edge */ box-shadow:0 2px 12px rgba(0,0,0,.4); }
 #pdf-viewer .pv-page canvas { position:absolute; inset:0; width:100%; height:100%; }
@@ -2153,6 +2168,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
   <symbol id="ic-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
   <symbol id="ic-stop" viewBox="0 -960 960 960"><path d="M320-640v320-320Zm-80 400v-480h480v480H240Zm80-80h320v-320H320v320Z"/></symbol>
   <symbol id="ic-volume_up" viewBox="0 -960 960 960"><path d="M560-131v-82q90-26 145-100t55-168q0-94-55-168T560-749v-82q124 28 202 125.5T840-481q0 127-78 224.5T560-131ZM120-360v-240h160l200-200v640L280-360H120Zm440 40v-322q47 22 73.5 66t26.5 96q0 51-26.5 94.5T560-320ZM400-606l-86 86H200v80h114l86 86v-252ZM300-480Z"/></symbol>
+  <symbol id="ic-expand_more" viewBox="0 -960 960 960"><path d="M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z"/></symbol>
   <symbol id="ic-zoom_out" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400ZM280-540v-80h200v80H280Z"/></symbol>
   <symbol id="ic-fit_width" viewBox="0 -960 960 960"><path d="M120-120v-720h80v720h-80Zm640 0v-720h80v720h-80ZM360-320 200-480l160-160 56 56-64 64h256l-64-64 56-56 160 160-160 160-56-56 64-64H352l64 64-56 56Z"/></symbol>
   <symbol id="ic-zoom_in" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Zm-40-60v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></symbol>
@@ -2284,7 +2300,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
     <div class="tv-head"><svg class="ic" aria-hidden="true"><use href="#ic-picture_as_pdf"/></svg><span class="tv-name"></span><span class="tf-meta"></span>
       <span class="pv-tools">
         <span class="pv-group pv-pagebox">Page <input type="number" class="pv-page-in" min="1" value="1" aria-label="Page"> of <span class="pv-count">–</span></span>
-        <span class="pv-group"><button type="button" class="tf-btn pv-out" title="Zoom out (Ctrl −)"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_out"/></svg></button><button type="button" class="pv-zoom-pct" title="Actual size (Ctrl 0)">100%</button><button type="button" class="tf-btn pv-in" title="Zoom in (Ctrl +)"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_in"/></svg></button><button type="button" class="tf-btn pv-fit" title="Fit to width"><svg class="ic" aria-hidden="true"><use href="#ic-fit_width"/></svg></button></span>
+        <span class="pv-group"><button type="button" class="tf-btn pv-out" title="Zoom out (Ctrl −)"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_out"/></svg></button><span class="pv-zoomsel"><button type="button" class="pv-zoom-pct" title="Zoom" aria-haspopup="menu" aria-expanded="false"><span class="pv-zoom-label">Fit to width</span><svg class="ic" aria-hidden="true"><use href="#ic-expand_more"/></svg></button><div class="pv-menu hidden" role="menu"></div></span><button type="button" class="tf-btn pv-in" title="Zoom in (Ctrl +)"><svg class="ic" aria-hidden="true"><use href="#ic-zoom_in"/></svg></button></span>
         <span class="pv-group"><button type="button" class="tf-btn pv-dl" title="Download"><svg class="ic" aria-hidden="true"><use href="#ic-download"/></svg></button><button type="button" class="tf-btn pv-close" title="Close (Esc)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></span>
       </span></div>
     <div class="pv-pages" tabindex="-1"></div>
@@ -7027,7 +7043,11 @@ function buildPdfFile(a){
 // as they scroll into view (the dozen nearest are kept drawn, the rest
 // let go), so a long PDF opens as fast as a short one.
 const pv={doc:null,a:null,gen:0,scale:1,fit:true,sizes:[],io:null,drawn:new Map(),tasks:new Map(),cur:1,resizeT:0};
-function pvEls(){const ov=document.getElementById('pdf-viewer');return {ov,pages:ov.querySelector('.pv-pages'),pageIn:ov.querySelector('.pv-page-in'),count:ov.querySelector('.pv-count'),pct:ov.querySelector('.pv-zoom-pct')};}
+function pvEls(){const ov=document.getElementById('pdf-viewer');return {ov,pages:ov.querySelector('.pv-pages'),pageIn:ov.querySelector('.pv-page-in'),count:ov.querySelector('.pv-count'),pct:ov.querySelector('.pv-zoom-pct'),menu:ov.querySelector('.pv-menu')};}
+// The zoom you last picked: "width", "page" (fit to height) or a scale.
+function pvZoomPref(){try{const v=localStorage.getItem('pdfZoom');return v==='page'||v==='width'?v:(+v>0?+v:'width');}catch{return 'width';}}
+function pvSetZoomPref(v){try{localStorage.setItem('pdfZoom',String(v));}catch{}}
+const PV_ZOOMS=[0.5,0.75,1,1.25,1.5,2,3,4];
 async function openPdfViewer(a){
   closePdfViewer(true);
   const gen=++pv.gen,E=pvEls();
@@ -7036,6 +7056,7 @@ async function openPdfViewer(a){
   E.ov.querySelector('.tf-meta').textContent='';
   E.count.textContent='\u2013';E.pageIn.value=1;
   E.pages.innerHTML=`<div class="pv-msg">Opening\u2026</div>`;
+  pvSize();
   E.ov.classList.remove('hidden');
   E.pages.focus({preventScroll:true});
   let doc;
@@ -7056,7 +7077,10 @@ async function openPdfViewer(a){
   if(gen!==pv.gen)return;
   pv.sizes=Array.from({length:n},()=>({w:first.width,h:first.height,known:false}));
   pv.sizes[0].known=true;
-  pv.fit=true;pv.scale=pvFitScale();
+  pv.cur=1;
+  const pref=pvZoomPref();
+  pv.fit=typeof pref==='string'?pref:'';
+  pv.scale=pv.fit?pvFitScale(pv.fit,1):pref;
   E.pages.innerHTML='';
   for(let i=1;i<=n;i++){const d=document.createElement('div');d.className='pv-page';d.dataset.page=i;E.pages.append(d);}
   pv.io=new IntersectionObserver(entries=>{
@@ -7065,9 +7089,18 @@ async function openPdfViewer(a){
   E.pages.querySelectorAll('.pv-page').forEach(d=>pv.io.observe(d));
   pvLayout();
 }
-function pvFitScale(){
-  const E=pvEls(),w=pv.sizes[0]?.w||612;
-  return Math.max(0.25,Math.min(4,(E.pages.clientWidth-40)/w));
+// The viewer's size: the window's, in the page's (zoomed) CSS pixels.
+function pvSize(){
+  const z=uiScale(),ov=pvEls().ov;
+  ov.style.setProperty('--pv-w',(window.innerWidth/z)+'px');ov.style.setProperty('--pv-h',(window.innerHeight/z)+'px');
+}
+// The scale that fits page i's width (mode "width") or the whole page
+// (mode "page": fit to height, and to width if it's wider) in the viewer.
+function pvFitScale(mode,i){
+  const E=pvEls(),z=pv.sizes[(i||1)-1]||pv.sizes[0]||{w:612,h:792};
+  const W=E.pages.clientWidth-32,H=E.pages.clientHeight-32;
+  const s=mode==='page'?Math.min(W/z.w,H/z.h):W/z.w;
+  return Math.max(0.1,Math.min(5,s));
 }
 // Sizes every page for the current zoom (drawn ones are redrawn sharp).
 function pvLayout(keepPage){
@@ -7076,8 +7109,8 @@ function pvLayout(keepPage){
     const z=pv.sizes[d.dataset.page-1];
     d.style.width=Math.round(z.w*s)+'px';d.style.height=Math.round(z.h*s)+'px';
   });
-  E.pct.textContent=Math.round(s*100)+'%';
-  E.ov.querySelector('.pv-fit').classList.toggle('on',pv.fit);
+  E.pct.querySelector('.pv-zoom-label').textContent=pv.fit==='width'?'Fit to width':pv.fit==='page'?'Fit to height':Math.round(s*100)+'%';
+  E.pct.title=`Zoom (${Math.round(s*100)}%)`;
   if(keepPage)pvGoto(keepPage,false);
   // Redraw what's on screen at the new size (the old drawing, stretched,
   // stays up until then).
@@ -7129,13 +7162,26 @@ function pvCurrentPage(){
   while(lo<hi){const m=(lo+hi+1)>>1;if(kids[m].offsetTop<=mid)lo=m;else hi=m-1;}
   return lo+1;
 }
-function pvZoom(to,fit=false){
+// Zoom to a scale, or fit ("width" / "page"). keep: remember it as your
+// choice (not for re-fitting when the window's resized).
+function pvZoom(to,fit='',keep=true){
   if(!pv.doc)return;
   const page=pvCurrentPage();
   pv.fit=fit;
-  pv.scale=Math.max(0.25,Math.min(5,fit?pvFitScale():to));
+  pv.scale=Math.max(0.1,Math.min(5,fit?pvFitScale(fit,page):to));
+  if(keep)pvSetZoomPref(fit||Math.round(pv.scale*100)/100);
   pvLayout(page);
 }
+function pvMenuOpen(){
+  const E=pvEls();
+  const on=v=>v===pv.fit||(!pv.fit&&typeof v==='number'&&Math.abs(v-pv.scale)<0.005);
+  const item=(v,label,kbd='')=>`<button type="button" role="menuitemradio" aria-checked="${on(v)}" class="${on(v)?'on':''}" data-z="${v}">${icon('check')}${label}${kbd?`<kbd>${kbd}</kbd>`:''}</button>`;
+  E.menu.innerHTML=item('width','Fit to width')+item('page','Fit to height')+'<hr>'+
+    PV_ZOOMS.map(z=>item(z,Math.round(z*100)+'%',z===1?'Ctrl 0':'')).join('');
+  E.menu.classList.remove('hidden');E.pct.setAttribute('aria-expanded','true');
+  (E.menu.querySelector('.on')||E.menu.querySelector('button')).focus();
+}
+function pvMenuClose(){const E=pvEls();E.menu.classList.add('hidden');E.pct.setAttribute('aria-expanded','false');}
 function closePdfViewer(reopening){
   pv.gen++;
   pv.io?.disconnect();pv.io=null;
@@ -7153,9 +7199,23 @@ function closePdfViewer(reopening){
   E.ov.querySelector('.pv-dl').addEventListener('click',()=>{if(pv.a)downloadAttachment(pv.a);});
   E.ov.querySelector('.pv-in').addEventListener('click',()=>pvZoom(pv.scale*1.2));
   E.ov.querySelector('.pv-out').addEventListener('click',()=>pvZoom(pv.scale/1.2));
-  E.ov.querySelector('.pv-fit').addEventListener('click',()=>pvZoom(0,true));
-  E.pct.addEventListener('click',()=>pvZoom(1));
-  E.ov.addEventListener('mousedown',e=>{if(e.target===E.ov)closePdfViewer();});
+  E.pct.addEventListener('click',e=>{e.stopPropagation();if(E.menu.classList.contains('hidden'))pvMenuOpen();else pvMenuClose();});
+  E.menu.addEventListener('click',e=>{
+    const b=e.target.closest('[data-z]');if(!b)return;
+    const z=b.dataset.z;pvMenuClose();
+    if(z==='width'||z==='page')pvZoom(0,z);else pvZoom(+z);
+    E.pages.focus({preventScroll:true});
+  });
+  E.menu.addEventListener('keydown',e=>{
+    if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;
+    e.preventDefault();e.stopPropagation();
+    const bs=[...E.menu.querySelectorAll('button')],i=bs.indexOf(document.activeElement);
+    bs[(i+(e.key==='ArrowDown'?1:-1)+bs.length)%bs.length].focus();
+  });
+  E.ov.addEventListener('mousedown',e=>{
+    if(!E.menu.classList.contains('hidden')&&!e.target.closest('.pv-zoomsel'))pvMenuClose();
+    if(e.target===E.ov)closePdfViewer();
+  });
   E.pageIn.addEventListener('change',()=>{const n=Math.max(1,Math.min(pv.doc?.numPages||1,parseInt(E.pageIn.value,10)||1));E.pageIn.value=n;pvGoto(n,false);});
   E.pageIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();E.pageIn.dispatchEvent(new Event('change'));E.pages.focus({preventScroll:true});}});
   E.pages.addEventListener('scroll',()=>{
@@ -7165,7 +7225,11 @@ function closePdfViewer(reopening){
   E.pages.addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();pvZoom(pv.scale*(e.deltaY<0?1.1:1/1.1));}},{passive:false});
   document.addEventListener('keydown',e=>{
     if(E.ov.classList.contains('hidden'))return;
-    if(e.key==='Escape'){e.stopImmediatePropagation();e.preventDefault();closePdfViewer();return;}
+    if(e.key==='Escape'){
+      e.stopImmediatePropagation();e.preventDefault();
+      if(!E.menu.classList.contains('hidden')){pvMenuClose();E.pct.focus();}else closePdfViewer();
+      return;
+    }
     if(e.ctrlKey||e.metaKey){
       if(e.key==='='||e.key==='+'){e.preventDefault();e.stopImmediatePropagation();pvZoom(pv.scale*1.2);}
       else if(e.key==='-'){e.preventDefault();e.stopImmediatePropagation();pvZoom(pv.scale/1.2);}
@@ -7178,8 +7242,10 @@ function closePdfViewer(reopening){
     else if(e.key==='End'){e.preventDefault();pvGoto(pv.doc?.numPages||1,false);}
   },true);
   window.addEventListener('resize',()=>{
-    if(E.ov.classList.contains('hidden')||!pv.fit||!pv.doc)return;
-    clearTimeout(pv.resizeT);pv.resizeT=setTimeout(()=>pvZoom(0,true),150);
+    if(E.ov.classList.contains('hidden'))return;
+    pvSize();
+    if(!pv.fit||!pv.doc)return;
+    clearTimeout(pv.resizeT);pv.resizeT=setTimeout(()=>pvZoom(0,pv.fit,false),150);
   });
 })();
 
