@@ -1292,13 +1292,17 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 .pc-edit .ic { width:16px; height:16px; }
 #profile-popup { position:fixed; z-index:400; }
 /* Kept a modest size (positionProfilePopup sets the height to fit the
-   window); what doesn't fit scrolls inside the card. */
-#profile-popup .profile-card { max-height:min(520px, calc(100vh - 16px)); overflow-y:auto; overscroll-behavior:contain; }
+   window); what doesn't fit scrolls — below the banner and picture, which
+   stay put. (The whole card scrolling put its scrollbar down the side of
+   the banner too, which stopped short of it with a square corner.) */
+#profile-popup .profile-card { max-height:min(520px, calc(100vh - 16px)); overflow:hidden; display:flex; flex-direction:column; }
+#profile-popup .pc-banner, #profile-popup .pc-avatar-wrap { flex-shrink:0; }
+#profile-popup .pc-body { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
 /* The app's own scrollbar (no scrollbar-width here: setting it makes the
    webview drop the ::-webkit-scrollbar styling for the plain one), kept
-   clear of the card's rounded corners. */
-#profile-popup .profile-card::-webkit-scrollbar-track { margin:10px 0; }
-#profile-popup .profile-card::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
+   clear of the card's rounded bottom corner. */
+#profile-popup .pc-body::-webkit-scrollbar-track { margin:0 0 10px; }
+#profile-popup .pc-body::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
 /* Things that open a profile card */
 .member-row, .voice-occupant-row, .msg-avatar:not(.msg-avatar-time), .msg-username { cursor:pointer; }
 .msg-username:hover { text-decoration:underline; }
