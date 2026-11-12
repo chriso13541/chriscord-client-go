@@ -28,7 +28,14 @@ html { height:100%; background:var(--bg-darkest); }
 #msg-input, .msg-edit-input { font-family:'OpenMojiInput','Segoe UI',system-ui,-apple-system,sans-serif; line-height:1.5; }
 /* No native text-box styling (macOS adds its own margins and inner offset,
    which put the text out of line with the highlight layer behind it). */
-#msg-input, .msg-edit-input { -webkit-appearance:none; appearance:none; margin:0; box-sizing:border-box; }
+#msg-input, .msg-edit-input { -webkit-appearance:none; appearance:none; margin:0; box-sizing:border-box; overscroll-behavior:none; }
+/* Their height: the padding and border (as in their own rules below) plus
+   --rows lines (set by autoResize), all worked out by the engine itself —
+   measuring them in script went wrong under page zoom in WebKit. The extra
+   2px absorbs the engine rounding a line to whole pixels, which otherwise
+   cut the text's bottom off (Linux) or let an empty box scroll (macOS). */
+#msg-input { height:calc(24px + var(--rows,1) * 1.5em + 2px); }
+.msg-edit-input { height:calc(18px + var(--rows,1) * 1.5em + 2px); }
 /* WebKit (macOS, Linux) lays out each line by the FIRST font in the list —
    even one, like OpenMojiInput, that only covers emoji — so its made-up
    ascent/descent put the text above or below the middle of the box, by a
@@ -13853,22 +13860,21 @@ function buildDateSeparator(iso){
 // "does the text still overflow?" (two numbers from the same box).
 const MAX_ROWS=4;
 function autoResize(el){
-  const cs=getComputedStyle(el);
-  // The line height is the one the styles give these boxes (line-height:1.5)
-  // rather than the computed one: under page zoom WebKit (Linux, macOS)
-  // reports it already zoomed while the font size isn't, which made the box
-  // too short when zoomed out (text cut off) and too tall when zoomed in.
-  // The padding goes in as CSS pixels and the lines as em, and the browser
-  // adds them up at whatever size things are drawn.
-  const lineEm=1.5;
-  const padPx=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)
-    +(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0); // border-box sizing
-  const fit=n=>{el.style.height=`calc(${padPx.toFixed(2)}px + ${(n*lineEm).toFixed(4)}em)`;};
+  // The height itself is in the styles (#msg-input / .msg-edit-input, from
+  // --rows): here only how many lines the text needs is counted.
+  el.style.removeProperty('height');
+  const fit=n=>el.style.setProperty('--rows',n);
   let rows=1;
   el.style.overflowY='hidden'; // no scrollbar taking room while it's measured
   fit(rows);
   if(el.value)while(rows<MAX_ROWS&&el.scrollHeight>el.clientHeight+2)fit(++rows);
   if(el.value&&el.scrollHeight>el.clientHeight+2)el.style.overflowY='auto'; // past the most: scroll
+  // Empty or one line: nothing to scroll (WebKit lets an empty box scroll
+  // by a pixel or two, moving the placeholder).
+  if(rows===1&&el.style.overflowY==='hidden'){
+    el.scrollTop=0;
+    if(!el._noScroll){el._noScroll=true;el.addEventListener('scroll',()=>{if(el.style.overflowY==='hidden'&&el.scrollTop)el.scrollTop=0;});}
+  }
   if(el.id==='msg-input')renderComposerHighlight();
 }
 // Boxes behind @mentions in the message box (see #msg-hl). Matched against
