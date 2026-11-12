@@ -792,7 +792,7 @@ body.pseudo-fs-on #titlebar { display:none; }
 #downloads-btn.failed .dl-dot { display:block; background:var(--red); }
 #downloads-btn.pop { animation:dl-pop .5s cubic-bezier(.3,1.6,.5,1); }
 @keyframes dl-pop { 0%{transform:scale(1)} 40%{transform:scale(1.28)} 100%{transform:scale(1)} }
-#downloads-pop { position:fixed; z-index:200; width:min(380px,calc(100vw - 16px)); max-height:min(520px,calc(100vh - 80px)); display:flex; flex-direction:column; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.45); color:var(--text); font-size:.86rem; }
+#downloads-pop { position:fixed; z-index:90; /* under dialogs (the PDF viewer…), which are 100 */ width:min(380px,calc(100vw - 16px)); max-height:min(520px,calc(100vh - 80px)); display:flex; flex-direction:column; background:var(--bg-mid); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.45); color:var(--text); font-size:.86rem; }
 #downloads-pop.hidden { display:none; }
 .dlp-head { display:flex; align-items:center; gap:6px; padding:12px 10px 8px 14px; }
 .dlp-head .dlp-title { font-weight:700; color:var(--text-strong); flex:1; }
@@ -1145,6 +1145,7 @@ body.call-mode #video-stage .vs-resize, body.call-mode #video-stage .vs-collapse
 [data-theme="light"] #pdf-viewer .pv-pages { background:#d6d8dc; }
 #pdf-viewer .pv-page { position:relative; flex-shrink:0; margin:0 auto; background:#fff; /* centred, but a page wider than the window still scrolls to its left edge */ box-shadow:0 2px 12px rgba(0,0,0,.4); }
 #pdf-viewer .pv-page canvas { position:absolute; inset:0; width:100%; height:100%; }
+#pdf-viewer .pv-page canvas.pv-detail { inset:auto; } /* placed by pvDetail() */
 #pdf-viewer .pv-msg { margin:auto; color:#d8dadd; font-size:.9rem; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:20px; }
 [data-theme="light"] #pdf-viewer .pv-msg { color:#3a3d42; }
 #pdf-viewer .pv-msg .ic { width:34px; height:34px; opacity:.7; }
@@ -3300,7 +3301,9 @@ async function startDownload(src){
     dlUpsert(d);
     const btn=document.getElementById('downloads-btn');
     btn.classList.remove('pop');void btn.offsetWidth;btn.classList.add('pop');
-    if(dlFirst){dlFirst=false;openDownloadsPop();} // the first one: show where downloads are now
+    // The first one: show where downloads are now — unless it was started
+    // from a dialog (the PDF viewer…), which it would only be hidden behind.
+    if(dlFirst&&!document.querySelector('.modal-overlay:not(.hidden)')){dlFirst=false;openDownloadsPop();}
   }catch(err){toast('Download failed: '+err,true);}
 }
 function dlUpsert(d){
@@ -6995,16 +6998,36 @@ function pdfErrorText(err){
   }
   return 'Couldn\u2019t show this PDF \u2014 download it to open.';
 }
-// Draws a page into a new canvas; the canvas is at most maxPx pixels (the
-// rest is scaled by CSS), so a huge page or zoom can't use up memory.
-async function drawPdfPage(page,scale,maxPx=16e6){
+// Screen pixels per CSS pixel here: the display's density times the app's
+// own zoom (Ctrl +/−), which stretches the page further. Drawing for the
+// display's density alone left everything soft with the app zoomed in.
+function pdfPixelRatio(){return (window.devicePixelRatio||1)*uiScale();}
+// The most pixels a whole page is drawn with (as Firefox's viewer: 2^25,
+// 128 MB). A bigger one is drawn at this and stretched, and the part on
+// screen drawn again sharp on top (pvDetail).
+const PDF_MAX_PX=2**25;
+// Draws a page into a new canvas exactly as big, in screen pixels, as the
+// box it's shown in (w×h CSS pixels): one canvas pixel per screen pixel,
+// nothing resampled. capped: it was too big, and is drawn smaller.
+async function drawPdfPage(page,scale,{w,h,maxPx=PDF_MAX_PX}={}){
   const vp=page.getViewport({scale});
-  let dpr=window.devicePixelRatio||1;
-  if(vp.width*vp.height*dpr*dpr>maxPx)dpr=Math.sqrt(maxPx/(vp.width*vp.height));
+  const cssW=w||Math.round(vp.width),cssH=h||Math.round(vp.height),r=pdfPixelRatio();
+  let cw=Math.round(cssW*r),ch=Math.round(cssH*r),capped=false;
+  if(cw*ch>maxPx){const k=Math.sqrt(maxPx/(cw*ch));cw=Math.floor(cw*k);ch=Math.floor(ch*k);capped=true;}
   const c=document.createElement('canvas');
-  c.width=Math.max(1,Math.floor(vp.width*dpr));c.height=Math.max(1,Math.floor(vp.height*dpr));
-  const task=page.render({canvasContext:c.getContext('2d'),viewport:vp,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null});
-  return {canvas:c,vp,task,done:task.promise.then(()=>c)};
+  c.width=Math.max(1,cw);c.height=Math.max(1,ch);
+  const task=page.render({canvasContext:c.getContext('2d'),viewport:vp,transform:[c.width/vp.width,0,0,c.height/vp.height,0,0]});
+  return {canvas:c,vp,task,cssW,cssH,capped,done:task.promise.then(()=>c)};
+}
+// Draws part of a page (x,y,w,h in CSS pixels of its w×h box) at full
+// resolution.
+function drawPdfRegion(page,scale,boxW,boxH,x,y,w,h){
+  const vp=page.getViewport({scale}),r=pdfPixelRatio();
+  const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(w*r));c.height=Math.max(1,Math.round(h*r));
+  const sx=boxW*r/vp.width,sy=boxH*r/vp.height;
+  const task=page.render({canvasContext:c.getContext('2d'),viewport:vp,transform:[sx,0,0,sy,-x*r,-y*r]});
+  return {canvas:c,task,done:task.promise.then(()=>c)};
 }
 
 const pdfThumbObserver=('IntersectionObserver' in window)?new IntersectionObserver(entries=>{
@@ -7026,13 +7049,13 @@ function buildPdfFile(a){
       const page=await doc.getPage(1);
       const w0=page.getViewport({scale:1}).width;
       const width=Math.min(Math.max(200,(el.clientWidth||520)-24),536);
-      const d=await drawPdfPage(page,width/w0,4e6);
+      const d=await drawPdfPage(page,width/w0,{maxPx:4e6});
       await d.done;
       const thumb=document.createElement('div');thumb.className='pdf-thumb';thumb.title='Open';
-      d.canvas.style.width=Math.round(d.vp.width)+'px';d.canvas.style.height=Math.round(d.vp.height)+'px';
+      d.canvas.style.width=d.cssW+'px';d.canvas.style.height=d.cssH+'px';
       thumb.append(d.canvas);
       const fade=document.createElement('div');fade.className='tf-fade';thumb.append(fade);
-      thumb.classList.toggle('short',d.vp.height+24<=340);
+      thumb.classList.toggle('short',d.cssH+24<=340);
       thumb.addEventListener('click',()=>openPdfViewer(a));
       status.replaceWith(thumb);
       const full=el.querySelector('.tf-full');full.disabled=false;
@@ -7142,21 +7165,62 @@ async function pvDraw(i,force){
     const v=page.getViewport({scale:1});z.w=v.width;z.h=v.height;z.known=true;
     const d=pvEls().pages.children[i-1];d.style.width=Math.round(z.w*s)+'px';d.style.height=Math.round(z.h*s)+'px';
   }
-  const d=await drawPdfPage(page,s);
+  const box=pvEls().pages.children[i-1];
+  const d=await drawPdfPage(page,s,{w:Math.round(z.w*s),h:Math.round(z.h*s)}); // the box's size (pvLayout)
+  d.canvas.className='pv-base';
   pv.tasks.set(i,{scale:s,task:d.task});
   try{await d.done;}
   catch{return;} // cancelled (zoomed again, or closed)
   finally{if(pv.tasks.get(i)?.task===d.task)pv.tasks.delete(i);}
   if(gen!==pv.gen||s!==pv.scale)return;
-  const box=pvEls().pages.children[i-1];
-  box.querySelector('canvas')?.remove();box.append(d.canvas);
-  pv.drawn.delete(i);pv.drawn.set(i,{scale:s});
-  // Keep the dozen most recently drawn; let the rest go.
-  for(const [j] of pv.drawn){
-    if(pv.drawn.size<=12)break;
+  pvFreeCanvases(box);box.append(d.canvas);
+  pv.drawn.delete(i);pv.drawn.set(i,{scale:s,px:d.canvas.width*d.canvas.height,capped:d.capped,w:d.cssW,h:d.cssH});
+  if(d.capped)pvDetailSoon(0);
+  // Keep the dozen most recently drawn (and at most ~4 full-size pages'
+  // worth of pixels); let the rest go.
+  let px=0;for(const [,v] of pv.drawn)px+=v.px;
+  for(const [j,v] of pv.drawn){
+    if(pv.drawn.size<=12&&px<=4*PDF_MAX_PX)break;
     if(pvNear(j))continue;
-    const c=pvEls().pages.children[j-1]?.querySelector('canvas');if(c){c.width=c.height=0;c.remove();}
-    pv.drawn.delete(j);
+    pvFreeCanvases(pvEls().pages.children[j-1]);
+    pv.drawn.delete(j);px-=v.px;
+  }
+}
+function pvFreeCanvases(box,only){
+  if(!box)return;
+  box.querySelectorAll(only||'canvas').forEach(c=>{c.width=c.height=0;c.remove();});
+  if(!only||only.includes('detail'))box._detailKey=''; // drawn again when next wanted
+}
+// Pages too big to draw whole at full resolution (zoomed well in): the
+// part on screen is drawn again, sharp, over the stretched whole — redone
+// when scrolling stops.
+function pvDetailSoon(ms=120){clearTimeout(pv.detailT);pv.detailT=setTimeout(pvDetail,ms);}
+async function pvDetail(){
+  const E=pvEls(),doc=pv.doc,gen=pv.gen,s=pv.scale;
+  if(!doc)return;
+  const L=E.pages.scrollLeft,T=E.pages.scrollTop,W=E.pages.clientWidth,H=E.pages.clientHeight;
+  for(const [i,v] of pv.drawn){
+    const box=E.pages.children[i-1];
+    if(!v.capped||v.scale!==s){pvFreeCanvases(box,'canvas.pv-detail');continue;}
+    // What's on screen of the page, plus a margin, in the page's CSS pixels.
+    const m=200;
+    const x0=Math.max(0,Math.floor(L-box.offsetLeft-m)),y0=Math.max(0,Math.floor(T-box.offsetTop-m));
+    const x1=Math.min(v.w,Math.ceil(L+W-box.offsetLeft+m)),y1=Math.min(v.h,Math.ceil(T+H-box.offsetTop+m));
+    if(x1<=x0||y1<=y0){pvFreeCanvases(box,'canvas.pv-detail');continue;}
+    const key=[s,x0,y0,x1,y1].join();
+    if(box._detailKey===key)continue;
+    box._detailKey=key;
+    pv.detailTasks?.get(i)?.cancel();
+    let page;try{page=await doc.getPage(i);}catch{return;}
+    if(gen!==pv.gen||s!==pv.scale)return;
+    const d=drawPdfRegion(page,s,v.w,v.h,x0,y0,x1-x0,y1-y0);
+    (pv.detailTasks??=new Map()).set(i,d.task);
+    try{await d.done;}catch{if(box._detailKey===key)box._detailKey='';continue;}
+    if(gen!==pv.gen||s!==pv.scale||box._detailKey!==key){d.canvas.width=d.canvas.height=0;continue;}
+    pvFreeCanvases(box,'canvas.pv-detail');
+    d.canvas.className='pv-detail';
+    Object.assign(d.canvas.style,{left:x0+'px',top:y0+'px',width:(x1-x0)+'px',height:(y1-y0)+'px'});
+    box.append(d.canvas);
   }
 }
 function pvGoto(i,smooth){
@@ -7193,6 +7257,7 @@ function closePdfViewer(reopening){
   pv.gen++;
   pv.io?.disconnect();pv.io=null;
   for(const [,t] of pv.tasks)t.task.cancel();
+  pv.detailTasks?.forEach(t=>t.cancel());pv.detailTasks?.clear();clearTimeout(pv.detailT);
   pv.tasks.clear();pv.drawn.clear();
   closePdfDoc(pv.doc);pv.doc=null;
   const E=pvEls();
@@ -7228,6 +7293,7 @@ function closePdfViewer(reopening){
   E.pages.addEventListener('scroll',()=>{
     const p=pvCurrentPage();
     if(p!==pv.cur){pv.cur=p;if(document.activeElement!==E.pageIn)E.pageIn.value=p;}
+    if([...pv.drawn.values()].some(v=>v.capped))pvDetailSoon();
   },{passive:true});
   E.pages.addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();pvZoom(pv.scale*(e.deltaY<0?1.1:1/1.1));}},{passive:false});
   document.addEventListener('keydown',e=>{
