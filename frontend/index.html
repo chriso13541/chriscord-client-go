@@ -1746,7 +1746,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .settings-label { display:block; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); margin:18px 0 6px; }
 .settings-label:first-of-type { margin-top:0; }
 .ss-view-row { display:flex; gap:12px; } .ss-view-row > div { flex:1; } .ss-view-row.off { opacity:.5; pointer-events:none; }
-#ss-view-res, #ss-view-fps, #settings-mic-select, #settings-speaker-select { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
+#ss-view-res, #ss-view-fps, #settings-mic-select, #settings-speaker-select, #pf-render-mode { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
 .settings-hint { margin-top:20px; font-size:.8rem; color:var(--text-muted); line-height:1.5; }
 #pfp-current-display { display:flex; align-items:center; gap:16px; margin-bottom:8px; }
 #pfp-current-circle { width:80px; height:80px; border-radius:50%; background-size:cover; background-position:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:700; color:#fff; }
@@ -2825,6 +2825,23 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 
     <div id="settings-tab-performance" class="settings-tab-pane">
       <h2>Performance</h2>
+
+      <div id="pf-render" class="hidden">
+        <label class="settings-label" for="pf-render-mode">Drawing the window</label>
+        <select id="pf-render-mode">
+          <option value="auto">Automatic</option>
+          <option value="gpu">Graphics card</option>
+          <option value="gpu-cpu">Graphics card, page painted by the CPU</option>
+          <option value="legacy">Graphics card, older way</option>
+          <option value="cpu">CPU only</option>
+        </select>
+        <p class="settings-hint" id="pf-render-hint"></p>
+        <p class="settings-hint" id="pf-render-modes">If the app is slow or stutters (especially opening a server), try another one; the best one depends on your graphics card and its driver.
+          <b>Graphics card</b> is the fastest where it works. <b>Page painted by the CPU</b> helps with older graphics chips that are slow at drawing pages.
+          <b>Older way</b> is for drivers where the window turns grey. <b>CPU only</b> works everywhere but is the slowest.</p>
+        <p class="settings-hint pf-gpu-problem hidden" id="pf-render-restart-note">Applies when Chriscord next starts.</p>
+        <button class="settings-secondary-btn hidden" type="button" id="pf-render-restart" style="margin-top:4px">Restart now</button>
+      </div>
 
       <label class="settings-label">Video transcoding</label>
       <label class="check-row"><input type="checkbox" id="pf-transcode"> Transcode videos before sending, so everyone can play them in the app</label>
@@ -15127,7 +15144,43 @@ function renderPerfSettings(){
   prob.classList.toggle('hidden',!prob.textContent);
   if(convInfo&&!convInfo.available)document.getElementById('pf-transcode-hint').textContent='No FFmpeg is available in this build of the app, so videos are always sent untranscoded.';
 }
+// How the window is drawn (Linux only; renderer.go). Read as the app
+// starts, so a change needs a restart.
+let rendererInfo=null;
+function renderRendererSettings(){
+  const box=document.getElementById('pf-render');if(!box)return;
+  if(!rendererInfo?.supported){box.classList.add('hidden');return;}
+  box.classList.remove('hidden');
+  document.getElementById('pf-render-mode').value=rendererInfo.mode;
+  let h=`Now drawing ${rendererInfo.active}`;
+  if(rendererInfo.running==='auto')h+=` — chosen automatically (${rendererInfo.reason})`;
+  h+='.';
+  if(rendererInfo.gpus)h+=` Graphics found: ${rendererInfo.gpus}.`;
+  if(rendererInfo.envSet)h+=` Set by hand when Chriscord was started, which wins over this: ${rendererInfo.envSet}.`;
+  document.getElementById('pf-render-hint').textContent=h;
+  const pending=rendererInfo.mode!==rendererInfo.running;
+  document.getElementById('pf-render-restart-note').classList.toggle('hidden',!pending);
+  document.getElementById('pf-render-restart').classList.toggle('hidden',!pending);
+}
+async function initRendererSettings(){
+  if(!IS_LINUX)return;
+  try{rendererInfo=await window.go.main.App.GetRendererInfo();}catch{return;}
+  renderRendererSettings();
+  document.getElementById('pf-render-mode').addEventListener('change',async e=>{
+    try{
+      await window.go.main.App.SetRendererMode(e.target.value);
+      rendererInfo={...rendererInfo,mode:e.target.value};
+      settingsSaved(rendererInfo.mode===rendererInfo.running?'Saved':'Saved — applies after a restart');
+    }catch(err){settingsSaved('Couldn’t save: '+err,'fail');}
+    renderRendererSettings();
+  });
+  document.getElementById('pf-render-restart').addEventListener('click',async e=>{
+    e.currentTarget.disabled=true;
+    try{await window.go.main.App.RestartApp();}catch(err){e.currentTarget.disabled=false;settingsSaved('Couldn’t restart: '+err,'fail');}
+  });
+}
 function initVideoConvert(){
+  initRendererSettings();
   document.getElementById('pf-transcode').addEventListener('change',e=>{
     videoConvertOn=e.target.checked;localStorage.setItem('videoConvert',videoConvertOn?'1':'0');persistClientSettings();renderPerfSettings();
   });

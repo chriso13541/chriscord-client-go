@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
@@ -17,11 +18,9 @@ import (
 // graphics-card path — without it a weak computer draws everything on the
 // CPU and the app crawls (an AMD A4 laptop: 100% CPU, smooth with it on).
 // But on some systems it loses the page (the window turns plain grey):
-// NVIDIA's own driver, and virtual machines' graphics. So it's left on,
-// except there (dmabufRendererRisky). Set WEBKIT_DISABLE_DMABUF_RENDERER
-// yourself (1 or 0) to decide. If the window still goes grey,
-// WEBKIT_DISABLE_COMPOSITING_MODE=1 (drawing without the graphics card) is
-// the next thing to try.
+// NVIDIA's own driver drawing the window, and virtual machines' graphics.
+// Settings > Performance chooses (renderer.go); in "auto" it's on except
+// there (dmabufRendererRisky). WEBKIT_* variables set by hand win.
 //
 // Looks. Chriscord keeps its own look rather than the desktop's:
 //   - The title bar is the app's own (#titlebar in index.html), as on
@@ -47,15 +46,7 @@ var linuxAppIcon []byte
 func init() {
 	originalEnv = os.Environ()
 
-	if _, set := os.LookupEnv("WEBKIT_DISABLE_DMABUF_RENDERER"); !set {
-		if why := dmabufRendererRisky(); why != "" {
-			os.Setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
-			log.Printf("webview: graphics-card rendering off (%s) — WEBKIT_DISABLE_DMABUF_RENDERER=0 turns it on", why)
-		}
-	}
-	if os.Getenv("WEBKIT_DISABLE_COMPOSITING_MODE") != "" {
-		log.Printf("webview: WEBKIT_DISABLE_COMPOSITING_MODE is set — drawing without the graphics card")
-	}
+	setupRenderer()
 
 	// H.264 is decoded by the app's FFmpeg, not the web view (videodec.go):
 	// unless CHRISCORD_VIDEO_DECODE=webview.
@@ -70,6 +61,13 @@ func init() {
 		}
 		os.Setenv("GST_PLUGIN_FEATURE_RANK", rank+"openh264dec:NONE")
 	}
+	// GStreamer's Vulkan elements aren't needed (nothing here plays through
+	// Vulkan), and starting Vulkan on an old chip — Intel Haswell ("Haswell
+	// Vulkan support is incomplete"), Ivy Bridge — can be slow or worse.
+	// Ranked out so nothing picks them when a video or camera list is set up.
+	if rank := os.Getenv("GST_PLUGIN_FEATURE_RANK"); !strings.Contains(rank, "vulkan") {
+		os.Setenv("GST_PLUGIN_FEATURE_RANK", rank+",vulkandeviceprovider:NONE,vulkanh264dec:NONE,vulkanh265dec:NONE,vulkansink:NONE,vulkanupload:NONE,vulkancolorconvert:NONE")
+	}
 
 	switch theme := strings.TrimSpace(os.Getenv("CHRISCORD_GTK_THEME")); {
 	case strings.EqualFold(theme, "system"):
@@ -81,11 +79,123 @@ func init() {
 	}
 }
 
+// setupRenderer sets WebKitGTK's drawing variables from the mode chosen in
+// Settings (renderer.go), before the web view starts.
+func setupRenderer() {
+	mode := savedRendererMode()
+	rendererState.Running = mode
+	rendererState.GPUs = describeGPUs()
+	set := map[string]string{} // variable → value
+	switch mode {
+	case "gpu":
+		set["WEBKIT_DISABLE_DMABUF_RENDERER"] = "0"
+	case "gpu-cpu":
+		set["WEBKIT_DISABLE_DMABUF_RENDERER"] = "0"
+		set["WEBKIT_SKIA_ENABLE_CPU_RENDERING"] = "1"
+	case "legacy":
+		set["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
+	case "cpu":
+		set["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
+		set["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
+	default: // auto
+		if why := dmabufRendererRisky(); why != "" {
+			set["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
+			rendererState.Reason = why
+		} else {
+			rendererState.Reason = "nothing known to have trouble with it"
+		}
+	}
+	var byHand []string
+	for _, k := range []string{"WEBKIT_DISABLE_DMABUF_RENDERER", "WEBKIT_DISABLE_COMPOSITING_MODE", "WEBKIT_SKIA_ENABLE_CPU_RENDERING"} {
+		if v, ok := os.LookupEnv(k); ok {
+			byHand = append(byHand, k+"="+v)
+		} else if v, ok := set[k]; ok {
+			os.Setenv(k, v)
+		}
+	}
+	rendererState.EnvSet = strings.Join(byHand, " ")
+
+	on := func(k string) bool { v := os.Getenv(k); return v != "" && v != "0" }
+	switch {
+	case on("WEBKIT_DISABLE_COMPOSITING_MODE"):
+		rendererState.Active = "without the graphics card (CPU only)"
+	case on("WEBKIT_DISABLE_DMABUF_RENDERER"):
+		rendererState.Active = "with the graphics card, WebKit's older way (no DMA-BUF)"
+	case on("WEBKIT_SKIA_ENABLE_CPU_RENDERING"):
+		rendererState.Active = "with the graphics card (DMA-BUF), the page painted by the CPU"
+	default:
+		rendererState.Active = "with the graphics card (DMA-BUF)"
+	}
+	msg := "webview: drawing " + rendererState.Active + " — mode " + mode
+	if mode == "auto" {
+		msg += " (" + rendererState.Reason + ")"
+	}
+	if len(byHand) > 0 {
+		msg += "; set by hand: " + rendererState.EnvSet
+	}
+	log.Printf("%s. Graphics: %s. Settings > Performance changes it.", msg, rendererState.GPUs)
+}
+
+// gpuVendors: the PCI vendor ids of the graphics cards the kernel drives
+// (0x8086 Intel, 0x1002 AMD, 0x10de NVIDIA, …), one per card.
+func gpuVendors() []string {
+	ents, _ := os.ReadDir("/sys/class/drm")
+	var out []string
+	for _, e := range ents {
+		n := e.Name()
+		if !strings.HasPrefix(n, "card") || strings.Contains(n, "-") {
+			continue // a connector (card0-eDP-1), not a card
+		}
+		b, err := os.ReadFile(filepath.Join("/sys/class/drm", n, "device", "vendor"))
+		if err == nil {
+			out = append(out, strings.ToLower(strings.TrimSpace(string(b))))
+		}
+	}
+	return out
+}
+
+func describeGPUs() string {
+	names := map[string]string{"0x8086": "Intel", "0x1002": "AMD", "0x10de": "NVIDIA", "0x1af4": "virtual (virtio)", "0x15ad": "VMware", "0x80ee": "VirtualBox", "0x1234": "QEMU", "0x1b36": "QEMU"}
+	var parts []string
+	for _, v := range gpuVendors() {
+		n := names[v]
+		if n == "" {
+			n = v
+		}
+		parts = append(parts, n)
+	}
+	if _, err := os.Stat("/proc/driver/nvidia/version"); err == nil {
+		parts = append(parts, "NVIDIA's own driver loaded")
+	}
+	if len(parts) == 0 {
+		return "none found"
+	}
+	return strings.Join(parts, ", ")
+}
+
 // dmabufRendererRisky: why WebKitGTK's DMA-BUF renderer shouldn't be used
-// here ("" if it's fine): NVIDIA's own driver, or a virtual machine.
+// here ("" if it's fine): NVIDIA's own driver drawing the window, or a
+// virtual machine.
+//
+// A laptop with both Intel (or AMD) graphics and an NVIDIA card (Optimus,
+// like a ThinkPad W540) draws the desktop — and so this window — on the
+// Intel chip unless told otherwise; the NVIDIA card only runs programs
+// sent to it. There the DMA-BUF renderer is fine (and without it the
+// window is drawn slowly), so NVIDIA's driver only counts when there's no
+// other graphics, or when this app was sent to the NVIDIA card.
 func dmabufRendererRisky() string {
 	if _, err := os.Stat("/proc/driver/nvidia/version"); err == nil {
-		return "NVIDIA's driver"
+		other := false
+		for _, v := range gpuVendors() {
+			other = other || v == "0x8086" || v == "0x1002"
+		}
+		offload := os.Getenv("__NV_PRIME_RENDER_OFFLOAD") == "1" || strings.EqualFold(os.Getenv("__GLX_VENDOR_LIBRARY_NAME"), "nvidia")
+		switch {
+		case !other:
+			return "NVIDIA's driver"
+		case offload:
+			return "NVIDIA's driver, and this app was started on the NVIDIA card"
+		}
 	}
 	for _, f := range []string{"/sys/class/dmi/id/sys_vendor", "/sys/class/dmi/id/product_name"} {
 		b, _ := os.ReadFile(f)

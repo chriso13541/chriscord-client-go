@@ -709,3 +709,15 @@ export function VideoSendCodec() {
 export function WatchScreen(arg1, arg2) {
   return window['go']['main']['App']['WatchScreen'](arg1, arg2);
 }
+
+export function GetRendererInfo() {
+  return window['go']['main']['App']['GetRendererInfo']();
+}
+
+export function RestartApp() {
+  return window['go']['main']['App']['RestartApp']();
+}
+
+export function SetRendererMode(arg1) {
+  return window['go']['main']['App']['SetRendererMode'](arg1);
+}

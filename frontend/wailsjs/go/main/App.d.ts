@@ -355,3 +355,9 @@ export function VideoConversionInfo():Promise<Record<string, any>>;
 export function VideoSendCodec():Promise<string>;
 
 export function WatchScreen(arg1:string,arg2:boolean):Promise<void>;
+
+export function GetRendererInfo():Promise<main.RendererInfo>;
+
+export function RestartApp():Promise<void>;
+
+export function SetRendererMode(arg1:string):Promise<void>;
