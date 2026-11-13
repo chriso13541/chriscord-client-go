@@ -188,7 +188,39 @@ func pickDevice(name string, wantInput bool) (*portaudio.DeviceInfo, error) {
 	if wantInput {
 		return portaudio.DefaultInputDevice()
 	}
-	return portaudio.DefaultOutputDevice()
+	d, err := portaudio.DefaultOutputDevice()
+	if a := analogOutput(d); a != nil {
+		return a, nil
+	}
+	return d, err
+}
+
+// analogOutput: without a sound server's device, PortAudio's "default"
+// output on Linux can be the first card it finds — often a graphics chip's
+// HDMI sound, with nothing plugged in, so calls are silent. If def is an
+// HDMI/DisplayPort output and the computer has a built-in (analog) one,
+// that's returned instead; nil otherwise.
+func analogOutput(def *portaudio.DeviceInfo) *portaudio.DeviceInfo {
+	if runtime.GOOS != "linux" || def == nil {
+		return nil
+	}
+	digital := func(n string) bool {
+		n = strings.ToLower(n)
+		return strings.Contains(n, "hdmi") || strings.Contains(n, "displayport")
+	}
+	if !digital(def.Name) {
+		return nil
+	}
+	devices, err := portaudio.Devices()
+	if err != nil {
+		return nil
+	}
+	for _, d := range devices {
+		if d.MaxOutputChannels > 0 && !digital(d.Name) && strings.Contains(strings.ToLower(d.Name), "analog") {
+			return d
+		}
+	}
+	return nil
 }
 
 // soundServerDevice: Linux's "pipewire" or "pulse" ALSA device (in that

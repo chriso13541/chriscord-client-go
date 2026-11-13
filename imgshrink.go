@@ -10,22 +10,26 @@ package main
 // kept — in memory, and in the cache folder so the next start doesn't
 // decode it again), it's a few tens of KB.
 //
-// Animated pictures (GIF, WebP, animated PNG) and anything Go can't read
-// are passed on as they are, as are pictures already small enough.
+// Animated GIFs are shrunk too (shrinkGIF), to half that size at most: a
+// big animated avatar — several MB, hundreds of frames — is redrawn every
+// frame in every place it's shown (the member list, each message), and on
+// a slow computer that alone can make a whole server crawl. Animated WebP
+// and PNG and anything Go can't read are passed on as they are, as are
+// pictures already small enough.
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"image"
+	"image/color"
 	"image/draw"
+	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
 	"sync"
-
-	_ "image/gif"
 )
 
 const (
@@ -52,14 +56,16 @@ func shrinkImage(data []byte, maxDim int) []byte {
 		return data
 	}
 	mime := pfpMime(data)
-	if mime != "image/png" && mime != "image/jpeg" {
+	if mime == "image/gif" {
+		maxDim = min(maxDim, max(256, maxDim/2)) // animated: costs per frame
+	} else if mime != "image/png" && mime != "image/jpeg" {
 		return data
 	}
 	if mime == "image/png" && bytes.Contains(data[:min(len(data), 4096)], []byte("acTL")) {
 		return data // animated PNG
 	}
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil || (cfg.Width <= maxDim && cfg.Height <= maxDim) {
+	if err != nil || (cfg.Width <= maxDim && cfg.Height <= maxDim) || cfg.Width*cfg.Height > 4096*4096 {
 		return data
 	}
 	key := sha256.Sum256(append(data[:0:0], data...))
@@ -77,17 +83,37 @@ func shrinkImage(data []byte, maxDim int) []byte {
 		return out
 	}
 
-	src, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
+	var out []byte
+	if mime == "image/gif" {
+		out = shrinkGIF(data, maxDim)
+	} else {
+		out = shrinkStill(data, mime, maxDim)
+	}
+	if out == nil || len(out) >= len(data) {
 		return data
 	}
-	b := src.Bounds()
-	w, h := b.Dx(), b.Dy()
-	if w >= h {
-		w, h = maxDim, max(1, h*maxDim/w)
-	} else {
-		w, h = max(1, w*maxDim/h), maxDim
+	shrinkRemember(key, out)
+	if os.MkdirAll(filepath.Dir(diskPath), 0700) == nil {
+		writeFileAtomic(diskPath, out, 0600)
 	}
+	return out
+}
+
+func fitIn(w, h, maxDim int) (int, int) {
+	if w >= h {
+		return maxDim, max(1, h*maxDim/w)
+	}
+	return max(1, w*maxDim/h), maxDim
+}
+
+// shrinkStill: a still PNG or JPEG at maxDim at most (nil: couldn't).
+func shrinkStill(data []byte, mime string, maxDim int) []byte {
+	src, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil
+	}
+	b := src.Bounds()
+	w, h := fitIn(b.Dx(), b.Dy(), maxDim)
 	rgba := image.NewRGBA(b)
 	draw.Draw(rgba, b, src, b.Min, draw.Src)
 	dst := shrinkRGBA(rgba, w, h)
@@ -98,15 +124,129 @@ func shrinkImage(data []byte, maxDim int) []byte {
 	} else {
 		err = (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, dst)
 	}
-	if err != nil || buf.Len() >= len(data) {
-		return data
+	if err != nil {
+		return nil
 	}
-	out := buf.Bytes()
-	shrinkRemember(key, out)
-	if os.MkdirAll(filepath.Dir(diskPath), 0700) == nil {
-		writeFileAtomic(diskPath, out, 0600)
+	return buf.Bytes()
+}
+
+// shrinkGIF: a GIF (animated or not) at maxDim at most (nil: couldn't).
+// Each frame is put together as it would be shown (GIFs draw each frame
+// over the last), shrunk, and stored whole. Frames faster than 25 a
+// second are merged: no one sees them on an avatar, and each costs.
+func shrinkGIF(data []byte, maxDim int) []byte {
+	g, err := gif.DecodeAll(bytes.NewReader(data))
+	if err != nil || len(g.Image) == 0 {
+		return nil
 	}
-	return out
+	W, H := g.Config.Width, g.Config.Height
+	if W <= 0 || H <= 0 {
+		b := g.Image[0].Bounds()
+		W, H = b.Max.X, b.Max.Y
+	}
+	w, h := fitIn(W, H, maxDim)
+	canvas := image.NewRGBA(image.Rect(0, 0, W, H))
+	var saved *image.RGBA
+	out := &gif.GIF{LoopCount: g.LoopCount, Config: image.Config{Width: w, Height: h}}
+	wait := 0 // hundredths of a second not yet given to an output frame
+	for i, fr := range g.Image {
+		disposal := byte(0)
+		if i < len(g.Disposal) {
+			disposal = g.Disposal[i]
+		}
+		delay := 10 // browsers show a frame of 0 or 1 for a tenth of a second
+		if i < len(g.Delay) && g.Delay[i] >= 2 {
+			delay = g.Delay[i]
+		}
+		if disposal == gif.DisposalPrevious {
+			saved = image.NewRGBA(canvas.Rect)
+			copy(saved.Pix, canvas.Pix)
+		}
+		fb := fr.Bounds().Intersect(canvas.Rect)
+		draw.Draw(canvas, fb, fr, fb.Min, draw.Over)
+
+		wait += delay
+		if wait >= 4 || i == len(g.Image)-1 {
+			out.Image = append(out.Image, toPaletted(shrinkRGBA(canvas, w, h), fr.Palette))
+			out.Delay = append(out.Delay, wait)
+			out.Disposal = append(out.Disposal, gif.DisposalBackground) // whole frames: no leftovers
+			wait = 0
+		}
+
+		switch disposal {
+		case gif.DisposalBackground:
+			draw.Draw(canvas, fb, image.Transparent, image.Point{}, draw.Src)
+		case gif.DisposalPrevious:
+			if saved != nil {
+				copy(canvas.Pix, saved.Pix)
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if gif.EncodeAll(&buf, out) != nil {
+		return nil
+	}
+	return buf.Bytes()
+}
+
+// toPaletted: img (premultiplied) in the colours of pal, plus see-through
+// where img mostly is.
+func toPaletted(img *image.RGBA, pal color.Palette) *image.Paletted {
+	p := make(color.Palette, 0, 256)
+	trans := -1
+	for _, c := range pal {
+		if _, _, _, a := c.RGBA(); a == 0 && trans < 0 {
+			trans = len(p)
+		}
+		p = append(p, c)
+	}
+	if len(p) == 0 {
+		p = append(p, color.Black, color.White)
+	}
+	if trans < 0 && len(p) < 256 {
+		trans = len(p)
+		p = append(p, color.RGBA{})
+	}
+	type rgb struct{ r, g, b int32 }
+	cols := make([]rgb, len(p))
+	for i, c := range p {
+		n := color.NRGBAModel.Convert(c).(color.NRGBA)
+		cols[i] = rgb{int32(n.R), int32(n.G), int32(n.B)}
+	}
+	var memo [1 << 15]int16 // nearest colour, by 5-bit r, g, b
+	for i := range memo {
+		memo[i] = -1
+	}
+	dst := image.NewPaletted(img.Rect, p)
+	for i, j := 0, 0; i < len(img.Pix); i, j = i+4, j+1 {
+		a := int32(img.Pix[i+3])
+		if a < 128 && trans >= 0 {
+			dst.Pix[j] = uint8(trans)
+			continue
+		}
+		if a == 0 {
+			a = 1
+		}
+		r := min(255, int32(img.Pix[i])*255/a)
+		g := min(255, int32(img.Pix[i+1])*255/a)
+		b := min(255, int32(img.Pix[i+2])*255/a)
+		k := r>>3<<10 | g>>3<<5 | b>>3
+		if memo[k] < 0 {
+			best, bestD := 0, int32(1<<30)
+			for n, c := range cols {
+				if n == trans {
+					continue
+				}
+				dr, dg, db := c.r-r, c.g-g, c.b-b
+				if d := 3*dr*dr + 4*dg*dg + 2*db*db; d < bestD {
+					best, bestD = n, d
+				}
+			}
+			memo[k] = int16(best)
+		}
+		dst.Pix[j] = uint8(memo[k])
+	}
+	return dst
 }
 
 func shrinkRemember(key [32]byte, out []byte) {
