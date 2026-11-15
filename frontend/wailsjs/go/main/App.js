@@ -721,3 +721,7 @@ export function RestartApp() {
 export function SetRendererMode(arg1) {
   return window['go']['main']['App']['SetRendererMode'](arg1);
 }
+
+export function ClipboardAttachments() {
+  return window['go']['main']['App']['ClipboardAttachments']();
+}

@@ -11,3 +11,7 @@ func linuxCustomTitlebar() bool    { return false }
 
 // childEnv: nil — programs Chriscord opens get its environment as is.
 func childEnv() []string { return nil }
+
+// readClipboardAttachments: Linux only (clipboard_linux.go); the web view
+// elsewhere hands pasted pictures and files to the page itself.
+func readClipboardAttachments() (ClipboardFiles, error) { return ClipboardFiles{}, nil }

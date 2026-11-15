@@ -2063,7 +2063,21 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .server-card .btn.autojoin-btn.on:hover { filter:brightness(1.1); }
 .server-card .autojoin-badge { display:inline-flex; align-items:center; gap:3px; margin-top:4px; padding:1px 7px 1px 4px; border-radius:999px; background:color-mix(in srgb, var(--accent) 18%, transparent); color:var(--accent); font-size:.68rem; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
 .server-card .autojoin-badge .ic { width:12px; height:12px; }
+/* Drop-down lists on Linux. WebKitGTK draws <select> with its own light,
+   GTK-looking box whatever the page's colours say (grey text on a light
+   grey box), so there it's drawn by the app instead: the app's colours and
+   a chevron. The list that opens is GTK's menu, in GTK's dark theme. The
+   background-image etc. are !important because many selects set the
+   `background` shorthand, which would otherwise take the chevron away. */
+html.linux select { -webkit-appearance:none; appearance:none; background-color:var(--bg-mid); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 10px; font:inherit; font-size:.88rem; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%239aa0ad' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat:no-repeat !important; background-position:right 11px center !important; background-size:11px 8px !important; padding-right:32px !important; }
+html.linux select:hover:not(:disabled) { border-color:var(--text-muted); }
+html.linux select:focus { outline:none; border-color:var(--accent); }
+html.linux select:disabled { opacity:.55; cursor:default; }
+html.linux select option { background-color:var(--bg-mid); color:var(--text); }
 </style>
+<script>if(/Linux/.test(navigator.userAgent)&&!/Android/.test(navigator.userAgent))document.documentElement.classList.add('linux');</script>
 </head>
 <body>
 <!-- The window's title bar, drawn in the app's theme (see main.go). -->
@@ -3360,9 +3374,18 @@ function closeDownloadsPop(){
 }
 function placeDownloadsPop(){
   const pop=dlPop(),btn=document.getElementById('downloads-btn');
-  const r=btn.getBoundingClientRect(),w=pop.offsetWidth;
-  pop.style.top=Math.round(r.bottom+6)+'px';
-  pop.style.left=Math.round(Math.max(8,Math.min(window.innerWidth-w-8,r.right-w)))+'px';
+  placeBelowRight(pop,btn.getBoundingClientRect());
+}
+// placeBelowRight puts a fixed pop-up under r (a button's rectangle), its
+// right edge lined up with r's, kept inside the window. r and the window's
+// size are in screen pixels but left/top are in the zoomed page's CSS
+// pixels (see uiScale): mixing them up put pop-ups partly off the window's
+// right edge whenever the zoom wasn't 100%.
+function placeBelowRight(pop,r){
+  const z=uiScale(),w=pop.getBoundingClientRect().width;
+  const x=Math.max(8,Math.min(innerWidth-w-8,r.right-w));
+  pop.style.top=Math.round(r.bottom+6)/z+'px';
+  pop.style.left=Math.round(x)/z+'px';
 }
 function renderDownloadsPop(){
   const pop=dlPop();
@@ -7359,11 +7382,33 @@ function acceptPasteOffer(){
   const o=pasteOffer;hidePasteOffer();
   if(!o)return;
   const input=document.getElementById('msg-input');
-  // Take the pasted text back out of the box (if it's still there as pasted).
-  const at=input.value.substr(o.start,o.text.length)===o.text?o.start:input.value.indexOf(o.text);
-  if(at>=0){input.value=input.value.slice(0,at)+input.value.slice(at+o.text.length);autoResize(input);renderComposerHighlight();input.setSelectionRange(at,at);}
+  // Take the pasted text back out of the box: where it was pasted, or
+  // anywhere — and if the box changed it a little on the way in (line
+  // breaks, invisible characters, spaces), matching it loosely. Only the
+  // file is sent: what's left is whatever else you'd typed, if anything.
+  const v=input.value;
+  let at=v.substr(o.start,o.text.length)===o.text?o.start:v.indexOf(o.text),end=at+o.text.length;
+  if(at<0)[at,end]=findLoose(v,o.text);
+  if(at>=0){
+    let rest=v.slice(0,at)+v.slice(end);
+    if(!rest.trim()){rest='';at=0;}
+    input.value=rest;autoResize(input);renderComposerHighlight();input.setSelectionRange(at,at);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+  }
   input.focus();
   queueBlobs([new File([o.text],'message.txt',{type:'text/plain'})]);
+}
+// findLoose: where needle is in hay ignoring white space and invisible
+// characters — [start, end] in hay, or [-1, -1].
+function findLoose(hay,needle){
+  const skip=/[\s\u0000-\u001f\u007f\u00a0\u200b-\u200d\u2028\u2029\ufeff]/;
+  const n=[...needle].filter(c=>!skip.test(c)).join('');
+  if(!n)return [-1,-1];
+  let h='';const pos=[]; // pos[i]: where h[i] is in hay
+  for(let i=0;i<hay.length;i++){if(!skip.test(hay[i])){h+=hay[i];pos.push(i);}}
+  const k=h.indexOf(n);
+  if(k<0)return [-1,-1];
+  return [pos[k],pos[k+n.length-1]+1];
 }
 function initPasteOffer(){
   const el=document.getElementById('paste-offer');
@@ -7378,10 +7423,58 @@ function initPasteOffer(){
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!ov.classList.contains('hidden')){e.stopImmediatePropagation();closeTextViewer();}},true);
 }
 
+// Linux: the web view's paste event only ever carries text — a copied
+// picture or a file copied in the file manager never arrives as a file. So
+// a paste with no text (or only file paths) asks the app, which reads the
+// clipboard itself (clipboard_linux.go).
+function linuxPasteWanted(e){
+  if(!IS_LINUX)return false;
+  if([...(e.clipboardData?.items||[])].some(it=>it.kind==='file'))return false;
+  const t=(e.clipboardData?.getData('text/plain')||'').trim();
+  return !t||t.split(/\n/).every(l=>/^(file:\/\/|\/)/.test(l.trim()));
+}
+// → {paths, files} (copied files' paths, or a copied picture as a File),
+// or null if there's nothing to attach.
+async function linuxClipboardAttachments(){
+  try{
+    const r=await window.go.main.App.ClipboardAttachments();
+    if(r?.paths?.length)return {paths:r.paths,files:[]};
+    if(r?.data){
+      const bin=atob(r.data),u=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+      const ext=(r.mime||'image/png').split('/')[1].replace('jpeg','jpg');
+      return {paths:[],files:[new File([u],`image.${ext}`,{type:r.mime||'image/png'})]};
+    }
+  }catch(err){console.warn('paste: couldn\u2019t read the clipboard',err);}
+  return null;
+}
+// What a Linux paste that turned out to have nothing to attach would have
+// pasted: its text, put in where the cursor is (undo still works).
+function pasteTextInstead(target,text){
+  if(!text||!target?.closest?.('input,textarea,[contenteditable="true"]'))return;
+  target.focus();
+  if(!document.execCommand('insertText',false,text)&&'selectionStart' in target){
+    const a=target.selectionStart,z=target.selectionEnd;
+    target.value=target.value.slice(0,a)+text+target.value.slice(z);
+    target.selectionStart=target.selectionEnd=a+text.length;
+    target.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+}
+
 // Ctrl+V / Paste in the message box: files on the clipboard become
 // attachments; plain text pastes as normal.
 function initPasteAttachments(){
   document.getElementById('msg-input').addEventListener('paste',e=>{
+    if(linuxPasteWanted(e)){
+      e.preventDefault();
+      const target=e.target,text=(e.clipboardData?.getData('text/plain')||'').replace(/\r\n?/g,'\n');
+      linuxClipboardAttachments().then(got=>{
+        if(!got){pasteTextInstead(target,text);return;}
+        if(document.getElementById('attach-btn').disabled){toast('Open a channel to attach files',true);return;}
+        if(got.paths.length)queueFiles(got.paths);else queueBlobs(got.files);
+      });
+      return;
+    }
     const files=[...(e.clipboardData?.items||[])].filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean);
     if(!files.length){ // just text — it pastes normally; a long one is offered as a file
       const text=(e.clipboardData?.getData('text/plain')||'').replace(/\r\n?/g,'\n');
@@ -9629,9 +9722,9 @@ function toggleNoisePop(){
   renderNoiseSuppression();
   pop.classList.remove('hidden');
   // Above the button, kept on screen.
-  const r=btn.getBoundingClientRect(),w=pop.offsetWidth,h=pop.offsetHeight;
-  pop.style.left=Math.max(8,Math.min(window.innerWidth-w-8,r.left+r.width/2-w/2))+'px';
-  pop.style.top=Math.max(8,r.top-h-8)+'px';
+  const z=uiScale(),r=btn.getBoundingClientRect(),pr=pop.getBoundingClientRect(),w=pr.width,h=pr.height;
+  pop.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2))/z+'px';
+  pop.style.top=Math.max(8,r.top-h-8)/z+'px';
 }
 function initNoiseSuppressionUI(){
   // Left click switches it on or off; right click opens the panel about it.
@@ -10340,6 +10433,15 @@ function initExpressionDrop(){
   // when you're not typing in a box) is added. Plain text pastes normally.
   document.addEventListener('paste',e=>{
     const kind=exprDropKind();if(!kind)return;
+    if(linuxPasteWanted(e)){ // (see linuxPasteWanted)
+      e.preventDefault();e.stopPropagation();
+      const target=e.target,text=e.clipboardData?.getData('text/plain')||'';
+      linuxClipboardAttachments().then(got=>{
+        if(!got){pasteTextInstead(target,text);return;}
+        if(got.paths.length)addExpressionPaths(kind,got.paths);else addExpressionBlobs(kind,got.files);
+      });
+      return;
+    }
     const blobs=[...(e.clipboardData?.items||[])].filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean);
     let url='';
     if(!blobs.length&&!e.target.closest?.('input,textarea')){
@@ -14180,9 +14282,7 @@ function closePluginPop(){
 function placePluginPop(pop){
   const a=plug.anchor&&document.body.contains(plug.anchor)?plug.anchor:document.querySelector('#plugin-bar .pb-tray');
   if(!a)return;
-  const r=a.getBoundingClientRect(),w=pop.offsetWidth;
-  pop.style.top=Math.round(r.bottom+6)+'px';
-  pop.style.left=Math.round(Math.max(8,Math.min(window.innerWidth-w-8,r.right-w)))+'px';
+  placeBelowRight(pop,a.getBoundingClientRect());
 }
 function renderPluginPop(){
   const pop=document.getElementById('plugin-pop');

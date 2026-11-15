@@ -361,3 +361,5 @@ export function GetRendererInfo():Promise<main.RendererInfo>;
 export function RestartApp():Promise<void>;
 
 export function SetRendererMode(arg1:string):Promise<void>;
+
+export function ClipboardAttachments():Promise<main.ClipboardFiles>;
