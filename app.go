@@ -88,6 +88,7 @@ func (a *App) startup(ctx context.Context) {
 	a.startUpdateWatcher()
 	go a.placeWindowAtStart()
 	a.startGameWatcher()
+	startOpenedSweeper() // decrypted copies opened in other apps (openfile.go)
 }
 
 // onSecondInstanceLaunch runs when Chriscord is started while it's already
@@ -817,6 +818,7 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 		Nickname       string `json:"nickname"`
 		GlobalNickname string `json:"global_nickname"`
 		HasBanner   bool   `json:"has_banner"`
+		UpdatedAt   int64  `json:"updated_at"`
 		MemberSince string `json:"member_since"`
 		Imported    *ImportedProfile `json:"imported"`
 	}
@@ -828,7 +830,15 @@ func (a *App) FetchUserProfile(username string) (*UserProfile, error) {
 		p.Tint = strings.ToLower(raw.Tint)
 	}
 	if raw.HasBanner {
-		if data, err := a.fetchAuthed("/api/banner/" + url.PathEscape(username)); err == nil && len(data) > 0 {
+		fetch := func() ([]byte, error) { return a.fetchAuthed("/api/banner/" + url.PathEscape(username)) }
+		var data []byte
+		var err error
+		if e, known, supported := a.pfpLookup(username); supported && known && raw.UpdatedAt > 0 {
+			data, err = cachedImage("banner", e.id, raw.UpdatedAt, fetch) // pfpcache.go
+		} else {
+			data, err = fetch()
+		}
+		if err == nil && len(data) > 0 {
 			p.Banner = sizedDataURL(data, bannerMaxDim)
 		}
 	}
@@ -901,8 +911,21 @@ func (a *App) FetchUserPfpFull(username string) (string, error) {
 	return pfpDataURL(data), nil
 }
 
-// fetchUserPfpBytes: their picture as stored, or nil if they have none.
+// fetchUserPfpBytes: their picture as stored, or nil if they have none —
+// from the disk cache when this version is there (pfpcache.go).
 func (a *App) fetchUserPfpBytes(username string) ([]byte, error) {
+	e, known, supported := a.pfpLookup(username)
+	if !supported {
+		return a.fetchUserPfpNet(username) // an older server: no index
+	}
+	if !known || e.pfp == 0 {
+		return nil, nil // no picture
+	}
+	return cachedImage("pfp", e.id, e.pfp, func() ([]byte, error) { return a.fetchUserPfpNet(username) })
+}
+
+// fetchUserPfpNet downloads their picture from the server.
+func (a *App) fetchUserPfpNet(username string) ([]byte, error) {
 	a.mu.Lock()
 	domain, token := a.domain, a.token
 	a.mu.Unlock()
@@ -1105,7 +1128,15 @@ func (a *App) connect(domain, serverKey, invite string) error {
 	go a.laneClient().begin() // plugin lanes (lanes_app.go)
 	a.sendPfpInfo(a.account.PfpUpdatedAt)
 	a.sendProfileInfo(a.account.ProfileUpdatedAt)
+	pfpIndexStale() // pictures may have changed while not connected (pfpcache.go)
 	return nil
+}
+
+// currentDomain is the server this app is connected to ("" if none).
+func (a *App) currentDomain() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.domain
 }
 
 type serverMsg struct {
@@ -1297,6 +1328,7 @@ func (a *App) hangUpAndClose(conn *websocket.Conn) {
 // (one copy at a time) and seem to close at once, and "Restart to update"
 // would wait for it forever.
 func (a *App) shutdown(ctx context.Context) {
+	sweepOpened(0) // decrypted copies opened in other apps (openfile.go)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -1458,10 +1490,12 @@ func (a *App) wsReader(conn *websocket.Conn) {
 		case "pfp_request":
 			a.handlePfpRequest()
 		case "pfp_updated":
+			pfpIndexSaw(a.currentDomain(), msg.Username, msg.PfpUpdatedAt, false) // before the page asks again
 			runtime.EventsEmit(a.ctx, "pfp:updated", pfpUpdatedEvent{Username: msg.Username})
 		case "profile_request":
 			a.handleProfileRequest()
 		case "profile_updated":
+			pfpIndexSaw(a.currentDomain(), msg.Username, msg.PfpUpdatedAt, true)
 			runtime.EventsEmit(a.ctx, "profile:updated", pfpUpdatedEvent{Username: msg.Username})
 		}
 	}

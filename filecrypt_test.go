@@ -23,12 +23,12 @@ func encryptedBlob(t *testing.T, plain []byte) ([]byte, *fileEntry) {
 		t.Fatal(err)
 	}
 	var buf bytes.Buffer
-	n, err := encryptFile(&buf, bytes.NewReader(plain), aead)
+	n, err := encryptFile(&buf, bytes.NewReader(plain), aead, 0)
 	if err != nil || n != int64(len(plain)) {
 		t.Fatalf("encrypt: %v (%d of %d)", err, n, len(plain))
 	}
-	if int64(buf.Len()) != fileCipherSize(int64(len(plain))) {
-		t.Fatalf("size %d, expected %d", buf.Len(), fileCipherSize(int64(len(plain))))
+	if want := paddedCipherSize(int64(len(plain)), 0); int64(buf.Len()) != want {
+		t.Fatalf("size %d, expected %d (padded)", buf.Len(), want)
 	}
 	return buf.Bytes(), &fileEntry{meta: fileMeta{URL: "/api/files/x.e2ee", Size: int64(len(plain)), Mime: "video/mp4"}, aead: aead}
 }
@@ -371,5 +371,40 @@ func TestMissingAttachmentShown(t *testing.T) {
 	}
 	if got := len(a.text.msgFiles["m1"]); got != 2 {
 		t.Errorf("kept for edits: %d", got)
+	}
+}
+
+// Padding: blobs round up to Padmé lengths, never by more than ~12%, many
+// different sizes share each length, and it stays under the server's limit.
+func TestFilePadding(t *testing.T) {
+	for _, l := range []int64{1, 4096, 4097, 10_000, 65_559, 1 << 20, 5_000_003, 1<<30 + 7} {
+		p := padmeLen(l)
+		if p < l || float64(p) > float64(max(l, filePadMin))*1.12 {
+			t.Errorf("padmeLen(%d) = %d", l, p)
+		}
+	}
+	// Sizes close together look the same.
+	if padmeLen(5_000_003) != padmeLen(5_000_100) {
+		t.Error("nearby sizes give different lengths")
+	}
+	// The limit caps it, but a blob is never cut below its real size.
+	if got := paddedCipherSize(1<<20, fileCipherSize(1<<20)+10); got != fileCipherSize(1<<20)+10 {
+		t.Errorf("not capped at the limit: %d", got)
+	}
+	if got := paddedCipherSize(1<<20, 100); got != fileCipherSize(1<<20) {
+		t.Errorf("cut below the blob: %d", got)
+	}
+	// Padding is random (nothing marks where the file ends), and an older
+	// reader — which reads exactly the chunks the size says — doesn't see it.
+	plain := make([]byte, 3*fileChunk+5)
+	rand.Read(plain)
+	blob, e := encryptedBlob(t, plain)
+	tail := blob[fileCipherSize(int64(len(plain))):]
+	if len(tail) == 0 || bytes.Count(tail, []byte{0}) > len(tail)/32+8 {
+		t.Fatalf("padding missing or not random (%d bytes)", len(tail))
+	}
+	var out bytes.Buffer
+	if err := decryptChunks(&out, bytes.NewReader(blob[fileHeaderLen:]), e.aead, int64(len(plain)), 0, fileChunks(int64(len(plain)))-1, 0, int64(len(plain))-1); err != nil || !bytes.Equal(out.Bytes(), plain) {
+		t.Fatalf("padded file didn't read back: %v", err)
 	}
 }

@@ -6,7 +6,11 @@ package main
 // before it's uploaded, in 64 KB chunks: each chunk is sealed on its own
 // (ChaCha20-Poly1305, nonce = its position, plus a flag on the last one so
 // a file can't be cut short unnoticed). The server stores a nameless blob
-// ("<uuid>.e2ee") and only ever learns its size.
+// ("<uuid>.e2ee") and only ever learns its size — and not even that
+// exactly: random bytes after the last chunk pad the blob to a Padmé
+// length (padmeLen), so it can't recognise a known file by its size.
+// Readers never look past the last chunk (they work from the real size,
+// inside the message), so padded files open in older apps too.
 //
 // What the file really is — its name, type, size and key — travels inside
 // the message's encrypted content (textPlain.A). The message's plain
@@ -32,6 +36,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/bits"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -89,6 +94,35 @@ func fileCipherSize(size int64) int64 {
 	return fileHeaderLen + size + chacha20poly1305.Overhead*fileChunks(size)
 }
 
+// filePadMin: no blob is smaller than this (tiny files all look alike).
+const filePadMin = 4 << 10
+
+// padmeLen rounds a blob's length up the Padmé way (Nikitin et al., "Reducing
+// Metadata Leakage from Encrypted Files and Communication with PURBs",
+// PETS 2019): only about log2(log2(L)) of its bits are left showing, for at
+// most ~12% more bytes (under 2% from 1 MB up).
+func padmeLen(l int64) int64 {
+	if l <= filePadMin {
+		return filePadMin
+	}
+	e := bits.Len64(uint64(l)) - 1 // floor(log2 L)
+	s := bits.Len64(uint64(e))     // floor(log2 E) + 1
+	mask := int64(1)<<(e-s) - 1
+	return (l + mask) &^ mask
+}
+
+// paddedCipherSize is how big a size-byte file's blob is with its padding,
+// kept to at most maxLen (the server's upload limit; 0 = none) — but never
+// below the blob itself.
+func paddedCipherSize(size, maxLen int64) int64 {
+	have := fileCipherSize(size)
+	want := padmeLen(have)
+	if maxLen > 0 && want > maxLen {
+		want = max(have, maxLen)
+	}
+	return want
+}
+
 func chunkNonce(i int64, last bool) []byte {
 	n := make([]byte, chacha20poly1305.NonceSize)
 	binary.BigEndian.PutUint64(n[:8], uint64(i))
@@ -106,9 +140,10 @@ func chunkPlainLen(size, i int64) int64 {
 	return fileChunk
 }
 
-// encryptFile writes src to dst encrypted under aead; returns the
+// encryptFile writes src to dst encrypted under aead, then its padding
+// (random bytes, see paddedCipherSize; maxLen 0 = no limit); returns the
 // plaintext size.
-func encryptFile(dst io.Writer, src io.Reader, aead cipher.AEAD) (int64, error) {
+func encryptFile(dst io.Writer, src io.Reader, aead cipher.AEAD, maxLen int64) (int64, error) {
 	if _, err := dst.Write(fileMagic[:]); err != nil {
 		return 0, err
 	}
@@ -135,6 +170,12 @@ func encryptFile(dst io.Writer, src io.Reader, aead cipher.AEAD) (int64, error) 
 		}
 		total += int64(n)
 		if last {
+			// Random, so nothing shows where the file ends and padding begins.
+			if pad := paddedCipherSize(total, maxLen) - fileCipherSize(total); pad > 0 {
+				if _, err := io.CopyN(dst, rand.Reader, pad); err != nil {
+					return 0, err
+				}
+			}
 			return total, nil
 		}
 		cur, next, n = next, cur, m
@@ -325,6 +366,7 @@ func (t *textCrypto) sealEdit(msgID, text string) (string, error) {
 // uploadEncrypted encrypts src while uploading it, and returns the result as
 // the page sees it: the file's local address, real name and type.
 func (a *App) uploadEncrypted(domain, token, filename string, src io.Reader) (*UploadResult, error) {
+	padLimit, _ := a.uploadLimit() // padding never takes a file over it (0: no limit)
 	key, aead, err := newFileKey()
 	if err != nil {
 		return nil, err
@@ -338,7 +380,7 @@ func (a *App) uploadEncrypted(domain, token, filename string, src io.Reader) (*U
 			pw.CloseWithError(err)
 			return
 		}
-		n, err := encryptFile(fw, src, aead)
+		n, err := encryptFile(fw, src, aead, padLimit)
 		if err != nil {
 			pw.CloseWithError(err)
 			return

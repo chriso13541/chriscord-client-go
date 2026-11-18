@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,12 +23,19 @@ import (
 // on this computer; the server never converts anything.
 //
 // While it downloads it emits "file:open-progress" {path, done, total}.
+//
+// The copy is decrypted, so it's kept where only you can read it (your own
+// cache folder, not the shared temp folder, and readable only by you) and
+// doesn't outlive its use: copies older than openedKeep are swept while the
+// app runs, and all of them when it starts and when it closes. (A copy the
+// other app still holds open may survive until the next start — Windows
+// won't delete a file that's in use.)
 func (a *App) OpenAttachmentExternally(path, name string) error {
 	link, err := a.GetFileLink(path)
 	if err != nil {
 		return err
 	}
-	dir := filepath.Join(os.TempDir(), "chriscord-open")
+	dir := openedDir()
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
@@ -46,7 +54,7 @@ func (a *App) OpenAttachmentExternally(path, name string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
 	}
-	f, err := os.Create(dest + ".part")
+	f, err := os.OpenFile(dest+".part", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -83,6 +91,63 @@ func (a *App) OpenAttachmentExternally(path, name string) error {
 	}
 	runtime.EventsEmit(a.ctx, "file:open-progress", map[string]interface{}{"path": path, "done": done, "total": done})
 	return openWithDefaultApp(dest)
+}
+
+const (
+	openedKeep  = 3 * time.Hour    // a decrypted copy older than this is deleted while the app runs
+	openedSweep = 30 * time.Minute // how often that's checked
+)
+
+// openedDir is where decrypted copies for other apps go: inside your own
+// cache folder (on Linux not /tmp, which every user shares).
+func openedDir() string {
+	if base, err := os.UserCacheDir(); err == nil {
+		return filepath.Join(base, "chriscord", "open")
+	}
+	return filepath.Join(chriscordConfigDir(), "open")
+}
+
+// sweepOpened deletes decrypted copies older than age (0: all of them).
+// Files another app has locked (Windows) are left for next time.
+func sweepOpened(age time.Duration) {
+	dir := openedDir()
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	n := 0
+	for _, e := range ents {
+		info, err := e.Info()
+		if err != nil || (age > 0 && time.Since(info.ModTime()) < age) {
+			continue
+		}
+		p := filepath.Join(dir, e.Name())
+		if e.IsDir() {
+			err = os.RemoveAll(p)
+		} else {
+			err = os.Remove(p)
+		}
+		if err == nil {
+			n++
+		}
+	}
+	if n > 0 {
+		log.Printf("open: deleted %d decrypted cop%s opened in other apps", n, map[bool]string{true: "y", false: "ies"}[n == 1])
+	}
+}
+
+// startOpenedSweeper clears what earlier runs left — including the old
+// shared location, os.TempDir()/chriscord-open — and keeps sweeping.
+func startOpenedSweeper() {
+	go func() {
+		os.RemoveAll(filepath.Join(os.TempDir(), "chriscord-open"))
+		sweepOpened(0)
+		t := time.NewTicker(openedSweep)
+		defer t.Stop()
+		for range t.C {
+			sweepOpened(openedKeep)
+		}
+	}()
 }
 
 func openWithDefaultApp(file string) error {
