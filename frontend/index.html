@@ -514,8 +514,13 @@ html.ring-fade .voice-occupant-avatar::after { transition:opacity .28s ease; }
    the picture, and grow mode spaces the list out to 8px between pictures,
    so two people talking at once never touch. */
 html.ring-grow .voice-occupant-row { isolation:isolate; padding-top:4px; padding-bottom:4px; }
-html.ring-grow .voice-occupant-avatar::after { z-index:-1; inset:-2px; background:var(--green); box-shadow:none; transform:scale(.3); transition:transform .14s ease-out, opacity .2s ease; will-change:transform,opacity; }
-html.ring-grow .voice-occupant-avatar.speaking::after { transform:scale(calc(1 + var(--lvl,.3) * .08)); }
+/* Its size is animated through its inset (equal on all four sides) rather
+   than with a scale transform: a transformed layer is drawn on its own and
+   lined up to whole pixels separately from the picture, which left it a
+   pixel off-centre at most zoom levels. Laid out like the picture, it
+   rounds the same way, so it stays centred. */
+html.ring-grow .voice-occupant-avatar::after { z-index:-1; background:var(--green); box-shadow:none; will-change:auto; inset:6px; transition:inset .14s ease-out, opacity .2s ease; }
+html.ring-grow .voice-occupant-avatar.speaking::after { inset:calc(-2px - var(--lvl,.3) * 1px); }
 html.ring-fade .vs-tile { transition:outline-color .28s ease; }
 html.ring-instant .vs-tile { transition:none; }
 html.ring-grow .vs-tile { transition:outline-color .2s ease, outline-width .14s ease-out; }
