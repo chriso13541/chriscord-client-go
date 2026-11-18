@@ -503,6 +503,17 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
 .voice-occupant-avatar { position:relative; }
 .voice-occupant-avatar::after { content:''; position:absolute; inset:-2px; border-radius:50%; box-shadow:inset 0 0 0 2px var(--green); opacity:0; pointer-events:none; will-change:opacity; }
 .voice-occupant-avatar.speaking::after { opacity:1; }
+/* How the ring comes and goes (Settings > Appearance > Speaking ring; a
+   class on <html>): straight on and off (above), fading, or growing out
+   from the middle of the picture — and, while someone talks, a little
+   bigger the louder they are (--lvl, 0–1, set from the app's "voice:levels"). */
+html.ring-fade .voice-occupant-avatar::after { transition:opacity .28s ease; }
+html.ring-grow .voice-occupant-avatar::after { transform:scale(.35); transition:transform .14s ease-out, opacity .2s ease; will-change:transform,opacity; }
+html.ring-grow .voice-occupant-avatar.speaking::after { transform:scale(calc(1 + var(--lvl,.4) * .22)); }
+html.ring-fade .vs-tile { transition:outline-color .28s ease; }
+html.ring-instant .vs-tile { transition:none; }
+html.ring-grow .vs-tile { transition:outline-color .2s ease, outline-width .14s ease-out; }
+html.ring-grow .vs-tile.speaking { outline-width:calc(2px + var(--lvl,.4) * 4px); }
 .voice-occupant-status { margin-left:auto; display:flex; gap:2px; flex-shrink:0; color:var(--text-muted); }
 .voice-occupant-status .ic { width:16px; height:16px; }
 .voice-occupant-status .ic.off { color:var(--red); }
@@ -1746,7 +1757,7 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .settings-label { display:block; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); margin:18px 0 6px; }
 .settings-label:first-of-type { margin-top:0; }
 .ss-view-row { display:flex; gap:12px; } .ss-view-row > div { flex:1; } .ss-view-row.off { opacity:.5; pointer-events:none; }
-#ss-view-res, #ss-view-fps, #settings-mic-select, #settings-speaker-select, #pf-render-mode { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
+#ss-view-res, #ss-view-fps, #settings-mic-select, #settings-speaker-select, #pf-render-mode, #ap-ring { width:100%; padding:9px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg-mid); color:var(--text); font-size:.88rem; }
 .settings-hint { margin-top:20px; font-size:.8rem; color:var(--text-muted); line-height:1.5; }
 #pfp-current-display { display:flex; align-items:center; gap:16px; margin-bottom:8px; }
 #pfp-current-circle { width:80px; height:80px; border-radius:50%; background-size:cover; background-position:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:700; color:#fff; }
@@ -1837,6 +1848,16 @@ body.custom-titlebar .modal-overlay, body.custom-titlebar #lightbox, body.custom
 .ctx-item.ctx-suggest:hover .ctx-label { color:#fff; }
 #msg-hl .hl-mention { background:rgba(114,137,218,.3); border-radius:3px; box-shadow:0 0 0 2px rgba(114,137,218,.3); }
 #msg-input::placeholder { color:var(--text-muted); }
+/* In WebKit (macOS, Linux) the placeholder ("Message #general") is drawn
+   by the app instead, in #msg-hl behind the box: WebKit draws its own in a
+   box exactly one line tall that clips anything past it, so at some zoom
+   levels the bottom of a g or y was cut off, whatever room the text box
+   had. This one has the box's whole height (and the same font, size and
+   padding, so it sits where the real one did). Shown while the box is
+   empty (.empty, set by renderComposerHighlight). */
+html.wk #msg-input::placeholder { color:transparent; }
+html.wk #composer-field.empty #msg-hl::before { content:attr(data-placeholder); display:block; color:var(--text-muted);
+  white-space:pre; overflow:hidden; text-overflow:ellipsis; padding-bottom:6px; margin-bottom:-6px; }
 #send-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.3rem; padding:4px 2px; transition:color .15s; line-height:1; flex-shrink:0; }
 #send-btn:hover { color:var(--accent); }
 #send-btn:disabled { opacity:.3; cursor:default; }
@@ -2754,6 +2775,15 @@ html.linux select option { background-color:var(--bg-mid); color:var(--text); }
         <p class="settings-hint" style="margin-top:0">Misspelled words get a red underline in the message box; right-click one for suggestions or to add it to your dictionary.</p>
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-previews"> Make link previews for links I send</label>
         <p class="settings-hint" style="margin-top:0">Your app fetches the page when you send a link and puts its title and picture inside your encrypted message — the server never sees the link. The site sees your connection, as if you'd opened it. Off: links are sent without a preview.</p>
+      </div>
+      <div class="ap-override">
+        <label class="settings-label" for="ap-ring">Speaking ring</label>
+        <select id="ap-ring">
+          <option value="instant">On / off</option>
+          <option value="fade">Fade</option>
+          <option value="grow">Grow</option>
+        </select>
+        <p class="settings-hint" style="margin-top:4px">The green ring around someone in a call while they're talking. <b>On / off</b> shows and hides it at once; <b>Fade</b> fades it in and out; <b>Grow</b> grows it out from the middle of their picture and back, and while they talk it gets a little bigger the louder they are.</p>
       </div>
       <div class="ap-override">
         <label class="check-row" style="margin-bottom:4px"><input type="checkbox" id="ap-elastic"> Elastic scrolling</label>
@@ -12494,7 +12524,7 @@ function initPresence(){
 // locally, so they travel in the exported account key. On sign-in the
 // account's copy wins — that's how an imported account brings its look.
 function collectClientSettings(){
-  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,sounds:soundSettings,spellcheck:spellOn,spellWords,videoConvert:videoConvertOn,performance:perfSettings,linkPreviews:previewsOn};
+  return {v:1,appearance,appearanceOverride,elasticScroll:elasticOn,ringStyle,sounds:soundSettings,spellcheck:spellOn,spellWords,videoConvert:videoConvertOn,performance:perfSettings,linkPreviews:previewsOn};
 }
 async function persistClientSettings(){
   try{await window.go.main.App.SaveClientSettings(JSON.stringify(collectClientSettings()));}
@@ -12513,6 +12543,7 @@ async function loadClientSettings(){
   if(typeof s.spellcheck==='boolean'){spellOn=s.spellcheck;localStorage.setItem('spellcheck',spellOn?'1':'0');const b=document.getElementById('ap-spell');if(b)b.checked=spellOn;if(spellOn)startSpellcheck();}
   if(typeof s.linkPreviews==='boolean'){previewsOn=s.linkPreviews;localStorage.setItem('linkPreviews',previewsOn?'1':'0');const b=document.getElementById('ap-previews');if(b)b.checked=previewsOn;window.go.main.App.SetLinkPreviews(previewsOn).catch(()=>{});}
   if(Array.isArray(s.spellWords)){spellWords=s.spellWords.filter(w=>typeof w==='string');localStorage.setItem('spellWords',JSON.stringify(spellWords));spellWorker?.postMessage({type:'setCustom',words:spellWords});}
+  if(['instant','fade','grow'].includes(s.ringStyle)){ringStyle=s.ringStyle;localStorage.setItem('ringStyle',ringStyle);applyRingStyle();}
   if(typeof s.elasticScroll==='boolean'){elasticOn=s.elasticScroll;localStorage.setItem('elasticScroll',elasticOn?'1':'0');const b=document.getElementById('ap-elastic');if(b)b.checked=elasticOn;}
   apDraft={...appearance};
   applyAppearance();
@@ -12771,6 +12802,32 @@ function attachElastic(el){
     el.style.transform=`translateY(${off}px)`;
     clearTimeout(timer);timer=setTimeout(release,110);
   },{passive:true});
+}
+// The speaking ring's style (Settings > Appearance). "grow" also wants how
+// loud each voice is, which the app sends only while it's chosen.
+let ringStyle=['instant','fade','grow'].includes(localStorage.getItem('ringStyle'))?localStorage.getItem('ringStyle'):'fade';
+function applyRingStyle(){
+  const h=document.documentElement;
+  for(const k of ['instant','fade','grow'])h.classList.toggle('ring-'+k,ringStyle===k);
+  const sel=document.getElementById('ap-ring');if(sel)sel.value=ringStyle;
+  window.go?.main?.App?.SetRingLevels?.(ringStyle==='grow').catch(()=>{});
+}
+// "voice:levels": dB by username → --lvl (0 quiet … 1 loud) on their ring.
+function applyVoiceLevels(levels){
+  if(ringStyle!=='grow'||!levels||!state.voiceHere)return;
+  for(const [user,db] of Object.entries(levels)){
+    const lvl=Math.max(0,Math.min(1,(db+50)/32)).toFixed(2);
+    const sel=CSS.escape(user);
+    document.querySelector(`.voice-occupant-row[data-board="${CSS.escape(String(state.voiceHere))}"][data-user="${sel}"] .voice-occupant-avatar`)?.style.setProperty('--lvl',lvl);
+    document.querySelector(`#video-stage .vs-tile[data-user="${sel}"]`)?.style.setProperty('--lvl',lvl);
+  }
+}
+function initRingStyle(){
+  applyRingStyle();
+  document.getElementById('ap-ring').addEventListener('change',e=>{
+    ringStyle=e.target.value;localStorage.setItem('ringStyle',ringStyle);applyRingStyle();persistClientSettings();
+  });
+  window.runtime.EventsOn('voice:levels',applyVoiceLevels);
 }
 function initElasticScroll(){
   attachElastic(document.getElementById('messages'));
@@ -14100,6 +14157,13 @@ function autoResize(el){
 function renderComposerHighlight(){
   const ta=document.getElementById('msg-input'),hl=document.getElementById('msg-hl');
   if(!ta||!hl)return;
+  // The placeholder, drawn here in WebKit (see html.wk #msg-hl::before).
+  if(hl.dataset.placeholder!==ta.placeholder)hl.dataset.placeholder=ta.placeholder;
+  hl.parentElement.classList.toggle('empty',!ta.value);
+  if(!hl._phWatch){ // the placeholder changes with the channel
+    hl._phWatch=new MutationObserver(()=>renderComposerHighlight());
+    hl._phWatch.observe(ta,{attributes:true,attributeFilter:['placeholder']});
+  }
   if(pluginCommandHighlight(ta,hl))return; // a plugin command: its own colours
   const v=ta.value;
   // Marked ranges on the raw text: @mentions (boxed) and misspellings
@@ -15723,6 +15787,7 @@ function init(){
   initContextMenus();
   initEditServer();
   initElasticScroll();
+  initRingStyle();
   initAppearance();
   initServerInfo();
   initPresence();

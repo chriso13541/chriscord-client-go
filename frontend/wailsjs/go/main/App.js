@@ -985,3 +985,7 @@ export function VideoSendCodec() {
 export function WatchScreen(arg1, arg2) {
   return window['go']['main']['App']['WatchScreen'](arg1, arg2);
 }
+
+export function SetRingLevels(arg1) {
+  return window['go']['main']['App']['SetRingLevels'](arg1);
+}

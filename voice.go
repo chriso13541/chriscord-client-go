@@ -129,7 +129,9 @@ type VoiceSession struct {
 	// (SetVoiceDevices): picked up by the capture / playback loop, which
 	// opens it and closes the old one on its own thread.
 	swapMic, swapSpeaker chan string
-	namesMu              sync.Mutex // guards micName, speakerName after start
+
+	myLevel atomic.Uint64 // your own voice's loudness (dB, as float bits), for the rings
+	namesMu sync.Mutex    // guards micName, speakerName after start
 
 	// Trickle-ICE ordering. Candidates start flowing both ways the moment
 	// each side calls SetLocalDescription — before the other side has the
@@ -929,6 +931,7 @@ func (s *VoiceSession) startCapture(micName string) error {
 					wailsruntime.EventsEmit(s.ctx, "voice:speaking", false)
 					s.app.sendSpeaking(s.boardID, false)
 				}
+				s.myLevel.Store(math.Float64bits(-100))
 				continue
 			}
 			// Background noise out first (when it's on), so the volume and
@@ -941,6 +944,13 @@ func (s *VoiceSession) startCapture(micName string) error {
 			// steady rather than stopping and starting it).
 			open, changed, level, threshold := s.vad.process(s.captureBuf)
 			s.vad.emitLevel(s.app, level, threshold)
+			if ringLevelsOn.Load() {
+				my := -100.0
+				if open {
+					my = levelDB(s.captureBuf) // as sent: after the gain
+				}
+				s.myLevel.Store(math.Float64bits(my))
+			}
 			if changed {
 				wailsruntime.EventsEmit(s.ctx, "voice:speaking", open)
 				s.app.sendSpeaking(s.boardID, open)
@@ -1053,6 +1063,12 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			for i := range s.playBuf {
 				s.playBuf[i] = 0
 			}
+			// How loud each voice is, for the speaking rings that grow
+			// with it (Settings > Appearance): every 3rd frame (60 ms).
+			var levels map[string]float64
+			if ringLevelsOn.Load() && lagTick%3 == 0 {
+				levels = map[string]float64{}
+			}
 			deafened := s.deafened.Load()
 			s.remotesMu.Lock()
 			for _, r := range s.remotes {
@@ -1102,6 +1118,9 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				if n > voiceFrameSize {
 					n = voiceFrameSize
 				}
+				if levels != nil {
+					levels[r.username] = max(levels[r.username], levelDB(r.buf[:n]))
+				}
 				// After a skip or a cut, fade the first 5 ms in.
 				fade := 0
 				if r.fadeIn && n > 0 {
@@ -1135,6 +1154,15 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				r.mu.Unlock()
 			}
 			s.remotesMu.Unlock()
+			if levels != nil {
+				if me := s.app.username; me != "" {
+					levels[me] = math.Float64frombits(s.myLevel.Load())
+				}
+				for k, v := range levels {
+					levels[k] = math.Round(v)
+				}
+				wailsruntime.EventsEmit(s.ctx, "voice:levels", levels)
+			}
 			// The app's own sounds (Linux: sfx.go) — heard even when
 			// deafened, as a mute or leave sound should be.
 			s.sfx.mixInto(s.playBuf, outCh)
@@ -1648,6 +1676,15 @@ func (a *App) StopMicTest() {
 		}
 	}
 }
+
+// ringLevelsOn: the page wants how loud each voice in the call is, to size
+// the speaking rings by (Settings > Appearance > Speaking ring: Grow).
+var ringLevelsOn atomic.Bool
+
+// SetRingLevels turns the "voice:levels" event on or off: about 16 times a
+// second during a call, each voice's loudness in dB (-100: silent), by
+// username — yours too.
+func (a *App) SetRingLevels(on bool) { ringLevelsOn.Store(on) }
 
 // testLatency: the voice test's buffer — long enough to hold several 20 ms
 // frames (it records a frame and then plays it, in turn), but not so long
