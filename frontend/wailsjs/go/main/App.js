@@ -6,16 +6,28 @@ export function AccountAvatar(arg1) {
   return window['go']['main']['App']['AccountAvatar'](arg1);
 }
 
+export function AccountKeyContents() {
+  return window['go']['main']['App']['AccountKeyContents']();
+}
+
 export function ActiveAccount() {
   return window['go']['main']['App']['ActiveAccount']();
 }
 
-export function AddBot(arg1,arg2,arg3,arg4) {
-  return window['go']['main']['App']['AddBot'](arg1,arg2,arg3,arg4);
+export function AddBot(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['AddBot'](arg1, arg2, arg3, arg4);
+}
+
+export function AddCustomGame(arg1, arg2) {
+  return window['go']['main']['App']['AddCustomGame'](arg1, arg2);
 }
 
 export function AutoLogin() {
   return window['go']['main']['App']['AutoLogin']();
+}
+
+export function BlockedPlugins() {
+  return window['go']['main']['App']['BlockedPlugins']();
 }
 
 export function CameraModes(arg1) {
@@ -30,12 +42,44 @@ export function CancelConversion(arg1) {
   return window['go']['main']['App']['CancelConversion'](arg1);
 }
 
+export function CancelDownload(arg1) {
+  return window['go']['main']['App']['CancelDownload'](arg1);
+}
+
 export function CaptureEncoders() {
   return window['go']['main']['App']['CaptureEncoders']();
 }
 
 export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
+}
+
+export function CheckUploadFiles(arg1) {
+  return window['go']['main']['App']['CheckUploadFiles'](arg1);
+}
+
+export function ChooseDownloadFolder() {
+  return window['go']['main']['App']['ChooseDownloadFolder']();
+}
+
+export function ClearDownloads() {
+  return window['go']['main']['App']['ClearDownloads']();
+}
+
+export function ClearSearch() {
+  return window['go']['main']['App']['ClearSearch']();
+}
+
+export function ClearSearchCopy() {
+  return window['go']['main']['App']['ClearSearchCopy']();
+}
+
+export function ClipboardAttachments() {
+  return window['go']['main']['App']['ClipboardAttachments']();
+}
+
+export function CloseWindow() {
+  return window['go']['main']['App']['CloseWindow']();
 }
 
 export function CloudCancelSignIn() {
@@ -46,8 +90,8 @@ export function CloudChangeEmail(arg1) {
   return window['go']['main']['App']['CloudChangeEmail'](arg1);
 }
 
-export function CloudChangePassword(arg1,arg2) {
-  return window['go']['main']['App']['CloudChangePassword'](arg1,arg2);
+export function CloudChangePassword(arg1, arg2) {
+  return window['go']['main']['App']['CloudChangePassword'](arg1, arg2);
 }
 
 export function CloudChangeUsername(arg1) {
@@ -62,16 +106,16 @@ export function CloudForget() {
   return window['go']['main']['App']['CloudForget']();
 }
 
-export function CloudLink(arg1,arg2,arg3) {
-  return window['go']['main']['App']['CloudLink'](arg1,arg2,arg3);
+export function CloudLink(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CloudLink'](arg1, arg2, arg3);
 }
 
 export function CloudNewRecoveryKey(arg1) {
   return window['go']['main']['App']['CloudNewRecoveryKey'](arg1);
 }
 
-export function CloudRecover(arg1,arg2,arg3) {
-  return window['go']['main']['App']['CloudRecover'](arg1,arg2,arg3);
+export function CloudRecover(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CloudRecover'](arg1, arg2, arg3);
 }
 
 export function CloudRemoveDevice(arg1) {
@@ -82,8 +126,8 @@ export function CloudResendVerification() {
   return window['go']['main']['App']['CloudResendVerification']();
 }
 
-export function CloudSignIn(arg1,arg2) {
-  return window['go']['main']['App']['CloudSignIn'](arg1,arg2);
+export function CloudSignIn(arg1, arg2) {
+  return window['go']['main']['App']['CloudSignIn'](arg1, arg2);
 }
 
 export function CloudStatus() {
@@ -114,12 +158,20 @@ export function CreateAccount(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateAccount'](arg1, arg2, arg3);
 }
 
-export function CreateBot(arg1,arg2,arg3) {
-  return window['go']['main']['App']['CreateBot'](arg1,arg2,arg3);
+export function CreateBot(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateBot'](arg1, arg2, arg3);
 }
 
 export function CreateInvite() {
   return window['go']['main']['App']['CreateInvite']();
+}
+
+export function CreateInviteFor(arg1) {
+  return window['go']['main']['App']['CreateInviteFor'](arg1);
+}
+
+export function CustomStatusSupported() {
+  return window['go']['main']['App']['CustomStatusSupported']();
 }
 
 export function CustomTitlebar() {
@@ -144,6 +196,10 @@ export function DiscardConverted(arg1) {
 
 export function Disconnect() {
   return window['go']['main']['App']['Disconnect']();
+}
+
+export function DownloadSearchCopy() {
+  return window['go']['main']['App']['DownloadSearchCopy']();
 }
 
 export function DropFiles(arg1) {
@@ -214,6 +270,22 @@ export function GetConnectionSecurity() {
   return window['go']['main']['App']['GetConnectionSecurity']();
 }
 
+export function GetCustomGames() {
+  return window['go']['main']['App']['GetCustomGames']();
+}
+
+export function GetCustomStatus() {
+  return window['go']['main']['App']['GetCustomStatus']();
+}
+
+export function GetDownloadSettings() {
+  return window['go']['main']['App']['GetDownloadSettings']();
+}
+
+export function GetDownloads() {
+  return window['go']['main']['App']['GetDownloads']();
+}
+
 export function GetEmojis() {
   return window['go']['main']['App']['GetEmojis']();
 }
@@ -228,6 +300,10 @@ export function GetFileURL(arg1) {
 
 export function GetFingerprint() {
   return window['go']['main']['App']['GetFingerprint']();
+}
+
+export function GetGameActivity() {
+  return window['go']['main']['App']['GetGameActivity']();
 }
 
 export function GetMediaLink(arg1) {
@@ -262,6 +338,10 @@ export function GetProfilePicture() {
   return window['go']['main']['App']['GetProfilePicture']();
 }
 
+export function GetRendererInfo() {
+  return window['go']['main']['App']['GetRendererInfo']();
+}
+
 export function GetRooms() {
   return window['go']['main']['App']['GetRooms']();
 }
@@ -282,12 +362,20 @@ export function GetSystemIdleSeconds() {
   return window['go']['main']['App']['GetSystemIdleSeconds']();
 }
 
+export function GetUsage() {
+  return window['go']['main']['App']['GetUsage']();
+}
+
 export function GetUsername() {
   return window['go']['main']['App']['GetUsername']();
 }
 
 export function GetVoiceEncryption() {
   return window['go']['main']['App']['GetVoiceEncryption']();
+}
+
+export function GetWindowSettings() {
+  return window['go']['main']['App']['GetWindowSettings']();
 }
 
 export function HasAccount() {
@@ -334,6 +422,10 @@ export function ListAccounts() {
   return window['go']['main']['App']['ListAccounts']();
 }
 
+export function ListAudioDevices() {
+  return window['go']['main']['App']['ListAudioDevices']();
+}
+
 export function ListCameras() {
   return window['go']['main']['App']['ListCameras']();
 }
@@ -362,6 +454,10 @@ export function MoveBoard(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveBoard'](arg1, arg2, arg3);
 }
 
+export function MoveMember(arg1, arg2) {
+  return window['go']['main']['App']['MoveMember'](arg1, arg2);
+}
+
 export function MoveRooms(arg1) {
   return window['go']['main']['App']['MoveRooms'](arg1);
 }
@@ -370,8 +466,24 @@ export function NativeCaptureInfo() {
   return window['go']['main']['App']['NativeCaptureInfo']();
 }
 
+export function NoiseSuppression() {
+  return window['go']['main']['App']['NoiseSuppression']();
+}
+
 export function OpenAttachmentExternally(arg1, arg2) {
   return window['go']['main']['App']['OpenAttachmentExternally'](arg1, arg2);
+}
+
+export function OpenDownload(arg1) {
+  return window['go']['main']['App']['OpenDownload'](arg1);
+}
+
+export function OpenDownloadsFolder() {
+  return window['go']['main']['App']['OpenDownloadsFolder']();
+}
+
+export function OpenPrograms() {
+  return window['go']['main']['App']['OpenPrograms']();
 }
 
 export function OpenURL(arg1) {
@@ -398,6 +510,10 @@ export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }
 
+export function PickGameProgram() {
+  return window['go']['main']['App']['PickGameProgram']();
+}
+
 export function PickImageFiles(arg1) {
   return window['go']['main']['App']['PickImageFiles'](arg1);
 }
@@ -416,6 +532,14 @@ export function PlaySound(arg1, arg2, arg3) {
 
 export function PlayableMedia(arg1, arg2) {
   return window['go']['main']['App']['PlayableMedia'](arg1, arg2);
+}
+
+export function PluginAction(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['PluginAction'](arg1, arg2, arg3, arg4);
+}
+
+export function PluginCommand(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['PluginCommand'](arg1, arg2, arg3, arg4);
 }
 
 export function PrepareAccountExport(arg1, arg2) {
@@ -466,6 +590,14 @@ export function RemoveBot(arg1) {
   return window['go']['main']['App']['RemoveBot'](arg1);
 }
 
+export function RemoveCustomGame(arg1) {
+  return window['go']['main']['App']['RemoveCustomGame'](arg1);
+}
+
+export function RemoveDownload(arg1) {
+  return window['go']['main']['App']['RemoveDownload'](arg1);
+}
+
 export function RemoveServer(arg1) {
   return window['go']['main']['App']['RemoveServer'](arg1);
 }
@@ -486,20 +618,76 @@ export function RequestVideoKeyframe(arg1) {
   return window['go']['main']['App']['RequestVideoKeyframe'](arg1);
 }
 
+export function ResetDownloadFolder() {
+  return window['go']['main']['App']['ResetDownloadFolder']();
+}
+
 export function ResolveServerAddress(arg1) {
   return window['go']['main']['App']['ResolveServerAddress'](arg1);
+}
+
+export function RestartApp() {
+  return window['go']['main']['App']['RestartApp']();
 }
 
 export function RestartToUpdate() {
   return window['go']['main']['App']['RestartToUpdate']();
 }
 
+export function RetryDownload(arg1) {
+  return window['go']['main']['App']['RetryDownload'](arg1);
+}
+
 export function RevokeBot(arg1) {
   return window['go']['main']['App']['RevokeBot'](arg1);
 }
 
+export function RosterAccept() {
+  return window['go']['main']['App']['RosterAccept']();
+}
+
+export function RosterApprove(arg1) {
+  return window['go']['main']['App']['RosterApprove'](arg1);
+}
+
+export function RosterInfo() {
+  return window['go']['main']['App']['RosterInfo']();
+}
+
+export function RosterJoin(arg1) {
+  return window['go']['main']['App']['RosterJoin'](arg1);
+}
+
+export function RosterNewInvite(arg1, arg2, arg3) {
+  return window['go']['main']['App']['RosterNewInvite'](arg1, arg2, arg3);
+}
+
+export function RosterPropose(arg1) {
+  return window['go']['main']['App']['RosterPropose'](arg1);
+}
+
+export function RosterReject(arg1) {
+  return window['go']['main']['App']['RosterReject'](arg1);
+}
+
+export function RosterServerView(arg1) {
+  return window['go']['main']['App']['RosterServerView'](arg1);
+}
+
+export function RosterStart(arg1) {
+  return window['go']['main']['App']['RosterStart'](arg1);
+}
+
+export function RosterWithdraw(arg1) {
+  return window['go']['main']['App']['RosterWithdraw'](arg1);
+}
+
 export function SaveAccountExport() {
   return window['go']['main']['App']['SaveAccountExport']();
+}
+
+export function SaveAccountKeyFile(arg1) {
+  return window['go']['main']['App']['SaveAccountKeyFile'](arg1);
 }
 
 export function SaveClientSettings(arg1) {
@@ -516,6 +704,18 @@ export function SaveProfilePicture(arg1) {
 
 export function ScreenShareInfo() {
   return window['go']['main']['App']['ScreenShareInfo']();
+}
+
+export function SearchAuthors() {
+  return window['go']['main']['App']['SearchAuthors']();
+}
+
+export function SearchCopyInfo() {
+  return window['go']['main']['App']['SearchCopyInfo']();
+}
+
+export function SearchMessages(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['SearchMessages'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function SearchServer(arg1) {
@@ -538,6 +738,18 @@ export function ServerBots() {
   return window['go']['main']['App']['ServerBots']();
 }
 
+export function ServerDeafenMember(arg1, arg2) {
+  return window['go']['main']['App']['ServerDeafenMember'](arg1, arg2);
+}
+
+export function ServerMuteMember(arg1, arg2) {
+  return window['go']['main']['App']['ServerMuteMember'](arg1, arg2);
+}
+
+export function ServerPlugins() {
+  return window['go']['main']['App']['ServerPlugins']();
+}
+
 export function SetActiveAccount(arg1) {
   return window['go']['main']['App']['SetActiveAccount'](arg1);
 }
@@ -550,20 +762,52 @@ export function SetCameraOutputs(arg1, arg2) {
   return window['go']['main']['App']['SetCameraOutputs'](arg1, arg2);
 }
 
+export function SetCustomGameHidden(arg1, arg2) {
+  return window['go']['main']['App']['SetCustomGameHidden'](arg1, arg2);
+}
+
+export function SetCustomStatus(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetCustomStatus'](arg1, arg2, arg3);
+}
+
+export function SetDownloadAsk(arg1) {
+  return window['go']['main']['App']['SetDownloadAsk'](arg1);
+}
+
 export function SetLevelMeter(arg1) {
   return window['go']['main']['App']['SetLevelMeter'](arg1);
+}
+
+export function SetLinkPreviews(arg1) {
+  return window['go']['main']['App']['SetLinkPreviews'](arg1);
+}
+
+export function SetMemberNickname(arg1, arg2) {
+  return window['go']['main']['App']['SetMemberNickname'](arg1, arg2);
 }
 
 export function SetMessagePinned(arg1, arg2) {
   return window['go']['main']['App']['SetMessagePinned'](arg1, arg2);
 }
 
+export function SetNoiseSuppression(arg1) {
+  return window['go']['main']['App']['SetNoiseSuppression'](arg1);
+}
+
 export function SetOpenOnStartup(arg1) {
   return window['go']['main']['App']['SetOpenOnStartup'](arg1);
 }
 
+export function SetPluginBlocked(arg1, arg2) {
+  return window['go']['main']['App']['SetPluginBlocked'](arg1, arg2);
+}
+
 export function SetPresence(arg1) {
   return window['go']['main']['App']['SetPresence'](arg1);
+}
+
+export function SetRendererMode(arg1) {
+  return window['go']['main']['App']['SetRendererMode'](arg1);
 }
 
 export function SetScreenPreview(arg1) {
@@ -582,8 +826,16 @@ export function SetScreenViewLimit(arg1, arg2) {
   return window['go']['main']['App']['SetScreenViewLimit'](arg1, arg2);
 }
 
+export function SetSearchCopy(arg1) {
+  return window['go']['main']['App']['SetSearchCopy'](arg1);
+}
+
 export function SetServerNickname(arg1) {
   return window['go']['main']['App']['SetServerNickname'](arg1);
+}
+
+export function SetShareGameActivity(arg1) {
+  return window['go']['main']['App']['SetShareGameActivity'](arg1);
 }
 
 export function SetStreamVideoLag(arg1, arg2) {
@@ -606,12 +858,28 @@ export function SetVideoEnabled(arg1) {
   return window['go']['main']['App']['SetVideoEnabled'](arg1);
 }
 
+export function SetVoiceDevices(arg1, arg2) {
+  return window['go']['main']['App']['SetVoiceDevices'](arg1, arg2);
+}
+
 export function SetVoiceSmoothing(arg1) {
   return window['go']['main']['App']['SetVoiceSmoothing'](arg1);
 }
 
+export function SetWindowSettings(arg1, arg2) {
+  return window['go']['main']['App']['SetWindowSettings'](arg1, arg2);
+}
+
+export function ShowDownload(arg1) {
+  return window['go']['main']['App']['ShowDownload'](arg1);
+}
+
 export function StartCamera(arg1) {
   return window['go']['main']['App']['StartCamera'](arg1);
+}
+
+export function StartDownload(arg1) {
+  return window['go']['main']['App']['StartDownload'](arg1);
 }
 
 export function StartMicTest(arg1, arg2) {
@@ -634,6 +902,14 @@ export function StopScreenShare() {
   return window['go']['main']['App']['StopScreenShare']();
 }
 
+export function StopSearch() {
+  return window['go']['main']['App']['StopSearch']();
+}
+
+export function StopSearchCopyDownload() {
+  return window['go']['main']['App']['StopSearchCopyDownload']();
+}
+
 export function SubscribeBoard(arg1) {
   return window['go']['main']['App']['SubscribeBoard'](arg1);
 }
@@ -650,8 +926,8 @@ export function UnlockAccount(arg1) {
   return window['go']['main']['App']['UnlockAccount'](arg1);
 }
 
-export function UpdateBot(arg1,arg2,arg3) {
-  return window['go']['main']['App']['UpdateBot'](arg1,arg2,arg3);
+export function UpdateBot(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateBot'](arg1, arg2, arg3);
 }
 
 export function UpdateEmoji(arg1, arg2, arg3) {
@@ -708,20 +984,4 @@ export function VideoSendCodec() {
 
 export function WatchScreen(arg1, arg2) {
   return window['go']['main']['App']['WatchScreen'](arg1, arg2);
-}
-
-export function GetRendererInfo() {
-  return window['go']['main']['App']['GetRendererInfo']();
-}
-
-export function RestartApp() {
-  return window['go']['main']['App']['RestartApp']();
-}
-
-export function SetRendererMode(arg1) {
-  return window['go']['main']['App']['SetRendererMode'](arg1);
-}
-
-export function ClipboardAttachments() {
-  return window['go']['main']['App']['ClipboardAttachments']();
 }

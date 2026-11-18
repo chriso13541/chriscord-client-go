@@ -4,11 +4,17 @@ import {main} from '../models';
 
 export function AccountAvatar(arg1:string):Promise<string>;
 
+export function AccountKeyContents():Promise<Array<main.AccountFile>>;
+
 export function ActiveAccount():Promise<main.AccountSummary>;
 
 export function AddBot(arg1:string,arg2:number,arg3:Array<string>,arg4:string):Promise<string>;
 
+export function AddCustomGame(arg1:string,arg2:string):Promise<Array<main.CustomGame>>;
+
 export function AutoLogin():Promise<main.AccountView>;
+
+export function BlockedPlugins():Promise<Array<string>>;
 
 export function CameraModes(arg1:string):Promise<Array<main.CameraMode>>;
 
@@ -16,9 +22,25 @@ export function CancelAccountExport():Promise<void>;
 
 export function CancelConversion(arg1:string):Promise<void>;
 
+export function CancelDownload(arg1:string):Promise<void>;
+
 export function CaptureEncoders():Promise<Array<main.EncoderChoice>>;
 
 export function CheckForUpdates():Promise<main.UpdateStatus>;
+
+export function CheckUploadFiles(arg1:Array<string>):Promise<Array<string>>;
+
+export function ChooseDownloadFolder():Promise<main.DownloadSettings>;
+
+export function ClearDownloads():Promise<void>;
+
+export function ClearSearch():Promise<void>;
+
+export function ClearSearchCopy():Promise<void>;
+
+export function ClipboardAttachments():Promise<main.ClipboardFiles>;
+
+export function CloseWindow():Promise<void>;
 
 export function CloudCancelSignIn():Promise<void>;
 
@@ -62,6 +84,10 @@ export function CreateBot(arg1:string,arg2:string,arg3:number):Promise<main.NewB
 
 export function CreateInvite():Promise<main.InviteInfo>;
 
+export function CreateInviteFor(arg1:number):Promise<main.InviteInfo>;
+
+export function CustomStatusSupported():Promise<boolean>;
+
 export function CustomTitlebar():Promise<boolean>;
 
 export function DeleteEmoji(arg1:string):Promise<void>;
@@ -73,6 +99,8 @@ export function DeleteSticker(arg1:string):Promise<void>;
 export function DiscardConverted(arg1:string):Promise<void>;
 
 export function Disconnect():Promise<void>;
+
+export function DownloadSearchCopy():Promise<void>;
 
 export function DropFiles(arg1:Array<string>):Promise<void>;
 
@@ -108,6 +136,14 @@ export function GetClientSettings():Promise<string>;
 
 export function GetConnectionSecurity():Promise<main.ConnectionSecurity>;
 
+export function GetCustomGames():Promise<Array<main.CustomGame>>;
+
+export function GetCustomStatus():Promise<main.CustomStatus>;
+
+export function GetDownloadSettings():Promise<main.DownloadSettings>;
+
+export function GetDownloads():Promise<Array<main.Download>>;
+
 export function GetEmojis():Promise<Array<main.CustomEmoji>>;
 
 export function GetFileLink(arg1:string):Promise<string>;
@@ -115,6 +151,8 @@ export function GetFileLink(arg1:string):Promise<string>;
 export function GetFileURL(arg1:string):Promise<string>;
 
 export function GetFingerprint():Promise<string>;
+
+export function GetGameActivity():Promise<main.GameActivitySetting>;
 
 export function GetMediaLink(arg1:string):Promise<string>;
 
@@ -132,6 +170,8 @@ export function GetPinnedMessages(arg1:string):Promise<Array<main.ChatMessage>>;
 
 export function GetProfilePicture():Promise<string>;
 
+export function GetRendererInfo():Promise<main.RendererInfo>;
+
 export function GetRooms():Promise<Array<main.Room>>;
 
 export function GetServerInfo(arg1:string):Promise<main.ServerInfo>;
@@ -142,9 +182,13 @@ export function GetStickers():Promise<Array<main.Sticker>>;
 
 export function GetSystemIdleSeconds():Promise<number>;
 
+export function GetUsage():Promise<main.Usage>;
+
 export function GetUsername():Promise<string>;
 
 export function GetVoiceEncryption():Promise<main.e2eeState>;
+
+export function GetWindowSettings():Promise<main.WindowSettings>;
 
 export function HasAccount():Promise<boolean>;
 
@@ -168,6 +212,8 @@ export function LeaveVoiceChannel():Promise<void>;
 
 export function ListAccounts():Promise<Array<main.AccountSummary>>;
 
+export function ListAudioDevices():Promise<main.AudioDeviceList>;
+
 export function ListCameras():Promise<Array<main.CameraDevice>>;
 
 export function ListMyBots():Promise<Array<main.MyBot>>;
@@ -182,11 +228,21 @@ export function MemberIdentity(arg1:string):Promise<main.MemberIdentityView>;
 
 export function MoveBoard(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function MoveMember(arg1:string,arg2:string):Promise<void>;
+
 export function MoveRooms(arg1:Array<string>):Promise<void>;
 
 export function NativeCaptureInfo():Promise<Record<string, any>>;
 
+export function NoiseSuppression():Promise<boolean>;
+
 export function OpenAttachmentExternally(arg1:string,arg2:string):Promise<void>;
+
+export function OpenDownload(arg1:string):Promise<void>;
+
+export function OpenDownloadsFolder():Promise<void>;
+
+export function OpenPrograms():Promise<Array<main.RunningProgram>>;
 
 export function OpenURL(arg1:string):Promise<void>;
 
@@ -200,6 +256,8 @@ export function PickBanner():Promise<string>;
 
 export function PickFiles():Promise<Array<string>>;
 
+export function PickGameProgram():Promise<string>;
+
 export function PickImageFiles(arg1:string):Promise<Array<string>>;
 
 export function PickPfp():Promise<string>;
@@ -209,6 +267,10 @@ export function PingServer():Promise<number>;
 export function PlaySound(arg1:string,arg2:number,arg3:string):Promise<void>;
 
 export function PlayableMedia(arg1:string,arg2:string):Promise<string>;
+
+export function PluginAction(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function PluginCommand(arg1:string,arg2:string,arg3:Record<string, string>,arg4:string):Promise<void>;
 
 export function PrepareAccountExport(arg1:string,arg2:string):Promise<string>;
 
@@ -234,6 +296,10 @@ export function RememberDescription():Promise<string>;
 
 export function RemoveBot(arg1:string):Promise<void>;
 
+export function RemoveCustomGame(arg1:string):Promise<Array<main.CustomGame>>;
+
+export function RemoveDownload(arg1:string):Promise<void>;
+
 export function RemoveServer(arg1:string):Promise<Array<main.SavedServer>>;
 
 export function ReorderServers(arg1:Array<string>):Promise<Array<main.SavedServer>>;
@@ -244,13 +310,41 @@ export function RequestScreenKeyframe(arg1:string):Promise<void>;
 
 export function RequestVideoKeyframe(arg1:string):Promise<void>;
 
+export function ResetDownloadFolder():Promise<main.DownloadSettings>;
+
 export function ResolveServerAddress(arg1:string):Promise<string>;
+
+export function RestartApp():Promise<void>;
 
 export function RestartToUpdate():Promise<void>;
 
+export function RetryDownload(arg1:string):Promise<void>;
+
 export function RevokeBot(arg1:string):Promise<main.RevokeResult>;
 
+export function RosterAccept():Promise<void>;
+
+export function RosterApprove(arg1:string):Promise<string>;
+
+export function RosterInfo():Promise<main.rosterInfo>;
+
+export function RosterJoin(arg1:string):Promise<void>;
+
+export function RosterNewInvite(arg1:number,arg2:number,arg3:Array<string>):Promise<Record<string, string>>;
+
+export function RosterPropose(arg1:string):Promise<string>;
+
+export function RosterReject(arg1:string):Promise<string>;
+
+export function RosterServerView(arg1:Array<string>):Promise<main.rosterServerView>;
+
+export function RosterStart(arg1:main.RosterStartReq):Promise<void>;
+
+export function RosterWithdraw(arg1:string):Promise<void>;
+
 export function SaveAccountExport():Promise<string>;
+
+export function SaveAccountKeyFile(arg1:string):Promise<string>;
 
 export function SaveClientSettings(arg1:string):Promise<void>;
 
@@ -259,6 +353,12 @@ export function SaveProfile(arg1:string,arg2:string,arg3:string,arg4:string):Pro
 export function SaveProfilePicture(arg1:string):Promise<void>;
 
 export function ScreenShareInfo():Promise<Record<string, any>>;
+
+export function SearchAuthors():Promise<Array<main.SearchAuthor>>;
+
+export function SearchCopyInfo():Promise<main.SearchCopyInfo>;
+
+export function SearchMessages(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:number):Promise<main.SearchPage>;
 
 export function SearchServer(arg1:string):Promise<Array<main.SearchResult>>;
 
@@ -270,19 +370,41 @@ export function SendTyping(arg1:boolean):Promise<void>;
 
 export function ServerBots():Promise<string>;
 
+export function ServerDeafenMember(arg1:string,arg2:boolean):Promise<void>;
+
+export function ServerMuteMember(arg1:string,arg2:boolean):Promise<void>;
+
+export function ServerPlugins():Promise<string>;
+
 export function SetActiveAccount(arg1:string):Promise<void>;
 
 export function SetAudioSettings(arg1:number,arg2:number,arg3:boolean,arg4:number,arg5:boolean):Promise<void>;
 
 export function SetCameraOutputs(arg1:boolean,arg2:boolean):Promise<void>;
 
+export function SetCustomGameHidden(arg1:string,arg2:boolean):Promise<Array<main.CustomGame>>;
+
+export function SetCustomStatus(arg1:string,arg2:string,arg3:string):Promise<main.CustomStatus>;
+
+export function SetDownloadAsk(arg1:boolean):Promise<void>;
+
 export function SetLevelMeter(arg1:boolean):Promise<void>;
+
+export function SetLinkPreviews(arg1:boolean):Promise<void>;
+
+export function SetMemberNickname(arg1:string,arg2:string):Promise<void>;
 
 export function SetMessagePinned(arg1:string,arg2:boolean):Promise<void>;
 
+export function SetNoiseSuppression(arg1:boolean):Promise<void>;
+
 export function SetOpenOnStartup(arg1:boolean):Promise<void>;
 
+export function SetPluginBlocked(arg1:string,arg2:boolean):Promise<void>;
+
 export function SetPresence(arg1:string):Promise<void>;
+
+export function SetRendererMode(arg1:string):Promise<void>;
 
 export function SetScreenPreview(arg1:boolean):Promise<void>;
 
@@ -292,7 +414,11 @@ export function SetScreenShareEnabled(arg1:boolean):Promise<void>;
 
 export function SetScreenViewLimit(arg1:number,arg2:number):Promise<void>;
 
+export function SetSearchCopy(arg1:boolean):Promise<void>;
+
 export function SetServerNickname(arg1:string):Promise<void>;
+
+export function SetShareGameActivity(arg1:boolean):Promise<void>;
 
 export function SetStreamVideoLag(arg1:string,arg2:number):Promise<void>;
 
@@ -304,9 +430,17 @@ export function SetVideoCodec(arg1:string):Promise<void>;
 
 export function SetVideoEnabled(arg1:boolean):Promise<void>;
 
+export function SetVoiceDevices(arg1:string,arg2:string):Promise<void>;
+
 export function SetVoiceSmoothing(arg1:boolean):Promise<void>;
 
+export function SetWindowSettings(arg1:boolean,arg2:boolean):Promise<void>;
+
+export function ShowDownload(arg1:string):Promise<void>;
+
 export function StartCamera(arg1:main.CameraStart):Promise<string>;
+
+export function StartDownload(arg1:main.DownloadSource):Promise<main.Download>;
 
 export function StartMicTest(arg1:string,arg2:string):Promise<void>;
 
@@ -317,6 +451,10 @@ export function StopCamera():Promise<void>;
 export function StopMicTest():Promise<void>;
 
 export function StopScreenShare():Promise<void>;
+
+export function StopSearch():Promise<void>;
+
+export function StopSearchCopyDownload():Promise<void>;
 
 export function SubscribeBoard(arg1:string):Promise<void>;
 
@@ -355,11 +493,3 @@ export function VideoConversionInfo():Promise<Record<string, any>>;
 export function VideoSendCodec():Promise<string>;
 
 export function WatchScreen(arg1:string,arg2:boolean):Promise<void>;
-
-export function GetRendererInfo():Promise<main.RendererInfo>;
-
-export function RestartApp():Promise<void>;
-
-export function SetRendererMode(arg1:string):Promise<void>;
-
-export function ClipboardAttachments():Promise<main.ClipboardFiles>;

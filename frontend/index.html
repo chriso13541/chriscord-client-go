@@ -5486,8 +5486,8 @@ let micTestRunning=false;
 async function toggleMicTest(){
   const btn=document.getElementById('settings-mic-test-btn');
   if(micTestRunning){stopMicTest();return;}
-  const micLabel=document.getElementById('settings-mic-select').selectedOptions[0]?.textContent||'';
-  const speakerLabel=document.getElementById('settings-speaker-select').selectedOptions[0]?.textContent||'';
+  const micLabel=audioDeviceArg(document.getElementById('settings-mic-select'));
+  const speakerLabel=audioDeviceArg(document.getElementById('settings-speaker-select'));
   try{
     await window.go.main.App.StartMicTest(micLabel,speakerLabel);
     micTestRunning=true;
@@ -6083,8 +6083,36 @@ function applyUserAvatar(el,user){
 // this is a standard, stable browser API. Selection doesn't do anything
 // live yet, but is saved so the real audio pipeline can read it later
 // without another round of settings-UI work.
+// What to hand the app for the chosen device: on Linux the list comes from
+// the app (ListAudioDevices) and each option's value is what it wants;
+// elsewhere, the device's name.
+const audioDeviceArg=sel=>IS_LINUX?(sel.value||''):(sel.selectedOptions[0]?.textContent||'');
+// A different mic or speaker chosen during a call: the call moves to it.
+// (A voice test that's running restarts on it too.)
+function applyVoiceDevices(){
+  window.go.main.App.SetVoiceDevices(localStorage.getItem('audioMicLabel')||'',localStorage.getItem('audioSpeakerLabel')||'').catch(()=>{});
+  if(micTestRunning){stopMicTest();setTimeout(toggleMicTest,150);}
+}
 async function populateAudioDeviceDropdowns(){
   const micSelect=document.getElementById('settings-mic-select'),spkSelect=document.getElementById('settings-speaker-select');
+  // Linux: the web view can't list sound devices (and calls don't use its
+  // names anyway), so the app lists the sound server's (audiodevices.go).
+  if(IS_LINUX){
+    let list=null;
+    try{list=await window.go.main.App.ListAudioDevices();}catch{}
+    if(list?.supported){
+      const fill=(sel,devs,saved,none)=>{
+        const def=devs.find(d=>d.default);
+        sel.innerHTML=`<option value="">${esc(def?`Default (${def.label})`:'Default')}</option>`+
+          devs.map(d=>`<option value="${esc(d.id)}">${esc(d.label)}</option>`).join('')+
+          (devs.length?'':`<option value="" disabled>${none}</option>`);
+        sel.value=devs.some(d=>d.id===saved)?saved:'';
+      };
+      fill(micSelect,list.inputs||[],localStorage.getItem('audioMicLabel')||'','No microphones found');
+      fill(spkSelect,list.outputs||[],localStorage.getItem('audioSpeakerLabel')||'','No speakers found');
+      return;
+    }
+  }
   // Device labels stay blank until mic permission has been granted at
   // least once — request it now just to unlock real names, then
   // immediately stop the stream rather than holding the mic open.
@@ -15773,11 +15801,13 @@ function init(){
   window.runtime.EventsOn('customstatus:changed',()=>{myCustomStatus=null;loadMyCustomStatus();});
   document.getElementById('settings-mic-select').addEventListener('change',e=>{
     localStorage.setItem('audioMicId',e.target.value);
-    localStorage.setItem('audioMicLabel',e.target.selectedOptions[0]?.textContent||'');
+    localStorage.setItem('audioMicLabel',audioDeviceArg(e.target));
+    applyVoiceDevices();
   });
   document.getElementById('settings-speaker-select').addEventListener('change',e=>{
     localStorage.setItem('audioSpeakerId',e.target.value);
-    localStorage.setItem('audioSpeakerLabel',e.target.selectedOptions[0]?.textContent||'');
+    localStorage.setItem('audioSpeakerLabel',audioDeviceArg(e.target));
+    applyVoiceDevices();
   });
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('settings-modal').classList.contains('hidden'))closeSettings();});
   document.getElementById('msg-search-btn').addEventListener('click',runSearch);

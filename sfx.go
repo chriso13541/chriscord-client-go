@@ -259,7 +259,7 @@ func (o *sfxPlayer) ensure(speaker string) error {
 			ch = 1
 		}
 		buf := make([]int16, voiceFrameSize*ch)
-		stream, err := portaudio.OpenStream(portaudio.StreamParameters{
+		stream, err := openAudioStream(speaker, false, portaudio.StreamParameters{
 			Output:          portaudio.StreamDeviceParameters{Device: device, Channels: ch, Latency: device.DefaultLowOutputLatency},
 			SampleRate:      voiceSampleRate,
 			FramesPerBuffer: voiceFrameSize,
@@ -296,7 +296,7 @@ func (o *sfxPlayer) ensure(speaker string) error {
 			} else {
 				idle++
 			}
-			if err := stream.Write(); err != nil {
+			if err := stream.Write(); err != nil && !audioGlitch(err) {
 				log.Printf("sfx: speaker stopped: %v", err)
 				return
 			}

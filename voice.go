@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -124,6 +125,12 @@ type VoiceSession struct {
 	closeOnce sync.Once
 	stopped   chan struct{}
 
+	// A different microphone or speaker chosen in Settings during the call
+	// (SetVoiceDevices): picked up by the capture / playback loop, which
+	// opens it and closes the old one on its own thread.
+	swapMic, swapSpeaker chan string
+	namesMu              sync.Mutex // guards micName, speakerName after start
+
 	// Trickle-ICE ordering. Candidates start flowing both ways the moment
 	// each side calls SetLocalDescription — before the other side has the
 	// description they belong to. The server drops a candidate that
@@ -160,6 +167,24 @@ func findDeviceByName(name string, wantInput bool) (*portaudio.DeviceInfo, error
 }
 
 func pickDevice(name string, wantInput bool) (*portaudio.DeviceInfo, error) {
+	// Chosen in Settings on Linux (audiodevices.go): a sound server device
+	// opens through the sound server's own ALSA device (aimed at it by
+	// openAudioStream); a PortAudio device by its exact name.
+	if strings.HasPrefix(name, "sys:") {
+		if d := soundServerDevice(wantInput); d != nil {
+			return d, nil
+		}
+		name = ""
+	} else if pa, ok := strings.CutPrefix(name, "pa:"); ok {
+		if devices, err := portaudio.Devices(); err == nil {
+			for _, d := range devices {
+				if d.Name == pa && ((wantInput && d.MaxInputChannels > 0) || (!wantInput && d.MaxOutputChannels > 0)) {
+					return d, nil
+				}
+			}
+		}
+		name = "" // gone (unplugged?): the default
+	}
 	if name != "" {
 		devices, err := portaudio.Devices()
 		if err == nil {
@@ -325,7 +350,10 @@ func (a *App) ReconnectVoice(knownOthers []string) error {
 	if session == nil {
 		return fmt.Errorf("not in a call")
 	}
-	return a.startVoiceSession(session.boardID, session.micName, session.speakerName, knownOthers, "connection failed, reconnecting")
+	session.namesMu.Lock()
+	mic, speaker := session.micName, session.speakerName
+	session.namesMu.Unlock()
+	return a.startVoiceSession(session.boardID, mic, speaker, knownOthers, "connection failed, reconnecting")
 }
 
 func (a *App) LeaveVoiceChannel() error {
@@ -499,6 +527,8 @@ func (a *App) startVoiceSession(boardID, micName, speakerName string, knownOther
 		encoder:     encoder,
 		remotes:     make(map[string]*voiceRemoteSource),
 		stopped:     make(chan struct{}),
+		swapMic:     make(chan string, 1),
+		swapSpeaker: make(chan string, 1),
 		muted:       &a.voiceMuted,
 		deafened:    &a.voiceDeafened,
 	}
@@ -845,7 +875,7 @@ func (s *VoiceSession) startCapture(micName string) error {
 			SampleRate:      voiceSampleRate,
 			FramesPerBuffer: voiceFrameSize,
 		}
-		stream, err := portaudio.OpenStream(params, s.captureBuf)
+		stream, err := openAudioStream(micName, true, params, s.captureBuf)
 		if err != nil {
 			started <- fmt.Errorf("open capture stream: %w", err)
 			return
@@ -870,9 +900,22 @@ func (s *VoiceSession) startCapture(micName string) error {
 					s.app.sendSpeaking(s.boardID, false)
 				}
 				return
+			case name := <-s.swapMic:
+				if ns, err := s.openCapture(name); err != nil {
+					log.Printf("voice: couldn't switch microphone to %q: %v", name, err)
+				} else {
+					stream.Stop()
+					stream.Close()
+					stream = ns
+					s.captureStream = ns
+					s.namesMu.Lock()
+					s.micName = name
+					s.namesMu.Unlock()
+				}
 			default:
 			}
-			if err := stream.Read(); err != nil {
+			if err := stream.Read(); err != nil && !audioGlitch(err) {
+				log.Printf("voice: microphone stopped: %v", err)
 				return
 			}
 			if s.muted.Load() {
@@ -963,7 +1006,7 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			SampleRate:      voiceSampleRate,
 			FramesPerBuffer: voiceFrameSize,
 		}
-		stream, err := portaudio.OpenStream(params, s.playBuf)
+		stream, err := openAudioStream(speakerName, false, params, s.playBuf)
 		if err != nil {
 			started <- fmt.Errorf("open playback stream: %w", err)
 			return
@@ -989,6 +1032,22 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 				stream.Stop()
 				stream.Close()
 				return
+			case name := <-s.swapSpeaker:
+				if ns, ch, buf, err := s.openPlayback(name); err != nil {
+					log.Printf("voice: couldn't switch speaker to %q: %v", name, err)
+				} else {
+					stream.Stop()
+					stream.Close()
+					stream, outCh = ns, ch
+					s.playBuf = buf
+					s.playStream = ns
+					if info := ns.Info(); info != nil && info.OutputLatency > 0 {
+						outLatencyMs = float64(info.OutputLatency) / float64(time.Millisecond)
+					}
+					s.namesMu.Lock()
+					s.speakerName = name
+					s.namesMu.Unlock()
+				}
 			default:
 			}
 			for i := range s.playBuf {
@@ -1080,7 +1139,8 @@ func (s *VoiceSession) startPlayback(speakerName string) error {
 			// deafened, as a mute or leave sound should be.
 			s.sfx.mixInto(s.playBuf, outCh)
 			lagTick++
-			if err := stream.Write(); err != nil {
+			if err := stream.Write(); err != nil && !audioGlitch(err) {
+				log.Printf("voice: speaker stopped: %v", err)
 				return
 			}
 			// Kept briefly while sharing sound, so it can be taken back out
@@ -1331,6 +1391,87 @@ var (
 	micTestSess *micTestSession
 )
 
+// openCapture opens and starts the microphone chosen as name, recording
+// into the session's capture buffer (for switching during a call; on the
+// capture goroutine's thread).
+func (s *VoiceSession) openCapture(name string) (*portaudio.Stream, error) {
+	device, err := findDeviceByName(name, true)
+	if err != nil {
+		return nil, err
+	}
+	stream, err := openAudioStream(name, true, portaudio.StreamParameters{
+		Input:           portaudio.StreamDeviceParameters{Device: device, Channels: voiceChannels, Latency: device.DefaultLowInputLatency},
+		SampleRate:      voiceSampleRate,
+		FramesPerBuffer: voiceFrameSize,
+	}, s.captureBuf)
+	if err != nil {
+		return nil, err
+	}
+	if err := stream.Start(); err != nil {
+		stream.Close()
+		return nil, err
+	}
+	return stream, nil
+}
+
+// openPlayback opens and starts the speaker chosen as name, with its own
+// buffer (its channel count may differ from the old one's).
+func (s *VoiceSession) openPlayback(name string) (*portaudio.Stream, int, []int16, error) {
+	device, err := findDeviceByName(name, false)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	ch := 2
+	if device.MaxOutputChannels < 2 {
+		ch = 1
+	}
+	buf := make([]int16, voiceFrameSize*ch)
+	stream, err := openAudioStream(name, false, portaudio.StreamParameters{
+		Output:          portaudio.StreamDeviceParameters{Device: device, Channels: ch, Latency: device.DefaultLowOutputLatency},
+		SampleRate:      voiceSampleRate,
+		FramesPerBuffer: voiceFrameSize,
+	}, buf)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	if err := stream.Start(); err != nil {
+		stream.Close()
+		return nil, 0, nil, err
+	}
+	return stream, ch, buf, nil
+}
+
+// SetVoiceDevices moves the call you're in (if any) to the microphone and
+// speaker chosen in Settings, without leaving it. Names as for
+// JoinVoiceChannel.
+func (a *App) SetVoiceDevices(micName, speakerName string) {
+	a.voiceMu.Lock()
+	s := a.voice
+	a.voiceMu.Unlock()
+	if s == nil {
+		return
+	}
+	s.namesMu.Lock()
+	micChanged, spkChanged := micName != s.micName, speakerName != s.speakerName
+	s.namesMu.Unlock()
+	send := func(ch chan string, v string) {
+		select { // only the latest choice matters
+		case <-ch:
+		default:
+		}
+		select {
+		case ch <- v:
+		default:
+		}
+	}
+	if micChanged && s.captureStream != nil {
+		send(s.swapMic, micName)
+	}
+	if spkChanged && s.playStream != nil {
+		send(s.swapSpeaker, speakerName)
+	}
+}
+
 func (a *App) StartMicTest(micName, speakerName string) error {
 	micTestMu.Lock()
 	if micTestSess != nil {
@@ -1386,28 +1527,34 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 		defer runtime.UnlockOSThread()
 
 		captureBuf := make([]int16, voiceFrameSize)
-		playBuf := make([]int16, voiceFrameSize)
+		// Stereo out, as in a call (startPlayback): many sound cards opened
+		// directly can't play one channel.
+		outCh := 2
+		if outDevice.MaxOutputChannels < 2 {
+			outCh = 1
+		}
+		playBuf := make([]int16, voiceFrameSize*outCh)
 		vad := newVoiceActivity()
 		var noise micCleaner
 		defer noise.close()
 
 		inParams := portaudio.StreamParameters{
-			Input:           portaudio.StreamDeviceParameters{Device: inDevice, Channels: voiceChannels, Latency: inDevice.DefaultLowInputLatency},
+			Input:           portaudio.StreamDeviceParameters{Device: inDevice, Channels: voiceChannels, Latency: testLatency(inDevice.DefaultHighInputLatency)},
 			SampleRate:      voiceSampleRate,
 			FramesPerBuffer: voiceFrameSize,
 		}
-		inStream, err := portaudio.OpenStream(inParams, captureBuf)
+		inStream, err := openAudioStream(micName, true, inParams, captureBuf)
 		if err != nil {
 			revertAutoDeafen()
 			started <- fmt.Errorf("open microphone: %w", err)
 			return
 		}
 		outParams := portaudio.StreamParameters{
-			Output:          portaudio.StreamDeviceParameters{Device: outDevice, Channels: voiceChannels, Latency: outDevice.DefaultLowOutputLatency},
+			Output:          portaudio.StreamDeviceParameters{Device: outDevice, Channels: outCh, Latency: testLatency(outDevice.DefaultHighOutputLatency)},
 			SampleRate:      voiceSampleRate,
 			FramesPerBuffer: voiceFrameSize,
 		}
-		outStream, err := portaudio.OpenStream(outParams, playBuf)
+		outStream, err := openAudioStream(speakerName, false, outParams, playBuf)
 		if err != nil {
 			inStream.Close()
 			revertAutoDeafen()
@@ -1438,6 +1585,14 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 		micTestSess = sess
 		micTestMu.Unlock()
 		started <- nil
+		// Some silence first, so the speaker always has a few frames queued
+		// while the next one is being recorded. (The loop records a frame,
+		// then plays it: with the low-latency buffer a call uses — shorter
+		// than one frame on PipeWire — the speaker ran dry every frame,
+		// which sounded like shrill, sped-up static.)
+		for i := 0; i < 4; i++ {
+			outStream.Write()
+		}
 
 		for {
 			select {
@@ -1449,7 +1604,8 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 				return
 			default:
 			}
-			if err := inStream.Read(); err != nil {
+			if err := inStream.Read(); err != nil && !audioGlitch(err) {
+				log.Printf("audio: voice test's microphone stopped: %v", err)
 				return
 			}
 			// Same noise suppression, gain and sensitivity as a real call,
@@ -1461,13 +1617,22 @@ func (a *App) StartMicTest(micName, speakerName string) error {
 			if !open {
 				clear(captureBuf)
 			}
-			copy(playBuf, captureBuf)
-			if err := outStream.Write(); err != nil {
+			for i, v := range captureBuf {
+				for c := 0; c < outCh; c++ {
+					playBuf[i*outCh+c] = v
+				}
+			}
+			if err := outStream.Write(); err != nil && !audioGlitch(err) {
+				log.Printf("audio: voice test's speaker stopped: %v", err)
 				return
 			}
 		}
 	}()
-	return <-started
+	err = <-started
+	if err != nil {
+		log.Printf("audio: voice test couldn't start: %v", err)
+	}
+	return err
 }
 
 func (a *App) StopMicTest() {
@@ -1482,6 +1647,21 @@ func (a *App) StopMicTest() {
 			a.voiceMuted.Store(sess.preTestMuted)
 		}
 	}
+}
+
+// testLatency: the voice test's buffer — long enough to hold several 20 ms
+// frames (it records a frame and then plays it, in turn), but not so long
+// the echo lags far behind.
+func testLatency(def time.Duration) time.Duration {
+	return min(max(def, 120*time.Millisecond), 250*time.Millisecond)
+}
+
+// audioGlitch: a stream ran dry or over for a moment — sound skipped, but
+// the stream carries on. PortAudio reports these as errors from Read and
+// Write; they used to end the loop. The voice test hit it every time (its
+// speaker starts before there's anything to play), so it played nothing.
+func audioGlitch(err error) bool {
+	return errors.Is(err, portaudio.OutputUnderflowed) || errors.Is(err, portaudio.InputOverflowed)
 }
 
 // mixInto adds v to one output sample, clipping instead of wrapping.
