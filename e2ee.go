@@ -9,14 +9,20 @@ package main
 // touching the frame format):
 //
 //   - Each call, this app makes a fresh X25519 key pair (the call key) and
-//     tells everyone in the channel with a "hello", signed by the account's
-//     Ed25519 identity key. The server relays it with the sender's identity
+//     a fresh ML-KEM-768 one, and tells everyone in the channel with a
+//     "hello", signed by the account's Ed25519 identity key. The server relays it with the sender's identity
 //     key attached (from its users table), and the signature is checked
 //     against that.
 //   - This app seals every frame it sends with its own random sending key
 //     (e2ee_frame.go) and hands that key to each other person in the call,
-//     wrapped for their call key. Nobody else — the server included — can
-//     unwrap it.
+//     wrapped for their call keys — X25519 and ML-KEM together
+//     (pqcrypt.go), so a recording of the key messages can't be opened
+//     later by a quantum computer either. Nobody else — the server
+//     included — can unwrap it.
+//   - Hellos and key messages from older apps (version 1, X25519 only) are
+//     ignored: one sending key goes to everyone in the call, so wrapping it
+//     the old way for one person would undo it for all. Such a person shows
+//     as "can't encrypt" until they update.
 //   - Whenever someone joins or leaves, it makes a new sending key, hands it
 //     to whoever's in the call now, and switches to it shortly after
 //     (switchDelay — time for the new key to arrive). Someone who joins
@@ -35,8 +41,10 @@ package main
 // person sends, and timing — but not the sound or picture.
 
 import (
+	"bytes"
 	"crypto/cipher"
 	"crypto/ed25519"
+	"crypto/mlkem"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -78,8 +86,9 @@ type e2eePeer struct {
 	identity    ed25519.PublicKey
 	identityHex string
 	eph         [32]byte
-	keys        []*peerKey // oldest first
-	changed     bool       // their identity key isn't the one remembered for them
+	kem         *mlkem.EncapsulationKey768 // their call's ML-KEM key
+	keys        []*peerKey                 // oldest first
+	changed     bool                       // their identity key isn't the one remembered for them
 }
 
 // callCrypto is the encryption state of the call this app is in (one at a
@@ -95,6 +104,7 @@ type callCrypto struct {
 	domain  string
 	ephPriv [32]byte
 	ephPub  [32]byte
+	kemDK   *mlkem.DecapsulationKey768 // this call's ML-KEM key
 
 	cur      *sendKey // frames are sealed with this
 	next     *sendKey // handed out already; used from switchAt
@@ -108,6 +118,7 @@ type callCrypto struct {
 	resync      *time.Timer          // the periodic check for anyone keys haven't reached (resyncLoop)
 	dropped     int                  // frames that didn't open, since the last log line
 	droppedLast time.Time
+	oldApps     map[string]bool // who's been logged as on an app too old to encrypt with
 
 	// transport sends one message to the server (sendVoiceJSON; swapped
 	// out in tests).
@@ -124,7 +135,9 @@ type e2eeMsg struct {
 	To      string `json:"to"`
 	Data    struct {
 		T     string `json:"t"` // "hello" or "key"
+		V     int    `json:"v"`
 		Eph   string `json:"eph"`
+		Kem   string `json:"kem"`
 		Sig   string `json:"sig"`
 		Reply bool   `json:"reply"`
 		KID   uint32 `json:"kid"`
@@ -173,6 +186,9 @@ func (c *callCrypto) begin(board string) {
 		var err error
 		c.ephPriv, c.ephPub, err = newEphemeral()
 		if err == nil {
+			c.kemDK, err = mlkem.GenerateKey768()
+		}
+		if err == nil {
 			c.cur, err = newSendKey(1)
 		}
 		if err != nil {
@@ -181,7 +197,7 @@ func (c *callCrypto) begin(board string) {
 			return
 		}
 		c.board, c.me, c.myIDHex, c.domain, c.lastKID = board, me, idHex, domain, 1
-		c.peers, c.roster = map[string]*e2eePeer{}, map[string]time.Time{}
+		c.peers, c.roster, c.oldApps = map[string]*e2eePeer{}, map[string]time.Time{}, map[string]bool{}
 		c.resync = time.AfterFunc(resyncEvery, c.resyncLoop)
 		log.Printf("e2ee: call in %s is end-to-end encrypted", board)
 	}
@@ -223,14 +239,17 @@ func (c *callCrypto) resetLocked() {
 		}
 	}
 	clear(c.ephPriv[:])
-	c.board, c.cur, c.next, c.peers, c.roster = "", nil, nil, nil, nil
+	c.kemDK = nil
+	c.board, c.cur, c.next, c.peers, c.roster, c.oldApps = "", nil, nil, nil, nil, nil
 }
 
 func (c *callCrypto) helloLocked(priv ed25519.PrivateKey, reply bool) map[string]interface{} {
-	sig := ed25519.Sign(priv, helloMessage(c.board, c.me, c.ephPub[:]))
+	kem := c.kemDK.EncapsulationKey().Bytes()
+	sig := ed25519.Sign(priv, helloMessage(c.board, c.me, c.ephPub[:], kem))
 	return map[string]interface{}{
-		"t": "hello", "v": 1, "reply": reply,
+		"t": "hello", "v": pqVersion, "reply": reply,
 		"eph": base64.StdEncoding.EncodeToString(c.ephPub[:]),
+		"kem": base64.StdEncoding.EncodeToString(kem),
 		"sig": base64.StdEncoding.EncodeToString(sig),
 	}
 }
@@ -242,13 +261,13 @@ func (c *callCrypto) keyMsgLocked(user string, p *e2eePeer, k *sendKey) (outMsg,
 	if !c.app.rosterAllowsCall(p.identityHex, c.board) {
 		return outMsg{}, false
 	}
-	box, err := wrapKey(c.ephPriv, c.ephPub, p.eph, c.board, c.me, user, k.kid, k.raw)
+	box, err := wrapKey(c.ephPriv, c.ephPub, p.eph, p.kem, c.board, c.me, user, k.kid, k.raw)
 	if err != nil {
 		log.Printf("e2ee: wrapping a key for %s: %v", user, err)
 		return outMsg{}, false
 	}
 	return outMsg{to: user, data: map[string]interface{}{
-		"t": "key", "v": 1, "kid": k.kid, "box": base64.StdEncoding.EncodeToString(box),
+		"t": "key", "v": pqVersion, "kid": k.kid, "box": base64.StdEncoding.EncodeToString(box),
 	}}, true
 }
 
@@ -375,10 +394,24 @@ func (c *callCrypto) handleMessage(raw []byte) {
 }
 
 func (c *callCrypto) onHelloLocked(m *e2eeMsg) ([]outMsg, bool) {
+	if m.Data.V < pqVersion {
+		// An older app: X25519 only. Not used (see the top of this file).
+		if !c.oldApps[m.From] {
+			c.oldApps[m.From] = true
+			log.Printf("e2ee: %s's app is too old for quantum-safe call keys — they can't hear or be heard until they update", m.From)
+		}
+		return nil, false
+	}
 	identity, err1 := hex.DecodeString(m.FromKey)
 	eph, err2 := base64.StdEncoding.DecodeString(m.Data.Eph)
-	sig, err3 := base64.StdEncoding.DecodeString(m.Data.Sig)
-	if err1 != nil || err2 != nil || err3 != nil || !verifyHello(identity, c.board, m.From, eph, sig) {
+	kemB, err3 := base64.StdEncoding.DecodeString(m.Data.Kem)
+	sig, err4 := base64.StdEncoding.DecodeString(m.Data.Sig)
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil || !verifyHello(identity, c.board, m.From, eph, kemB, sig) {
+		log.Printf("e2ee: %s's call key didn't check out — ignoring it", m.From)
+		return nil, false
+	}
+	kem, err := mlkem.NewEncapsulationKey768(kemB)
+	if err != nil {
 		log.Printf("e2ee: %s's call key didn't check out — ignoring it", m.From)
 		return nil, false
 	}
@@ -387,9 +420,9 @@ func (c *callCrypto) onHelloLocked(m *e2eeMsg) ([]outMsg, bool) {
 	idHex := strings.ToLower(m.FromKey)
 
 	p := c.peers[m.From]
-	isNew := p == nil || p.eph != ephArr || p.identityHex != idHex
+	isNew := p == nil || p.eph != ephArr || !bytes.Equal(p.kem.Bytes(), kemB) || p.identityHex != idHex
 	if isNew {
-		p = &e2eePeer{identity: identity, identityHex: idHex, eph: ephArr}
+		p = &e2eePeer{identity: identity, identityHex: idHex, eph: ephArr, kem: kem}
 		// A new key for this name is flagged — unless the signed member list
 		// has it as a bot or plugin (its approvers signed it in): a
 		// reinstalled plugin has a new identity under the same name, and
@@ -475,11 +508,14 @@ func (c *callCrypto) onKeyLocked(m *e2eeMsg) bool {
 	if p == nil {
 		return false // no hello from them (yet): nothing to unwrap it with
 	}
+	if m.Data.V < pqVersion {
+		return false // an older app's key (they'd have no hello here anyway)
+	}
 	box, err := base64.StdEncoding.DecodeString(m.Data.Box)
 	if err != nil {
 		return false
 	}
-	raw, err := unwrapKey(c.ephPriv, c.ephPub, p.eph, c.board, m.From, c.me, m.Data.KID, box)
+	raw, err := unwrapKey(c.ephPriv, c.ephPub, p.eph, c.kemDK, c.board, m.From, c.me, m.Data.KID, box)
 	if err != nil {
 		log.Printf("e2ee: a key from %s didn't unwrap: %v", m.From, err)
 		return false

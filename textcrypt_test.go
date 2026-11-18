@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/ed25519"
+	"crypto/mlkem"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -19,20 +21,22 @@ import (
 type fakeKeyServer struct {
 	mu      sync.Mutex
 	users   map[string]*App                       // username → their app
-	enc     map[string][2]string                  // identity key → (enc key, sig)
+	enc     map[string][4]string                  // identity key → (enc key, sig, pq key, pq sig)
 	access  map[string]map[string]bool            // board → who can see it (missing board: everyone)
 	gens    map[string]int                        // board → latest generation
 	boxes   map[string]map[int]map[string]fakeBox // board → gen → recipient → box
 	failNew int                                   // make the next N new-generation requests conflict
 	order   []string                              // usernames, in the order added (the first owns the list)
 	listFP  string                                // what the signed member list was last made from
+	noPQ    map[string]bool                       // users whose app publishes no ML-KEM key
 }
 
 type fakeBox struct{ sender, box string }
 
 func newFakeKeyServer() *fakeKeyServer {
-	return &fakeKeyServer{users: map[string]*App{}, enc: map[string][2]string{},
-		access: map[string]map[string]bool{}, gens: map[string]int{}, boxes: map[string]map[int]map[string]fakeBox{}}
+	return &fakeKeyServer{users: map[string]*App{}, enc: map[string][4]string{},
+		access: map[string]map[string]bool{}, gens: map[string]int{}, boxes: map[string]map[int]map[string]fakeBox{},
+		noPQ: map[string]bool{}}
 }
 
 func (s *fakeKeyServer) add(t *testing.T, name string) *App {
@@ -122,9 +126,18 @@ func (s *fakeKeyServer) sees(name, board string) bool {
 }
 
 func (s *fakeKeyServer) member(name string) map[string]interface{} {
-	m := map[string]interface{}{"username": name, "public_key": s.idOf(name), "enc_key": nil, "sig": nil}
-	if e, ok := s.enc[s.idOf(name)]; ok {
+	return s.memberByKey(name, s.idOf(name))
+}
+
+// memberByKey is a member as the server lists them: the ML-KEM fields only
+// once published (an older app has none).
+func (s *fakeKeyServer) memberByKey(name, id string) map[string]interface{} {
+	m := map[string]interface{}{"username": name, "public_key": id, "enc_key": nil, "sig": nil}
+	if e, ok := s.enc[id]; ok {
 		m["enc_key"], m["sig"] = e[0], e[1]
+		if e[2] != "" {
+			m["pq_key"], m["pq_sig"] = e[2], e[3]
+		}
 	}
 	return m
 }
@@ -147,7 +160,12 @@ func (s *fakeKeyServer) handle(user, method, path string, body, out interface{})
 		if !ed25519.Verify(s.users[user].account.PublicKey, encKeyMessage(encB), sigB) {
 			return &httpError{400, "bad signature"}
 		}
-		s.enc[me] = [2]string{in["enc_key"].(string), in["sig"].(string)}
+		pqKey, _ := in["pq_key"].(string)
+		pqSig, _ := in["pq_sig"].(string)
+		if s.noPQ[user] {
+			pqKey, pqSig = "", "" // an older app (or server) that doesn't publish it
+		}
+		s.enc[me] = [4]string{in["enc_key"].(string), in["sig"].(string), pqKey, pqSig}
 
 	case strings.HasPrefix(path, "/api/boards/") && strings.HasSuffix(path, "/keys"):
 		board := strings.TrimSuffix(strings.TrimPrefix(path, "/api/boards/"), "/keys")
@@ -173,7 +191,7 @@ func (s *fakeKeyServer) handle(user, method, path string, body, out interface{})
 			boxes := []interface{}{}
 			for g := 1; g <= latest; g++ {
 				if b, ok := s.boxes[board][g][me]; ok {
-					sender := map[string]interface{}{"username": "", "public_key": b.sender, "enc_key": s.enc[b.sender][0], "sig": s.enc[b.sender][1]}
+					sender := s.memberByKey("", b.sender)
 					boxes = append(boxes, map[string]interface{}{"generation": g, "box": b.box, "sender": sender})
 				}
 			}
@@ -394,5 +412,122 @@ func TestTextEnvelope(t *testing.T) {
 	a2, p2 := encKeyFromSeed(append([]byte(nil), priv.Seed()...))
 	if a1 != a2 || p1 != p2 {
 		t.Fatal("encryption key isn't deterministic")
+	}
+}
+
+// sealBoxV1 makes an older, X25519-only box, as an app from before
+// quantum-safe boxes did.
+func sealBoxV1(t *testing.T, id textIdentity, recipientID string, recipientEnc [32]byte, board string, gen int, key []byte) string {
+	t.Helper()
+	c, err := boxCipher(id.encPriv, recipientEnc, board, gen, id.idHex, recipientID, id.encPub, recipientEnc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonce := make([]byte, c.NonceSize())
+	rand.Read(nonce)
+	return base64.StdEncoding.EncodeToString(c.Seal(nonce, nonce, key, nil))
+}
+
+func TestTextBoxesAreQuantumSafe(t *testing.T) {
+	textTestEnv(t)
+	s := newFakeKeyServer()
+	alice, bob, carol := s.add(t, "alice"), s.add(t, "bob"), s.add(t, "carol")
+	s.noPQ["carol"] = true // carol's app is older: no ML-KEM key
+	for _, a := range []*App{alice, bob, carol} {
+		a.text.ensurePublished()
+	}
+	s.access["b1"] = map[string]bool{"alice": true, "bob": true, "carol": true}
+
+	msg := mustSeal(t, alice, "b1", "quantum-safe")
+	expectText(t, deliver(bob, "b1", "alice", msg), "quantum-safe", "ok")
+	for r, b := range s.boxes["b1"][1] {
+		if !strings.HasPrefix(b.box, pqBoxPrefix) {
+			t.Fatalf("box for %s isn't hybrid: %q", r, b.box)
+		}
+	}
+	// Carol (no ML-KEM key) gets nothing — not a weaker box.
+	alice.text.runPending()
+	bob.text.runPending()
+	if _, ok := s.boxes["b1"][1][s.idOf("carol")]; ok {
+		t.Fatal("a key was sealed for someone with no ML-KEM key")
+	}
+	expectText(t, deliver(carol, "b1", "alice", msg), textLockedMsg, "locked")
+
+	// Carol updates: she publishes one, and gets the key.
+	s.noPQ["carol"] = false
+	carol.text.mu.Lock()
+	carol.text.published, carol.text.triedAt = "", map[string]time.Time{}
+	carol.text.mu.Unlock()
+	carol.text.ensurePublished()
+	alice.text.runPending()
+	if b := s.boxes["b1"][1][s.idOf("carol")]; !strings.HasPrefix(b.box, pqBoxPrefix) {
+		t.Fatalf("carol's box: %q", b.box)
+	}
+	expectText(t, deliver(carol, "b1", "alice", msg), "quantum-safe", "ok")
+}
+
+// A server can't strip or swap someone's ML-KEM key to get a weaker box.
+func TestTextPQKeyCantBeSwappedOrStripped(t *testing.T) {
+	textTestEnv(t)
+	s := newFakeKeyServer()
+	alice, bob := s.add(t, "alice"), s.add(t, "bob")
+	alice.text.ensurePublished()
+	bob.text.ensurePublished()
+	s.access["b1"] = map[string]bool{"alice": true, "bob": true}
+
+	// Swapped: an ML-KEM key the server holds, with bob's real signature.
+	evil, _ := mlkem.GenerateKey768()
+	e := s.enc[s.idOf("bob")]
+	e[2] = hex.EncodeToString(evil.EncapsulationKey().Bytes())
+	s.enc[s.idOf("bob")] = e
+	mustSeal(t, alice, "b1", "not for the server")
+	if _, ok := s.boxes["b1"][1][s.idOf("bob")]; ok {
+		t.Fatal("sealed for a swapped ML-KEM key")
+	}
+	// Stripped: just as if bob's app were older — no box at all.
+	e[2], e[3] = "", ""
+	s.enc[s.idOf("bob")] = e
+	alice.text.runPending()
+	if _, ok := s.boxes["b1"][1][s.idOf("bob")]; ok {
+		t.Fatal("sealed for someone whose ML-KEM key was stripped")
+	}
+}
+
+// The newest generation reached this app only in an X25519-only box (from
+// an older app): it still opens, but sending starts a new, hybrid one.
+func TestTextClassicalGenerationIsReplaced(t *testing.T) {
+	textTestEnv(t)
+	s := newFakeKeyServer()
+	alice, bob := s.add(t, "alice"), s.add(t, "bob")
+	alice.text.ensurePublished()
+	bob.text.ensurePublished()
+	s.access["b2"] = map[string]bool{"alice": true, "bob": true}
+
+	// Bob's old app made generation 1 and sealed it the old way.
+	bobID, _ := bob.text.identity()
+	aliceID, _ := alice.text.identity()
+	key := make([]byte, 32)
+	rand.Read(key)
+	s.gens["b2"] = 1
+	s.boxes["b2"] = map[int]map[string]fakeBox{1: {
+		s.idOf("alice"): {s.idOf("bob"), sealBoxV1(t, bobID, aliceID.idHex, aliceID.encPub, "b2", 1, key)},
+		s.idOf("bob"):   {s.idOf("bob"), sealBoxV1(t, bobID, bobID.idHex, bobID.encPub, "b2", 1, key)},
+	}}
+	old, _ := sealText(key, "b2", 1, "bob", "sent before the update")
+	expectText(t, deliver(alice, "b2", "bob", old), "sent before the update", "ok")
+
+	reply := mustSeal(t, alice, "b2", "after the update")
+	if g, _, _ := parseText(reply); g != 2 {
+		t.Fatalf("still on the X25519-only generation (%d)", g)
+	}
+	for r, b := range s.boxes["b2"][2] {
+		if !strings.HasPrefix(b.box, pqBoxPrefix) {
+			t.Fatalf("new generation's box for %s isn't hybrid", r)
+		}
+	}
+	expectText(t, deliver(bob, "b2", "alice", reply), "after the update", "ok")
+	// And it doesn't rotate again on the next message.
+	if g, _, _ := parseText(mustSeal(t, bob, "b2", "again")); g != 2 {
+		t.Fatalf("rotated again: %d", g)
 	}
 }

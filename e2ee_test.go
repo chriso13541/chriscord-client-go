@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/mlkem"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"strings"
@@ -164,28 +166,54 @@ func TestReplayWindow(t *testing.T) {
 func TestKeyWrapAndHello(t *testing.T) {
 	aPriv, aPub, _ := newEphemeral()
 	bPriv, bPub, _ := newEphemeral()
+	aKEM, _ := mlkem.GenerateKey768()
+	bKEM, _ := mlkem.GenerateKey768()
 	key := testKey(t)
-	box, err := wrapKey(aPriv, aPub, bPub, "board", "alice", "bob", 3, key)
+	box, err := wrapKey(aPriv, aPub, bPub, bKEM.EncapsulationKey(), "board", "alice", "bob", 3, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := unwrapKey(bPriv, bPub, aPub, "board", "alice", "bob", 3, box)
+	got, err := unwrapKey(bPriv, bPub, aPub, bKEM, "board", "alice", "bob", 3, box)
 	if err != nil || !bytes.Equal(got, key) {
 		t.Fatalf("unwrap: %v", err)
 	}
 	// Bound to the names, the channel and the key id.
 	for _, tc := range [][4]interface{}{{"board", "alice", "carol", uint32(3)}, {"other", "alice", "bob", uint32(3)}, {"board", "alice", "bob", uint32(4)}} {
-		if _, err := unwrapKey(bPriv, bPub, aPub, tc[0].(string), tc[1].(string), tc[2].(string), tc[3].(uint32), box); err == nil {
+		if _, err := unwrapKey(bPriv, bPub, aPub, bKEM, tc[0].(string), tc[1].(string), tc[2].(string), tc[3].(uint32), box); err == nil {
 			t.Fatalf("unwrapped with %v", tc)
 		}
 	}
+	// Needs both halves: the wrong ML-KEM key, or the wrong X25519 key, fails.
+	if _, err := unwrapKey(bPriv, bPub, aPub, aKEM, "board", "alice", "bob", 3, box); err == nil {
+		t.Fatal("unwrapped with the wrong ML-KEM key")
+	}
+	cPriv, cPub, _ := newEphemeral()
+	if _, err := unwrapKey(cPriv, cPub, aPub, bKEM, "board", "alice", "bob", 3, box); err == nil {
+		t.Fatal("unwrapped with the wrong X25519 key")
+	}
+
 	idPub, idPriv, _ := ed25519.GenerateKey(rand.Reader)
-	sig := ed25519.Sign(idPriv, helloMessage("board", "alice", aPub[:]))
-	if !verifyHello(idPub, "board", "alice", aPub[:], sig) {
+	kem := aKEM.EncapsulationKey().Bytes()
+	sig := ed25519.Sign(idPriv, helloMessage("board", "alice", aPub[:], kem))
+	if !verifyHello(idPub, "board", "alice", aPub[:], kem, sig) {
 		t.Fatal("good hello rejected")
 	}
-	if verifyHello(idPub, "board", "mallory", aPub[:], sig) || verifyHello(idPub, "board2", "alice", aPub[:], sig) {
+	if verifyHello(idPub, "board", "mallory", aPub[:], kem, sig) || verifyHello(idPub, "board2", "alice", aPub[:], kem, sig) {
 		t.Fatal("hello accepted for the wrong name or channel")
+	}
+	// A server can't swap in its own ML-KEM key, or drop it.
+	if verifyHello(idPub, "board", "alice", aPub[:], bKEM.EncapsulationKey().Bytes(), sig) {
+		t.Fatal("hello accepted with a swapped ML-KEM key")
+	}
+	if verifyHello(idPub, "board", "alice", aPub[:], nil, sig) {
+		t.Fatal("hello accepted with no ML-KEM key")
+	}
+	// An old-style (X25519-only) signature doesn't pass as a new hello.
+	var old bytes.Buffer
+	old.WriteString("chriscord-e2ee-v1/hello\x00board\x00alice\x00")
+	old.Write(aPub[:])
+	if verifyHello(idPub, "board", "alice", aPub[:], kem, ed25519.Sign(idPriv, old.Bytes())) {
+		t.Fatal("a v1 signature verified as a v2 hello")
 	}
 }
 
@@ -406,7 +434,7 @@ func TestCallKeyExchange(t *testing.T) {
 	s.ids["mallory"] = s.ids["carol"]
 	s.mu.Unlock()
 	bad, _ := json.Marshal(map[string]interface{}{"type": "voice_e2ee", "board_id": "vc1", "from": "mallory",
-		"from_key": s.ids["carol"], "data": map[string]interface{}{"t": "hello", "eph": "AAAA", "sig": "AAAA"}})
+		"from_key": s.ids["carol"], "data": map[string]interface{}{"t": "hello", "v": pqVersion, "eph": "AAAA", "kem": "AAAA", "sig": "AAAA"}})
 	alice.e2ee.handleMessage(bad)
 	alice.e2ee.mu.Lock()
 	_, has := alice.e2ee.peers["mallory"]
@@ -575,5 +603,45 @@ func TestReinstalledPluginNotChanged(t *testing.T) {
 	forgetIdentityKeys("srv", []string{newKey})
 	if pinIdentity("srv", "alice", strings.Repeat("d", 64)) {
 		t.Fatal("alice's pin was forgotten too")
+	}
+}
+
+// An older app's hello (X25519 only, properly signed with its identity key)
+// is ignored: wrapping this app's sending key the old way for it would let
+// a recording of that one message open everyone's audio later.
+func TestOldHelloIgnored(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AppData", t.TempDir())
+	s := &fakeServer{clients: map[string]*callCrypto{}, ids: map[string]string{}, board: "vc1"}
+	alice, old := s.add(t, "alice"), s.add(t, "old")
+	s.sign(t, alice, old)
+	alice.e2ee.begin("vc1")
+	s.roster("alice", "old")
+	s.settle()
+
+	_, eph, _ := newEphemeral()
+	var v1 bytes.Buffer
+	v1.WriteString("chriscord-e2ee-v1/hello\x00vc1\x00old\x00")
+	v1.Write(eph[:])
+	hello, _ := json.Marshal(map[string]interface{}{"type": "voice_e2ee", "board_id": "vc1", "from": "old",
+		"from_key": s.ids["old"], "data": map[string]interface{}{"t": "hello", "v": 1,
+			"eph": base64.StdEncoding.EncodeToString(eph[:]),
+			"sig": base64.StdEncoding.EncodeToString(ed25519.Sign(old.account.PrivateKey, v1.Bytes()))}})
+	s.mu.Lock()
+	s.queue = nil
+	s.mu.Unlock()
+	alice.e2ee.handleMessage(hello)
+	alice.e2ee.mu.Lock()
+	_, has := alice.e2ee.peers["old"]
+	alice.e2ee.mu.Unlock()
+	if has {
+		t.Fatal("an X25519-only hello was accepted")
+	}
+	s.mu.Lock()
+	sent := len(s.queue)
+	s.mu.Unlock()
+	if sent != 0 {
+		t.Fatalf("answered an X25519-only hello with %d message(s)", sent)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"crypto/ed25519"
+	"crypto/mlkem"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
@@ -32,7 +33,6 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/curve25519"
-	"golang.org/x/crypto/hkdf"
 )
 
 const (
@@ -214,7 +214,8 @@ func (w *replayWindow) check(c uint32) bool {
 
 // ── Key exchange ──────────────────────────────────────────────────────────────
 
-// newEphemeral makes this call's X25519 key pair.
+// newEphemeral makes this call's X25519 key pair. (Its ML-KEM one comes from
+// mlkem.GenerateKey768, in callCrypto.begin.)
 func newEphemeral() (priv, pub [32]byte, err error) {
 	if _, err = io.ReadFull(rand.Reader, priv[:]); err != nil {
 		return
@@ -225,67 +226,59 @@ func newEphemeral() (priv, pub [32]byte, err error) {
 }
 
 // helloMessage is what a participant signs with their identity key to say
-// "this is my key for this call": tied to the server's channel and their
-// name, so it can't be replayed into another call or for someone else.
-func helloMessage(board, user string, eph []byte) []byte {
+// "these are my keys for this call": the X25519 call key and the ML-KEM-768
+// one (pqcrypt.go), tied to the server's channel and their name, so it
+// can't be replayed into another call or for someone else. Both keys are
+// signed together, so a server can't pair someone's real X25519 key with an
+// ML-KEM key of its own, or pass a hello off as an older, X25519-only one
+// (that's signed over different bytes).
+func helloMessage(board, user string, eph, kem []byte) []byte {
 	var b bytes.Buffer
-	b.WriteString("chriscord-e2ee-v1/hello\x00")
+	b.WriteString("chriscord-e2ee-v2/hello\x00" + pqSuite + "\x00")
 	b.WriteString(board)
 	b.WriteByte(0)
 	b.WriteString(user)
 	b.WriteByte(0)
 	b.Write(eph)
+	b.Write(kem)
 	return b.Bytes()
 }
 
-func verifyHello(identity ed25519.PublicKey, board, user string, eph, sig []byte) bool {
-	return len(identity) == ed25519.PublicKeySize && len(eph) == 32 &&
-		ed25519.Verify(identity, helloMessage(board, user, eph), sig)
+func verifyHello(identity ed25519.PublicKey, board, user string, eph, kem, sig []byte) bool {
+	return len(identity) == ed25519.PublicKeySize && len(eph) == 32 && len(kem) == mlkem.EncapsulationKeySize768 &&
+		ed25519.Verify(identity, helloMessage(board, user, eph, kem), sig)
 }
 
-// keyWrapCipher derives the one-off cipher that carries a sending key from
-// one participant to another: X25519 between their two call keys, through
-// HKDF bound to the channel, both names, both keys and the key id.
-func keyWrapCipher(myPriv, peerPub [32]byte, board, from, to string, fromPub, toPub [32]byte, kid uint32) (cipher.AEAD, error) {
-	shared, err := curve25519.X25519(myPriv[:], peerPub[:])
-	if err != nil {
-		return nil, err // the peer's key was a low-order point
-	}
+// keyWrapContext is what a wrapped sending key is bound to: the channel,
+// both names, both X25519 call keys and the key id.
+func keyWrapContext(board, from, to string, fromPub, toPub [32]byte, kid uint32) []byte {
 	var info bytes.Buffer
-	fmt.Fprintf(&info, "chriscord-e2ee-v1/key\x00%s\x00%s\x00%s\x00", board, from, to)
+	fmt.Fprintf(&info, "chriscord-e2ee-v2/key\x00%s\x00%s\x00%s\x00", board, from, to)
 	info.Write(fromPub[:])
 	info.Write(toPub[:])
 	binary.Write(&info, binary.BigEndian, kid)
-	k := make([]byte, chacha20poly1305.KeySize)
-	if _, err := io.ReadFull(hkdf.New(sha256.New, shared, nil, info.Bytes()), k); err != nil {
-		return nil, err
-	}
-	return chacha20poly1305.New(k)
+	return info.Bytes()
 }
 
-// wrapKey seals a sending key for one peer: a random nonce, then the
-// sealed key.
-func wrapKey(myPriv, myPub, peerPub [32]byte, board, from, to string, kid uint32, key []byte) ([]byte, error) {
-	c, err := keyWrapCipher(myPriv, peerPub, board, from, to, myPub, peerPub, kid)
+// wrapKey seals a sending key for one peer: hybrid X25519 (between the two
+// call keys) + ML-KEM-768 (to the peer's call ML-KEM key) — pqcrypt.go. The
+// result is KEM ciphertext | nonce | sealed key.
+func wrapKey(myPriv, myPub, peerPub [32]byte, peerKEM *mlkem.EncapsulationKey768, board, from, to string, kid uint32, key []byte) ([]byte, error) {
+	dh, err := curve25519.X25519(myPriv[:], peerPub[:])
+	if err != nil {
+		return nil, err // the peer's key was a low-order point
+	}
+	defer clear(dh)
+	return pqSeal(dh, peerKEM, keyWrapContext(board, from, to, myPub, peerPub, kid), key)
+}
+
+func unwrapKey(myPriv, myPub, peerPub [32]byte, myKEM *mlkem.DecapsulationKey768, board, from, to string, kid uint32, box []byte) ([]byte, error) {
+	dh, err := curve25519.X25519(myPriv[:], peerPub[:])
 	if err != nil {
 		return nil, err
 	}
-	nonce := make([]byte, c.NonceSize(), c.NonceSize()+len(key)+c.Overhead())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-	return c.Seal(nonce, nonce, key, nil), nil
-}
-
-func unwrapKey(myPriv, myPub, peerPub [32]byte, board, from, to string, kid uint32, box []byte) ([]byte, error) {
-	c, err := keyWrapCipher(myPriv, peerPub, board, from, to, peerPub, myPub, kid)
-	if err != nil {
-		return nil, err
-	}
-	if len(box) < c.NonceSize() {
-		return nil, errors.New("short key box")
-	}
-	key, err := c.Open(nil, box[:c.NonceSize()], box[c.NonceSize():], nil)
+	defer clear(dh)
+	key, err := pqOpen(dh, myKEM, keyWrapContext(board, from, to, peerPub, myPub, kid), box)
 	if err == nil && len(key) != chacha20poly1305.KeySize {
 		err = errors.New("wrong key size")
 	}

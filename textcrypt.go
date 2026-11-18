@@ -22,6 +22,16 @@ package main
 //     keep; nothing after.
 //   - A message whose key hasn't reached you yet shows as locked, and opens
 //     by itself once someone shares the key.
+//   - Quantum-safe boxes (pqcrypt.go): each box is sealed with X25519 and
+//     ML-KEM-768 together, so boxes the server keeps can't be opened later
+//     by a quantum computer. Your ML-KEM key is derived from your identity
+//     seed like your X25519 key, and published signed together with it.
+//     This app only ever seals that kind: someone whose app hasn't
+//     published an ML-KEM key gets no new keys until it does (an older box
+//     sealed for them would undo it for everyone — it's the same channel
+//     key). Older X25519-only boxes still open, for old history, but when
+//     the newest generation reached this app in one, sending starts a new
+//     generation first — that one may have been kept to open later.
 //
 // Who counts as a member of a channel comes from the server (its roles and
 // channel access). A dishonest server could add someone to that list — the
@@ -37,6 +47,7 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"crypto/ed25519"
+	"crypto/mlkem"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -77,10 +88,16 @@ type textMember struct {
 	PublicKey string  `json:"public_key"` // identity key (Ed25519), hex
 	EncKey    *string `json:"enc_key"`    // X25519, hex; nil if not published yet
 	Sig       *string `json:"sig"`        // identity key's signature over it, hex
+	// PQKey, PQSig: their ML-KEM-768 key (hex), and the identity key's
+	// signature over it together with EncKey (encBundleMessage). nil from an
+	// older app or server — no keys can be sealed for them then.
+	PQKey *string `json:"pq_key,omitempty"`
+	PQSig *string `json:"pq_sig,omitempty"`
 }
 
 type boardKeys struct {
 	keys      map[int][]byte // generation → key
+	classical map[int]bool   // generations that reached this app only in an X25519-only box
 	latest    int            // the newest generation (0: none yet)
 	rotate    bool           // someone who had the newest one has lost access
 	members   []textMember
@@ -92,6 +109,7 @@ type textIdentity struct {
 	idPriv  ed25519.PrivateKey
 	encPriv [32]byte
 	encPub  [32]byte
+	pqDK    *mlkem.DecapsulationKey768 // ML-KEM half of the encryption key (pqcrypt.go)
 	me      string
 	domain  string
 }
@@ -218,6 +236,11 @@ func (t *textCrypto) identity() (id textIdentity, ok bool) {
 	id.idPriv = a.account.PrivateKey
 	id.idHex = hex.EncodeToString(a.account.PublicKey)
 	id.encPriv, id.encPub = encKeyFromSeed(a.account.PrivateKey.Seed())
+	dk, err := pqKeyFromSeed(a.account.PrivateKey.Seed())
+	if err != nil {
+		return id, false
+	}
+	id.pqDK = dk
 	id.me, id.domain = a.username, a.domain
 	return id, true
 }
@@ -243,55 +266,108 @@ func (t *textCrypto) memberEncKey(m textMember, domain string) ([32]byte, bool) 
 	return enc, true
 }
 
-// boxCipher is the one-off cipher that carries a channel key from one
-// member (sender) to another (recipient): X25519 between their encryption
-// keys, through HKDF bound to the channel, the generation and both people.
+// memberPQKey is memberEncKey plus the member's ML-KEM key, checked against
+// their identity key together with the X25519 one. ok is false if they
+// haven't published one (an older app) or it isn't signed properly — no
+// key may be sealed for them then.
+func (t *textCrypto) memberPQKey(m textMember, domain string) ([32]byte, *mlkem.EncapsulationKey768, bool) {
+	enc, ok := t.memberEncKey(m, domain)
+	if !ok || m.PQKey == nil || m.PQSig == nil {
+		return enc, nil, false
+	}
+	id, err1 := hex.DecodeString(m.PublicKey)
+	ek, err2 := hex.DecodeString(*m.PQKey)
+	sig, err3 := hex.DecodeString(*m.PQSig)
+	if err1 != nil || err2 != nil || err3 != nil || len(id) != ed25519.PublicKeySize ||
+		len(ek) != mlkem.EncapsulationKeySize768 || !ed25519.Verify(id, encBundleMessage(enc[:], ek), sig) {
+		return enc, nil, false
+	}
+	k, err := mlkem.NewEncapsulationKey768(ek)
+	if err != nil {
+		return enc, nil, false
+	}
+	return enc, k, true
+}
+
+// boxContext is what a channel-key box is bound to: the channel, the
+// generation and both people (identity and X25519 keys).
+func boxContext(version string, board string, gen int, senderID, recipientID string, senderEnc, recipientEnc [32]byte) []byte {
+	var info bytes.Buffer
+	fmt.Fprintf(&info, "chriscord-e2ee-%s/channel-key\x00%s\x00%d\x00%s\x00%s\x00", version, board, gen,
+		strings.ToLower(senderID), strings.ToLower(recipientID))
+	info.Write(senderEnc[:])
+	info.Write(recipientEnc[:])
+	return info.Bytes()
+}
+
+// boxCipher is the one-off cipher of an older, X25519-only box: X25519
+// between the two people's encryption keys, through HKDF bound to
+// boxContext. Only opened now, never made.
 func boxCipher(myPriv, peerPub [32]byte, board string, gen int, senderID, recipientID string, senderEnc, recipientEnc [32]byte) (cipher.AEAD, error) {
 	shared, err := curve25519.X25519(myPriv[:], peerPub[:])
 	if err != nil {
 		return nil, err
 	}
-	var info bytes.Buffer
-	fmt.Fprintf(&info, "chriscord-e2ee-v1/channel-key\x00%s\x00%d\x00%s\x00%s\x00", board, gen,
-		strings.ToLower(senderID), strings.ToLower(recipientID))
-	info.Write(senderEnc[:])
-	info.Write(recipientEnc[:])
+	info := boxContext("v1", board, gen, senderID, recipientID, senderEnc, recipientEnc)
 	k := make([]byte, chacha20poly1305.KeySize)
-	if _, err := io.ReadFull(hkdf.New(sha256.New, shared, nil, info.Bytes()), k); err != nil {
+	if _, err := io.ReadFull(hkdf.New(sha256.New, shared, nil, info), k); err != nil {
 		return nil, err
 	}
 	return chacha20poly1305.New(k)
 }
 
-func sealBox(id textIdentity, recipientID string, recipientEnc [32]byte, board string, gen int, key []byte) (string, error) {
-	c, err := boxCipher(id.encPriv, recipientEnc, board, gen, id.idHex, recipientID, id.encPub, recipientEnc)
+// sealBox seals a channel key for one member: hybrid X25519 + ML-KEM-768
+// (pqcrypt.go). The X25519 half, between this account's key and theirs, is
+// what shows them it came from this account.
+func sealBox(id textIdentity, recipientID string, recipientEnc [32]byte, recipientEK *mlkem.EncapsulationKey768, board string, gen int, key []byte) (string, error) {
+	dh, err := curve25519.X25519(id.encPriv[:], recipientEnc[:])
 	if err != nil {
 		return "", err
 	}
-	nonce := make([]byte, c.NonceSize(), c.NonceSize()+len(key)+c.Overhead())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+	defer clear(dh)
+	blob, err := pqSeal(dh, recipientEK, boxContext("v2", board, gen, id.idHex, recipientID, id.encPub, recipientEnc), key)
+	if err != nil {
 		return "", err
 	}
-	return base64.StdEncoding.EncodeToString(c.Seal(nonce, nonce, key, nil)), nil
+	return pqBoxPrefix + base64.StdEncoding.EncodeToString(blob), nil
 }
 
-func openBox(id textIdentity, senderID string, senderEnc [32]byte, board string, gen int, box string) ([]byte, error) {
+// openBox opens a channel key sealed for this account. classical is true
+// for an older X25519-only box: its key may have been kept by whoever
+// stored it, to open with a quantum computer later.
+func openBox(id textIdentity, senderID string, senderEnc [32]byte, board string, gen int, box string) (key []byte, classical bool, err error) {
+	if b64, ok := strings.CutPrefix(box, pqBoxPrefix); ok {
+		raw, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			return nil, false, err
+		}
+		dh, err := curve25519.X25519(id.encPriv[:], senderEnc[:])
+		if err != nil {
+			return nil, false, err
+		}
+		defer clear(dh)
+		key, err = pqOpen(dh, id.pqDK, boxContext("v2", board, gen, senderID, id.idHex, senderEnc, id.encPub), raw)
+		if err == nil && len(key) != chacha20poly1305.KeySize {
+			err = errors.New("wrong key size")
+		}
+		return key, false, err
+	}
 	raw, err := base64.StdEncoding.DecodeString(box)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 	c, err := boxCipher(id.encPriv, senderEnc, board, gen, senderID, id.idHex, senderEnc, id.encPub)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 	if len(raw) < c.NonceSize() {
-		return nil, errors.New("short box")
+		return nil, true, errors.New("short box")
 	}
-	key, err := c.Open(nil, raw[:c.NonceSize()], raw[c.NonceSize():], nil)
+	key, err = c.Open(nil, raw[:c.NonceSize()], raw[c.NonceSize():], nil)
 	if err == nil && len(key) != chacha20poly1305.KeySize {
 		err = errors.New("wrong key size")
 	}
-	return key, err
+	return key, true, err
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
@@ -458,8 +534,11 @@ func (t *textCrypto) ensurePublished() {
 		return
 	}
 	sig := ed25519.Sign(id.idPriv, encKeyMessage(id.encPub[:]))
+	ek := id.pqDK.EncapsulationKey().Bytes()
+	pqSig := ed25519.Sign(id.idPriv, encBundleMessage(id.encPub[:], ek))
 	err := t.call("PUT", "/api/e2ee/enc-key", map[string]string{
 		"enc_key": hex.EncodeToString(id.encPub[:]), "sig": hex.EncodeToString(sig),
+		"pq_key": hex.EncodeToString(ek), "pq_sig": hex.EncodeToString(pqSig),
 	}, nil)
 	if err != nil {
 		log.Printf("e2ee: publishing this account's encryption key: %v", err)
@@ -482,25 +561,31 @@ func (t *textCrypto) fetch(board string) (*boardKeys, error) {
 	if err := t.call("GET", "/api/boards/"+url.PathEscape(board)+"/keys", nil, &r); err != nil {
 		return nil, err
 	}
-	bk := &boardKeys{keys: map[int][]byte{}, latest: r.Latest, rotate: r.Rotate, members: r.Members, fetchedAt: time.Now()}
+	bk := &boardKeys{keys: map[int][]byte{}, classical: map[int]bool{}, latest: r.Latest, rotate: r.Rotate, members: r.Members, fetchedAt: time.Now()}
 	for _, b := range r.Boxes {
 		senderEnc, ok := t.memberEncKey(b.Sender, id.domain)
 		if !ok {
 			log.Printf("e2ee: a key for %s from %s isn't signed properly — ignored", board, b.Sender.PublicKey)
 			continue
 		}
-		key, err := openBox(id, b.Sender.PublicKey, senderEnc, board, b.Generation, b.Box)
+		key, classical, err := openBox(id, b.Sender.PublicKey, senderEnc, board, b.Generation, b.Box)
 		if err != nil {
 			log.Printf("e2ee: a key for %s (generation %d) didn't open: %v", board, b.Generation, err)
 			continue
 		}
 		bk.keys[b.Generation] = key
+		if classical {
+			bk.classical[b.Generation] = true
+		}
 	}
 	t.mu.Lock()
 	if old := t.boards[board]; old != nil {
 		for g, k := range old.keys { // keep what's already open (e.g. made here)
 			if bk.keys[g] == nil {
 				bk.keys[g] = k
+				if old.classical[g] {
+					bk.classical[g] = true
+				}
 			}
 		}
 	}
@@ -547,11 +632,14 @@ func (t *textCrypto) newGeneration(board string, bk *boardKeys) error {
 		if !t.app.rosterAllows(m.PublicKey, board) {
 			continue // the signed member list doesn't let them read it (roster_app.go)
 		}
-		enc, ok := t.memberEncKey(m, id.domain)
+		enc, ek, ok := t.memberPQKey(m, id.domain)
 		if !ok {
-			continue // not on an encryption-capable app yet: they get it once they are (runPending)
+			// Not on an app with quantum-safe keys yet: they get it once
+			// they are (runPending). Never an X25519-only box — that would
+			// let whoever keeps it open this channel key later.
+			continue
 		}
-		box, err := sealBox(id, m.PublicKey, enc, board, gen, key)
+		box, err := sealBox(id, m.PublicKey, enc, ek, board, gen, key)
 		if err != nil {
 			continue
 		}
@@ -559,7 +647,7 @@ func (t *textCrypto) newGeneration(board string, bk *boardKeys) error {
 		boxes = append(boxes, map[string]string{"recipient": strings.ToLower(m.PublicKey), "box": box})
 	}
 	if !haveSelf {
-		box, err := sealBox(id, id.idHex, id.encPub, board, gen, key)
+		box, err := sealBox(id, id.idHex, id.encPub, id.pqDK.EncapsulationKey(), board, gen, key)
 		if err != nil {
 			return err
 		}
@@ -573,6 +661,7 @@ func (t *textCrypto) newGeneration(board string, bk *boardKeys) error {
 	t.mu.Lock()
 	if cur := t.boards[board]; cur != nil {
 		cur.keys[gen] = key
+		delete(cur.classical, gen)
 		cur.latest, cur.rotate = gen, false
 	}
 	t.mu.Unlock()
@@ -614,9 +703,11 @@ func (t *textCrypto) sealWith(board, text string, files []fileMeta, preview *tex
 		if err != nil {
 			return "", fmt.Errorf("%s%w", textNoKeyNotice, err)
 		}
-		if bk.latest == 0 || bk.rotate || t.key(board, bk.latest) == nil || t.app.rosterNeedsNewKey(board) {
-			// No key yet, someone lost access, or the newest key hasn't been
-			// shared with this account: start a new generation.
+		if bk.latest == 0 || bk.rotate || t.key(board, bk.latest) == nil || bk.classical[bk.latest] || t.app.rosterNeedsNewKey(board) {
+			// No key yet, someone lost access, the newest key hasn't been
+			// shared with this account, or it only reached it in an
+			// X25519-only box (it may have been kept to open later): start
+			// a new generation.
 			err := t.newGeneration(board, bk)
 			if isConflict(err) && attempt < 2 {
 				continue // someone else just made it: use theirs
@@ -889,9 +980,9 @@ func (t *textCrypto) runPending() {
 		if !t.app.rosterAllows(p.Recipient.PublicKey, p.BoardID) {
 			continue // the signed member list doesn't let them read it (roster_app.go)
 		}
-		enc, ok := t.memberEncKey(p.Recipient, id.domain)
+		enc, ek, ok := t.memberPQKey(p.Recipient, id.domain)
 		if !ok {
-			continue
+			continue // no quantum-safe key from them yet (see newGeneration)
 		}
 		key := t.key(p.BoardID, p.Generation)
 		if key == nil && !fetched[p.BoardID] {
@@ -902,7 +993,7 @@ func (t *textCrypto) runPending() {
 		if key == nil {
 			continue
 		}
-		box, err := sealBox(id, p.Recipient.PublicKey, enc, p.BoardID, p.Generation, key)
+		box, err := sealBox(id, p.Recipient.PublicKey, enc, ek, p.BoardID, p.Generation, key)
 		if err != nil {
 			continue
 		}
