@@ -508,12 +508,18 @@ body.sb-drag-active, body.sb-drag-active * { cursor:grabbing !important; user-se
    from the middle of the picture — and, while someone talks, a little
    bigger the louder they are (--lvl, 0–1, set from the app's "voice:levels"). */
 html.ring-fade .voice-occupant-avatar::after { transition:opacity .28s ease; }
-html.ring-grow .voice-occupant-avatar::after { transform:scale(.35); transition:transform .14s ease-out, opacity .2s ease; will-change:transform,opacity; }
-html.ring-grow .voice-occupant-avatar.speaking::after { transform:scale(calc(1 + var(--lvl,.4) * .22)); }
+/* Grow: a filled green disc behind the picture (the row is its own layer,
+   so the disc sits under the picture but over the list's background),
+   growing out from the middle; at its biggest it reaches about 3px past
+   the picture, and grow mode spaces the list out to 8px between pictures,
+   so two people talking at once never touch. */
+html.ring-grow .voice-occupant-row { isolation:isolate; padding-top:4px; padding-bottom:4px; }
+html.ring-grow .voice-occupant-avatar::after { z-index:-1; inset:-2px; background:var(--green); box-shadow:none; transform:scale(.3); transition:transform .14s ease-out, opacity .2s ease; will-change:transform,opacity; }
+html.ring-grow .voice-occupant-avatar.speaking::after { transform:scale(calc(1 + var(--lvl,.3) * .08)); }
 html.ring-fade .vs-tile { transition:outline-color .28s ease; }
 html.ring-instant .vs-tile { transition:none; }
 html.ring-grow .vs-tile { transition:outline-color .2s ease, outline-width .14s ease-out; }
-html.ring-grow .vs-tile.speaking { outline-width:calc(2px + var(--lvl,.4) * 4px); }
+html.ring-grow .vs-tile.speaking { outline-width:calc(2px + var(--lvl,.3) * 2px); }
 .voice-occupant-status { margin-left:auto; display:flex; gap:2px; flex-shrink:0; color:var(--text-muted); }
 .voice-occupant-status .ic { width:16px; height:16px; }
 .voice-occupant-status .ic.off { color:var(--red); }
